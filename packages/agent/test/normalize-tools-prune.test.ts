@@ -49,7 +49,7 @@ describe("Agent.prunesToolDescriptions", () => {
 	// Context accounting reads this; owned dialects render full definitions
 	// in-band, so counting pruned specs would undercount their prompt.
 	it("reports pruning only when the requested model uses native tool calling", () => {
-		const model = getBundledModel("google", "gemini-2.5-pro");
+		const model = getBundledModel("github-copilot", "gemini-2.5-pro");
 		let dialect: "glm" | undefined;
 		const agent = new Agent({ pruneToolDescriptions: true, dialectResolver: () => dialect });
 		expect(agent.prunesToolDescriptions(model)).toBe(true);

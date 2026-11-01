@@ -8,7 +8,7 @@ import {
 	type Usage,
 } from "@oh-my-pi/pi-ai";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { registerCustomApi } from "@oh-my-pi/pi-ai/api-registry";
+import { getCustomApi, registerCustomApi } from "@oh-my-pi/pi-ai/api-registry";
 import { isTinyLocalModelKey } from "./models";
 import { tinyModelClient } from "./title-client";
 import type { TinyChatMessage } from "./title-protocol";
@@ -161,7 +161,9 @@ export function streamLocalInferenceSimple(
 	return stream;
 }
 
-/** Register the local-inference transport with the shared API registry. */
+/** Register the bundled local-inference transport unless another source already owns the API. */
 export function registerLocalInferenceApi(): void {
+	const owner = getCustomApi(LOCAL_INFERENCE_API);
+	if (owner && owner.sourceId !== LOCAL_INFERENCE_SOURCE) return;
 	registerCustomApi(LOCAL_INFERENCE_API, streamLocalInferenceSimple, LOCAL_INFERENCE_SOURCE);
 }

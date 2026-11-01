@@ -7,8 +7,8 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { createMockModel, MOCK_API } from "@oh-my-pi/pi-ai/providers/mock";
 import { Effort } from "@oh-my-pi/pi-ai";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
@@ -52,7 +52,6 @@ beforeEach(async () => {
 	setAgentDir(path.join(home, ".omp", "agent"));
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
-	registerMockApi(MOCK_API_SOURCE);
 	manager = new AsyncJobManager({ maxRunningJobs: 4 });
 	AsyncJobManager.setInstance(manager);
 });
@@ -123,7 +122,7 @@ async function restoreInterruptedChild(options: { transcript?: "handoff" | "fall
 	child.appendMessage({
 		role: "assistant",
 		content: [{ type: "toolCall", id: "call_read", name: "read", arguments: { path: notes } }],
-		api: "mock",
+		api: MOCK_API,
 		provider: "mock",
 		model: servingModel,
 		usage: {
@@ -147,6 +146,7 @@ async function restoreInterruptedChild(options: { transcript?: "handoff" | "fall
 	const mocks = [SPAWN_MODEL, HANDOFF_MODEL].map(id =>
 		Object.assign(
 			createMockModel({
+				provider: "mock",
 				id,
 				reasoning: true,
 				handler: (context, streamOptions) => {
@@ -160,8 +160,16 @@ async function restoreInterruptedChild(options: { transcript?: "handoff" | "fall
 			{ thinking },
 		),
 	);
-	const catalogAvailable = modelRegistry.getAvailable.bind(modelRegistry);
-	vi.spyOn(modelRegistry, "getAvailable").mockImplementation(kind => [...mocks, ...catalogAvailable(kind)]);
+	modelRegistry.registerProvider("mock", {
+		api: mocks[0]!.api,
+		baseUrl: mocks[0]!.baseUrl,
+		models: mocks,
+	});
+	registerCustomApi(
+		mocks[0]!.api,
+		(model, context, options) => mocks.find(candidate => candidate.id === model.id)!.stream(model, context, options),
+		MOCK_API_SOURCE,
+	);
 	const settings = Settings.isolated({
 		"task.agentIdleTtlMs": 0,
 		"compaction.enabled": false,

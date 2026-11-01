@@ -4,7 +4,6 @@ import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { Model, TextContent } from "@oh-my-pi/pi-ai";
-import * as codexResponses from "@oh-my-pi/pi-ai/providers/openai-codex-state";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -73,8 +72,8 @@ function createAssistantResponse(text: string) {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text }],
 		api: "anthropic-messages" as const,
-		provider: "anthropic" as const,
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot" as const,
+		model: "claude-sonnet-4.5",
 		usage: {
 			input: 0,
 			output: 0,
@@ -105,8 +104,8 @@ function emitHighUsageTurn(session: AgentSession): void {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text: "Done." }],
 		api: "anthropic-messages" as const,
-		provider: "anthropic" as const,
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot" as const,
+		model: "claude-sonnet-4.5",
 		stopReason: "stop" as const,
 		usage: {
 			input: 190_000,
@@ -132,7 +131,7 @@ describe("AgentSession eager prelude re-injection after compaction", () => {
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-agent-session-eager-compaction-shared-");
 		sharedAuthStorage = await AuthStorage.create(path.join(sharedDir.path(), "auth.db"));
-		sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+		sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 		sharedAuthStorage.keys.setRuntime("openai-codex", "test-key");
 		sharedModelRegistry = new ModelRegistry(sharedAuthStorage, path.join(sharedDir.path(), "models.yml"));
 	});
@@ -163,8 +162,8 @@ describe("AgentSession eager prelude re-injection after compaction", () => {
 			predicate: (call: ObservedPromptCall) => boolean;
 			resolve: (call: ObservedPromptCall) => void;
 		}> = [];
-		const defaultModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!defaultModel) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const defaultModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!defaultModel) throw new Error("Expected claude-sonnet-4.5 model to exist");
 		const selectedModel = opts.model ?? defaultModel;
 		// Pin the window and output reservation: usage figures below trip the
 		// context-full strategy at a 200k/64k threshold; catalog regeneration must
@@ -393,26 +392,5 @@ describe("AgentSession eager prelude re-injection after compaction", () => {
 		expect(session.getTodoPhases().length).toBeGreaterThan(0);
 		expect(continuation.messageTexts.some(text => text.includes("Consider calling"))).toBe(false);
 		expect(continuation.messageTexts.some(text => text.includes("You MUST call"))).toBe(false);
-	});
-
-	it("resets Codex provider history after successful auto-compaction", async () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-terra");
-		if (!model) throw new Error("Expected gpt-5.6-terra model to exist");
-		const resetSpy = vi.spyOn(codexResponses, "resetOpenAICodexHistoryAfterCompaction");
-		const { session, waitForCall } = await createHarness({}, { model });
-		stubCompaction();
-
-		await runToContinuation(session, waitForCall);
-
-		expect(resetSpy).toHaveBeenCalledTimes(1);
-		const reset = resetSpy.mock.calls[0]?.[0];
-		if (!reset) throw new Error("Expected Codex compaction reset");
-		expect(reset.providerSessionState).toBe(session.providerSessionState);
-		expect(reset.sessionId).toBe(session.sessionId);
-		expect(reset.compaction).toMatchObject({
-			trigger: "auto",
-			reason: "context_limit",
-			phase: "pre_turn",
-		});
 	});
 });

@@ -23,7 +23,9 @@ const registry: STTControllerDependencies["registry"] = {
 	getError: () => undefined,
 	getAvailable: () => DICTATION_MODELS,
 	getAll: () => DICTATION_MODELS,
-	resolver: () => () => "test-key",
+	resolver: () => {
+		throw new Error("Local dictation must not resolve credentials");
+	},
 };
 
 async function touch(file: string): Promise<void> {
@@ -270,7 +272,9 @@ describe("STTController preflight", () => {
 			getError: () => undefined,
 			getAvailable: () => [],
 			getAll: () => [],
-			resolver: () => () => "test-key",
+			resolver: () => {
+				throw new Error("Local dictation must not resolve credentials");
+			},
 		};
 		const isCached = vi.spyOn(downloader, "isSttModelCached").mockResolvedValue(true);
 		vi.spyOn(downloader, "downloadSttModel").mockReturnValue(new Promise<void>(() => {}));

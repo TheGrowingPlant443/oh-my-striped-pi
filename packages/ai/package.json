@@ -1,14 +1,11 @@
 {
 	"name": "@oh-my-pi/pi-ai",
 	"version": "18.13.3",
-	"description": "Unified LLM API with automatic model discovery and provider configuration",
+	"description": "GitHub Copilot, on-device and configured self-hosted inference API",
 	"keywords": [
 		"ai",
-		"anthropic",
 		"api",
-		"gemini",
 		"llm",
-		"openai",
 		"unified"
 	],
 	"homepage": "https://omp.sh",
@@ -45,33 +42,33 @@
 			"types": "./src/error/index.ts",
 			"import": "./src/error/index.ts"
 		},
-		"./embeddings": {
-			"types": "./src/embeddings/index.ts",
-			"import": "./src/embeddings/index.ts"
-		},
 		"./judgment": {
 			"types": "./src/judgment/index.ts",
 			"import": "./src/judgment/index.ts"
+		},
+		"./embeddings": {
+			"types": "./src/embeddings/index.ts",
+			"import": "./src/embeddings/index.ts"
 		},
 		"./rerank": {
 			"types": "./src/rerank/index.ts",
 			"import": "./src/rerank/index.ts"
 		},
-		"./speech": {
-			"types": "./src/speech/index.ts",
-			"import": "./src/speech/index.ts"
-		},
 		"./images": {
 			"types": "./src/images/index.ts",
 			"import": "./src/images/index.ts"
 		},
+		"./images/shared": {
+			"types": "./src/images/shared.ts",
+			"import": "./src/images/shared.ts"
+		},
+		"./speech": {
+			"types": "./src/speech/index.ts",
+			"import": "./src/speech/index.ts"
+		},
 		"./transcription": {
 			"types": "./src/transcription/index.ts",
 			"import": "./src/transcription/index.ts"
-		},
-		"./video": {
-			"types": "./src/video/index.ts",
-			"import": "./src/video/index.ts"
 		},
 		"./*": {
 			"types": "./src/*.ts",
@@ -98,10 +95,6 @@
 			"import": "./src/providers/*.ts"
 		},
 		"./providers/*.js": "./src/providers/*.ts",
-		"./providers/openai-codex/*": {
-			"types": "./src/providers/openai-codex/*.ts",
-			"import": "./src/providers/openai-codex/*.ts"
-		},
 		"./usage/*": {
 			"types": "./src/usage/*.ts",
 			"import": "./src/usage/*.ts"

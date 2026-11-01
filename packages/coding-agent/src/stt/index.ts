@@ -5,4 +5,3 @@ export * from "./push-to-talk";
 export * from "./models";
 export * from "./stt-controller";
 export * from "./submit-trigger";
-export * from "./wav";

@@ -18,6 +18,7 @@ import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-comm
 import { createTools, type Tool, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "../helpers/model-fixtures";
 
 function createToolSession(cwd: string, settings: Settings, overrides: Partial<ToolSession> = {}): ToolSession {
 	return {
@@ -57,12 +58,9 @@ async function createSharedFixture(): Promise<SharedFixture> {
 	const baseDir = TempDir.createSync("@pi-goal-mode-shared-");
 	const authStorage = await AuthStorage.create(path.join(baseDir.path(), "testauth.db"));
 	// The real prompt path gates on a resolvable key; never rely on ambient env.
-	authStorage.keys.setRuntime("anthropic", "test-key");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
 	const modelRegistry = new ModelRegistry(authStorage);
-	const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-	if (!model) {
-		throw new Error("Expected claude-sonnet-4-5 to exist in registry");
-	}
+	const model = getTestModel("github-copilot");
 	return { authStorage, modelRegistry, model, baseDir };
 }
 

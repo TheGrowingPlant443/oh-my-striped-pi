@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { Agent, type AgentEvent, validateAgentToolArguments } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { convertOpenAICodexResponsesTools } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import { convertTools } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { Model, Tool, ToolCall } from "@oh-my-pi/pi-ai/types";
 import { enforceStrictSchema } from "@oh-my-pi/pi-ai/utils/schema";
 import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
@@ -33,13 +33,13 @@ function getDataSchema(parameters: Record<string, unknown>): Record<string, unkn
 	return toRecord(toRecord(parameters.properties).data);
 }
 
-function makeCodexModel(): Model<"openai-codex-responses"> {
+function makeResponsesModel(): Model<"openai-responses"> {
 	return buildModel({
-		id: "gpt-5.1-codex",
-		name: "GPT-5.1 Codex",
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		baseUrl: "https://api.openai.com/v1",
+		id: "gpt-5.4",
+		name: "GPT-5.4",
+		api: "openai-responses",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -960,7 +960,7 @@ describe("YieldTool", () => {
 		};
 		// A typed yield may omit data (last-turn extraction). The untyped empty-result
 		// case is rejected at runtime by execute(), NOT the schema — a top-level
-		// combinator expressing that constraint would break OpenAI/Codex strict mode.
+		// combinator expressing that constraint would break Responses strict mode.
 		expect(
 			validateToolArguments(toolDefinition, {
 				type: "toolCall",
@@ -971,7 +971,7 @@ describe("YieldTool", () => {
 		).toEqual({ type: "summary" });
 	});
 
-	it("emits Codex-valid yield parameters: no top-level combinator under strict mode", () => {
+	it("emits valid Responses yield parameters: no top-level combinator under strict mode", () => {
 		const tool = new YieldTool(
 			createSession({
 				outputSchema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
@@ -985,13 +985,14 @@ describe("YieldTool", () => {
 			parameters: tool.parameters,
 			strict: tool.strict,
 		};
-		const [converted] = convertOpenAICodexResponsesTools([toolDefinition], makeCodexModel());
+		const [converted] = convertTools([toolDefinition], true, makeResponsesModel());
 		if (converted.type !== "function") throw new Error("expected a function tool payload");
 		expect(converted.strict).toBe(true);
 
 		const params = converted.parameters;
+		if (params === null) throw new Error("expected a function parameter schema");
 		expect(params.type).toBe("object");
-		// OpenAI/Codex Responses reject a function whose parameters carry any of these
+		// Responses rejects a function whose parameters carry any of these
 		// at the top level (the bug this guards against).
 		for (const combinator of ["allOf", "anyOf", "oneOf", "enum", "const", "not"]) {
 			expect(params[combinator]).toBeUndefined();
@@ -1004,41 +1005,6 @@ describe("YieldTool", () => {
 			const variants = Array.isArray(prop.anyOf) ? prop.anyOf.map(toRecord) : [];
 			expect(variants.some(variant => variant.type === "null")).toBe(true);
 		}
-	});
-
-	it("emits no itemless arrays to Codex for an output schema array without items", () => {
-		// Codex rejects the request with `array schema must define items`.
-		const tool = new YieldTool(
-			createSession({
-				outputSchema: {
-					type: "object",
-					properties: { listeners: { type: "array" } },
-					required: ["listeners"],
-					additionalProperties: false,
-				},
-			}),
-		);
-		const toolDefinition: Tool = {
-			name: tool.name,
-			description: tool.description,
-			parameters: tool.parameters,
-			strict: tool.strict,
-		};
-		const [converted] = convertOpenAICodexResponsesTools([toolDefinition], makeCodexModel());
-		if (converted.type !== "function") throw new Error("expected a function tool payload");
-		expect(converted.strict).toBeUndefined();
-
-		const itemless: unknown[] = [];
-		const visit = (node: unknown): void => {
-			if (Array.isArray(node)) return node.forEach(visit);
-			if (node === null || typeof node !== "object") return;
-			const record = node as Record<string, unknown>;
-			const isArray = record.type === "array" || (Array.isArray(record.type) && record.type.includes("array"));
-			if (isArray && !Object.hasOwn(record, "items")) itemless.push(record);
-			Object.values(record).forEach(visit);
-		};
-		visit(converted.parameters);
-		expect(itemless).toEqual([]);
 	});
 
 	it("treats strict-mode nulls as omitted arguments", async () => {
@@ -1373,12 +1339,14 @@ describe("YieldTool", () => {
 			}),
 		).toBeDefined();
 
-		// Stays Codex-valid: strict, no top-level combinator.
-		const [converted] = convertOpenAICodexResponsesTools([toolDefinition], makeCodexModel());
+		// Stays Responses-valid: strict, no top-level combinator.
+		const [converted] = convertTools([toolDefinition], true, makeResponsesModel());
 		if (converted.type !== "function") throw new Error("expected a function tool payload");
 		expect(converted.strict).toBe(true);
+		const params = converted.parameters;
+		if (params === null) throw new Error("expected a function parameter schema");
 		for (const combinator of ["allOf", "anyOf", "oneOf", "enum", "const", "not"]) {
-			expect(converted.parameters[combinator]).toBeUndefined();
+			expect(params[combinator]).toBeUndefined();
 		}
 	});
 	it("supports $defs/$ref output schemas by inlining definitions and degrades after first runtime failure", async () => {

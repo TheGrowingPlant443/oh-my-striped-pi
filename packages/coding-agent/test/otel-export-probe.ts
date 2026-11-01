@@ -57,7 +57,7 @@ if (!isTelemetryExportEnabled()) {
 
 const span = trace.getTracer("@oh-my-pi/pi-agent-core").startSpan("agent.llm_call");
 span.setAttribute("gen_ai.system", "probe");
-span.setAttribute("gen_ai.request.model", "claude-haiku-4-5");
+span.setAttribute("gen_ai.request.model", "local-probe-model");
 span.end();
 
 await flushTelemetryExport();

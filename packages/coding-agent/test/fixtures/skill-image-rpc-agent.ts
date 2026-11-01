@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { runRpcMode } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
@@ -10,6 +10,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { VISION_DESCRIPTION_SSE, waitForFile } from "../helpers/skill-image-vision";
+import { toProviderModelConfig } from "../helpers/model-fixtures";
 
 // Real RPC dispatch with a `/skill:look` command on a text-only main model, so an image
 // attached to the skill is described by the vision role first. The vision request creates
@@ -31,12 +32,45 @@ globalThis.fetch = Object.assign(
 );
 
 const authStorage = await AuthStorage.create(path.join(cwd, "auth.db"));
-authStorage.keys.setRuntime("zai", "test-key");
+const provider = "rpc-skill";
+const models = [
+	buildModel({
+		id: "glm-5.3",
+		name: "Private text-only GLM",
+		api: "openai-completions",
+		provider,
+		baseUrl: "http://127.0.0.1:9/v1",
+		reasoning: true,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 8192,
+	}),
+	buildModel({
+		id: "glm-5.3-flash",
+		name: "Private vision GLM",
+		api: "openai-completions",
+		provider,
+		baseUrl: "http://127.0.0.1:9/v1",
+		reasoning: true,
+		input: ["text", "image"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 8192,
+	}),
+];
+authStorage.keys.setRuntime(provider, "test-key");
 const modelRegistry = new ModelRegistry(authStorage, path.join(cwd, "models.yml"));
+modelRegistry.registerProvider(provider, {
+	api: "openai-completions",
+	baseUrl: "http://127.0.0.1:9/v1",
+	apiKey: "test-key",
+	models: models.map(model => toProviderModelConfig({ ...model, input: [...model.input] })),
+});
 const mock = createMockModel({ handler: { content: ["ok"] } });
 const agent = new Agent({
 	getApiKey: () => "test-key",
-	initialState: { model: getBundledModel("zai", "glm-5.3"), systemPrompt: ["Test"], tools: [], messages: [] },
+	initialState: { model: models[0], systemPrompt: ["Test"], tools: [], messages: [] },
 	convertToLlm,
 	streamFn: mock.stream,
 });
@@ -45,7 +79,7 @@ const session = new AgentSession({
 	sessionManager: SessionManager.inMemory(cwd),
 	settings: Settings.isolated({
 		"compaction.enabled": false,
-		modelRoles: { vision: "zai/glm-5.3-flash:max", default: "zai/glm-5.3:max" },
+		modelRoles: { vision: "rpc-skill/glm-5.3-flash:max", default: "rpc-skill/glm-5.3:max" },
 	}),
 	modelRegistry,
 	toolRegistry: new Map(),

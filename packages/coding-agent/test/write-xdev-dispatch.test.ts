@@ -75,6 +75,17 @@ function createTestXdevState(
 }
 
 describe("read and write route xd:// device URLs", () => {
+	it("treats the removed report device as an unknown tool", async () => {
+		const session = xdevSession(os.tmpdir(), { xdev: createTestXdevState([]) });
+		const write = new WriteTool(session);
+		const result = await write.execute("removed-report-device", {
+			path: "xd://report_issue",
+			content: "write: unexpected output",
+		});
+		expect(result.isError).toBe(true);
+		expect(result.content.find(entry => entry.type === "text")?.text).toContain("No such tool: xd://report_issue");
+	});
+
 	it("lists, documents, and dispatches an ast_edit device", async () => {
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "write-xdev-"));
 		try {

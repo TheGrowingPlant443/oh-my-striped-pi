@@ -20,9 +20,9 @@ export default class AuthBroker extends Command {
 			required: false,
 			options: [...AUTH_BROKER_ACTIONS],
 		}),
-		// Second positional: provider id (login/logout) or filesystem path (import).
+		// Second positional: provider id (login/logout).
 		source: Args.string({
-			description: "OAuth provider id (login/logout) or path (import)",
+			description: "OAuth provider id (login/logout)",
 			required: false,
 		}),
 	};
@@ -35,10 +35,7 @@ export default class AuthBroker extends Command {
 			description: "SSH user@host for remote login (login --via=user@host)",
 		}),
 		provider: Flags.string({
-			description: "Override provider id for `import` (e.g. when JSON `type` is unrecognized)",
-		}),
-		"include-disabled": Flags.boolean({
-			description: "Import credentials whose JSON has `disabled: true` (import)",
+			description: "OAuth provider id (github-copilot)",
 		}),
 		"from-local": Flags.boolean({
 			description: "migrate source: local SQLite + env vars (required for `migrate`)",
@@ -49,7 +46,7 @@ export default class AuthBroker extends Command {
 		"include-oauth": Flags.boolean({
 			description: "Also upload OAuth from local SQLite during migrate (default skips them)",
 		}),
-		"dry-run": Flags.boolean({ description: "Print actions without executing (import / login --via / migrate)" }),
+		"dry-run": Flags.boolean({ description: "Print actions without executing (login --via / migrate)" }),
 		"trust-proxy-headers": Flags.boolean({
 			description: "Trust forwarded peer IP headers from a reverse proxy (serve); off by default.",
 		}),
@@ -62,12 +59,10 @@ export default class AuthBroker extends Command {
 		"# Print the bearer token\n  omp auth-broker token",
 		"# Rotate the bearer token\n  omp auth-broker token --regenerate",
 		"# List supported OAuth providers\n  omp auth-broker list",
-		"# Local login (run on the broker host)\n  omp auth-broker login anthropic",
+		"# Local login (run on the broker host)\n  omp auth-broker login github-copilot",
 		"# Interactive provider selection\n  omp auth-broker login",
-		"# Remote login over SSH tunnel\n  omp auth-broker login anthropic --via=user@broker",
-		"# Log out of a provider (interactive without provider arg)\n  omp auth-broker logout anthropic",
-		"# Import a CLIProxyAPI auth dump\n  omp auth-broker import ~/.cliproxy/auth",
-		"# Import a single CLIProxyAPI JSON, overriding the provider mapping\n  omp auth-broker import ~/.cliproxy/auth/claude-foo.json --provider anthropic",
+		"# Remote login over SSH tunnel\n  omp auth-broker login github-copilot --via=user@broker",
+		"# Log out of a provider (interactive without provider arg)\n  omp auth-broker logout github-copilot",
 		"# Preview a migration from local store + env vars to the configured broker\n  omp auth-broker migrate --from-local --include-env --dry-run",
 		"# Apply the migration\n  omp auth-broker migrate --from-local --include-env",
 		"# Health-check the configured remote broker\n  omp auth-broker status",
@@ -87,11 +82,8 @@ export default class AuthBroker extends Command {
 				bind: flags.bind,
 				regenerate: flags.regenerate,
 				via: flags.via,
-				// `login`/`logout` reuse the legacy `provider` slot; `import` keeps `source` separate
-				// so `provider` flag (used as an override) is unambiguous.
-				provider: action === "import" ? flags.provider : (args.source ?? flags.provider),
+				provider: args.source ?? flags.provider,
 				source: args.source,
-				includeDisabled: flags["include-disabled"],
 				fromLocal: flags["from-local"],
 				includeEnv: flags["include-env"],
 				includeOauth: flags["include-oauth"],

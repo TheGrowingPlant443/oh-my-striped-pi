@@ -1,6 +1,21 @@
 import { describe, expect, it } from "bun:test";
 import type { Usage } from "@oh-my-pi/pi-ai/types";
-import { calculateCost, getBundledModel, getBundledModels } from "@oh-my-pi/pi-catalog/models";
+import { calculateCost, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+
+const cacheModel = {
+	...getBundledModel("github-copilot", "claude-opus-5"),
+	cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+};
+const tieredModel = {
+	...getBundledModel("github-copilot", "gpt-5"),
+	cost: {
+		input: 5,
+		output: 30,
+		cacheRead: 0.5,
+		cacheWrite: 6.25,
+		longContext: { inputThreshold: 272_000, input: 10, output: 45, cacheRead: 1, cacheWrite: 12.5 },
+	},
+};
 
 describe("calculateCost", () => {
 	it("keeps token-based calculation for GitHub Copilot models", () => {
@@ -39,7 +54,7 @@ describe("calculateCost", () => {
 
 	it("prices provider orchestration tokens without changing visible usage buckets", () => {
 		const model = {
-			...getBundledModel("openai", "gpt-4o-mini"),
+			...getBundledModel("github-copilot", "gpt-4o"),
 			cost: {
 				input: 1000,
 				output: 2000,
@@ -70,7 +85,7 @@ describe("calculateCost", () => {
 	});
 
 	it("prices 1h cache writes at the 1h rate via the cttl breakdown (issue #6876)", () => {
-		const model = getBundledModel("anthropic", "claude-opus-5");
+		const model = cacheModel;
 		const usage: Usage = {
 			input: 0,
 			output: 0,
@@ -90,7 +105,7 @@ describe("calculateCost", () => {
 	});
 
 	it("prices a mixed 5m/1h cache write per component", () => {
-		const model = getBundledModel("anthropic", "claude-opus-5");
+		const model = cacheModel;
 		const usage: Usage = {
 			input: 0,
 			output: 0,
@@ -111,7 +126,7 @@ describe("calculateCost", () => {
 		// message_start supplied the 5m/1h split, a later message_delta bumped
 		// cache_creation_input_tokens without repeating `cache_creation`. The
 		// unattributed remainder must still be billed, never silently free.
-		const model = getBundledModel("anthropic", "claude-opus-5");
+		const model = cacheModel;
 		const usage: Usage = {
 			input: 0,
 			output: 0,
@@ -129,7 +144,7 @@ describe("calculateCost", () => {
 	});
 
 	it("keeps the flat 5m rate for cache writes without a cttl breakdown", () => {
-		const model = getBundledModel("anthropic", "claude-opus-5");
+		const model = cacheModel;
 		const usage: Usage = {
 			input: 0,
 			output: 0,
@@ -144,39 +159,8 @@ describe("calculateCost", () => {
 		expect(usage.cost.cacheWrite).toBeCloseTo((6.25 * 1000) / 1e6, 12);
 	});
 
-	it("prices OpenAI Codex GPT models from the matching OpenAI catalog entry", () => {
-		const openAIModel = getBundledModels("openai")
-			.sort((a, b) => a.id.localeCompare(b.id))
-			.find(
-				model =>
-					model.id.startsWith("gpt-") &&
-					model.cost.input > 0 &&
-					model.cost.output > 0 &&
-					getBundledModel("openai-codex", model.id) !== undefined,
-			);
-		if (!openAIModel) throw new Error("Expected a shared, priced OpenAI/Codex GPT model");
-		const codexModel = getBundledModel("openai-codex", openAIModel.id);
-		const usage: Usage = {
-			input: 1000,
-			output: 500,
-			cacheRead: 200,
-			cacheWrite: 0,
-			totalTokens: 1700,
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-		};
-		const referenceUsage = structuredClone(usage);
-		calculateCost(openAIModel, referenceUsage);
-
-		expect(codexModel.cost).toEqual(openAIModel.cost);
-
-		calculateCost(codexModel, usage);
-
-		expect(referenceUsage.cost.total).toBeGreaterThan(0);
-		expect(usage.cost).toEqual(referenceUsage.cost);
-	});
-
-	it("keeps Daybreak Blue at short-context rates through 272K prompt tokens", () => {
-		const model = getBundledModel("openai", "daybreak-blue-latest");
+	it("keeps short-context rates through the configured prompt threshold", () => {
+		const model = tieredModel;
 		const usage: Usage = {
 			input: 270_000,
 			output: 1_000,
@@ -194,8 +178,8 @@ describe("calculateCost", () => {
 		expect(usage.cost.cacheWrite).toBeCloseTo(0.00625, 12);
 	});
 
-	it("prices the full Daybreak Blue request at long-context rates above 272K prompt tokens", () => {
-		const model = getBundledModel("openai", "daybreak-blue-latest");
+	it("prices the full request at long-context rates above the configured prompt threshold", () => {
+		const model = tieredModel;
 		const usage: Usage = {
 			input: 270_001,
 			output: 1_000,

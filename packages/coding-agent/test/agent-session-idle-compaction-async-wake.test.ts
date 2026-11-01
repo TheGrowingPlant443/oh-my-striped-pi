@@ -101,8 +101,8 @@ describe("AgentSession idle compaction async-job deferral", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "first assistant turn ".repeat(200) }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: highUsage(50_000),
 			timestamp: Date.now(),
@@ -116,8 +116,8 @@ describe("AgentSession idle compaction async-job deferral", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "second assistant turn ".repeat(200) }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: highUsage(60_000),
 			timestamp: Date.now(),
@@ -127,14 +127,14 @@ describe("AgentSession idle compaction async-job deferral", () => {
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-idle-compaction-async-wake-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 		sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 		manager = new AsyncJobManager({ onJobComplete: async () => {} });
 		gates = [];
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected bundled Copilot model");
 
 		seedBranch();
 

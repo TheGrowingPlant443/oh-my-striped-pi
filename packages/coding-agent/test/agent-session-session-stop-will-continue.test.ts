@@ -26,7 +26,7 @@ describe("AgentSession session_stop willContinue", () => {
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-session-stop-will-continue-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("openai", "openai-test-key");
+		authStorage.keys.setRuntime("github-copilot", "copilot-test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -41,9 +41,9 @@ describe("AgentSession session_stop willContinue", () => {
 	});
 
 	it("marks extension agent_end willContinue when session_stop schedules a hidden turn", async () => {
-		const model = getBundledModel("openai", "gpt-5");
+		const model = getBundledModel("github-copilot", "gpt-5");
 		if (!model) {
-			throw new Error("Expected bundled OpenAI test model to exist");
+			throw new Error("Expected bundled Copilot test model to exist");
 		}
 
 		// First settle reaches session_stop; second is the terminal continuation turn.

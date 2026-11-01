@@ -1,5 +1,5 @@
 /**
- * Offline stand-in for the public collab relay (`wss://my.omp.sh`).
+ * Local, loopback-only collaboration relay.
  *
  * Speaks the exact relay contract the real clients expect:
  * - `GET /r/<roomId>?role=host|guest` upgrades to a WebSocket.
@@ -47,6 +47,7 @@ export function startLocalRelay(port = 0): LocalRelay {
 	const rooms = new Map<string, Room>();
 
 	const server = Bun.serve({
+		hostname: "localhost",
 		port,
 		fetch(req, srv): Response | undefined {
 			const url = new URL(req.url);

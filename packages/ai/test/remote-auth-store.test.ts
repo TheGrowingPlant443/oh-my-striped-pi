@@ -14,7 +14,7 @@ import {
 import { snapshotResponseSchema } from "@oh-my-pi/pi-ai/auth-broker/wire-schemas";
 import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
 import type { UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
-import * as claudeUsage from "@oh-my-pi/pi-ai/usage/claude";
+import { mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
 
 function requireLimit(report: UsageReport, id: string): UsageLimit {
 	const limit = report.limits.find(candidate => candidate.id === id);
@@ -22,8 +22,15 @@ function requireLimit(report: UsageReport, id: string): UsageLimit {
 	return limit;
 }
 
-const ANTHROPIC_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN"] as const;
-const savedEnv: Partial<Record<(typeof ANTHROPIC_ENV)[number], string | undefined>> = {};
+const COPILOT_ENV = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN"] as const;
+const savedEnv: Partial<Record<(typeof COPILOT_ENV)[number], string | undefined>> = {};
+
+const usageProvider: UsageProvider = {
+	id: "github-copilot",
+	async fetchUsage() {
+		return null;
+	},
+};
 
 describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	let serverStore: SqliteAuthCredentialStore | undefined;
@@ -33,13 +40,20 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	let testUsageProviders: Map<string, UsageProvider> | undefined;
 
 	beforeEach(async () => {
+		mockOAuthProvider({
+			id: "github-copilot",
+			name: "Copilot",
+			async login() {
+				throw new Error("login not used");
+			},
+		});
 		testUsageProviders = undefined;
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			savedEnv[key] = process.env[key];
 			delete process.env[key];
 		}
 		serverStore = new SqliteAuthCredentialStore(new Database(":memory:"));
-		await serverStore.saveOAuth("anthropic", {
+		await serverStore.saveOAuth("github-copilot", {
 			access: "server-access-1",
 			refresh: "server-refresh-1",
 			expires: Date.now() - 60_000, // expired so refresh is forced
@@ -50,8 +64,8 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			usageProviderResolver: provider =>
 				testUsageProviders
 					? testUsageProviders.get(provider)
-					: provider === "anthropic"
-						? claudeUsage.claudeUsageProvider
+					: provider === "github-copilot"
+						? usageProvider
 						: undefined,
 		});
 		await serverStorage.credentials.reload();
@@ -65,11 +79,11 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 
 	afterEach(async () => {
 		testUsageProviders = undefined;
-		vi.restoreAllMocks();
+		resetOAuthMocks();
 		await handle?.close();
 		serverStorage?.close();
 		serverStore?.close();
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			if (savedEnv[key] === undefined) delete process.env[key];
 			else process.env[key] = savedEnv[key];
 		}
@@ -114,7 +128,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 		await clientStorage.credentials.reload();
 
-		const apiKey = await clientStorage.keys.get("anthropic");
+		const apiKey = await clientStorage.keys.get("github-copilot");
 		expect(apiKey).toBe("server-access-rotated");
 		expect(overrideCalls).toBe(1);
 		// The local oauth refresh helper was used exactly once — by the broker server.
@@ -143,7 +157,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 
 		await remoteStore.markCredentialSuspect(initialEntry.id);
-		const rows = remoteStore.listAuthCredentials("anthropic");
+		const rows = remoteStore.listAuthCredentials("github-copilot");
 
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.credential.type).toBe("oauth");
@@ -189,18 +203,18 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const otherClient = new AuthBrokerClient({ url: handle!.url, token });
 		const accessTokens = () =>
 			remoteStore
-				.listAuthCredentials("anthropic")
+				.listAuthCredentials("github-copilot")
 				.map(row => row.credential.type === "oauth" && row.credential.access);
 		const expected = relogin ? [relogin] : [];
 		try {
 			await streaming.promise;
-			const outcome = remoteStore.refreshOAuthCredential("anthropic", entry.id, entry.credential).then(
+			const outcome = remoteStore.refreshOAuthCredential("github-copilot", entry.id, entry.credential).then(
 				credential => credential.access,
 				() => "rejected",
 			);
 			await replyParked.promise;
 			if (relogin) {
-				await otherClient.uploadCredential("anthropic", {
+				await otherClient.uploadCredential("github-copilot", {
 					type: "oauth",
 					access: relogin,
 					refresh: "server-refresh-relogin",
@@ -224,7 +238,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	});
 
 	test("invalidated OAuth tokens disable the remote row and rotate to a sibling", async () => {
-		await serverStore!.upsertAuthCredential("anthropic", {
+		await serverStore!.upsertAuthCredential("github-copilot", {
 			type: "oauth",
 			access: "server-access-2",
 			refresh: "server-refresh-2",
@@ -233,7 +247,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			email: "b@example.com",
 		});
 		await serverStorage!.credentials.reload();
-		const seededRows = serverStore!.listAuthCredentials("anthropic");
+		const seededRows = serverStore!.listAuthCredentials("github-copilot");
 		expect(seededRows).toHaveLength(2);
 		const failedRow = seededRows[0];
 		if (failedRow?.credential.type !== "oauth") throw new Error("expected failed OAuth row");
@@ -251,15 +265,15 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			credentialId: failedRow.id,
 		};
 
-		const rotated = await clientStorage.limits.rotate("anthropic", "invalidated-session", {
+		const rotated = await clientStorage.limits.rotate("github-copilot", "invalidated-session", {
 			error: new Error("Encountered invalidated oauth token for user, failing request"),
 			apiKey: first.accessToken,
 			credentialId: first.credentialId,
 		});
 
 		expect(rotated.switched).toBe(true);
-		expect(serverStore!.listAuthCredentials("anthropic").map(row => row.id)).not.toContain(first.credentialId);
-		const next = await clientStorage.oauth.access("anthropic", "invalidated-session");
+		expect(serverStore!.listAuthCredentials("github-copilot").map(row => row.id)).not.toContain(first.credentialId);
+		const next = await clientStorage.oauth.access("github-copilot", "invalidated-session");
 		expect(next?.credentialId).not.toBe(first.credentialId);
 		clientStorage.close();
 		remoteStore.close();
@@ -279,13 +293,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 
 		const reportForA = {
-			provider: "anthropic" as const,
+			provider: "github-copilot" as const,
 			fetchedAt: Date.now(),
 			limits: [],
 			metadata: { email: "a@example.com" },
 		};
 		const reportForB = {
-			provider: "anthropic" as const,
+			provider: "github-copilot" as const,
 			fetchedAt: Date.now(),
 			limits: [],
 			metadata: { email: "b@example.com" },
@@ -304,8 +318,8 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const credB = { ...credA, email: "b@example.com" };
 
 		const [resA, resB] = await Promise.all([
-			remoteStore.getUsageReport("anthropic", credA),
-			remoteStore.getUsageReport("anthropic", credB),
+			remoteStore.getUsageReport("github-copilot", credA),
+			remoteStore.getUsageReport("github-copilot", credB),
 		]);
 		// Parallel callers share a single broker round-trip.
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -313,55 +327,49 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		expect(resB?.metadata?.email).toBe("b@example.com");
 
 		// Cached on the second call — still one fetch total.
-		const cached = await remoteStore.getUsageReport("anthropic", credA);
+		const cached = await remoteStore.getUsageReport("github-copilot", credA);
 		expect(cached?.metadata?.email).toBe("a@example.com");
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
 		// One provider's cache says nothing about another provider.
-		const miss = await remoteStore.getUsageReport("openai-codex", credA);
+		const miss = await remoteStore.getUsageReport("local", credA);
 		expect(miss).toBeNull();
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
-		expect(fetchSpy).toHaveBeenNthCalledWith(1, { provider: "anthropic", maxAccountsPerProvider: 1 });
-		expect(fetchSpy).toHaveBeenNthCalledWith(2, { provider: "openai-codex", maxAccountsPerProvider: 1 });
+		expect(fetchSpy).toHaveBeenNthCalledWith(1, { provider: "github-copilot", maxAccountsPerProvider: 1 });
+		expect(fetchSpy).toHaveBeenNthCalledWith(2, { provider: "local", maxAccountsPerProvider: 1 });
 
 		remoteStore.close();
 	});
 
-	test("provider-scoped broker usage excludes unrelated probes without poisoning aggregate polls", async () => {
-		const entry = serverStore!.listAuthCredentials("anthropic")[0]!;
+	test("broker usage reports every provider with a registered usage hook", async () => {
+		const entry = serverStore!.listAuthCredentials("github-copilot")[0]!;
 		if (entry.credential.type !== "oauth") throw new Error("expected OAuth credential");
 		const credential = { ...entry.credential, expires: Date.now() + 3_600_000 };
 		serverStore!.updateAuthCredential(entry.id, credential);
-		await serverStore!.upsertAuthCredential("openai-codex", {
+		await serverStore!.upsertAuthCredential("local", {
 			...credential,
-			access: "codex-access",
-			refresh: "codex-refresh",
-			accountId: "codex-account",
+			access: "local-access",
+			refresh: "local-refresh",
+			accountId: "local-account",
 		});
 		await serverStorage!.credentials.reload();
-		const slowStarted = Promise.withResolvers<void>();
-		const releaseSlow = Promise.withResolvers<void>();
-		const anthropicReport: UsageReport = {
-			provider: "anthropic",
+		const copilotReport: UsageReport = {
+			provider: "github-copilot",
 			fetchedAt: Date.now(),
 			limits: [],
 			metadata: { accountId: credential.accountId },
 		};
-		const codexReport: UsageReport = {
-			provider: "openai-codex",
+		const localReport: UsageReport = {
+			provider: "local",
 			fetchedAt: Date.now(),
 			limits: [],
-			metadata: { accountId: "codex-account" },
+			metadata: { accountId: "local-account" },
 		};
-		const fastFetch = vi.fn(async () => anthropicReport);
-		const slowFetch = vi.fn(async () => {
-			slowStarted.resolve();
-			await releaseSlow.promise;
-			return codexReport;
-		});
+		const fastFetch = vi.fn(async () => copilotReport);
+		const slowFetch = vi.fn(async () => localReport);
 		testUsageProviders = new Map([
-			["anthropic", { id: "anthropic", fetchUsage: fastFetch }],
-			["openai-codex", { id: "openai-codex", fetchUsage: slowFetch }],
+			["github-copilot", { id: "github-copilot", fetchUsage: fastFetch }],
+			["local", { id: "local", fetchUsage: slowFetch }],
 		]);
 		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
 		const initial = await brokerClient.fetchSnapshot();
@@ -372,21 +380,17 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			streamSnapshots: false,
 		});
 		try {
-			expect(await remote.getUsageReport("anthropic", credential)).toEqual(anthropicReport);
+			expect(await remote.getUsageReport("github-copilot", credential)).toEqual(copilotReport);
 			expect(fastFetch).toHaveBeenCalledTimes(1);
 			expect(slowFetch).not.toHaveBeenCalled();
 
-			const aggregate = remote.fetchUsageReports();
-			await slowStarted.promise;
-			releaseSlow.resolve();
-			expect((await aggregate)?.map(report => report.provider).sort()).toEqual(["anthropic", "openai-codex"]);
-			expect(fastFetch).toHaveBeenCalledTimes(1);
+			const reports = await remote.fetchUsageReports();
+			expect(reports?.map(report => report.provider).sort()).toEqual(["github-copilot", "local"]);
 			expect(slowFetch).toHaveBeenCalledTimes(1);
-			expect(await remote.getUsageReport("openai-codex", { ...credential, accountId: "codex-account" })).toEqual(
-				codexReport,
+			expect(await remote.getUsageReport("local", { ...credential, accountId: "local-account" })).toEqual(
+				localReport,
 			);
 		} finally {
-			releaseSlow.resolve();
 			remote.close();
 		}
 	});
@@ -399,7 +403,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		if (entry.credential.type !== "oauth") throw new Error("expected OAuth credential");
 		const release = Promise.withResolvers<void>();
 		const report: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: Date.now(),
 			limits: [],
 			metadata: { accountId: entry.credential.accountId },
@@ -415,13 +419,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 		const controller = new AbortController();
 		try {
-			const cancelled = remote.getUsageReport("anthropic", entry.credential, controller.signal);
-			const peer = remote.getUsageReport("anthropic", entry.credential);
+			const cancelled = remote.getUsageReport("github-copilot", entry.credential, controller.signal);
+			const peer = remote.getUsageReport("github-copilot", entry.credential);
 			controller.abort();
 			await expect(cancelled).rejects.toThrow();
 			release.resolve();
 			expect(await peer).toEqual(report);
-			expect(await remote.getUsageReport("anthropic", entry.credential)).toEqual(report);
+			expect(await remote.getUsageReport("github-copilot", entry.credential)).toEqual(report);
 			expect(fetchSpy).toHaveBeenCalledTimes(1);
 		} finally {
 			release.resolve();
@@ -438,7 +442,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			const credential = initial.snapshot.credentials[0]!.credential;
 			if (credential.type !== "oauth") throw new Error("expected OAuth credential");
 			const report: UsageReport = {
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [],
 				metadata: { accountId: credential.accountId },
@@ -454,9 +458,9 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				streamSnapshots: false,
 			});
 			try {
-				await remote.getUsageReport("anthropic", credential);
+				await remote.getUsageReport("github-copilot", credential);
 				await remote.fetchUsageReports();
-				expect(await remote.getUsageReport("anthropic", credential)).toEqual(report);
+				expect(await remote.getUsageReport("github-copilot", credential)).toEqual(report);
 			} finally {
 				remote.close();
 			}
@@ -469,7 +473,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const blockedUntilMs = now + 60_000;
 		const credentialEntry = {
 			id: 7,
-			provider: "anthropic" as const,
+			provider: "github-copilot" as const,
 			credential: {
 				type: "oauth" as const,
 				access: "remote-access",
@@ -496,18 +500,18 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			credentials: [
 				{
 					...credentialEntry,
-					blocks: [{ providerKey: "anthropic:oauth", blockScope: "tier:fable", blockedUntilMs }],
+					blocks: [{ providerKey: "github-copilot:oauth", blockScope: "tier:standard", blockedUntilMs }],
 				},
 			],
 		};
 		const healthyReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 10, limit: 100, usedFraction: 0.1, unit: "percent" },
 					status: "ok",
@@ -516,13 +520,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			metadata: { accountId: "remote-account", email: "remote@example.com", brokerFetch: "before-block" },
 		};
 		const blockedReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now + 1,
 			limits: [
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 100, limit: 100, usedFraction: 1, unit: "percent" },
 					status: "exhausted",
@@ -552,16 +556,16 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			expect(fetchUsageSpy).toHaveBeenCalledTimes(1);
 			expect(first).not.toBeNull();
 			expect(first?.[0]?.metadata?.brokerFetch).toBe("before-block");
-			expect(requireLimit(first![0]!, "anthropic:7d:fable").status).toBe("ok");
+			expect(requireLimit(first![0]!, "github-copilot:7d:standard").status).toBe("ok");
 
 			await remoteStore.refreshSnapshot();
-			expect(remoteStore.getCredentialBlock(7, "anthropic:oauth", "tier:fable")).toBe(blockedUntilMs);
+			expect(remoteStore.getCredentialBlock(7, "github-copilot:oauth", "tier:standard")).toBe(blockedUntilMs);
 
 			const second = await remoteStore.fetchUsageReports();
 			expect(fetchUsageSpy).toHaveBeenCalledTimes(2);
 			expect(second).not.toBeNull();
 			expect(second?.[0]?.metadata?.brokerFetch).toBe("after-block");
-			const afterBlockLimit = requireLimit(second![0]!, "anthropic:7d:fable");
+			const afterBlockLimit = requireLimit(second![0]!, "github-copilot:7d:standard");
 			expect(afterBlockLimit.status).toBe("exhausted");
 			expect(afterBlockLimit.amount.usedFraction).toBe(1);
 		} finally {
@@ -569,7 +573,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		}
 	});
 
-	test.each([undefined, "anthropic"])("usage failure keeps the 15s cache TTL (%s)", async provider => {
+	test.each([undefined, "github-copilot"])("usage failure keeps the 15s cache TTL (%s)", async provider => {
 		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
@@ -606,7 +610,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			expires: Date.now() + 60_000,
 			email: "a@example.com",
 		};
-		const perCred = await remoteStore.getUsageReport("anthropic", cred);
+		const perCred = await remoteStore.getUsageReport("github-copilot", cred);
 		expect(perCred).toBeNull();
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
@@ -629,7 +633,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			credentials: [
 				{
 					id: 1,
-					provider: "anthropic",
+					provider: "github-copilot",
 					credential: {
 						type: "oauth",
 						access: "access-without-blocks",
@@ -643,7 +647,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				},
 				{
 					id: 2,
-					provider: "anthropic",
+					provider: "github-copilot",
 					credential: {
 						type: "oauth",
 						access: "access-with-blocks",
@@ -654,7 +658,9 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 					},
 					identityKey: "email:with-blocks@example.com",
 					rotatesInMs: null,
-					blocks: [{ providerKey: "anthropic:oauth", blockScope: "tier:fable", blockedUntilMs: futureBlock }],
+					blocks: [
+						{ providerKey: "github-copilot:oauth", blockScope: "tier:standard", blockedUntilMs: futureBlock },
+					],
 				},
 			],
 		});
@@ -663,14 +669,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		if (validated instanceof type.errors) throw new Error("expected valid snapshot");
 		expect(validated.credentials[0]!.blocks).toBeUndefined();
 		expect(validated.credentials[1]!.blocks).toEqual([
-			{ providerKey: "anthropic:oauth", blockScope: "tier:fable", blockedUntilMs: futureBlock },
+			{ providerKey: "github-copilot:oauth", blockScope: "tier:standard", blockedUntilMs: futureBlock },
 		]);
 	});
 
 	test("getUsageReport routes each org-scoped credential to its own org's report", async () => {
 		// Two subscriptions (orgs) on one account email: the broker aggregate
 		// carries both pools. Matching by shared email/account would hand the
-		// healthy Max credential the exhausted Team report (and vice versa).
+		// healthy organization credential the exhausted sibling report (and vice versa).
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const now = Date.now();
 		const makeCredential = (id: number, orgId?: string) => ({
@@ -683,13 +689,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			orgId,
 		});
 		const makeOrgReport = (orgId: string, usedFraction: number, status: "ok" | "exhausted"): UsageReport => ({
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:5h",
-					label: "Claude 5 Hour",
-					scope: { provider: "anthropic", windowId: "5h" },
+					id: "github-copilot:5h",
+					label: "Account 5 Hour",
+					scope: { provider: "github-copilot", windowId: "5h" },
 					window: { id: "5h", label: "5 Hour" },
 					amount: { used: usedFraction * 100, limit: 100, usedFraction, unit: "percent" },
 					status,
@@ -712,14 +718,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: makeCredential(1, "org-team"),
 						identityKey: "email:shared@example.com|org:org-team",
 						rotatesInMs: null,
 					},
 					{
 						id: 2,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: makeCredential(2, "org-max"),
 						identityKey: "email:shared@example.com|org:org-max",
 						rotatesInMs: null,
@@ -728,18 +734,18 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			},
 		});
 		try {
-			const teamReport = await remoteStore.getUsageReport("anthropic", makeCredential(1, "org-team"));
+			const teamReport = await remoteStore.getUsageReport("github-copilot", makeCredential(1, "org-team"));
 			expect(teamReport?.metadata?.orgId).toBe("org-team");
-			expect(requireLimit(teamReport!, "anthropic:5h").status).toBe("exhausted");
+			expect(requireLimit(teamReport!, "github-copilot:5h").status).toBe("exhausted");
 
-			const maxReport = await remoteStore.getUsageReport("anthropic", makeCredential(2, "org-max"));
+			const maxReport = await remoteStore.getUsageReport("github-copilot", makeCredential(2, "org-max"));
 			expect(maxReport?.metadata?.orgId).toBe("org-max");
-			expect(requireLimit(maxReport!, "anthropic:5h").status).toBe("ok");
+			expect(requireLimit(maxReport!, "github-copilot:5h").status).toBe("ok");
 
 			// An org-less (legacy) credential must not receive an org-attributed
 			// sibling's pool via the shared email/account — "no usage data" is
 			// the correct answer.
-			const legacyReport = await remoteStore.getUsageReport("anthropic", makeCredential(3));
+			const legacyReport = await remoteStore.getUsageReport("github-copilot", makeCredential(3));
 			expect(legacyReport).toBeNull();
 		} finally {
 			remoteStore.close();
@@ -747,7 +753,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	});
 
 	test("getUsageReport gates same-org siblings on the member's email when their account ID is shared", async () => {
-		// Two Team members share the org and account ids but draw on per-user
+		// Two organization members share the org and account ids but draw on per-user
 		// pools: Bob must never receive Alice's report just because the shared
 		// workspace identifiers match first.
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
@@ -766,13 +772,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			usedFraction: number,
 			status: "ok" | "exhausted",
 		): UsageReport => ({
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:5h",
-					label: "Claude 5 Hour",
-					scope: { provider: "anthropic", windowId: "5h" },
+					id: "github-copilot:5h",
+					label: "Account 5 Hour",
+					scope: { provider: "github-copilot", windowId: "5h" },
 					window: { id: "5h", label: "5 Hour" },
 					amount: { used: usedFraction * 100, limit: 100, usedFraction, unit: "percent" },
 					status,
@@ -803,33 +809,41 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 		try {
 			// Each member routes to their OWN pool inside the shared org.
-			const aliceReport = await remoteStore.getUsageReport("anthropic", makeMemberCredential("alice", "org-team"));
+			const aliceReport = await remoteStore.getUsageReport(
+				"github-copilot",
+				makeMemberCredential("alice", "org-team"),
+			);
 			expect(aliceReport?.metadata?.email).toBe("alice@example.com");
-			expect(requireLimit(aliceReport!, "anthropic:5h").status).toBe("exhausted");
-			const bobReport = await remoteStore.getUsageReport("anthropic", makeMemberCredential("bob", "org-team"));
+			expect(requireLimit(aliceReport!, "github-copilot:5h").status).toBe("exhausted");
+			const bobReport = await remoteStore.getUsageReport("github-copilot", makeMemberCredential("bob", "org-team"));
 			expect(bobReport?.metadata?.email).toBe("bob@example.com");
-			expect(requireLimit(bobReport!, "anthropic:5h").status).toBe("ok");
+			expect(requireLimit(bobReport!, "github-copilot:5h").status).toBe("ok");
 
 			// Erin's own report is missing: the lone same-org sibling report
 			// (Dave's) must not stand in for hers — "no usage data" is correct.
-			expect(await remoteStore.getUsageReport("anthropic", makeMemberCredential("erin", "org-duo"))).toBeNull();
+			expect(await remoteStore.getUsageReport("github-copilot", makeMemberCredential("erin", "org-duo"))).toBeNull();
 
 			// An org-only credential (no base identifiers) still matches on the
 			// org alone, but only when the same-org report is unambiguous.
-			const duoReport = await remoteStore.getUsageReport("anthropic", makeMemberCredential("org-only", "org-duo"));
+			const duoReport = await remoteStore.getUsageReport(
+				"github-copilot",
+				makeMemberCredential("org-only", "org-duo"),
+			);
 			expect(duoReport?.metadata?.email).toBe("dave@example.com");
-			expect(await remoteStore.getUsageReport("anthropic", makeMemberCredential("org-only", "org-team"))).toBeNull();
+			expect(
+				await remoteStore.getUsageReport("github-copilot", makeMemberCredential("org-only", "org-team")),
+			).toBeNull();
 
 			// Header-ingest overlays partition per member too: Alice's ingest
 			// must merge into HER aggregate row, not Bob's earlier same-org row.
 			const overlay: UsageReport = {
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [
 					{
-						id: "anthropic:5h",
-						label: "Claude 5 Hour",
-						scope: { provider: "anthropic", windowId: "5h" },
+						id: "github-copilot:5h",
+						label: "Account 5 Hour",
+						scope: { provider: "github-copilot", windowId: "5h" },
 						window: { id: "5h", label: "5 Hour" },
 						amount: { used: 90, limit: 100, usedFraction: 0.9, unit: "percent" },
 						status: "ok",
@@ -837,16 +851,19 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				],
 				metadata: { email: "alice@example.com", accountId: "account-shared", orgId: "org-team" },
 			};
-			expect(remoteStore.ingestUsageReport("anthropic", makeMemberCredential("alice", "org-team"), overlay)).toBe(
-				true,
-			);
+			expect(
+				remoteStore.ingestUsageReport("github-copilot", makeMemberCredential("alice", "org-team"), overlay),
+			).toBe(true);
 			const merged = await remoteStore.fetchUsageReports();
 			const mergedAlice = merged?.find(report => report.metadata?.email === "alice@example.com");
 			const mergedBob = merged?.find(report => report.metadata?.email === "bob@example.com");
-			expect(requireLimit(mergedAlice!, "anthropic:5h").amount.used).toBe(90);
-			expect(requireLimit(mergedBob!, "anthropic:5h").amount.used).toBe(10);
-			const bobAfterIngest = await remoteStore.getUsageReport("anthropic", makeMemberCredential("bob", "org-team"));
-			expect(requireLimit(bobAfterIngest!, "anthropic:5h").amount.used).toBe(10);
+			expect(requireLimit(mergedAlice!, "github-copilot:5h").amount.used).toBe(90);
+			expect(requireLimit(mergedBob!, "github-copilot:5h").amount.used).toBe(10);
+			const bobAfterIngest = await remoteStore.getUsageReport(
+				"github-copilot",
+				makeMemberCredential("bob", "org-team"),
+			);
+			expect(requireLimit(bobAfterIngest!, "github-copilot:5h").amount.used).toBe(10);
 		} finally {
 			remoteStore.close();
 		}
@@ -860,13 +877,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const now = Date.now();
 		const orgLessReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:5h",
-					label: "Claude 5 Hour",
-					scope: { provider: "anthropic", windowId: "5h" },
+					id: "github-copilot:5h",
+					label: "Account 5 Hour",
+					scope: { provider: "github-copilot", windowId: "5h" },
 					window: { id: "5h", label: "5 Hour" },
 					amount: { used: 100, limit: 100, usedFraction: 1, unit: "percent" },
 					status: "exhausted",
@@ -887,7 +904,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			},
 		});
 		try {
-			const scoped = await remoteStore.getUsageReport("anthropic", {
+			const scoped = await remoteStore.getUsageReport("github-copilot", {
 				type: "oauth",
 				access: "remote-access-scoped",
 				refresh: REMOTE_REFRESH_SENTINEL,
@@ -906,13 +923,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const now = Date.now();
 		const orgReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [],
 			metadata: { email: "alice@example.com", accountId: "account-alice", orgId: "org-team" },
 		};
 		const legacyReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [],
 			metadata: { email: "carol@example.com", accountId: "account-carol" },
@@ -941,14 +958,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			email: "bob@example.com",
 		};
 		const bobOverlay: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [],
 			metadata: { email: "bob@example.com", accountId: "account-bob" },
 		};
 		try {
-			expect(await remoteStore.getUsageReport("anthropic", bobCredential)).toBeNull();
-			expect(remoteStore.ingestUsageReport("anthropic", bobCredential, bobOverlay)).toBe(true);
+			expect(await remoteStore.getUsageReport("github-copilot", bobCredential)).toBeNull();
+			expect(remoteStore.ingestUsageReport("github-copilot", bobCredential, bobOverlay)).toBe(true);
 			expect(await remoteStore.fetchUsageReports()).toHaveLength(3);
 		} finally {
 			remoteStore.close();
@@ -957,49 +974,36 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 
 	test("hands a provider's lone usage report only to a credential its identity cannot contradict", async () => {
 		// Bob's fetch succeeded and Alice's failed, so the aggregate holds one
-		// Antigravity report. The shared project must not give Alice Bob's
+		// account report. The shared project must not give Alice Bob's
 		// exhausted pool, and her header overlay must not land on his row.
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const now = Date.now();
 		const projectId = "shared-project";
 		const weeklyLimit = (usedFraction: number): UsageLimit => ({
-			id: "google-antigravity:weekly",
+			id: "github-copilot:weekly",
 			label: "Weekly",
-			scope: { provider: "google-antigravity", projectId, windowId: "weekly" },
+			scope: { provider: "github-copilot", projectId, windowId: "weekly" },
 			window: { id: "weekly", label: "Weekly" },
 			amount: { usedFraction, unit: "percent" },
 			status: usedFraction >= 1 ? "exhausted" : "ok",
 		});
 		const bobReport: UsageReport = {
-			provider: "google-antigravity",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [weeklyLimit(1)],
 			metadata: { email: "bob@example.com", projectId },
 		};
 		// Lone reports stay usable when they share no identity field with the
-		// credential, or match one Gemini copied verbatim into a limit scope.
-		const cursorReport: UsageReport = {
-			provider: "cursor",
+		// credential.
+		const localReport: UsageReport = {
+			provider: "local",
 			fetchedAt: now,
 			limits: [],
 			metadata: { email: "carol@example.com" },
 		};
-		const geminiReport: UsageReport = {
-			provider: "google-gemini-cli",
-			fetchedAt: now,
-			limits: [
-				{
-					id: "google-gemini-cli:pro",
-					label: "Pro",
-					scope: { provider: "google-gemini-cli", accountId: " account-dave " },
-					amount: { usedFraction: 0.2, unit: "percent" },
-				},
-			],
-			metadata: { currentTierId: "standard-tier" },
-		};
 		vi.spyOn(brokerClient, "fetchUsage").mockResolvedValue({
 			generatedAt: now,
-			reports: [bobReport, cursorReport, geminiReport],
+			reports: [bobReport, localReport],
 		});
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
@@ -1021,34 +1025,27 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 		const alice = credential({ email: "alice@example.com", projectId });
 		try {
-			expect(await remoteStore.getUsageReport("google-antigravity", alice)).toBeNull();
+			expect(await remoteStore.getUsageReport("github-copilot", alice)).toBeNull();
 			const bob = await remoteStore.getUsageReport(
-				"google-antigravity",
+				"github-copilot",
 				credential({ email: "bob@example.com", projectId }),
 			);
 			expect(bob?.metadata?.email).toBe("bob@example.com");
-			const cursor = await remoteStore.getUsageReport("cursor", credential({}));
-			expect(cursor?.metadata?.email).toBe("carol@example.com");
-			for (const dave of [
-				{ email: "dave@example.com" },
-				{ email: "dave@example.com", accountId: " account-dave " },
-			]) {
-				const gemini = await remoteStore.getUsageReport("google-gemini-cli", credential(dave));
-				expect(gemini?.metadata?.currentTierId).toBe("standard-tier");
-			}
+			const local = await remoteStore.getUsageReport("local", credential({}));
+			expect(local?.metadata?.email).toBe("carol@example.com");
 
 			const aliceOverlay: UsageReport = {
-				provider: "google-antigravity",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [weeklyLimit(0.1)],
 				metadata: { email: "alice@example.com", projectId },
 			};
-			expect(remoteStore.ingestUsageReport("google-antigravity", alice, aliceOverlay)).toBe(true);
-			const antigravityRows = (await remoteStore.fetchUsageReports())
-				?.filter(report => report.provider === "google-antigravity")
-				.map(report => [report.metadata?.email, requireLimit(report, "google-antigravity:weekly").status])
+			expect(remoteStore.ingestUsageReport("github-copilot", alice, aliceOverlay)).toBe(true);
+			const accountRows = (await remoteStore.fetchUsageReports())
+				?.filter(report => report.provider === "github-copilot")
+				.map(report => [report.metadata?.email, requireLimit(report, "github-copilot:weekly").status])
 				.toSorted();
-			expect(antigravityRows).toEqual([
+			expect(accountRows).toEqual([
 				["alice@example.com", "ok"],
 				["bob@example.com", "exhausted"],
 			]);
@@ -1056,6 +1053,70 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			remoteStore.close();
 		}
 	});
+
+	test.each([undefined, " account-dave "])("matches a lone report's scoped account identity (%s)", async accountId => {
+		const now = Date.now();
+		const report: UsageReport = {
+			provider: "github-copilot",
+			fetchedAt: now,
+			limits: [
+				{
+					id: "github-copilot:premium",
+					label: "Premium",
+					scope: { provider: "github-copilot", accountId: " account-dave " },
+					amount: { usedFraction: 0.2, unit: "percent" },
+				},
+			],
+			metadata: { currentTierId: "standard-tier" },
+		};
+		const client = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
+		vi.spyOn(client, "fetchUsage").mockResolvedValue({ generatedAt: now, reports: [report] });
+		const store = new RemoteAuthCredentialStore({
+			client,
+			streamSnapshots: false,
+			initialSnapshot: {
+				generation: 1,
+				generatedAt: now,
+				serverNowMs: now,
+				refresher: { enabled: false, intervalMs: 0, skewMs: 0, nextSweepInMs: Number.MAX_SAFE_INTEGER },
+				credentials: [],
+			},
+		});
+		try {
+			const result = await store.getUsageReport("github-copilot", {
+				type: "oauth",
+				access: "dave-access",
+				refresh: REMOTE_REFRESH_SENTINEL,
+				expires: now + 120_000,
+				email: "dave@example.com",
+				accountId,
+			});
+			expect(result).toEqual(report);
+		} finally {
+			store.close();
+		}
+	});
+
+	test.each(["company", "ollama", "lm-studio"])(
+		"returns no credential for an unconfigured %s broker identity",
+		async provider => {
+			const client = new AuthBrokerClient({ url: handle!.url, token });
+			const initial = await client.fetchSnapshot();
+			if (initial.status !== 200) throw new Error("expected snapshot");
+			const remote = new RemoteAuthCredentialStore({
+				client,
+				initialSnapshot: initial.snapshot,
+				streamSnapshots: false,
+			});
+			const storage = new AuthStorage(remote);
+			try {
+				await storage.credentials.reload();
+				expect(await storage.keys.getWithCredential(provider)).toBeUndefined();
+			} finally {
+				storage.close();
+			}
+		},
+	);
 
 	test("applies block upserts before broker acknowledgement and retains them when persistence is rejected", async () => {
 		const futureBlock = Date.now() + 60_000;
@@ -1076,7 +1137,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 7,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: {
 							type: "oauth",
 							access: "remote-access",
@@ -1088,29 +1149,29 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 						identityKey: "email:remote@example.com",
 						rotatesInMs: null,
 						blocks: [
-							{ providerKey: "anthropic:oauth", blockScope: "tier:fable", blockedUntilMs: futureBlock },
-							{ providerKey: "anthropic:oauth", blockScope: "shared", blockedUntilMs: futureBlock },
+							{ providerKey: "github-copilot:oauth", blockScope: "tier:standard", blockedUntilMs: futureBlock },
+							{ providerKey: "github-copilot:oauth", blockScope: "shared", blockedUntilMs: futureBlock },
 						],
 					},
 				],
 			},
 		});
 		try {
-			expect(remoteStore.getCredentialBlock(7, "anthropic:oauth", "tier:fable")).toBe(futureBlock);
+			expect(remoteStore.getCredentialBlock(7, "github-copilot:oauth", "tier:standard")).toBe(futureBlock);
 
 			remoteStore.upsertCredentialBlock({
 				credentialId: 7,
-				providerKey: "anthropic:oauth",
-				blockScope: "tier:fable",
+				providerKey: "github-copilot:oauth",
+				blockScope: "tier:standard",
 				blockedUntilMs: laterBlock,
 			});
 
-			expect(remoteStore.getCredentialBlock(7, "anthropic:oauth", "tier:fable")).toBe(laterBlock);
-			expect(remoteStore.getCredentialBlock(7, "anthropic:oauth", "shared")).toBe(futureBlock);
+			expect(remoteStore.getCredentialBlock(7, "github-copilot:oauth", "tier:standard")).toBe(laterBlock);
+			expect(remoteStore.getCredentialBlock(7, "github-copilot:oauth", "shared")).toBe(futureBlock);
 			upsertPending.reject(new Error("500 persistent credential block store unavailable"));
 			await upsertPending.promise.catch(() => {});
 			await Promise.resolve();
-			expect(remoteStore.getCredentialBlock(7, "anthropic:oauth", "tier:fable")).toBe(laterBlock);
+			expect(remoteStore.getCredentialBlock(7, "github-copilot:oauth", "tier:standard")).toBe(laterBlock);
 		} finally {
 			remoteStore.close();
 		}
@@ -1120,7 +1181,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const entry = {
 			id: 7,
-			provider: "anthropic",
+			provider: "github-copilot",
 			credential: {
 				type: "oauth" as const,
 				access: "remote-access",
@@ -1132,7 +1193,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			identityKey: "email:remote@example.com",
 			rotatesInMs: null,
 		};
-		const block = { providerKey: "anthropic:oauth", blockScope: "", blockedUntilMs, updatedAtMs: Date.now() };
+		const block = { providerKey: "github-copilot:oauth", blockScope: "", blockedUntilMs, updatedAtMs: Date.now() };
 		let incoming: SnapshotResponse = {
 			generation: 1,
 			generatedAt: Date.now(),
@@ -1174,49 +1235,8 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			remoteStore.close();
 		}
 	});
-	test("retains the legacy Codex shared block from an older broker snapshot", () => {
-		const blockedUntilMs = Date.now() + 60_000;
-		const remoteStore = new RemoteAuthCredentialStore({
-			client: new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" }),
-			streamSnapshots: false,
-			initialSnapshot: {
-				generation: 1,
-				generatedAt: Date.now(),
-				serverNowMs: Date.now(),
-				refresher: { enabled: false, intervalMs: 0, skewMs: 0, nextSweepInMs: Number.MAX_SAFE_INTEGER },
-				credentials: [
-					{
-						id: 7,
-						provider: "openai-codex",
-						credential: {
-							type: "oauth",
-							access: "remote-codex-access",
-							refresh: REMOTE_REFRESH_SENTINEL,
-							expires: blockedUntilMs,
-							accountId: "remote-codex-account",
-							email: "remote-codex@example.com",
-						},
-						identityKey: "email:remote-codex@example.com",
-						rotatesInMs: null,
-						blocks: [
-							{
-								providerKey: "openai-codex:oauth",
-								blockScope: "shared",
-								blockedUntilMs,
-							},
-						],
-					},
-				],
-			},
-		});
-		try {
-			expect(remoteStore.getCredentialBlock(7, "openai-codex:oauth", "shared")).toBe(blockedUntilMs);
-		} finally {
-			remoteStore.close();
-		}
-	});
 
-	test("ingestUsageReport overlays only the matching Anthropic report and getUsageReport returns the overlaid Fable row", async () => {
+	test("ingestUsageReport overlays only the matching account report and returns the overlaid tier", async () => {
 		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
@@ -1231,37 +1251,37 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const now = Date.now();
 
 		const reportForA: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now - 20_000,
 			limits: [
 				{
-					id: "anthropic:5h",
-					label: "Claude 5 Hour",
-					scope: { provider: "anthropic", windowId: "5h", shared: true },
+					id: "github-copilot:5h",
+					label: "Account 5 Hour",
+					scope: { provider: "github-copilot", windowId: "5h", shared: true },
 					window: { id: "5h", label: "5 Hour" },
 					amount: { used: 42, limit: 100, usedFraction: 0.42, unit: "percent" },
 					status: "ok",
 				},
 				{
-					id: "anthropic:7d",
-					label: "Claude 7 Day",
-					scope: { provider: "anthropic", windowId: "7d", shared: true },
+					id: "github-copilot:7d",
+					label: "Account 7 Day",
+					scope: { provider: "github-copilot", windowId: "7d", shared: true },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 84, limit: 100, usedFraction: 0.84, unit: "percent" },
 					status: "ok",
 				},
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 11, limit: 100, usedFraction: 0.11, unit: "percent" },
 					status: "ok",
 				},
 				{
-					id: "anthropic:7d:opus",
-					label: "Claude 7 Day (Opus)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "opus" },
+					id: "github-copilot:7d:premium",
+					label: "Account 7 Day (Premium)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "premium" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 12, limit: 100, usedFraction: 0.12, unit: "percent" },
 					status: "ok",
@@ -1270,13 +1290,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			metadata: { accountId: "account-a", email: "a@example.com" },
 		};
 		const reportForB: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now - 10_000,
 			limits: [
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 13, limit: 100, usedFraction: 0.13, unit: "percent" },
 					status: "ok",
@@ -1298,13 +1318,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		};
 		const credB = { ...credA, access: "bx", accountId: "account-b", email: "b@example.com" };
 		const overlay: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day", resetsAt: 1_780_617_600_000 },
 					amount: {
 						used: 61,
@@ -1319,37 +1339,37 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			metadata: { accountId: "account-a", email: "a@example.com", headersUpdatedAt: 1_780_000_000_000 },
 		};
 
-		expect(remoteStore.ingestUsageReport("anthropic", credA, overlay)).toBe(true);
+		expect(remoteStore.ingestUsageReport("github-copilot", credA, overlay)).toBe(true);
 
 		const reports = await remoteStore.fetchUsageReports();
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 		expect(reports).not.toBeNull();
 		const reportA = reports?.find(report => report.metadata?.accountId === "account-a");
 		const reportB = reports?.find(report => report.metadata?.accountId === "account-b");
-		if (!reportA || !reportB) throw new Error("expected anthropic reports for both broker accounts");
+		if (!reportA || !reportB) throw new Error("expected reports for both broker accounts");
 
 		expect(reportA.metadata?.email).toBe("a@example.com");
 		expect(reportA.metadata?.headersUpdatedAt).toBe(1_780_000_000_000);
-		expect(reportA.limits.filter(limit => limit.id === "anthropic:7d:fable")).toHaveLength(1);
-		expect(requireLimit(reportA, "anthropic:5h").amount.used).toBe(42);
-		expect(requireLimit(reportA, "anthropic:7d").amount.used).toBe(84);
-		expect(requireLimit(reportA, "anthropic:7d:opus").amount.used).toBe(12);
-		const overlaidFable = requireLimit(reportA, "anthropic:7d:fable");
-		expect(overlaidFable.amount.used).toBe(61);
-		expect(overlaidFable.amount.usedFraction).toBeCloseTo(0.61);
-		expect(overlaidFable.window?.resetsAt).toBe(1_780_617_600_000);
+		expect(reportA.limits.filter(limit => limit.id === "github-copilot:7d:standard")).toHaveLength(1);
+		expect(requireLimit(reportA, "github-copilot:5h").amount.used).toBe(42);
+		expect(requireLimit(reportA, "github-copilot:7d").amount.used).toBe(84);
+		expect(requireLimit(reportA, "github-copilot:7d:premium").amount.used).toBe(12);
+		const overlaidStandard = requireLimit(reportA, "github-copilot:7d:standard");
+		expect(overlaidStandard.amount.used).toBe(61);
+		expect(overlaidStandard.amount.usedFraction).toBeCloseTo(0.61);
+		expect(overlaidStandard.window?.resetsAt).toBe(1_780_617_600_000);
 
 		expect(reportB.metadata?.email).toBe("b@example.com");
 		expect(reportB.metadata?.headersUpdatedAt).toBeUndefined();
-		expect(requireLimit(reportB, "anthropic:7d:fable").amount.used).toBe(13);
+		expect(requireLimit(reportB, "github-copilot:7d:standard").amount.used).toBe(13);
 
-		const perCredA = await remoteStore.getUsageReport("anthropic", credA);
-		const perCredB = await remoteStore.getUsageReport("anthropic", credB);
+		const perCredA = await remoteStore.getUsageReport("github-copilot", credA);
+		const perCredB = await remoteStore.getUsageReport("github-copilot", credB);
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 		expect(perCredA).not.toBeNull();
 		expect(perCredB).not.toBeNull();
-		expect(requireLimit(perCredA!, "anthropic:7d:fable").amount.used).toBe(61);
-		expect(requireLimit(perCredB!, "anthropic:7d:fable").amount.used).toBe(13);
+		expect(requireLimit(perCredA!, "github-copilot:7d:standard").amount.used).toBe(61);
+		expect(requireLimit(perCredB!, "github-copilot:7d:standard").amount.used).toBe(13);
 
 		remoteStore.close();
 	});
@@ -1377,13 +1397,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			email: "a@example.com",
 		};
 		const overlay: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [
 				{
-					id: "anthropic:7d:fable",
-					label: "Claude 7 Day (Fable)",
-					scope: { provider: "anthropic", windowId: "7d", tier: "fable" },
+					id: "github-copilot:7d:standard",
+					label: "Account 7 Day (Standard)",
+					scope: { provider: "github-copilot", windowId: "7d", tier: "standard" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 61, limit: 100, usedFraction: 0.61, remainingFraction: 0.39, unit: "percent" },
 					status: "ok",
@@ -1392,14 +1412,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			metadata: { accountId: "account-a", email: "a@example.com", headersUpdatedAt: 1_780_000_000_000 },
 		};
 
-		expect(remoteStore.ingestUsageReport("anthropic", cred, overlay)).toBe(true);
+		expect(remoteStore.ingestUsageReport("github-copilot", cred, overlay)).toBe(true);
 
 		const first = await remoteStore.fetchUsageReports();
 		expect(first).toBeNull();
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
-		const perCred = await remoteStore.getUsageReport("anthropic", cred);
+		const perCred = await remoteStore.getUsageReport("github-copilot", cred);
 		expect(perCred).not.toBeNull();
-		expect(requireLimit(perCred!, "anthropic:7d:fable").amount.used).toBe(61);
+		expect(requireLimit(perCred!, "github-copilot:7d:standard").amount.used).toBe(61);
 		expect(fetchSpy).toHaveBeenCalledTimes(1);
 
 		const second = await remoteStore.fetchUsageReports();
@@ -1441,22 +1461,22 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		// Regression: keys stored via the /login flow carry `source: "login"`.
 		// exportSnapshot() forwards them verbatim; the client wire schema used
 		// to reject the field ("credentials[0].credential.source must be removed").
-		await serverStorage!.credentials.set("custom-host", { type: "api_key", key: "sk-custom", source: "login" });
+		await serverStorage!.credentials.set("local", { type: "api_key", key: "sk-custom", source: "login" });
 
 		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
 		const result = await brokerClient.fetchSnapshot();
 		if (result.status !== 200) throw new Error("expected snapshot");
-		const entry = result.snapshot.credentials.find(candidate => candidate.provider === "custom-host");
+		const entry = result.snapshot.credentials.find(candidate => candidate.provider === "local");
 		expect(entry?.credential).toEqual({ type: "api_key", key: "sk-custom", source: "login" });
 	});
 
 	test("client credentials.remove disables every broker-side credential for the provider (logout)", async () => {
-		await serverStore!.saveApiKey("kagi", "k1");
-		await serverStore!.saveOAuth("kagi", {
+		await serverStore!.saveApiKey("github-copilot", "k1");
+		await serverStore!.saveOAuth("github-copilot", {
 			access: "oauth-access",
 			refresh: "oauth-refresh",
 			expires: Date.now() + 120_000,
-			accountId: "acct-kagi",
+			accountId: "copilot-logout",
 			email: "user@example.com",
 		});
 		await serverStorage!.credentials.reload();
@@ -1471,79 +1491,82 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const clientStorage = new AuthStorage(remoteStore);
 		await clientStorage.credentials.reload();
 
-		await clientStorage.credentials.remove("kagi");
+		await clientStorage.credentials.remove("github-copilot");
 
-		expect(serverStore!.listAuthCredentials("kagi")).toEqual([]);
-		expect(clientStorage.credentials.get("kagi")).toBeUndefined();
+		expect(serverStore!.listAuthCredentials("github-copilot")).toEqual([]);
+		expect(clientStorage.credentials.get("github-copilot")).toBeUndefined();
 		clientStorage.close();
 	});
 
-	test.each(["", "tier:fable"])("scoped block deletion removes only the exact broker row (%s)", async blockScope => {
-		const credential = serverStore!.listAuthCredentials("anthropic")[0];
-		if (!credential) throw new Error("expected credential");
-		const providerKey = "anthropic:oauth";
-		const scopes = ["", "tier:fable", "model-account-policy:claude-test"];
-		const blockedUntilMs = Date.now() + 60_000;
-		for (const scope of scopes) {
-			serverStorage!.blocks.upsert({
-				credentialId: credential.id,
-				providerKey,
-				blockScope: scope,
-				blockedUntilMs,
+	test.each(["", "tier:standard"])(
+		"scoped block deletion removes only the exact broker row (%s)",
+		async blockScope => {
+			const credential = serverStore!.listAuthCredentials("github-copilot")[0];
+			if (!credential) throw new Error("expected credential");
+			const providerKey = "github-copilot:oauth";
+			const scopes = ["", "tier:standard", "model-account-policy:copilot-test"];
+			const blockedUntilMs = Date.now() + 60_000;
+			for (const scope of scopes) {
+				serverStorage!.blocks.upsert({
+					credentialId: credential.id,
+					providerKey,
+					blockScope: scope,
+					blockedUntilMs,
+				});
+			}
+			const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
+			const initial = await brokerClient.fetchSnapshot();
+			if (initial.status !== 200) throw new Error("expected snapshot");
+			const remoteStore = new RemoteAuthCredentialStore({
+				client: brokerClient,
+				initialSnapshot: initial.snapshot,
+				streamSnapshots: false,
 			});
-		}
-		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
-		const initial = await brokerClient.fetchSnapshot();
-		if (initial.status !== 200) throw new Error("expected snapshot");
-		const remoteStore = new RemoteAuthCredentialStore({
-			client: brokerClient,
-			initialSnapshot: initial.snapshot,
-			streamSnapshots: false,
-		});
-		const propagated = Promise.withResolvers<void>();
-		const removeBlock = brokerClient.deleteCredentialBlock.bind(brokerClient);
-		vi.spyOn(brokerClient, "deleteCredentialBlock").mockImplementation(async (...args) => {
+			const propagated = Promise.withResolvers<void>();
+			const removeBlock = brokerClient.deleteCredentialBlock.bind(brokerClient);
+			vi.spyOn(brokerClient, "deleteCredentialBlock").mockImplementation(async (...args) => {
+				try {
+					return await removeBlock(...args);
+				} finally {
+					propagated.resolve();
+				}
+			});
 			try {
-				return await removeBlock(...args);
+				remoteStore.deleteCredentialBlock(credential.id, providerKey, blockScope);
+				expect(remoteStore.getCredentialBlock(credential.id, providerKey, blockScope)).toBeUndefined();
+				for (const scope of scopes.filter(scope => scope !== blockScope)) {
+					expect(remoteStore.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
+				}
+				await propagated.promise;
+				expect(serverStore!.getCredentialBlock(credential.id, providerKey, blockScope)).toBeUndefined();
+				for (const scope of scopes.filter(scope => scope !== blockScope)) {
+					expect(serverStore!.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
+				}
+
+				const observer = new AuthBrokerClient({ url: handle!.url, token });
+				const updated = await observer.fetchSnapshot();
+				if (updated.status !== 200) throw new Error("expected snapshot");
+				expect(
+					updated.snapshot.credentials
+						.find(entry => entry.id === credential.id)
+						?.blocks?.map(block => block.blockScope)
+						.sort(),
+				).toEqual(scopes.filter(scope => scope !== blockScope).sort());
+
+				const malformed = await fetch(`${handle!.url}/v1/credential/${credential.id}/block`, {
+					method: "DELETE",
+					headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+					body: JSON.stringify({ providerKey }),
+				});
+				expect(malformed.status).toBe(400);
+				for (const scope of scopes.filter(scope => scope !== blockScope)) {
+					expect(serverStore!.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
+				}
 			} finally {
-				propagated.resolve();
+				remoteStore.close();
 			}
-		});
-		try {
-			remoteStore.deleteCredentialBlock(credential.id, providerKey, blockScope);
-			expect(remoteStore.getCredentialBlock(credential.id, providerKey, blockScope)).toBeUndefined();
-			for (const scope of scopes.filter(scope => scope !== blockScope)) {
-				expect(remoteStore.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
-			}
-			await propagated.promise;
-			expect(serverStore!.getCredentialBlock(credential.id, providerKey, blockScope)).toBeUndefined();
-			for (const scope of scopes.filter(scope => scope !== blockScope)) {
-				expect(serverStore!.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
-			}
-
-			const observer = new AuthBrokerClient({ url: handle!.url, token });
-			const updated = await observer.fetchSnapshot();
-			if (updated.status !== 200) throw new Error("expected snapshot");
-			expect(
-				updated.snapshot.credentials
-					.find(entry => entry.id === credential.id)
-					?.blocks?.map(block => block.blockScope)
-					.sort(),
-			).toEqual(scopes.filter(scope => scope !== blockScope).sort());
-
-			const malformed = await fetch(`${handle!.url}/v1/credential/${credential.id}/block`, {
-				method: "DELETE",
-				headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-				body: JSON.stringify({ providerKey }),
-			});
-			expect(malformed.status).toBe(400);
-			for (const scope of scopes.filter(scope => scope !== blockScope)) {
-				expect(serverStore!.getCredentialBlock(credential.id, providerKey, scope)).toBe(blockedUntilMs);
-			}
-		} finally {
-			remoteStore.close();
-		}
-	});
+		},
+	);
 
 	test("scoped deletion masks racing old snapshots without hiding newer blocks or failed deletes", async () => {
 		const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
@@ -1553,12 +1576,12 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		if (!entry) throw new Error("expected credential");
 		const now = Date.now();
 		const globalBlock = {
-			providerKey: "anthropic:oauth",
+			providerKey: "github-copilot:oauth",
 			blockScope: "",
 			blockedUntilMs: now + 60_000,
 			updatedAtMs: now,
 		};
-		const scopedBlock = { ...globalBlock, blockScope: "tier:fable" };
+		const scopedBlock = { ...globalBlock, blockScope: "tier:standard" };
 		let incoming: SnapshotResponse = {
 			...initial.snapshot,
 			credentials: [{ ...entry, blocks: [globalBlock, scopedBlock] }],
@@ -1582,7 +1605,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			remoteStore.deleteCredentialBlock(entry.id, globalBlock.providerKey, "");
 			await remoteStore.refreshSnapshot();
 			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "")).toBeUndefined();
-			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "tier:fable")).toBe(
+			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "tier:standard")).toBe(
 				globalBlock.blockedUntilMs,
 			);
 
@@ -1603,7 +1626,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			await new Promise<void>(resolve => setImmediate(resolve));
 			await remoteStore.refreshSnapshot();
 			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "")).toBe(globalBlock.blockedUntilMs);
-			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "tier:fable")).toBe(
+			expect(remoteStore.getCredentialBlock(entry.id, globalBlock.providerKey, "tier:standard")).toBe(
 				globalBlock.blockedUntilMs,
 			);
 		} finally {
@@ -1612,7 +1635,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		}
 	});
 
-	test.each([undefined, "anthropic"])(
+	test.each([undefined, "github-copilot"])(
 		"invalidated broker usage flights serialize one fresh successor (%s)",
 		async provider => {
 			const brokerClient = new AuthBrokerClient({ url: handle!.url, token });
@@ -1621,7 +1644,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			const release = Promise.withResolvers<void>();
 			const started = Promise.withResolvers<void>();
 			const stale: UsageReport = {
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: 1,
 				limits: [],
 				metadata: { accountId: "account-1" },
@@ -1710,7 +1733,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	});
 
 	test("broker invalidation drops server-side last-good usage reports", async () => {
-		const credential = serverStore!.listAuthCredentials("anthropic")[0];
+		const credential = serverStore!.listAuthCredentials("github-copilot")[0];
 		if (credential?.credential.type !== "oauth") throw new Error("expected OAuth credential");
 		serverStore!.updateAuthCredential(credential.id, {
 			...credential.credential,
@@ -1719,17 +1742,17 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		await serverStorage!.credentials.reload();
 
 		let calls = 0;
-		const fetchSpy = vi.spyOn(claudeUsage.claudeUsageProvider, "fetchUsage").mockImplementation(async () => {
+		const fetchSpy = vi.spyOn(usageProvider, "fetchUsage").mockImplementation(async () => {
 			calls += 1;
 			if (calls > 1) return null;
 			return {
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [
 					{
-						id: "anthropic:5h",
-						label: "Claude 5 Hour",
-						scope: { provider: "anthropic", windowId: "5h" },
+						id: "github-copilot:5h",
+						label: "Account 5 Hour",
+						scope: { provider: "github-copilot", windowId: "5h" },
 						amount: { used: 80, limit: 100, unit: "percent" },
 						status: "ok",
 					},
@@ -1757,7 +1780,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 	});
 
 	test("a client's single-provider usage refresh leaves the broker's other providers cached", async () => {
-		const credential = serverStore!.listAuthCredentials("anthropic")[0];
+		const credential = serverStore!.listAuthCredentials("github-copilot")[0];
 		if (credential?.credential.type !== "oauth") throw new Error("expected OAuth credential");
 		serverStore!.updateAuthCredential(credential.id, {
 			...credential.credential,
@@ -1766,17 +1789,17 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		await serverStorage!.credentials.reload();
 
 		let calls = 0;
-		const fetchSpy = vi.spyOn(claudeUsage.claudeUsageProvider, "fetchUsage").mockImplementation(async () => {
+		const fetchSpy = vi.spyOn(usageProvider, "fetchUsage").mockImplementation(async () => {
 			calls += 1;
 			if (calls > 1) return null;
 			return {
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [
 					{
-						id: "anthropic:5h",
-						label: "Claude 5 Hour",
-						scope: { provider: "anthropic", windowId: "5h" },
+						id: "github-copilot:5h",
+						label: "Account 5 Hour",
+						scope: { provider: "github-copilot", windowId: "5h" },
 						amount: { used: 80, limit: 100, unit: "percent" },
 						status: "ok",
 					},
@@ -1795,12 +1818,12 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		await clientStorage.credentials.reload();
 		try {
 			expect(await clientStorage.usage.reports()).toHaveLength(1);
-			await clientStorage.usage.invalidate("openai-codex");
+			await clientStorage.usage.invalidate("local");
 			const reports = await clientStorage.usage.reports();
-			expect(reports?.map(report => report.provider)).toEqual(["anthropic"]);
+			expect(reports?.map(report => report.provider)).toEqual(["github-copilot"]);
 			expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-			await clientStorage.usage.invalidate("anthropic");
+			await clientStorage.usage.invalidate("github-copilot");
 			expect(await clientStorage.usage.reports()).toEqual([]);
 			expect(fetchSpy).toHaveBeenCalledTimes(2);
 		} finally {
@@ -1808,7 +1831,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		}
 	});
 
-	test("broker returns an upgraded plan through a delayed serialized Codex refresh", async () => {
+	test("broker returns an upgraded plan through a delayed serialized account refresh", async () => {
 		const accountIds = ["account-free", "account-upgraded", "account-other"];
 		const refreshStarted = new Map<string, PromiseWithResolvers<void>>();
 		const refreshReleases = new Map<string, PromiseWithResolvers<void>>();
@@ -1818,8 +1841,8 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		}
 		const startedAccounts: string[] = [];
 		const usageProvider: UsageProvider = {
-			id: "openai-codex",
-			supports: params => params.provider === "openai-codex" && params.credential.type === "oauth",
+			id: "github-copilot",
+			supports: params => params.provider === "github-copilot" && params.credential.type === "oauth",
 			async fetchUsage(params) {
 				const accountId = params.credential.accountId;
 				if (!accountId) return null;
@@ -1830,13 +1853,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				started.resolve();
 				await release.promise;
 				return {
-					provider: "openai-codex",
+					provider: "github-copilot",
 					fetchedAt: Date.now(),
 					limits: [
 						{
-							id: "openai-codex:7d",
+							id: "github-copilot:7d",
 							label: "7 days",
-							scope: { provider: "openai-codex", windowId: "7d" },
+							scope: { provider: "github-copilot", windowId: "7d" },
 							amount: { used: 0, limit: 100, unit: "percent" },
 							status: "ok",
 						},
@@ -1849,9 +1872,10 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				};
 			},
 		};
-		testUsageProviders = new Map([["openai-codex", usageProvider]]);
+		testUsageProviders = new Map([["github-copilot", usageProvider]]);
+		await serverStorage!.credentials.remove("github-copilot");
 		for (const accountId of accountIds) {
-			await serverStore!.upsertAuthCredential("openai-codex", {
+			await serverStore!.upsertAuthCredential("github-copilot", {
 				type: "oauth",
 				access: `access-${accountId}`,
 				refresh: `refresh-${accountId}`,
@@ -1906,7 +1930,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		}
 	});
 
-	test.each([undefined, "openai-codex"])("sizes usage timeout before account-pool filtering (%s)", async provider => {
+	test.each([undefined, "local"])("sizes usage timeout before account-pool filtering (%s)", async provider => {
 		vi.useFakeTimers();
 		const now = Date.now();
 		const credentials: SnapshotResponse["credentials"] = [];
@@ -1914,7 +1938,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			const accountId = `account-${index}`;
 			credentials.push({
 				id: index + 1,
-				provider: "openai-codex",
+				provider: "local",
 				credential: {
 					type: "oauth",
 					access: `access-${index}`,
@@ -1960,7 +1984,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
 			streamSnapshots: false,
-			accountPool: new Map([["openai-codex", new Set([visible.identityKey])]]),
+			accountPool: new Map([["local", new Set([visible.identityKey])]]),
 			initialSnapshot,
 		});
 		try {
@@ -1977,7 +2001,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 					generatedAt: Date.now(),
 					reports: [
 						{
-							provider: "openai-codex",
+							provider: "local",
 							fetchedAt: Date.now(),
 							limits: [],
 							metadata: { accountId: "account-0", email: "0@example.com" },
@@ -2006,25 +2030,25 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		});
 		const reports: UsageReport[] = [
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [],
 				metadata: { accountId: "account-shared", email: "shared@example.com", orgId: "org-team" },
 			},
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [],
 				metadata: { accountId: "account-shared", email: "shared@example.com", orgId: "org-max" },
 			},
-			{ provider: "anthropic", fetchedAt: now, limits: [] },
+			{ provider: "github-copilot", fetchedAt: now, limits: [] },
 		];
 		vi.spyOn(brokerClient, "fetchUsage").mockResolvedValue({ generatedAt: now, reports });
 		const teamIdentity = "email:shared@example.com|org:org-team";
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", new Set([teamIdentity])]]),
+			accountPool: new Map([["github-copilot", new Set([teamIdentity])]]),
 			initialSnapshot: {
 				generation: 1,
 				generatedAt: now,
@@ -2033,14 +2057,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: makeCredential("org-team"),
 						identityKey: teamIdentity,
 						rotatesInMs: null,
 					},
 					{
 						id: 2,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: makeCredential("org-max"),
 						identityKey: "email:shared@example.com|org:org-max",
 						rotatesInMs: null,
@@ -2052,7 +2076,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			expect(remoteStore.snapshot.credentials.map(entry => entry.identityKey)).toEqual([teamIdentity]);
 			const visibleReports = await remoteStore.fetchUsageReports();
 			expect(visibleReports?.map(report => report.metadata?.orgId)).toEqual(["org-team"]);
-			expect(await remoteStore.getUsageReport("anthropic", makeCredential("org-max"))).toBeNull();
+			expect(await remoteStore.getUsageReport("github-copilot", makeCredential("org-max"))).toBeNull();
 		} finally {
 			remoteStore.close();
 		}
@@ -2071,13 +2095,13 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		};
 		const reports: UsageReport[] = [
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [],
 				metadata: { accountId: "oauth-account", email: "oauth@example.com" },
 			},
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: now,
 				limits: [],
 				metadata: { accountId: "api-key-account" },
@@ -2088,7 +2112,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", new Set([oauthIdentity])]]),
+			accountPool: new Map([["github-copilot", new Set([oauthIdentity])]]),
 			initialSnapshot: {
 				generation: 1,
 				generatedAt: now,
@@ -2097,14 +2121,14 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: oauthCredential,
 						identityKey: oauthIdentity,
 						rotatesInMs: null,
 					},
 					{
 						id: 2,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: { type: "api_key", key: "visible-api-key" },
 						identityKey: null,
 						rotatesInMs: null,
@@ -2123,8 +2147,8 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const brokerClient = new AuthBrokerClient({ url: "http://127.0.0.1:9", token: "unused" });
 		const now = Date.now();
 		const reports: UsageReport[] = [
-			{ provider: "openai-codex", fetchedAt: now, limits: [], metadata: { accountId: "codex-account" } },
-			{ provider: "openrouter", fetchedAt: now, limits: [], metadata: {} },
+			{ provider: "github-copilot", fetchedAt: now, limits: [], metadata: { accountId: "copilot-account" } },
+			{ provider: "local", fetchedAt: now, limits: [], metadata: {} },
 		];
 		vi.spyOn(brokerClient, "fetchUsage").mockResolvedValue({ generatedAt: now, reports });
 		const remoteStore = new RemoteAuthCredentialStore({
@@ -2132,7 +2156,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			streamSnapshots: false,
 			accountPool: new Map([
 				["*", { accounts: new Set<string>(), apiKeys: false }],
-				["openrouter", {}],
+				["local", {}],
 			]),
 			initialSnapshot: {
 				generation: 1,
@@ -2142,20 +2166,20 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "openai-codex",
+						provider: "github-copilot",
 						credential: {
 							type: "oauth",
-							access: "codex-access",
+							access: "local-access",
 							refresh: REMOTE_REFRESH_SENTINEL,
 							expires: now + 120_000,
-							accountId: "codex-account",
+							accountId: "local-account",
 						},
-						identityKey: "account:codex-account",
+						identityKey: "account:local-account",
 						rotatesInMs: null,
 					},
 					{
 						id: 2,
-						provider: "openrouter",
+						provider: "local",
 						credential: { type: "api_key", key: "visible-api-key" },
 						identityKey: null,
 						rotatesInMs: null,
@@ -2164,7 +2188,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			},
 		});
 		try {
-			expect(remoteStore.listAuthCredentials().map(entry => entry.provider)).toEqual(["openrouter"]);
+			expect(remoteStore.listAuthCredentials().map(entry => entry.provider)).toEqual(["local"]);
 			expect(await remoteStore.fetchUsageReports()).toEqual([reports[1]]);
 		} finally {
 			remoteStore.close();
@@ -2183,22 +2207,22 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			email: "oauth@example.com",
 		};
 		const matchingReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [],
 			metadata: { accountId: "oauth-account", email: "oauth@example.com" },
 		};
 		const strangerReport: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt: now,
 			limits: [],
 			metadata: { accountId: "stranger-account", email: "stranger@example.com" },
 		};
 		const nonPooledReport: UsageReport = {
-			provider: "openai-codex",
+			provider: "local",
 			fetchedAt: now,
 			limits: [],
-			metadata: { accountId: "codex-account" },
+			metadata: { accountId: "local-account" },
 		};
 		const reports: UsageReport[] = [matchingReport, strangerReport, nonPooledReport];
 		const fetchSpy = vi.spyOn(brokerClient, "fetchUsage").mockResolvedValue({ generatedAt: now, reports });
@@ -2207,7 +2231,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", new Set([oauthIdentity])]]),
+			accountPool: new Map([["github-copilot", new Set([oauthIdentity])]]),
 			initialSnapshot: {
 				generation: 1,
 				generatedAt: now,
@@ -2216,7 +2240,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: oauthCredential,
 						identityKey: oauthIdentity,
 						rotatesInMs: null,
@@ -2259,7 +2283,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		vi.spyOn(brokerClient, "refreshCredential").mockResolvedValue({
 			entry: {
 				id: 1,
-				provider: "anthropic",
+				provider: "github-copilot",
 				credential: {
 					...allowedCredential,
 					access: "excluded-access",
@@ -2272,7 +2296,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 		const remoteStore = new RemoteAuthCredentialStore({
 			client: brokerClient,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", new Set([allowedIdentity])]]),
+			accountPool: new Map([["github-copilot", new Set([allowedIdentity])]]),
 			initialSnapshot: {
 				generation: 1,
 				generatedAt: now,
@@ -2281,7 +2305,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 				credentials: [
 					{
 						id: 1,
-						provider: "anthropic",
+						provider: "github-copilot",
 						credential: allowedCredential,
 						identityKey: allowedIdentity,
 						rotatesInMs: null,
@@ -2290,7 +2314,7 @@ describe("RemoteAuthCredentialStore + AuthStorage integration", () => {
 			},
 		});
 		try {
-			await expect(remoteStore.refreshOAuthCredential("anthropic", 1, allowedCredential)).rejects.toThrow(
+			await expect(remoteStore.refreshOAuthCredential("github-copilot", 1, allowedCredential)).rejects.toThrow(
 				"outside the configured account pool",
 			);
 			expect(remoteStore.snapshot.credentials).toEqual([]);

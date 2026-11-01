@@ -75,8 +75,8 @@ describe("issue #6516 — tool output appears twice", () => {
 		}
 
 		tempDir = TempDir.createSync("@pi-issue-6516-");
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 test model");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 test model");
 
 		session = new AgentSession({
 			agent: new Agent({ initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] } }),

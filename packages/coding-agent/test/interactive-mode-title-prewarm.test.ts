@@ -48,9 +48,9 @@ describe("InteractiveMode tiny-title prewarm", () => {
 
 		resetSettingsForTest();
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+			throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		}
 
 		session = new AgentSession({
@@ -134,7 +134,7 @@ describe("InteractiveMode tiny-title prewarm", () => {
 
 	it("does not prewarm a paid tiny role", async () => {
 		const prewarm = vi.spyOn(tinyTitleClient, "prewarm").mockImplementation(() => {});
-		session.settings.setModelRole("tiny", "anthropic/claude-haiku-4-5");
+		session.settings.setModelRole("tiny", "github-copilot/claude-haiku-4.5");
 
 		await mode.init();
 		const immediateFlushed = Promise.withResolvers<void>();

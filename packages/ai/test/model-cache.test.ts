@@ -15,8 +15,8 @@ function createModel(id: string, name: string): Model<"openai-completions"> {
 		id,
 		name,
 		api: "openai-completions",
-		provider: "ollama-cloud",
-		baseUrl: "https://ollama.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: false,
 		input: ["text"],
 		cost: {
@@ -64,18 +64,18 @@ describe("model cache migrations", () => {
 		`);
 		legacyDb.run(
 			"INSERT INTO model_cache (provider_id, version, updated_at, authoritative, models) VALUES (?, ?, ?, ?, ?)",
-			["ollama-cloud", 9, Date.now(), 1, JSON.stringify([legacyModel])],
+			["github-copilot", 9, Date.now(), 1, JSON.stringify([legacyModel])],
 		);
 		legacyDb.close();
 
-		const migrated = readModelCache<"openai-completions">("ollama-cloud", TTL_MS, Date.now, dbPath);
+		const migrated = readModelCache<"openai-completions">("github-copilot", TTL_MS, Date.now, dbPath);
 		expect(migrated).toBeNull();
 		expect((await fs.readFile(dbPath)).includes("legacy-cached-secret")).toBe(false);
 
 		const replacementModel = createModel("fresh-cloud-model", "Fresh Cloud Model");
-		writeModelCache("ollama-cloud", Date.now(), [replacementModel], true, "static-v3", dbPath);
+		writeModelCache("github-copilot", Date.now(), [replacementModel], true, "static-v3", dbPath);
 
-		const fresh = readModelCache<"openai-completions">("ollama-cloud", TTL_MS, Date.now, dbPath);
+		const fresh = readModelCache<"openai-completions">("github-copilot", TTL_MS, Date.now, dbPath);
 		expect(fresh?.models.map(model => model.id)).toEqual(["fresh-cloud-model"]);
 		expect(fresh?.staticFingerprint).toBe("static-v3");
 	});
@@ -85,7 +85,7 @@ describe("model cache migrations", () => {
 			id: "gated-model",
 			name: "Gated Model",
 			api: "openai-completions",
-			provider: "runtime-ext",
+			provider: "github-copilot",
 			baseUrl: "https://ext.example.com/v1",
 			reasoning: false,
 			input: ["text"],
@@ -99,13 +99,13 @@ describe("model cache migrations", () => {
 				"X-Project-Id": "proj-42",
 			},
 		});
-		writeModelCache("runtime-ext", Date.now(), [model], true, "static-v1", dbPath);
+		writeModelCache("github-copilot", Date.now(), [model], true, "static-v1", dbPath);
 
 		// Header names are provider-defined and any value may be a credential.
 		// The plaintext SQLite payload therefore persists no model headers.
 		const raw = new Database(dbPath, { readonly: true });
 		const row = raw
-			.query<{ models: string }, []>("SELECT models FROM model_cache WHERE provider_id = 'runtime-ext'")
+			.query<{ models: string }, []>("SELECT models FROM model_cache WHERE provider_id = 'github-copilot'")
 			.get();
 		raw.close();
 		expect(row?.models).not.toContain("standard-secret");
@@ -113,7 +113,7 @@ describe("model cache migrations", () => {
 		expect(row?.models).not.toContain("access-secret");
 		expect(row?.models).not.toContain("proj-42");
 
-		const cached = readModelCache<"openai-completions">("runtime-ext", TTL_MS, Date.now, dbPath);
+		const cached = readModelCache<"openai-completions">("github-copilot", TTL_MS, Date.now, dbPath);
 		expect(cached?.models[0]?.headers).toBeUndefined();
 		expect(cached?.headerOmittedModelIds).toEqual(["gated-model"]);
 		expect(cached?.unrestorableHeaderModelIds).toEqual(["gated-model"]);
@@ -121,19 +121,19 @@ describe("model cache migrations", () => {
 
 	it("fails closed and deletes corrupt header provenance", () => {
 		const model = createModel("corrupt-provenance", "Corrupt Provenance");
-		writeModelCache("runtime-ext", Date.now(), [model], true, "static-v1", dbPath);
+		writeModelCache("github-copilot", Date.now(), [model], true, "static-v1", dbPath);
 
 		const db = new Database(dbPath);
 		db.run("UPDATE model_cache SET header_omitted_model_ids = ? WHERE provider_id = ?", [
 			JSON.stringify({ invalid: "not-an-id-list" }),
-			"runtime-ext",
+			"github-copilot",
 		]);
 		db.close();
 
-		expect(readModelCache("runtime-ext", TTL_MS, Date.now, dbPath)).toBeNull();
+		expect(readModelCache("github-copilot", TTL_MS, Date.now, dbPath)).toBeNull();
 		const verified = new Database(dbPath, { readonly: true });
 		const row = verified
-			.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM model_cache WHERE provider_id = 'runtime-ext'")
+			.query<{ count: number }, []>("SELECT COUNT(*) AS count FROM model_cache WHERE provider_id = 'github-copilot'")
 			.get();
 		verified.close();
 		expect(row?.count).toBe(0);

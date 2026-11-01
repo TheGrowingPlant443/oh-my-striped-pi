@@ -140,145 +140,14 @@ labeling action. `getAllTools()` returns tool schemas and source metadata, while
 
 ### Provider registration
 
-Provider `models` entries and rows returned by `fetchDynamicModels` accept the same `api`/`kind` pairs as `models.yml` (see [Models](./models.md)): a runner API such as `openai-images` implies its kind, so the model reaches the `image` role and `generate_image` instead of registering as chat. A static `models` entry whose `kind` its api cannot serve fails `registerProvider`; such a `fetchDynamicModels` row is dropped with a logged warning.
+`pi.registerProvider(name, config)` remains a generic extension interface, but the only accepted provider IDs are `github-copilot` and `local`. Unsupported IDs fail before credential commands or discovery run. Custom OAuth registration is rejected; Copilot retains its built-in authentication flow.
 
-```ts
-pi.registerProvider("my-gateway", {
-	baseUrl: "https://gateway.example.com/v1",
-	apiKey: "GATEWAY_API_KEY",
-	models: [
-		{
-			id: "gpt-image-2",
-			name: "GPT Image 2",
-			api: "openai-images", // kind: "image" implied
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 128000,
-			maxTokens: 16384,
-		},
-	],
-});
-```
+Provider model entries and `fetchDynamicModels` rows must use the retained model/API contracts described in [Models](./models.md). Shared protocol adapters do not enable direct upstream vendor providers. `local` means the bundled on-device tiny text, TTS, and STT workers, not a generic command-backed or HTTP-server provider.
 
-`pi.registerProvider(name, config)` can include an optional `usage` field containing a
-`UsageProvider` imported from `@oh-my-pi/pi-ai`. Its `fetchUsage` implementation receives the
-normalized credential and returns a normalized `UsageReport`; the result is then handled
-by the host's AuthStorage cache, history, and usage displays just like built-in provider
-usage.
+The optional `usage` hook can override usage reporting for a retained provider. `pi.unregisterProvider(name)` and extension cleanup remove that runtime override rather than deleting the built-in provider. Use a distinct usage `cacheVersion` when overriding built-in usage reporting so cached reports remain scoped to the implementation that produced them.
 
-```ts
-pi.registerProvider("my-provider", {
-	baseUrl: "https://api.example.com/v1",
-	api: "openai-completions",
-	usage: {
-		id: "my-provider",
-		async fetchUsage(params, { fetch }) {
-			const response = await fetch("https://api.example.com/usage", {
-				headers: { Authorization: `Bearer ${params.credential.apiKey}` },
-			});
-			if (!response.ok) return null;
-			const payload = (await response.json()) as {
-				used: number;
-				limit: number;
-			};
-			return {
-				provider: "my-provider",
-				fetchedAt: Date.now(),
-				limits: [
-					{
-						id: "requests",
-						label: "Requests",
-						scope: { provider: "my-provider" },
-						amount: {
-							used: payload.used,
-							limit: payload.limit,
-							unit: "requests",
-						},
-					},
-				],
-			};
-		},
-	},
-});
-```
+Persisted selectors naming removed providers fail explicitly rather than silently selecting Copilot. Extension registration cannot migrate an obsolete provider by aliasing it to `local` or using a custom transport. Generic extension tools, hooks, plugins, MCP, and independent web/search integrations remain supported.
 
-An extension usage provider overrides a built-in provider with the same name for as
-long as that extension registration is active. `pi.unregisterProvider(name)` (and
-extension source cleanup) removes only that runtime override, restoring the built-in
-or configured usage resolver.
-
-Cached usage reports live in the shared `agent.db`, keyed by provider name, the
-usage provider's `cacheVersion`, normalized base URL, and credential identity. When overriding a built-in provider, set a `cacheVersion`
-distinct from the built-in one so processes without the extension (older sessions,
-`--no-extensions` runs, SDK scripts) never serve their reports to yours, or yours to them.
-
-Extension-registered providers (`registerProvider`) can supply `fetchDynamicModels` for runtime model discovery; these fetches are hard-bounded to a 15-second timeout (`RUNTIME_DYNAMIC_MODEL_FETCH_TIMEOUT_MS` in `model-provider-discovery.ts`) so a hung endpoint cannot stall discovery.
-
-A provider's `apiKey` (a literal key or an environment variable name) normally overrides any stored OAuth or `/login` credential for that provider. When the registration also supplies `oauth`, `apiKey` becomes a fallback instead: the key the user saved with `/login` wins, and `apiKey` is used only when no stored login credential exists. This keeps an unset env-var name from being sent as the literal key. Registering a built-in provider id with both `oauth` and a gateway `apiKey` therefore lets a stored upstream credential take precedence over the gateway key.
-
-Provider login callbacks can request masked entry with
-`callbacks.onPrompt({ message: "Consumer key", secret: true })`. Native `/login`
-and first-run setup preserve the exact submitted value while hiding it in the
-input, retained answers, and input diagnostic previews. Login prompts do not
-share undo or kill/yank history. Ordinary prompts remain unmasked.
-
-RPC rejects secret prompts instead of forwarding them as ordinary input. SDK
-hosts implementing `onPrompt` must honor `secret` or reject the prompt. Masking
-does not provide encryption, memory erasure, or general log redaction.
-
-### Command-backed providers
-
-`registerProvider` also supports providers whose transport is implemented by the
-extension itself. The `api` value is an extension-owned string (built-in API
-names are reserved), and `streamSimple` returns the canonical
-`AssistantMessageEventStream`; it does not need to be an HTTP endpoint:
-
-```ts
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai";
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-
-export default function (pi: ExtensionAPI) {
-	pi.registerProvider("local-command", {
-		// Required model metadata; the custom stream does not use this URL.
-		baseUrl: "https://command-provider.invalid/",
-		apiKey: "unused-by-extension",
-		api: "local-command-api",
-		streamSimple(model, context, options) {
-			const stream = new AssistantMessageEventStream();
-			// Spawn the command, translate its output, and push canonical OMP events.
-			// The implementation owns process cleanup, cancellation, and errors; the
-			// helper needs `context` for the conversation and `options` for `signal`,
-			// `cwd`, and the stable `sessionId`.
-			void runCommandAndPushEvents(stream, model, context, options);
-			return stream;
-		},
-		models: [
-			{
-				id: "local-command-model",
-				name: "Local command",
-				reasoning: false,
-				input: ["text"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 128000,
-				maxTokens: 16000,
-			},
-		],
-	});
-}
-```
-
-This pattern is useful for a local CLI, stdio service, or JSONL process. It is
-also how a provider rides a plan the vendor only exposes through its CLI: the
-child authenticates with its own subscription credentials, where the same model
-reached through an API key bills per token even for an account that already pays
-for a plan. A command-backed provider should keep its own tool loop inside the
-child process and emit only the resulting assistant events if those tools must
-remain owned by the child. A complete subprocess adapter should also remove
-credentials it must not inherit, honor `options.signal`, use `options.cwd`, map
-one stable session id to one child conversation, and convert non-zero exits into
-a stream error. `models.yml` remains HTTP/configuration-only; extensions are the
-supported escape hatch for non-HTTP transports.
 
 In interactive mode, `input` handlers run before the built-in first-message auto-title check. Extensions that call `await pi.setSessionName(...)` from `input` can set the persisted session name and prevent the default auto-generated title from running for that session.
 
@@ -378,7 +247,6 @@ Handlers and tool `execute` receive `ctx` with:
 - `isProjectTrusted()` — always `true`; OMP does not ask for per-directory trust before loading project inputs
 - `agent` — the agent this session runs: `{ kind: "main" | "sub", id, name, depth, parentId? }`. Factories are rebound to every subagent session (task tool, eval `agent()`, `/tan` clones), so a handler can check `ctx.agent.kind === "sub"` or the lowercased agent definition `name` (for example `"explore"`) to act only in subagents. Use `kind`, not `depth`: `depth` counts `task` nesting only, so `/tan` clones are subagents at depth 0 and report `name: "sub"`. An advisor's own tool calls reach the session's `tool_call`/`tool_result` handlers with `{ kind: "sub", id: "advisor", name: "advisor", depth: 0, parentId }`, so `kind === "main"` also excludes advisor activity
 - `runEphemeralTurn(...)` (optional; see below)
-- `startLive(...)` (optional; interactive mode only; see below)
 - `memory` (optional structured memory runtime — status/search/save across the configured backend)
 - `annotations`: `/annotate` as an API, for boards and remote clients. `submit({ source, notes, deliver?, review?, focus? })` builds the feedback `/annotate` would and delivers it without any UI; `open({ source, deliver?, focus? })` mounts the annotation overlay on the source and resolves with the operator's notes (`undefined` when dismissed; `mode === "tui"` only). Text sources are `{ kind: "text", text, label? }`, `{ kind: "file", path }` (resolved against the live session cwd), or `{ kind: "last" }`; diff sources are `{ kind: "diff", diff, label? }`, `{ kind: "uncommitted" }`, or `{ kind: "pr", ref }` (`ref` is a GitHub PR or GitLab MR URL, `pr://owner/repo/N`, or `mr://<host>/<group>/<project>/N/diff`). `review`/`focus` apply to diff sources only (a type error on text sources). Text notes are `{ note, line?, quote? }` (1-based; whole-source when omitted, and the quoted line is filled in); diff notes are `{ path, note, line?, side?, occurrence?, rawLine? }` (`side` defaults to `"new"`; `rawLine` is the diff row including its `+`/`-`/space prefix). Notes that do not match their source reject rather than being dropped. `text` and `diff` sources are frozen snapshots of what you pass; `file`, `last`, `uncommitted`, and `pr` are re-read at call time and line numbers are matched against the current content, so pass `quote`/`rawLine` to reject a note (naming it) when that content drifted. `deliver` defaults to `"auto"`: pasteable notes go into the composer when the interactive TUI editor is available and are sent otherwise; an LLM review request (`review: true` on a diff) is always sent. Sending uses `pi.sendUserMessage` and queues as a follow-up while the agent is streaming. `"paste"`/`"send"` force a channel and `"none"` only returns `text`. The result is discriminated by `kind`: `"text"` carries `TextReviewAnnotation[]` and, after `open`, `editedText` when the operator replaced the source in the external editor (the feedback then refers to that text); `"diff"` carries `CodeReviewAnnotation[]` and `review` (whether `text` is an LLM review request). Both carry the rendered `text` and the `delivered` channel.
   Explicit paste requires `ctx.ui.supportsEditor === true`: the TUI and non-headless RPC expose composers; ACP and no-op UI contexts do not. Supplied diffs used for LLM review reject above 50,000 characters or 20 reviewable files before delivery, and `open` rejects such a patch before mounting the overlay; split larger patches into smaller requests. Notes-only submissions do not have this review-prompt bound.
@@ -411,28 +279,6 @@ Hooks may start a side turn, including from delayed callbacks. Only `context`, `
 Tool calls are always discarded rather than executed. Pass `tools: false` to remove tool definitions after context transforms and set `toolChoice: "none"` at the provider boundary. Omitting it preserves `/btw`'s tool catalog for prompt-cache reuse; disabling it may reduce cache hits. Bedrock Converse rejects tool opt-out if the transformed history still contains tool calls or results. Existing context/provider hooks still run. It is not a sandbox or a guarantee that arbitrary extension hooks have no side effects. Model inference consumes the configured provider's resources. `dedupeReply` defaults to `true`, collapses runs of more than three identical lines, and caps the returned reply at 4 KiB. Set it to `false` to disable those transformations; `replyText` is still trimmed. Callers should use `replyText` for the final result.
 
 Use `history` only for detached prior side-turn messages; it is cloned with `structuredClone`, so pass cloneable message data. A `conversationKey` keeps related side turns on one provider lineage. Rotate it after cancellation or failure before retrying. A side turn also rejects with a retryable error if its session or exact model instance changes before dispatch; callers should retry from a new current-context snapshot rather than reuse the old one.
-
-### Live voice on your own peer (`ctx.startLive`)
-
-Start a `/live` session whose audio runs on a WebRTC peer the extension owns, for example a browser on a phone, instead of the host's microphone and speakers. omp keeps everything else: Codex signaling with the session's OpenAI Codex sign-in, the bundled live prompt, delegations into this session as ordinary turns, and transcripts. The TUI shows its live visualizer, and `/live` or the stop key ends the call.
-
-```ts
-if (!ctx.startLive) throw new Error("This host does not run live sessions");
-const live = await ctx.startLive({
-	sdpOffer, // from the peer: one sendrecv Opus audio track plus an "oai-events" data channel
-	onPhase: phase => relay({ phase }), // "muted": silence the peer's microphone track
-	onTranscript: t => relay({ transcript: t }),
-	onEnd: error => relay({ end: error?.message ?? null }),
-});
-await peer.setRemoteDescription({ type: "answer", sdp: live.sdpAnswer });
-// later: await live.stop();
-```
-
-The promise resolves once the call is signaled and its control socket is open; apply `sdpAnswer` right away. It rejects without a non-empty `sdpOffer` and while another live session is active. `voice` and `instructions` work as for RPC `live_start`. The peer does its own echo cancellation and mute: the TUI mute key only moves the phase to `muted`, so silence the peer's microphone track while that phase lasts. omp reports no audio levels and no `speaking` phase for these calls. `onEnd` is called exactly once, including when the call fails to start (before the promise rejects). Observer callbacks that throw are logged and do not end the call.
-
-omp has no media peer for these calls, so it cannot tell when yours goes away. Call `live.stop()` when the peer disconnects (`connectionstatechange` to `failed` or `closed`, or your relay socket closing); otherwise the call stays open and the TUI keeps the live visualizer up.
-
-Whoever holds the peer steers this session by voice, including delegated work that runs tools, so authenticate the page or relay that hands you the offer.
 
 ### Background work (`ctx.setInterval` / `ctx.setTimeout`)
 

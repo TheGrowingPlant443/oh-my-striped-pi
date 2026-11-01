@@ -3,17 +3,9 @@ import { type } from "@oh-my-pi/omptype";
 import { complete } from "@oh-my-pi/pi-ai/stream";
 import type { Api, Context, Model, OptionsForApi, Tool } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { e2eApiKey, resolveApiKey } from "./oauth";
+import { resolveApiKey } from "./oauth";
 
-// Resolve OAuth tokens at module level (async, runs before tests)
-const oauthTokens = await Promise.all([
-	resolveApiKey("anthropic"),
-	resolveApiKey("github-copilot"),
-	resolveApiKey("google-gemini-cli"),
-	resolveApiKey("google-antigravity"),
-	resolveApiKey("openai-codex"),
-]);
-const [anthropicOAuthToken, githubCopilotToken, geminiCliToken, antigravityToken, openaiCodexToken] = oauthTokens;
+const githubCopilotToken = await resolveApiKey("github-copilot");
 
 // Simple calculate tool
 const calculateSchema = type({
@@ -91,133 +83,6 @@ async function testToolCallWithoutResult<TApi extends Api>(
 }
 
 describe("Tool Call Without Result Tests", () => {
-	// =========================================================================
-	// API Key-based providers
-	// =========================================================================
-
-	describe.skipIf(!e2eApiKey("GEMINI_API_KEY"))("Google Provider", () => {
-		const model = getBundledModel("google", "gemini-2.5-flash");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Completions Provider", () => {
-		const model: Model<"openai-completions"> = {
-			...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">)!,
-			api: "openai-completions",
-		};
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Responses Provider", () => {
-		const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("Anthropic Provider", () => {
-		const model = getBundledModel("anthropic", "claude-haiku-4-5-20251001");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("XAI_API_KEY"))("xAI Provider", () => {
-		const model = getBundledModel("xai", "grok-3-fast");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("GROQ_API_KEY"))("Groq Provider", () => {
-		const model = getBundledModel("groq", "openai/gpt-oss-20b");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("CEREBRAS_API_KEY"))("Cerebras Provider", () => {
-		const model = getBundledModel("cerebras", "gpt-oss-120b");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("ZAI_API_KEY"))("zAI Provider", () => {
-		const model = getBundledModel("zai", "glm-4.5-flash");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("MISTRAL_API_KEY"))("Mistral Provider", () => {
-		const model = getBundledModel("mistral", "devstral-medium-latest");
-
-		it(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model);
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe("Anthropic OAuth Provider", () => {
-		const model = getBundledModel("anthropic", "claude-haiku-4-5-20251001");
-
-		it.skipIf(!anthropicOAuthToken)(
-			"should filter out tool calls without corresponding tool results",
-			async () => {
-				await testToolCallWithoutResult(model, { apiKey: anthropicOAuthToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
 	describe("GitHub Copilot Provider", () => {
 		it.skipIf(!githubCopilotToken)(
 			"gpt-4o - should filter out tool calls without corresponding tool results",
@@ -233,57 +98,6 @@ describe("Tool Call Without Result Tests", () => {
 			async () => {
 				const model = getBundledModel("github-copilot", "claude-sonnet-4");
 				await testToolCallWithoutResult(model, { apiKey: githubCopilotToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe("Google Gemini CLI Provider", () => {
-		it.skipIf(!geminiCliToken)(
-			"gemini-2.5-flash - should filter out tool calls without corresponding tool results",
-			async () => {
-				const model = getBundledModel("google-gemini-cli", "gemini-2.5-flash");
-				await testToolCallWithoutResult(model, { apiKey: geminiCliToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe("Google Antigravity Provider", () => {
-		it.skipIf(!antigravityToken)(
-			"gemini-3.8-flash - should filter out tool calls without corresponding tool results",
-			async () => {
-				const model = getBundledModel("google-antigravity", "gemini-3.8-flash");
-				await testToolCallWithoutResult(model, { apiKey: antigravityToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-
-		it.skipIf(!antigravityToken)(
-			"claude-sonnet-4-5 - should filter out tool calls without corresponding tool results",
-			async () => {
-				const model = getBundledModel("google-antigravity", "claude-sonnet-4-5");
-				await testToolCallWithoutResult(model, { apiKey: antigravityToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-
-		it.skipIf(!antigravityToken)(
-			"gpt-oss-120b-medium - should filter out tool calls without corresponding tool results",
-			async () => {
-				const model = getBundledModel("google-antigravity", "gpt-oss-120b-medium");
-				await testToolCallWithoutResult(model, { apiKey: antigravityToken });
-			},
-			{ retry: 3, timeout: 30000 },
-		);
-	});
-
-	describe("OpenAI Codex Provider", () => {
-		it.skipIf(!openaiCodexToken)(
-			"gpt-5.2-codex - should filter out tool calls without corresponding tool results",
-			async () => {
-				const model = getBundledModel("openai-codex", "gpt-5.2-codex");
-				await testToolCallWithoutResult(model, { apiKey: openaiCodexToken });
 			},
 			{ retry: 3, timeout: 30000 },
 		);

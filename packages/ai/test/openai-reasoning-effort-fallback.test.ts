@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { streamAzureOpenAIResponses } from "@oh-my-pi/pi-ai/providers/azure-openai-responses";
+
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
@@ -200,15 +200,23 @@ function templateKwargValueRejectionResponse(): Response {
 	);
 }
 
-/** Local Qwen 3.8 model whose auto-compat routes effort onto the template kwarg. */
-function createLocalQwenModel(provider: string, baseUrl: string): Model<"openai-completions"> {
+/** Explicit template dialects exercise generic reasoning fallback independently of catalog inference. */
+function createTemplateModel(thinkingFormat: "qwen" | "qwen-chat-template"): Model<"openai-completions"> {
 	return buildModel({
-		id: "qwen3.8-27b",
-		name: "Qwen3.8 27B (local)",
+		id: "template-reasoner",
+		name: "Template Reasoner",
 		api: "openai-completions",
-		provider,
-		baseUrl,
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
+		compat: {
+			thinkingFormat,
+			supportsReasoningParams: true,
+			qwenPreserveThinking: true,
+			qwenTemplateReasoningEffort: true,
+			supportsReasoningEffort: true,
+		},
+		thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.XHigh] },
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 262_144,
@@ -225,8 +233,8 @@ function createCompletionsModel(): Model<"openai-completions"> {
 		id: "fallback-reasoner",
 		name: "Fallback Reasoner",
 		api: "openai-completions",
-		provider: "custom",
-		baseUrl: "https://proxy.example.test/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		compat: {
 			thinkingFormat: "openai",
@@ -244,22 +252,20 @@ function createCompletionsModel(): Model<"openai-completions"> {
 	});
 }
 
-/**
- * First-party OpenAI 5.6 model: disabled reasoning goes out as wire `none`
- * (`reasoning-disable-mode: none-effort`), unlike the default lowest-effort dialects.
- */
+/** Explicitly disabled reasoning uses wire `none` rather than a lowest-effort tier. */
 function createNoneEffortCompletionsModel(): Model<"openai-completions"> {
 	return buildModel({
 		id: "gpt-5.6-none-effort-test",
 		name: "None Effort Test",
 		api: "openai-completions",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		compat: {
 			thinkingFormat: "openai",
 			supportsReasoningParams: true,
 			supportsReasoningEffort: true,
+			reasoningDisableMode: "none-effort",
 		},
 		thinking: {
 			mode: "effort",
@@ -272,28 +278,13 @@ function createNoneEffortCompletionsModel(): Model<"openai-completions"> {
 	});
 }
 
-function createAzureAstraCompletionsModel(): Model<"openai-completions"> {
-	return buildModel({
-		id: "gpt-6-astra",
-		name: "GPT-6 Astra",
-		api: "openai-completions",
-		provider: "azure",
-		baseUrl: "https://resource.openai.azure.com/openai/v1",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 262_144,
-		maxTokens: 128_000,
-	});
-}
-
 function createResponsesModel(): Model<"openai-responses"> {
 	return buildModel({
 		id: "fallback-responses-reasoner",
 		name: "Fallback Responses Reasoner",
 		api: "openai-responses",
-		provider: "custom-responses",
-		baseUrl: "https://responses.example.test/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		compat: {
 			supportsReasoningParams: true,
@@ -314,8 +305,8 @@ function createMaxLadderResponsesModel(): Model<"openai-responses"> {
 		id: "max-ladder-responses-reasoner",
 		name: "Max Ladder Responses Reasoner",
 		api: "openai-responses",
-		provider: "custom-responses",
-		baseUrl: "https://responses.example.test/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		compat: {
 			supportsReasoningParams: true,
@@ -324,29 +315,6 @@ function createMaxLadderResponsesModel(): Model<"openai-responses"> {
 		thinking: {
 			mode: "effort",
 			efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max],
-		},
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 128_000,
-		maxTokens: 16_384,
-	});
-}
-
-function createAzureResponsesModel(): Model<"azure-openai-responses"> {
-	return buildModel({
-		id: "gpt-5.2-test",
-		name: "GPT 5.2 Test",
-		api: "azure-openai-responses",
-		provider: "azure",
-		baseUrl: "https://azure.example.test/openai/v1",
-		reasoning: true,
-		compat: {
-			supportsReasoningParams: true,
-			supportsReasoningEffort: true,
-		},
-		thinking: {
-			mode: "effort",
-			efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh],
 		},
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -399,53 +367,6 @@ describe("OpenAI reasoning effort fallback retry", () => {
 		expect(result.stopReason).toBe("stop");
 		expect(bodies.map(body => body.reasoning_effort)).toEqual(["xhigh", "high"]);
 	});
-
-	it("does not apply a cached enabled-effort fallback to tool-suppressed Azure Astra requests", async () => {
-		const bodies: Record<string, unknown>[] = [];
-		const fetchMock: FetchImpl = Object.assign(
-			async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-				const body = parseJsonBody(init);
-				bodies.push(body);
-				return bodies.length === 1 ? invalidReasoningResponse("reasoning_effort", "max") : createChatSseResponse();
-			},
-			{ preconnect: fetch.preconnect },
-		);
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		const model = createAzureAstraCompletionsModel();
-
-		const first = await streamOpenAICompletions(model, testContext, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-			reasoning: "max",
-			providerSessionState,
-		}).result();
-		expect(first.stopReason).toBe("stop");
-
-		const second = await streamOpenAICompletions(
-			model,
-			{
-				messages: testContext.messages,
-				tools: [
-					{
-						name: "read",
-						description: "Read a file",
-						parameters: { type: "object", properties: {} },
-					},
-				],
-			},
-			{
-				apiKey: "test-key",
-				fetch: fetchMock,
-				reasoning: "max",
-				providerSessionState,
-			},
-		).result();
-
-		expect(second.stopReason).toBe("stop");
-		expect(bodies.map(body => body.reasoning_effort)).toEqual(["max", "high", "none"]);
-		expect(bodies[2]!.tools).toHaveLength(1);
-	});
-
 	it("retries Responses xhigh as provider max and stores the successful fallback params", async () => {
 		const bodies: Record<string, unknown>[] = [];
 		const fetchMock: FetchImpl = Object.assign(
@@ -522,32 +443,6 @@ describe("OpenAI reasoning effort fallback retry", () => {
 			"high",
 		]);
 	});
-
-	it("retries Azure Responses xhigh as provider max", async () => {
-		const bodies: Record<string, unknown>[] = [];
-		const fetchMock: FetchImpl = Object.assign(
-			async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-				const body = parseJsonBody(init);
-				bodies.push(body);
-				return bodies.length === 1
-					? invalidReasoningResponse("reasoning.effort", "xhigh")
-					: createResponsesSseResponse();
-			},
-			{ preconnect: fetch.preconnect },
-		);
-
-		const result = await streamAzureOpenAIResponses(createAzureResponsesModel(), testContext, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-			azureBaseUrl: "https://azure.example.test/openai/v1",
-			azureApiVersion: "v1",
-			reasoning: "xhigh",
-		}).result();
-
-		expect(result.stopReason).toBe("stop");
-		expect(bodies.map(body => (body.reasoning as { effort?: string } | undefined)?.effort)).toEqual(["xhigh", "max"]);
-	});
-
 	it("clamps a rejected reasoning-off request to the lowest level the gateway allows", async () => {
 		const bodies: Record<string, unknown>[] = [];
 		const fetchMock: FetchImpl = Object.assign(
@@ -773,7 +668,7 @@ describe("OpenAI reasoning effort fallback retry", () => {
 			{ preconnect: fetch.preconnect },
 		);
 		const providerSessionState = new Map<string, ProviderSessionState>();
-		const model = createLocalQwenModel("llama.cpp", "http://127.0.0.1:8080/v1");
+		const model = createTemplateModel("qwen");
 
 		const first = await streamOpenAICompletions(model, testContext, {
 			apiKey: "test-key",
@@ -814,7 +709,7 @@ describe("OpenAI reasoning effort fallback retry", () => {
 			},
 			{ preconnect: fetch.preconnect },
 		);
-		const model = createLocalQwenModel("vllm", "http://127.0.0.1:8000/v1");
+		const model = createTemplateModel("qwen-chat-template");
 
 		const result = await streamOpenAICompletions(model, testContext, {
 			apiKey: "test-key",
@@ -824,7 +719,7 @@ describe("OpenAI reasoning effort fallback retry", () => {
 
 		expect(result.stopReason).toBe("stop");
 		expect(bodies).toHaveLength(2);
-		// vLLM dialect rides kwargs alone — nothing top-level on the first try.
+		// This dialect rides kwargs alone — nothing top-level on the first try.
 		expect(bodies[0]!.reasoning_effort).toBeUndefined();
 		expect(bodies[0]!.chat_template_kwargs).toEqual({
 			preserve_thinking: true,
@@ -845,7 +740,7 @@ describe("OpenAI reasoning effort fallback retry", () => {
 			},
 			{ preconnect: fetch.preconnect },
 		);
-		const model = createLocalQwenModel("llama.cpp", "http://127.0.0.1:8080/v1");
+		const model = createTemplateModel("qwen");
 
 		const result = await streamOpenAICompletions(model, testContext, {
 			apiKey: "test-key",

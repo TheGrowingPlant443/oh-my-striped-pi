@@ -1,7 +1,7 @@
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import type { Api, Model, Usage } from "@oh-my-pi/pi-catalog/types";
 import { USER_AGENT } from "@oh-my-pi/pi-utils";
-import { withAuth } from "../auth-retry";
+import { NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import { SPEECH_FORMAT_MIME_TYPES, type SpeechFormat, type SpeechOptions, type SpeechResult } from "./types";
 
@@ -18,6 +18,8 @@ export async function postSpeechRequest(
 	format: SpeechFormat,
 	options: SpeechOptions,
 ): Promise<SpeechResult> {
+	if (!model.baseUrl?.trim())
+		throw new AIError.ConfigurationError(`${model.provider}/${model.id} requires an explicit base URL`);
 	const timeoutSignal = AbortSignal.timeout(SPEECH_TIMEOUT_MS);
 	const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 	const fetchImpl = options.fetch ?? fetch;
@@ -25,12 +27,12 @@ export async function postSpeechRequest(
 	const audio = await withAuth(
 		options.apiKey,
 		async key => {
-			const configuredHeaders = model.resolveHeaders ? await model.resolveHeaders(signal) : model.headers;
+			const configuredHeaders = { ...model.headers, ...(await model.resolveHeaders?.(signal)) };
 			const response = await fetchImpl(`${model.baseUrl.replace(/\/+$/, "")}${path}`, {
 				method: "POST",
 				headers: {
 					...configuredHeaders,
-					Authorization: `Bearer ${key}`,
+					...(key && key !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${key}` } : {}),
 					"Content-Type": "application/json",
 					"User-Agent": USER_AGENT,
 				},

@@ -3,13 +3,14 @@ import type { Model } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getRoleInfo } from "@oh-my-pi/pi-coding-agent/config/model-roles";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { getSearchEngineModel } from "@oh-my-pi/pi-coding-agent/web/search/provider";
 
-function makeModel(id: string, metadata: Partial<Pick<Model, "api" | "kind" | "webSearch">> = {}): Model {
+function makeModel(id: string, metadata: Partial<Pick<Model, "api" | "kind">> = {}): Model {
 	return buildModel({
 		id,
 		name: id,
-		api: "ollama-chat",
-		provider: "fixture",
+		api: metadata.kind && metadata.kind !== "chat" ? "local-inference" : "openai-completions",
+		provider: metadata.kind && metadata.kind !== "chat" ? "local" : "github-copilot",
 		baseUrl: "https://example.com",
 		reasoning: false,
 		input: ["text"],
@@ -22,15 +23,13 @@ function makeModel(id: string, metadata: Partial<Pick<Model, "api" | "kind" | "w
 
 const chat = makeModel("chat");
 const explicitChat = makeModel("explicit-chat", { kind: "chat" });
-const groundedChat = makeModel("grounded-chat", { webSearch: "gemini" });
 const tiny = makeModel("tiny", { kind: "tiny" });
 const image = makeModel("image", { kind: "image" });
-const search = makeModel("search", { kind: "search" });
+const search = getSearchEngineModel("searxng")!;
 const speech = makeModel("speech", { kind: "tts" });
 const localDictation = makeModel("local-dictation", { api: "local-inference", kind: "stt" });
-const cloudDictation = makeModel("cloud-dictation", { api: "openai-transcriptions", kind: "stt" });
 const judge = makeModel("judge", { kind: "judge" });
-const fixtures = [chat, explicitChat, groundedChat, tiny, image, search, speech, localDictation, cloudDictation, judge];
+const fixtures = [chat, explicitChat, tiny, image, search, speech, localDictation, judge];
 
 function acceptedIds(role: string, settings: Settings): string[] {
 	return fixtures.filter(getRoleInfo(role, settings).accepts).map(model => model.id);
@@ -40,14 +39,14 @@ describe("getRoleInfo", () => {
 	test("built-in roles accept models by capability", () => {
 		const settings = Settings.isolated({});
 
-		expect(acceptedIds("default", settings)).toEqual(["chat", "explicit-chat", "grounded-chat"]);
-		expect(acceptedIds("tiny", settings)).toEqual(["chat", "explicit-chat", "grounded-chat", "tiny"]);
-		expect(acceptedIds("memory", settings)).toEqual(["chat", "explicit-chat", "grounded-chat", "tiny"]);
+		expect(acceptedIds("default", settings)).toEqual(["chat", "explicit-chat"]);
+		expect(acceptedIds("tiny", settings)).toEqual(["chat", "explicit-chat", "tiny"]);
+		expect(acceptedIds("memory", settings)).toEqual(["chat", "explicit-chat", "tiny"]);
 		expect(acceptedIds("image", settings)).toEqual(["image"]);
-		expect(acceptedIds("web", settings)).toEqual(["grounded-chat", "search"]);
+		expect(acceptedIds("web", settings)).toEqual(["searxng"]);
 		expect(acceptedIds("speech", settings)).toEqual(["speech"]);
-		expect(acceptedIds("dictation", settings)).toEqual(["local-dictation", "cloud-dictation"]);
-		expect(acceptedIds("judge", settings)).toEqual(["chat", "explicit-chat", "grounded-chat", "tiny", "judge"]);
+		expect(acceptedIds("dictation", settings)).toEqual(["local-dictation"]);
+		expect(acceptedIds("judge", settings)).toEqual(["chat", "explicit-chat", "tiny", "judge"]);
 	});
 
 	test("custom metadata overrides presentation without widening model acceptance", () => {
@@ -60,11 +59,11 @@ describe("getRoleInfo", () => {
 
 		const smol = getRoleInfo("smol", settings);
 		expect(smol).toMatchObject({ name: "My Smol", color: "success", hidden: true, section: "chat" });
-		expect(fixtures.filter(smol.accepts)).toEqual([chat, explicitChat, groundedChat]);
+		expect(fixtures.filter(smol.accepts)).toEqual([chat, explicitChat]);
 
 		const custom = getRoleInfo("custom", settings);
 		expect(custom).toMatchObject({ name: "My Custom Tag", color: "error", hidden: true, section: "chat" });
-		expect(fixtures.filter(custom.accepts)).toEqual([chat, explicitChat, groundedChat]);
+		expect(fixtures.filter(custom.accepts)).toEqual([chat, explicitChat]);
 	});
 
 	test("kind roles remain in the kind section when their presentation is overridden", () => {

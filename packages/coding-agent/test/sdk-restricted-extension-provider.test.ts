@@ -31,7 +31,7 @@ import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/age
 
 import { cfgExtensionHandlersToolCallTimeoutMs } from "@oh-my-pi/pi-coding-agent/extensibility/settings";
 
-const providerName = "restricted-session-provider";
+const providerName = "company-restricted-session";
 const modelId = "restricted-session-model";
 const apiId = "restricted-session-api";
 const sourceId = "<inline-0>";

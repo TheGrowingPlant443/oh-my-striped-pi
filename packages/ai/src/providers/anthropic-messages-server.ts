@@ -10,6 +10,7 @@ import type {
 	AssistantMessageEventStream,
 	DeveloperMessage,
 	Message,
+	Model,
 	RedactedThinkingContent,
 	StopReason,
 	TextContent,
@@ -19,7 +20,6 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from "../types";
-import { isCursorExecResolved } from "../utils/block-symbols";
 import {
 	type AnthropicAssistantContentBlock,
 	type AnthropicMessage,
@@ -355,24 +355,7 @@ const REASONING_EFFORT_BY_WIRE: Partial<Record<string, Effort>> = {
 	max: Effort.Max,
 };
 
-/**
- * Recover the id of the model this request will actually reach, for labelling
- * replayed assistant turns.
- *
- * `/v1/models` advertises `<provider>/<id>` and nothing else, so that is what
- * clients send, but `resolveModel` resolves a catalog model whose id is the
- * bare half. Labelling a replayed turn with the full id the client sent leaves
- * `transform-messages` reading it as written by some other model.
- *
- * A prefix naming another provider is left intact: it describes a different
- * route, so removing it would invent history rather than recover it.
- */
-function stampedAssistantModelId(wireModelId: string, provider: string): string {
-	const prefix = `${provider}/`;
-	return wireModelId.startsWith(prefix) ? wireModelId.slice(prefix.length) : wireModelId;
-}
-
-export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
+export function parseRequest(body: unknown, target: Pick<Model, "id" | "provider">, headers?: Headers): ParsedRequest {
 	const data = anthropicMessagesRequestSchema(body);
 	if (data instanceof type.errors) {
 		throw new AIError.ValidationError(`anthropic-messages: ${data.summary}`);
@@ -391,8 +374,8 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 				role: "assistant",
 				content,
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: stampedAssistantModelId(data.model, "anthropic"),
+				provider: target.provider,
+				model: target.id,
 				usage: emptyUsage(),
 				// The wire carries no stop reason, but tool calls answered by their
 				// `tool_result` blocks did request execution. A constant "stop" reads
@@ -508,17 +491,9 @@ function randomFallback(): string {
 	return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/**
- * True for a `toolCall` block the client is expected to execute.
- *
- * Cursor's exec channel stamps {@link kCursorExecResolved} on calls it already
- * ran server-side — `todo`, `web_fetch`, `connect_scm`, a native it declined —
- * and those are not handoffs: the client never declared the tool, has no
- * implementation to run, and repeating one would reapply a side effect the
- * server already committed. Only unresolved calls are real external handoffs.
- */
+/** True for a tool call the client is expected to execute. */
 function isClientToolUse(content: AssistantMessage["content"][number]): content is ToolCall {
-	return content.type === "toolCall" && !isCursorExecResolved(content);
+	return content.type === "toolCall";
 }
 
 function mapStopReasonOut(reason: StopReason, hasToolUse: boolean): "end_turn" | "max_tokens" | "tool_use" {
@@ -626,7 +601,7 @@ export function encodeResponse(message: AssistantMessage, requestedModelId: stri
 		throw new AIError.ProviderResponseError(
 			message.errorMessage ?? `anthropic-messages: upstream ${message.stopReason}`,
 			{
-				provider: "anthropic",
+				provider: message.provider,
 				kind: "output",
 			},
 		);

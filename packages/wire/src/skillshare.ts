@@ -17,17 +17,15 @@
 /** Default registry; `skills.registryUrl` overrides it. */
 export const DEFAULT_SKILLS_URL = "https://skills.omp.sh";
 
-/** Scopes are Stencil usernames (or registry orgs): lowercase letters, digits, underscores; 3–32 chars. */
-export const SKILL_SCOPE_RE = /^[a-z0-9][a-z0-9_]{2,31}$/;
 /** Registry skill names: ASCII kebab-case, 1–64 chars, no leading/trailing/double hyphens. */
 export const SKILL_NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const SKILL_NAME_MAX = 64;
 /** `@scope/name`, optionally `@version-or-range-or-tag`. */
 export const SKILL_SPEC_RE = /^@([a-z0-9][a-z0-9_]{2,31})\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:@(.+))?$/;
 
-/** Publish limits, enforced by both the CLI and the server. */
+/** Archive limits enforced when installing skills. */
 export const SKILL_LIMITS = {
-	/** Compressed `.tgz` upload. */
+	/** Compressed `.tgz` archive. */
 	tarballBytes: 5 * 1024 * 1024,
 	/** Sum of all file sizes after unpacking. */
 	unpackedBytes: 20 * 1024 * 1024,
@@ -39,40 +37,6 @@ export const SKILL_LIMITS = {
 	keywordLength: 50,
 	deprecationLength: 500,
 } as const;
-
-/** Paths excluded from packs in addition to `.skillignore` entries. */
-export const SKILL_DEFAULT_IGNORES = [
-	".git",
-	".DS_Store",
-	"node_modules",
-	"__pycache__",
-	"*.pyc",
-	"evals",
-	".skillignore",
-] as const;
-
-/**
- * Publish request: `PUT SKILLS_ROUTES.publish(scope, name, version)`, body is
- * the `.tgz` (gzip tar; entries are paths relative to the skill root, regular
- * files only, sorted, mtime 0, mode 0644 or 0755). Auth: `Authorization:
- * Bearer <Stencil access token | registry publish token>`.
- */
-export const SKILL_HEADERS = {
-	/** Required: SRI `sha512-<base64>` of the body. */
-	integrity: "X-Skill-Integrity",
-	/** Optional dist-tag to point at the new version (default `latest` for stable, none for prereleases). */
-	tag: "X-Skill-Tag",
-	/** Optional base64(JSON {@link SkillReportedProvenance}); shown as "reported". */
-	provenance: "X-Skill-Provenance",
-	/** Optional GitHub Actions OIDC token (audience {@link SKILLS_OIDC_AUDIENCE}); verified server-side. */
-	githubOidc: "X-Skill-GitHub-OIDC",
-} as const;
-
-/** Audience CI must request for GitHub Actions OIDC tokens. */
-export const SKILLS_OIDC_AUDIENCE = "skills.omp.sh";
-
-/** Env var holding a registry publish token for CI (`sks_…`); wins over the Stencil login. */
-export const SKILLS_TOKEN_ENV = "SKILLS_TOKEN";
 
 /** Public identity of an account: current username + avatar seed (hash of the immutable sub). */
 export interface SkillUser {
@@ -232,33 +196,6 @@ export interface SkillProfile {
 
 export type SkillOrgRole = "owner" | "member";
 
-export interface SkillPublishResponse {
-	scope: string;
-	name: string;
-	version: string;
-	integrity: string;
-	/** Package page. */
-	url: string;
-	/** Dist-tags now pointing at this version. */
-	tags: string[];
-}
-
-/** Registry publish token (CI). The secret is shown once, at creation. */
-export interface SkillToken {
-	id: string;
-	name: string;
-	/** `@scope/name` packages the token may publish; empty = all packages the creator manages. */
-	packages: string[];
-	createdAt: number;
-	expiresAt?: number;
-	lastUsedAt?: number;
-}
-
-export interface SkillTokenCreated extends SkillToken {
-	/** `sks_…`; never retrievable again. */
-	token: string;
-}
-
 /** `GET SKILLS_ROUTES.me`. */
 export interface SkillSession {
 	user: SkillUser | null;
@@ -274,19 +211,7 @@ export interface SkillError {
 
 const pkg = (scope: string, name: string) => `/api/v1/skills/@${scope}/${name}`;
 
-/**
- * HTTP routes, relative to the registry base URL. Mutations with a JSON body
- * use the documented request shapes:
- * - `tag` PUT `{ version }`, DELETE to remove (never `latest`)
- * - `yank` POST `{ yanked: boolean }`
- * - `deprecate` POST `{ message: string | null }`
- * - `owner` PUT / DELETE (no body)
- * - `tokens` POST `{ name, packages?: string[], expiresInDays?: number }`
- * - `report` POST `{ reason: string }`
- * - `takedown` POST `{ reason: string }` (admins)
- * - `orgs` POST `{ name }`; `orgMember` PUT `{ role }` / DELETE
- * - `importSkill` POST body = Claude `.skill` zip (bearer) → {@link SkillPublishResponse}
- */
+/** Read-only HTTP routes, relative to the registry base URL. */
 export const SKILLS_ROUTES = {
 	home: "/api/v1/home",
 	search: "/api/v1/search",
@@ -300,19 +225,7 @@ export const SKILLS_ROUTES = {
 		`${pkg(scope, name)}/versions/${version}/files/${path}`,
 	source: (scope: string, name: string, version: string, path: string) =>
 		`${pkg(scope, name)}/versions/${version}/source/${path}`,
-	publish: (scope: string, name: string, version: string) => `${pkg(scope, name)}/versions/${version}`,
-	tag: (scope: string, name: string, tag: string) => `${pkg(scope, name)}/tags/${tag}`,
-	yank: (scope: string, name: string, version: string) => `${pkg(scope, name)}/versions/${version}/yank`,
-	deprecate: (scope: string, name: string, version: string) => `${pkg(scope, name)}/versions/${version}/deprecate`,
-	owner: (scope: string, name: string, username: string) => `${pkg(scope, name)}/owners/${username}`,
-	report: (scope: string, name: string) => `${pkg(scope, name)}/report`,
-	takedown: (scope: string, name: string) => `/api/v1/admin/skills/@${scope}/${name}/takedown`,
 	user: (username: string) => `/api/v1/users/${username}`,
-	tokens: "/api/v1/tokens",
-	token: (id: string) => `/api/v1/tokens/${id}`,
-	orgs: "/api/v1/orgs",
-	orgMember: (org: string, username: string) => `/api/v1/orgs/${org}/members/${username}`,
-	importSkill: "/api/v1/import",
 	me: "/api/me",
 	/** Web pages. */
 	pages: {

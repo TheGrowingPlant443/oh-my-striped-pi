@@ -30,7 +30,6 @@ import {
 	guardStreamFn,
 } from "@oh-my-pi/pi-coding-agent/session/cost-gate";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { wrapStreamFnWithProviderConcurrency } from "@oh-my-pi/pi-coding-agent/task/provider-concurrency";
 import { cfgSessionMaxCost, cfgSessionWarnCost } from "@oh-my-pi/pi-coding-agent/session/settings";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
@@ -153,25 +152,6 @@ describe("CostGate", () => {
 
 		const refused = await rejectionOf(Promise.resolve(guarded(model, { messages: [] })));
 		expect(refused).toBeInstanceOf(CostCapError);
-		expect(calls).toBe(1);
-	});
-
-	it("checks a request that waited for a provider slot when it goes out", async () => {
-		const { gate, settings } = gateWith({ "session.maxCost": 1, "providers.ollama-cloud.maxConcurrency": 1 });
-		const first = new AssistantMessageEventStream();
-		let calls = 0;
-		const provider: StreamFn = () => (++calls === 1 ? first : streamOf(response(0.1)));
-		const send = wrapStreamFnWithProviderConcurrency(
-			settings,
-			guardStreamFn(provider, () => gate),
-		);
-		const model = { ...createCostModel("test-cost-gate-slot"), provider: "ollama-cloud" };
-
-		await send(model, { messages: [] });
-		const queued = rejectionOf(Promise.resolve(send(model, { messages: [] })));
-		first.push({ type: "done", reason: "stop", message: response(1.2) });
-
-		expect(await queued).toBeInstanceOf(CostCapError);
 		expect(calls).toBe(1);
 	});
 });

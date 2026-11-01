@@ -28,7 +28,7 @@ function rerankModel(provider: string, id: string, api: Api = "openrouter-rerank
 		name: id,
 		api,
 		provider,
-		baseUrl: "https://openrouter.ai/api/v1",
+		baseUrl: "https://proxy.company.example/v1",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -41,9 +41,9 @@ function rerankModel(provider: string, id: string, api: Api = "openrouter-rerank
 async function boot(): Promise<Harness> {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-rerank-"));
 	const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-	storage.keys.setRuntime("openrouter", "openrouter-secret");
-	const model = rerankModel("openrouter", "cohere/rerank-v3.5");
-	const wrongApi = rerankModel("openrouter", "not-rerank-wire", "openrouter");
+	storage.keys.setRuntime("company-proxy", "openrouter-secret");
+	const model = rerankModel("company-proxy", "cohere/rerank-v3.5");
+	const wrongApi = rerankModel("company-proxy", "not-rerank-wire", "openai-completions");
 	const upstream: UpstreamRequest[] = [];
 	const fetchImpl: FetchImpl = async (input, init) => {
 		const body: unknown = JSON.parse(String(init?.body));
@@ -67,8 +67,8 @@ async function boot(): Promise<Harness> {
 		bearerTokens: ["gw-token"],
 		storage,
 		resolveModel: id => {
-			if (id === model.id || id === `openrouter/${model.id}`) return model;
-			if (id === wrongApi.id || id === `openrouter/${wrongApi.id}`) return wrongApi;
+			if (id === model.id || id === `company-proxy/${model.id}`) return model;
+			if (id === wrongApi.id || id === `company-proxy/${wrongApi.id}`) return wrongApi;
 			return undefined;
 		},
 		version: "test",
@@ -103,7 +103,7 @@ describe("auth-gateway POST /v1/rerank", () => {
 			method: "POST",
 			headers: headers(),
 			body: JSON.stringify({
-				model: "openrouter/cohere/rerank-v3.5",
+				model: "company-proxy/cohere/rerank-v3.5",
 				query: "European capitals",
 				documents: ["Paris is in France.", { text: "Berlin is in Germany." }],
 				top_n: 2,
@@ -113,7 +113,7 @@ describe("auth-gateway POST /v1/rerank", () => {
 
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({
-			model: "openrouter/cohere/rerank-v3.5",
+			model: "company-proxy/cohere/rerank-v3.5",
 			results: [
 				{ index: 1, relevance_score: 0.98, document: { text: "Berlin is in Germany." } },
 				{ index: 0, relevance_score: 0.41, document: { text: "Paris is in France." } },
@@ -122,7 +122,7 @@ describe("auth-gateway POST /v1/rerank", () => {
 		});
 		expect(harness.upstream).toEqual([
 			{
-				url: "https://openrouter.ai/api/v1/rerank",
+				url: "https://proxy.company.example/v1/rerank",
 				authorization: "Bearer openrouter-secret",
 				body: {
 					model: "cohere/rerank-v3.5",
@@ -135,7 +135,7 @@ describe("auth-gateway POST /v1/rerank", () => {
 		]);
 		expect(observed).toHaveLength(1);
 		expect(observed[0]).toMatchObject({
-			provider: "openrouter",
+			provider: "company-proxy",
 			model: "cohere/rerank-v3.5",
 			costUsd: 0.004,
 			client: { app: "search-client" },

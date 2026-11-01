@@ -44,7 +44,7 @@ describe("AgentSession.resume", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-resume-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -62,7 +62,11 @@ describe("AgentSession.resume", () => {
 		const mock = createMockModel({ responses });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
-			initialState: { model: getBundledModel("anthropic", "claude-sonnet-4-5")!, systemPrompt: ["Test"], tools: [] },
+			initialState: {
+				model: getBundledModel("github-copilot", "claude-sonnet-4.5")!,
+				systemPrompt: ["Test"],
+				tools: [],
+			},
 			convertToLlm,
 			streamFn: mock.stream,
 		});

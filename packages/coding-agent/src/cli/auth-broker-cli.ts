@@ -6,15 +6,11 @@
  *   - `token` / `token --regenerate` — manages the bearer token file.
  *   - `login <provider> [--via=user@host]` — logs into a provider locally, or
  *     via SSH tunnel into a remote broker host.
- *   - `import <file|dir>` — imports CLIProxyAPI-style JSON credentials into
- *     the local SQLite store (typical use: `import ~/.cliproxy/auth`).
  *   - `migrate --from-local [--include-env] [--include-oauth] [--dry-run]` —
  *     uploads local SQLite + env API keys to the broker, skipping anything
  *     the broker already has.
  *   - `status` — health-pings the configured remote broker.
  */
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline";
 import {
@@ -37,14 +33,13 @@ import type { OAuthCredentials } from "@oh-my-pi/pi-ai/oauth/types";
 import { $which, APP_NAME, getAgentDbPath, getConfigRootDir, logger, VERSION } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { setTransports as setLoggerTransports } from "@oh-my-pi/pi-utils/logger";
-import { $ } from "bun";
 import { refreshManagedMcpOAuthCredential } from "../mcp/oauth-credentials";
 import { isManagedMCPOAuthCredentialId, mcpOAuthServerUrlFromCredentialId } from "../mcp/oauth-flow";
 import { resolveAuthBrokerConfig } from "../session/auth-broker-config";
 import { pickIndex, pickOAuthProvider, runTerminalOAuthLogin } from "./oauth-terminal";
 import { generateToken, readTokenFile, writeTokenFile } from "./token-file";
 
-export type AuthBrokerAction = "serve" | "token" | "login" | "logout" | "status" | "import" | "migrate" | "list";
+export type AuthBrokerAction = "serve" | "token" | "login" | "logout" | "status" | "migrate" | "list";
 
 export interface AuthBrokerCommandArgs {
 	action: AuthBrokerAction;
@@ -56,11 +51,9 @@ export interface AuthBrokerCommandArgs {
 		via?: string;
 		provider?: string;
 		dryRun?: boolean;
-		/** `login`/`logout`: provider id. `import`: filesystem path. */
+		/** `login`/`logout`: provider id. */
 		source?: string;
-		/** `import`: keep credentials whose JSON had `disabled: true`. */
-		includeDisabled?: boolean;
-		/** `migrate`: also upload local OAuth (default: api_key only, since OAuth is via cliproxy import). */
+		/** `migrate`: also upload local OAuth credentials. */
 		includeOauth?: boolean;
 		/** `migrate`: also capture env-var API keys for providers not yet on broker. */
 		includeEnv?: boolean;
@@ -69,16 +62,7 @@ export interface AuthBrokerCommandArgs {
 	};
 }
 
-const ACTIONS: readonly AuthBrokerAction[] = [
-	"serve",
-	"token",
-	"login",
-	"logout",
-	"import",
-	"migrate",
-	"status",
-	"list",
-];
+const ACTIONS: readonly AuthBrokerAction[] = ["serve", "token", "login", "logout", "migrate", "status", "list"];
 
 /** Callback ports baked from the per-provider OAuth flow modules. */
 const CALLBACK_PORTS: Record<string, number> = Object.fromEntries(
@@ -301,228 +285,6 @@ async function runList(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
 	process.stdout.write("Available providers:\n\n");
 	for (const p of providers) {
 		process.stdout.write(`  ${p.id.padEnd(20)} ${p.name}\n`);
-	}
-}
-
-// ─── CLIProxyAPI import ─────────────────────────────────────────────────
-
-/**
- * Maps the `type` field of a CLIProxyAPI credential JSON to the omp provider id.
- * The filename also encodes the type (e.g. `claude-foo@bar.json`), but the
- * in-file `type` is authoritative — we only fall back to filename if absent.
- */
-const CLIPROXY_TYPE_TO_PROVIDER: Record<string, string> = {
-	claude: "anthropic",
-	codex: "openai-codex",
-	gemini: "google-gemini-cli",
-	antigravity: "google-antigravity",
-	"gemini-cli": "google-gemini-cli",
-};
-
-interface CliProxyCredentialJson {
-	type?: string;
-	access_token?: string;
-	refresh_token?: string;
-	id_token?: string;
-	expired?: string;
-	last_refresh?: string;
-	email?: string;
-	account_id?: string;
-	disabled?: boolean;
-}
-
-interface ImportPlanEntry {
-	sourceFile: string;
-	provider: string;
-	email: string | null;
-	accountId: string | null;
-	expiresAt: number;
-	disabled: boolean;
-	credential: OAuthCredential;
-}
-
-function resolveCliProxyProvider(json: CliProxyCredentialJson, filename: string, overrideId?: string): string | null {
-	if (overrideId && overrideId.length > 0) return overrideId;
-	const typeField = json.type?.trim().toLowerCase();
-	if (typeField && CLIPROXY_TYPE_TO_PROVIDER[typeField]) return CLIPROXY_TYPE_TO_PROVIDER[typeField];
-	// Fall back to filename prefix: `<type>-<email>.json`
-	const base = path.basename(filename, ".json").toLowerCase();
-	for (const prefix in CLIPROXY_TYPE_TO_PROVIDER) {
-		const providerId = CLIPROXY_TYPE_TO_PROVIDER[prefix];
-		if (base.startsWith(`${prefix}-`) || base === prefix) return providerId;
-	}
-	return null;
-}
-
-function parseCliProxyExpiry(raw: string | undefined): number | null {
-	if (!raw) return null;
-	// CLIProxyAPI writes RFC3339-ish dates. `Date.parse` handles both `Z` and offsets.
-	const ms = Date.parse(raw);
-	if (!Number.isFinite(ms)) return null;
-	return ms;
-}
-
-async function collectImportSources(target: string): Promise<string[]> {
-	const stat = await fs.stat(target);
-	if (stat.isFile()) return [target];
-	if (!stat.isDirectory()) {
-		throw new Error(`Import source is neither file nor directory: ${target}`);
-	}
-	const entries = await fs.readdir(target, { withFileTypes: true });
-	const files: string[] = [];
-	for (const entry of entries) {
-		if (!entry.isFile()) continue;
-		if (!entry.name.endsWith(".json")) continue;
-		files.push(path.join(target, entry.name));
-	}
-	files.sort();
-	return files;
-}
-
-async function loadImportPlan(
-	target: string,
-	overrideProvider: string | undefined,
-	includeDisabled: boolean,
-): Promise<{ entries: ImportPlanEntry[]; skipped: Array<{ file: string; reason: string }> }> {
-	const files = await collectImportSources(target);
-	const entries: ImportPlanEntry[] = [];
-	const skipped: Array<{ file: string; reason: string }> = [];
-	for (const file of files) {
-		let json: CliProxyCredentialJson;
-		try {
-			json = JSON.parse(await fs.readFile(file, "utf8")) as CliProxyCredentialJson;
-		} catch (err) {
-			skipped.push({ file, reason: `unreadable JSON: ${String(err)}` });
-			continue;
-		}
-		if (json.disabled === true && !includeDisabled) {
-			skipped.push({ file, reason: "credential marked disabled (use --include-disabled to import anyway)" });
-			continue;
-		}
-		const provider = resolveCliProxyProvider(json, file, overrideProvider);
-		if (!provider) {
-			skipped.push({
-				file,
-				reason: `cannot determine omp provider from type=${json.type ?? "?"} (pass --provider to override)`,
-			});
-			continue;
-		}
-		if (!json.access_token || !json.refresh_token) {
-			skipped.push({ file, reason: "missing access_token or refresh_token" });
-			continue;
-		}
-		const expiresAt = parseCliProxyExpiry(json.expired);
-		if (expiresAt === null) {
-			skipped.push({ file, reason: `cannot parse expired=${json.expired ?? "?"}` });
-			continue;
-		}
-		const email = typeof json.email === "string" && json.email.length > 0 ? json.email : null;
-		const accountId = typeof json.account_id === "string" && json.account_id.length > 0 ? json.account_id : null;
-		const credential: OAuthCredential = {
-			type: "oauth",
-			access: json.access_token,
-			refresh: json.refresh_token,
-			expires: expiresAt,
-			...(email !== null ? { email } : {}),
-			...(accountId !== null ? { accountId } : {}),
-		};
-		entries.push({
-			sourceFile: file,
-			provider,
-			email,
-			accountId,
-			expiresAt,
-			disabled: json.disabled === true,
-			credential,
-		});
-	}
-	return { entries, skipped };
-}
-
-function describeImportEntry(entry: ImportPlanEntry): string {
-	const ident = entry.email ?? entry.accountId ?? "(no identity)";
-	const stale = entry.expiresAt < Date.now() ? " [expired]" : "";
-	const disabled = entry.disabled ? " [disabled]" : "";
-	return `${entry.provider}: ${ident}${stale}${disabled} from ${entry.sourceFile}`;
-}
-
-async function runImport(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
-	const target = flags.source;
-	if (!target) {
-		throw new Error("Usage: omp auth-broker import <file|dir> [--provider=<id>] [--include-disabled] [--dry-run]");
-	}
-	const resolvedTarget = path.resolve(target.startsWith("~") ? target.replace(/^~/, os.homedir()) : target);
-	const { entries, skipped } = await loadImportPlan(resolvedTarget, flags.provider, flags.includeDisabled === true);
-
-	if (flags.json) {
-		process.stdout.write(
-			`${JSON.stringify({
-				dryRun: flags.dryRun === true,
-				imported: flags.dryRun
-					? []
-					: entries.map(e => ({ provider: e.provider, email: e.email, file: e.sourceFile })),
-				plan: entries.map(e => ({
-					provider: e.provider,
-					email: e.email,
-					accountId: e.accountId,
-					expiresAt: e.expiresAt,
-					disabled: e.disabled,
-					file: e.sourceFile,
-				})),
-				skipped,
-			})}\n`,
-		);
-	}
-
-	if (!flags.json) {
-		for (const skip of skipped) {
-			process.stdout.write(`${chalk.yellow("skip")} ${skip.file}: ${skip.reason}\n`);
-		}
-	}
-
-	if (entries.length === 0) {
-		if (!flags.json) process.stdout.write(`No importable credentials in ${resolvedTarget}.\n`);
-		return;
-	}
-
-	if (flags.dryRun === true) {
-		if (!flags.json) {
-			process.stdout.write(`Dry run — would import ${entries.length} credential(s):\n`);
-			for (const entry of entries) process.stdout.write(`  ${describeImportEntry(entry)}\n`);
-		}
-		return;
-	}
-
-	const brokerConfig = await resolveAuthBrokerConfig();
-	if (brokerConfig) {
-		const client = new AuthBrokerClient({ url: brokerConfig.url, token: brokerConfig.token });
-		for (const entry of entries) {
-			try {
-				await client.uploadCredential(entry.provider, entry.credential);
-				if (!flags.json) {
-					process.stdout.write(`${chalk.green("uploaded")} ${describeImportEntry(entry)} → ${brokerConfig.url}\n`);
-				}
-			} catch (error) {
-				const message = error instanceof Error ? error.message : String(error);
-				if (flags.json) {
-					process.stdout.write(`${JSON.stringify({ error: message, file: entry.sourceFile })}\n`);
-				} else {
-					process.stdout.write(`${chalk.red("failed")} ${describeImportEntry(entry)}: ${message}\n`);
-				}
-				process.exitCode = 1;
-			}
-		}
-		return;
-	}
-
-	const store = await SqliteAuthCredentialStore.open(getAgentDbPath());
-	try {
-		for (const entry of entries) {
-			await store.upsertAuthCredential(entry.provider, entry.credential);
-			if (!flags.json) process.stdout.write(`${chalk.green("imported")} ${describeImportEntry(entry)}\n`);
-		}
-	} finally {
-		store.close();
 	}
 }
 
@@ -766,9 +528,6 @@ export async function runAuthBrokerCommand(cmd: AuthBrokerCommandArgs): Promise<
 		case "logout":
 			await runLogout(cmd.flags);
 			return;
-		case "import":
-			await runImport(cmd.flags);
-			return;
 		case "migrate":
 			await runMigrate(cmd.flags);
 			return;
@@ -787,6 +546,3 @@ export async function runAuthBrokerCommand(cmd: AuthBrokerCommandArgs): Promise<
 }
 
 export { ACTIONS as AUTH_BROKER_ACTIONS };
-
-// Touch `$` so Bun's tree-shaker keeps the shell helper imported (used by future verbs).
-void $;

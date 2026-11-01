@@ -17,8 +17,7 @@
   "keywords": [
     "wire",
     "protocol",
-    "types",
-    "collab"
+    "types"
   ],
   "main": "./src/index.ts",
   "types": "./src/index.ts",

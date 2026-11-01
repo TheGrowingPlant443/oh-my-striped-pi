@@ -134,6 +134,9 @@ Build screens from persistent components and update their data, selection, expan
 | Transcripts  | `TranscriptBrowser`                                                             | package root |
 | Data         | `MetricRow`, `ProgressBar`, `Table`, `KeyValueList`, `Section`                  | package root |
 
+The status line's `record` segment displays `● REC` during local screen recording (`setRecording`).
+Local recording and transcript playback do not include live collaboration, relay links, or network viewer status.
+
 ```typescript
 import { Disclosure, SplitPane, Text } from "@oh-my-pi/pi-tui";
 

@@ -1,7 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { buildRequest } from "@oh-my-pi/pi-ai/providers/google-gemini-cli";
-import { convertTools } from "@oh-my-pi/pi-ai/providers/google-shared";
-import type { Context, Model, TJsonSchema, Tool } from "@oh-my-pi/pi-ai/types";
 import {
 	enforceStrictSchema,
 	mergeCompatibleEnumSchemas,
@@ -17,27 +14,6 @@ import {
 	tryEnforceStrictSchema,
 	upgradeJsonSchemaTo202012,
 } from "@oh-my-pi/pi-ai/utils/schema";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-
-function createGoogleCliModel(id: string): Model<"google-gemini-cli"> {
-	return buildModel({
-		id,
-		name: id,
-		api: "google-gemini-cli",
-		provider: "google-antigravity",
-		baseUrl: "https://example.com",
-		reasoning: false,
-		input: ["text"],
-		cost: {
-			input: 0,
-			output: 0,
-			cacheRead: 0,
-			cacheWrite: 0,
-		},
-		contextWindow: 200000,
-		maxTokens: 8192,
-	});
-}
 
 // ---------------------------------------------------------------------------
 // mergeCompatibleEnumSchemas
@@ -1040,57 +1016,6 @@ describe("normalizeSchemaForCCA", () => {
 		expect(normalized.minLength).toBeUndefined();
 		expect(normalized.maxLength).toBeUndefined();
 		expect(normalized.description).toBe('ID\n\n{pattern: "^\\\\d+$", minLength: 1, maxLength: 8}');
-	});
-
-	it("uses the same merged object output in shared and gemini-cli Antigravity paths", () => {
-		const parameters = {
-			anyOf: [
-				{
-					type: "object",
-					properties: {
-						shared: { type: "string" },
-						a: { type: "string" },
-					},
-					required: ["shared"],
-				},
-				{
-					type: "object",
-					properties: {
-						shared: { type: "string" },
-						b: { type: "number" },
-					},
-					required: ["shared"],
-				},
-			],
-		} as TJsonSchema;
-		const tools: Tool[] = [{ name: "merge_test", description: "Merge test", parameters }];
-
-		const sharedTools = convertTools(tools, createGoogleCliModel("claude-sonnet-4-5"));
-		const sharedDeclaration = sharedTools?.[0]?.functionDeclarations[0] as Record<string, unknown>;
-
-		const context: Context = {
-			messages: [{ role: "user", content: "hello", timestamp: 0 }],
-			tools,
-		};
-		const antigravityRequest = buildRequest(createGoogleCliModel("gemini-2.5-pro"), context, "project", {}, true);
-		const antigravityDeclaration = antigravityRequest.request.tools?.[0]?.functionDeclarations[0] as Record<
-			string,
-			unknown
-		>;
-
-		const expected = {
-			type: "object",
-			properties: {
-				shared: { type: "string" },
-				a: { type: "string" },
-				b: { type: "number" },
-			},
-			required: ["shared"],
-		};
-		expect(sharedDeclaration.parameters).toEqual(expected);
-		expect(antigravityDeclaration.parameters).toEqual(expected);
-		expect(antigravityDeclaration.parameters).toEqual(sharedDeclaration.parameters);
-		expect(antigravityDeclaration.parametersJsonSchema).toBeUndefined();
 	});
 
 	it("does not retain stale required keys after an object-union anyOf merge", () => {

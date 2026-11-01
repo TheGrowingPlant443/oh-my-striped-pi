@@ -134,6 +134,7 @@ describe("createAgentSession credential_disabled subscription", () => {
 	 */
 	const makeRecordingExtension = () => {
 		const events: CredentialDisabledEvent[] = [];
+		let consumedEvents = 0;
 		const waiters: Array<{ resolve: (event: CredentialDisabledEvent) => void }> = [];
 		const factory: ExtensionFactory = pi => {
 			pi.on("credential_disabled", event => {
@@ -144,11 +145,12 @@ describe("createAgentSession credential_disabled subscription", () => {
 			});
 		};
 		const next = (): Promise<CredentialDisabledEvent> => {
-			if (events.length > waiters.length) {
-				return Promise.resolve(events[waiters.length] as CredentialDisabledEvent);
+			if (events.length > consumedEvents) {
+				return Promise.resolve(events[consumedEvents++] as CredentialDisabledEvent);
 			}
 			const { promise, resolve } = Promise.withResolvers<CredentialDisabledEvent>();
 			waiters.push({ resolve });
+			consumedEvents++;
 			return promise;
 		};
 		return { factory, events, next };
@@ -191,48 +193,53 @@ describe("createAgentSession credential_disabled subscription", () => {
 		failOAuthRefresh();
 
 		// All three sessions + embedder receive the first event.
-		await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+		await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 		const wait1All = Promise.all([ext1.next(), ext2.next(), ext3.next()]);
-		await authStorage.keys.get("anthropic", "concurrent-1");
+		await authStorage.keys.get("github-copilot", "concurrent-1");
 		await wait1All;
-		expect(embedderEvents.map(e => e.provider)).toEqual(["anthropic"]);
-		expect(ext1.events.map(e => e.provider)).toEqual(["anthropic"]);
-		expect(ext2.events.map(e => e.provider)).toEqual(["anthropic"]);
-		expect(ext3.events.map(e => e.provider)).toEqual(["anthropic"]);
+		expect(embedderEvents.map(e => e.provider)).toEqual(["github-copilot"]);
+		expect(ext1.events.map(e => e.provider)).toEqual(["github-copilot"]);
+		expect(ext2.events.map(e => e.provider)).toEqual(["github-copilot"]);
+		expect(ext3.events.map(e => e.provider)).toEqual(["github-copilot"]);
 
 		// Dispose session1; sessions 2 and 3 + embedder still receive.
 		await session1.session.dispose();
 
-		await authStorage.credentials.set("openai", [expiredOAuth()]);
+		await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 		const wait2 = Promise.all([ext2.next(), ext3.next()]);
-		await authStorage.keys.get("openai", "concurrent-2");
+		await authStorage.keys.get("github-copilot", "concurrent-2");
 		await wait2;
 		await drainCredentialDisabledDispatch();
-		expect(embedderEvents.map(e => e.provider)).toEqual(["anthropic", "openai"]);
-		expect(ext1.events.map(e => e.provider)).toEqual(["anthropic"]);
-		expect(ext2.events.map(e => e.provider)).toEqual(["anthropic", "openai"]);
-		expect(ext3.events.map(e => e.provider)).toEqual(["anthropic", "openai"]);
+		expect(embedderEvents.map(e => e.provider)).toEqual(["github-copilot", "github-copilot"]);
+		expect(ext1.events.map(e => e.provider)).toEqual(["github-copilot"]);
+		expect(ext2.events.map(e => e.provider)).toEqual(["github-copilot", "github-copilot"]);
+		expect(ext3.events.map(e => e.provider)).toEqual(["github-copilot", "github-copilot"]);
 
 		// Dispose session2; only session3 + embedder receive.
 		await session2.session.dispose();
 
-		await authStorage.credentials.set("google", [expiredOAuth()]);
+		await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 		const wait3 = ext3.next();
-		await authStorage.keys.get("google", "concurrent-3");
+		await authStorage.keys.get("github-copilot", "concurrent-3");
 		await wait3;
 		await drainCredentialDisabledDispatch();
-		expect(embedderEvents.map(e => e.provider)).toEqual(["anthropic", "openai", "google"]);
-		expect(ext1.events.map(e => e.provider)).toEqual(["anthropic"]);
-		expect(ext2.events.map(e => e.provider)).toEqual(["anthropic", "openai"]);
-		expect(ext3.events.map(e => e.provider)).toEqual(["anthropic", "openai", "google"]);
+		expect(embedderEvents.map(e => e.provider)).toEqual(["github-copilot", "github-copilot", "github-copilot"]);
+		expect(ext1.events.map(e => e.provider)).toEqual(["github-copilot"]);
+		expect(ext2.events.map(e => e.provider)).toEqual(["github-copilot", "github-copilot"]);
+		expect(ext3.events.map(e => e.provider)).toEqual(["github-copilot", "github-copilot", "github-copilot"]);
 
 		// Dispose the last session; only the embedder receives.
 		await session3.session.dispose();
 
-		await authStorage.credentials.set("anthropic", [expiredOAuth()]);
-		await authStorage.keys.get("anthropic", "concurrent-final");
+		await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
+		await authStorage.keys.get("github-copilot", "concurrent-final");
 		await drainCredentialDisabledDispatch();
-		expect(embedderEvents.map(e => e.provider)).toEqual(["anthropic", "openai", "google", "anthropic"]);
+		expect(embedderEvents.map(e => e.provider)).toEqual([
+			"github-copilot",
+			"github-copilot",
+			"github-copilot",
+			"github-copilot",
+		]);
 		expect(ext1.events).toHaveLength(1);
 		expect(ext2.events).toHaveLength(2);
 		expect(ext3.events).toHaveLength(3);
@@ -253,9 +260,9 @@ describe("createAgentSession credential_disabled subscription", () => {
 			// Fire the event BEFORE initializing. Extension must NOT see it yet — the runner
 			// would otherwise emit with `hasUI=false`, an unset model, and no-op runtime
 			// actions, defeating the headline re-login flow.
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			failOAuthRefresh();
-			await authStorage.keys.get("anthropic", "pre-init");
+			await authStorage.keys.get("github-copilot", "pre-init");
 			await drainCredentialDisabledDispatch();
 			expect(ext.events).toHaveLength(0);
 
@@ -265,8 +272,11 @@ describe("createAgentSession credential_disabled subscription", () => {
 			initializeRunnerForTest(session.extensionRunner);
 			const extEvent = await observed;
 
-			expect(extEvent.provider).toBe("anthropic");
+			expect(extEvent.provider).toBe("github-copilot");
 			expect(extEvent.disabledCause).toContain("invalid_grant");
+			expect(await authStorage.keys.get("github-copilot", "after-disable")).toBeUndefined();
+			await drainCredentialDisabledDispatch();
+			expect(ext.events).toHaveLength(1);
 		} finally {
 			await session.dispose();
 		}
@@ -292,15 +302,15 @@ describe("createAgentSession credential_disabled subscription", () => {
 		try {
 			// Fire BEFORE initialize — simulates an OAuth invalid_grant during startup model
 			// probes when the embedder constructor handler is set.
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			failOAuthRefresh();
-			await authStorage.keys.get("anthropic", "startup-with-embedder");
+			await authStorage.keys.get("github-copilot", "startup-with-embedder");
 			await drainCredentialDisabledDispatch();
 
 			// Embedder fires immediately (sync push from AuthStorage's fan-out loop). The
 			// extension still hasn't received it because the runner is uninitialized.
 			expect(embedderEvents).toHaveLength(1);
-			expect(embedderEvents[0]?.provider).toBe("anthropic");
+			expect(embedderEvents[0]?.provider).toBe("github-copilot");
 			expect(ext.events).toHaveLength(0);
 
 			// Initialize the runner. The buffered event flushes through emit().
@@ -308,7 +318,7 @@ describe("createAgentSession credential_disabled subscription", () => {
 			initializeRunnerForTest(session.extensionRunner);
 			const extEvent = await observed;
 
-			expect(extEvent.provider).toBe("anthropic");
+			expect(extEvent.provider).toBe("github-copilot");
 			expect(extEvent.disabledCause).toContain("invalid_grant");
 			// Embedder didn't double-receive.
 			expect(embedderEvents).toHaveLength(1);
@@ -343,13 +353,13 @@ describe("createAgentSession credential_disabled subscription", () => {
 		// Now fire a real disable. Only the embedder must observe it — no leftover listener
 		// from either failed startup attempt.
 		failOAuthRefresh();
-		await authStorage.credentials.set("anthropic", [expiredOAuth()]);
-		await authStorage.keys.get("anthropic", "post-failure");
+		await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
+		await authStorage.keys.get("github-copilot", "post-failure");
 		await drainCredentialDisabledDispatch();
 
 		expect(embedderEvents).toEqual([
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				disabledCause: expect.stringContaining("invalid_grant"),
 				credentialId: expect.any(Number),
 			},
@@ -384,21 +394,21 @@ describe("createAgentSession credential_disabled subscription", () => {
 		initializeRunnerForTest(session.extensionRunner);
 
 		try {
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			failOAuthRefresh();
 
 			const observed = ext.next();
-			await modelRegistry.getApiKeyForProvider("anthropic", "registry-only");
+			await modelRegistry.getApiKeyForProvider("github-copilot", "registry-only");
 			const extEvent = await observed;
 
 			expect(embedderEvents).toEqual([
 				{
-					provider: "anthropic",
+					provider: "github-copilot",
 					disabledCause: expect.stringContaining("invalid_grant"),
 					credentialId: expect.any(Number),
 				},
 			]);
-			expect(extEvent.provider).toBe("anthropic");
+			expect(extEvent.provider).toBe("github-copilot");
 			expect(extEvent.disabledCause).toContain("invalid_grant");
 		} finally {
 			await session.dispose();
@@ -470,7 +480,7 @@ describe("createAgentSession credential_disabled subscription", () => {
 			const runner = new ExtensionRunner([throwingExtension], runtime, dirs.cwd, sessionManager, modelRegistry);
 
 			// 1. Buffer the event BEFORE initialize so it lands in #pendingCredentialDisabled.
-			await runner.emitCredentialDisabled({ provider: "anthropic", disabledCause: "test" });
+			await runner.emitCredentialDisabled({ provider: "github-copilot", disabledCause: "test" });
 
 			// 2. initialize(); the flush is queued as a microtask.
 			runner.initialize(
@@ -538,12 +548,12 @@ describe("createAgentSession credential_disabled subscription", () => {
 		const { session } = await createAgentSession(baseOptions(dirs, authStorage));
 		const notices = recordNotices(session);
 		try {
-			await authStorage.credentials.set("anthropic", [{ ...expiredOAuth(), email: "alice@example.com" }]);
+			await authStorage.credentials.set("github-copilot", [{ ...expiredOAuth(), email: "alice@example.com" }]);
 			failOAuthRefresh();
 
-			await authStorage.keys.get("anthropic", "session-notice");
+			await authStorage.keys.get("github-copilot", "session-notice");
 
-			const name = getOAuthProviders().find(provider => provider.id === "anthropic")?.name;
+			const name = getOAuthProviders().find(provider => provider.id === "github-copilot")?.name;
 			expect(name).toBeDefined();
 			expect(notices).toEqual([
 				{

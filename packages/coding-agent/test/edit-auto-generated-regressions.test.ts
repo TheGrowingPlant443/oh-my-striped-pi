@@ -20,7 +20,6 @@ import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, StopReason, ToolCall } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
@@ -30,6 +29,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function createAssistantMessage(content: AssistantMessage["content"], stopReason: StopReason): AssistantMessage {
 	return {
@@ -89,7 +89,7 @@ function createSessionWith(
 	settingsOverrides: Record<string, unknown> = {},
 ): Promise<{ agent: Agent; session: AgentSession; authStorage: AuthStorage }> {
 	return (async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getTestModel("github-copilot");
 		const agent = new Agent({
 			getApiKey: () => "test-key",
 			initialState: { model, systemPrompt: ["Test"], tools: [tool] },
@@ -98,7 +98,7 @@ function createSessionWith(
 		const sessionManager = SessionManager.inMemory(tempDir);
 		const settings = Settings.isolated(settingsOverrides);
 		const authStorage = await AuthStorage.create(path.join(tempDir, "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
 		return {
 			agent,

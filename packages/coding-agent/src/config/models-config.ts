@@ -4,6 +4,7 @@
 
 import type { FluentType } from "@oh-my-pi/omptype";
 import type { Api, ModelSpec } from "@oh-my-pi/pi-ai/types";
+import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
 import { AXES } from "@oh-my-pi/pi-catalog/compat/axes";
 import { type ModelKind, servedKinds } from "@oh-my-pi/pi-catalog/types";
 import { isRecord, once } from "@oh-my-pi/pi-utils";
@@ -33,8 +34,6 @@ export interface ProviderValidationConfig {
 	compat?: ModelSpec<Api>["compat"];
 	remoteCompaction?: unknown;
 	disableStrictTools?: boolean;
-	guardrailIdentifier?: string;
-	requestMetadata?: Record<string, string>;
 	modelOverrides?: Record<string, { api?: Api; kind?: ModelKind }>;
 	models: ProviderValidationModel[];
 }
@@ -46,6 +45,16 @@ export function validateProviderConfiguration(
 	config: ProviderValidationConfig,
 	mode: ProviderValidationMode,
 ): void {
+	if (providerName === "local" && config.discovery) {
+		throw new Error("Provider local uses built-in on-device inference and does not support HTTP discovery.");
+	}
+	if (
+		config.discovery &&
+		!config.baseUrl &&
+		!["ollama", "llama.cpp", "lm-studio", "litellm", "apple-foundation-models"].includes(config.discovery.type)
+	) {
+		throw new Error(`Provider ${providerName}: "baseUrl" is required when discovery is enabled.`);
+	}
 	const hasProviderApi = !!config.api;
 	const models = config.models;
 
@@ -59,35 +68,45 @@ export function validateProviderConfiguration(
 				!config.apiKey &&
 				config.auth !== "none" &&
 				!config.disableStrictTools &&
-				!config.guardrailIdentifier &&
-				!config.requestMetadata &&
 				!config.remoteCompaction &&
 				!hasModelOverrides &&
 				!config.discovery
 			) {
 				throw new Error(
-					`Provider ${providerName}: must specify "baseUrl", "headers", "apiKey", "auth: none", "compat", "disableStrictTools", "guardrailIdentifier", "requestMetadata", "remoteCompaction", "modelOverrides", "discovery", or "models"`,
+					`Provider ${providerName}: must specify "baseUrl", "headers", "apiKey", "auth: none", "compat", "disableStrictTools", "remoteCompaction", "modelOverrides", "discovery", or "models"`,
 				);
 			}
 		}
 	} else {
-		if (!config.baseUrl) {
+		const usesHttp = models.some(
+			model => !["local-inference", "apple-foundation-models"].includes(model.api ?? config.api ?? ""),
+		);
+		if (usesHttp && !config.baseUrl) {
 			throw new Error(`Provider ${providerName}: "baseUrl" is required when defining custom models.`);
 		}
 		const requiresAuth =
-			mode === "runtime-register"
+			usesHttp &&
+			config.auth !== "none" &&
+			authPolicyFor(providerName)?.allowsMissingApiKey !== true &&
+			(mode === "runtime-register"
 				? !config.apiKey && !config.oauthConfigured
-				: !config.apiKey && (config.auth ?? "apiKey") !== "none" && (config.auth ?? "apiKey") !== "oauth";
+				: !config.apiKey && (config.auth ?? "apiKey") !== "oauth");
 		if (requiresAuth) {
 			throw new Error(
 				mode === "runtime-register"
-					? `Provider ${providerName}: "apiKey" or "oauth" is required when defining models.`
+					? `Provider ${providerName}: "apiKey", "oauth", or "auth: none" is required when defining models.`
 					: `Provider ${providerName}: "apiKey" is required when defining custom models unless auth is "none" or "oauth".`,
 			);
 		}
 	}
 
-	if (mode === "models-config" && config.discovery && !config.api && config.discovery.type !== "proxy") {
+	if (
+		mode === "models-config" &&
+		config.discovery &&
+		!config.api &&
+		config.discovery.type !== "proxy" &&
+		config.discovery.type !== "apple-foundation-models"
+	) {
 		throw new Error(`Provider ${providerName}: "api" is required when discovery is enabled at provider level.`);
 	}
 
@@ -213,8 +232,6 @@ export const ModelsConfigFile = new ConfigFile<ModelsConfig>("models", {
 				compat: providerConfig.compat,
 				remoteCompaction: providerConfig.remoteCompaction,
 				disableStrictTools: providerConfig.disableStrictTools,
-				guardrailIdentifier: providerConfig.guardrailIdentifier,
-				requestMetadata: providerConfig.requestMetadata,
 				modelOverrides: providerConfig.modelOverrides,
 				models: (providerConfig.models ?? []) as ProviderValidationModel[],
 			},

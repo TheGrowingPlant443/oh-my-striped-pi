@@ -144,7 +144,12 @@ export class UsageService implements UsageApi {
 	 * providers without a usage API) — the latter never warrants a usage row.
 	 */
 	providerFor(provider: Provider): UsageProvider | undefined {
-		return this.#runtimeUsageProviderOverrides.get(provider)?.provider ?? this.#deps.usageProviders(provider);
+		const implementation =
+			this.#runtimeUsageProviderOverrides.get(provider)?.provider ?? this.#deps.usageProviders(provider);
+		if (implementation && implementation.id !== provider) {
+			throw new AIError.ConfigurationError(`Usage provider id must be ${provider}`);
+		}
+		return implementation;
 	}
 
 	/**
@@ -154,6 +159,9 @@ export class UsageService implements UsageApi {
 	 * built-in fallback. Removing the override restores that resolver unchanged.
 	 */
 	setProvider(provider: Provider, usageProvider: UsageProvider, apiKey?: string): void {
+		if (usageProvider.id !== provider) {
+			throw new AIError.ConfigurationError(`Usage provider id must be ${provider}`);
+		}
 		this.#runtimeUsageProviderOverrides.set(provider, {
 			provider: usageProvider,
 			apiKey,
@@ -350,7 +358,6 @@ export class UsageService implements UsageApi {
 		}
 		const usageCacheEpoch = this.#deps.cache.epoch;
 		const refreshEpoch = this.#deps.cache.refreshEpoch(request.provider);
-		const recoveryEpoch = this.#deps.cache.recoveryEpoch(request.provider);
 		const promise = (async () => {
 			const report = await this.#fetchUsageUncached(request, timeoutMs);
 			// Block marks bump the generation too: a report racing a fresh 429 may
@@ -385,11 +392,7 @@ export class UsageService implements UsageApi {
 			const coolDown = Date.now() + failureBackoffMs + backoffJitter;
 			// Dropping snapshots is not recovery from a failed endpoint. Persist its
 			// cooldown even if a manual refresh or block update raced this probe.
-			// A confirmed reset is the exception: the old failure cannot suppress
-			// the first post-reset probe.
-			if (recoveryEpoch === this.#deps.cache.recoveryEpoch(request.provider)) {
-				this.#deps.cache.set(failureKey, { value: null, expiresAt: coolDown });
-			}
+			this.#deps.cache.set(failureKey, { value: null, expiresAt: coolDown });
 			if (!invalidated) this.#deps.cache.set(cacheKey, { value: lastGood, expiresAt: coolDown });
 			return lastGood;
 		})().finally(() => {
@@ -780,9 +783,8 @@ export class UsageService implements UsageApi {
 			}
 			const fetched = await raceSignal(shared, options?.signal, "usage fetch aborted");
 			const reports =
-				fetched && options?.provider !== undefined
-					? fetched.filter(report => report.provider === options.provider)
-					: fetched;
+				fetched?.filter(report => options?.provider === undefined || report.provider === options.provider) ??
+				fetched;
 			if (reports) this.#deps.blocks.reconcileReports(reports);
 			if (!reports || this.#runtimeUsageProviderOverrides.size === 0) return reports;
 

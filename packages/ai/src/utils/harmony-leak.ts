@@ -147,10 +147,9 @@ export interface HarmonyRecoveredToolCall {
 }
 
 /**
- * Whether to run leak detection on responses from this model. The default-on policy
- * lives on the harmony-leak-mitigation axis in providers/openai-codex.kdl.
- * It targets the provider rather than enumerating model ids so future models
- * do not silently bypass this cheap mitigation.
+ * Whether to run leak detection on responses from this model. The catalog's
+ * model-lineage policy enables mitigation for Harmony output; transports
+ * consume the resolved capability without matching provider/model names.
  */
 export function isHarmonyLeakMitigationTarget(model: Model): boolean {
 	const compat = model.compat;

@@ -1,8 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
+import { Effort, type Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
@@ -13,6 +13,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 // A classifier refusal judges the advisor's context, not the model's health.
 // The advisor must stay on its fallback instead of returning to the refusing
@@ -31,17 +32,56 @@ describe("advisor classifier-refusal fallback", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-advisor-refusal-pin-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("google", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const primary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallback = getBundledModel("google", "gemini-2.5-flash");
-		const second = getBundledModel("openai", "gpt-4o");
-		if (!primary || !fallback || !second) throw new Error("Expected bundled advisor models to exist");
-		advisorPrimary = primary;
-		advisorFallback = fallback;
-		secondFallback = second;
+		advisorPrimary = buildModel({
+			provider: "company-advisor-refusal-primary",
+			id: "primary-reviewer",
+			name: "Company primary reviewer",
+			api: "anthropic-messages",
+			baseUrl: "https://advisor-primary.company.invalid",
+			reasoning: true,
+			thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		advisorFallback = buildModel({
+			provider: "company-advisor-refusal-fallback",
+			id: "fallback-reviewer",
+			name: "Company fallback reviewer",
+			api: "openai-completions",
+			baseUrl: "https://advisor-fallback.company.invalid",
+			reasoning: true,
+			thinking: { mode: "effort", efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High] },
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		secondFallback = buildModel({
+			provider: "company-advisor-refusal-second",
+			id: "second-reviewer",
+			name: "Company second reviewer",
+			api: "openai-responses",
+			baseUrl: "https://advisor-second.company.invalid",
+			reasoning: false,
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		for (const fixture of [advisorPrimary, advisorFallback, secondFallback]) {
+			modelRegistry.registerProvider(fixture.provider, {
+				api: fixture.api,
+				apiKey: "test-key",
+				baseUrl: fixture.baseUrl,
+				models: [toProviderModelConfig(fixture)],
+			});
+		}
 	});
 
 	afterAll(() => {

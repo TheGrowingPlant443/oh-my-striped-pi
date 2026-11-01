@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import type { PreparedExtension } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
@@ -22,6 +21,7 @@ import type { PreparedSeanceSession } from "@oh-my-pi/pi-coding-agent/task/seanc
 import { seanceIsolationOptions } from "@oh-my-pi/pi-coding-agent/task/seance-policy";
 import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
 import { getAgentDir, prompt, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "../helpers/model-fixtures";
 
 function preparedSourceSession(sourceFile: string, sourceSessionId: string): PreparedSeanceSession {
 	return {
@@ -145,10 +145,9 @@ describe("seance startup contracts", () => {
 		const sourceFile = path.join(tempDir.path(), "source.jsonl");
 		const sourceText = await writeSourceSession(sourceFile, cwd, [sourceRoot]);
 		const forked = await forkSeance(sourceFile, cwd, path.join(tempDir.path(), "forks", "seance.jsonl"));
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5");
+		const model = getTestModel("github-copilot");
 		const authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		const extensionPath = path.join(tempDir.path(), "hostile-extension.ts");
 		const extensionMarker = path.join(tempDir.path(), "extension-loaded.txt");
@@ -216,7 +215,8 @@ describe("seance startup contracts", () => {
 		const agent = getBundledAgent("seance");
 		if (!agent) throw new Error("Expected the bundled seance agent");
 		const authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = getTestModel("github-copilot");
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		const previousAgentDir = getAgentDir();
 		setAgentDir(path.join(tempDir.path(), "agent"));
@@ -254,7 +254,7 @@ describe("seance startup contracts", () => {
 				id,
 				settings: Settings.isolated(),
 				modelRegistry,
-				modelOverride: ["anthropic/claude-sonnet-4-5"],
+				modelOverride: [`${model.provider}/${model.id}`],
 				preparedSession: preparedSourceSession(sourceFile, "source-session"),
 				artifactsDir,
 				preloadedPreparedExtensions: [extension],
@@ -305,7 +305,8 @@ describe("seance startup contracts", () => {
 		const sessionFile = forked.getSessionFile();
 		if (!sessionFile) throw new Error("Expected a persisted fork");
 		const authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = getTestModel("github-copilot");
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		const seanceSettings = Settings.isolated({
 			"workspace.additionalDirectories": [settingsRoot],
@@ -319,8 +320,6 @@ describe("seance startup contracts", () => {
 		try {
 			const seanceAgent = getBundledAgent("seance");
 			if (!seanceAgent) throw new Error("Expected the bundled seance agent");
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5");
 			const resolvedModel = `${model.provider}/${model.id}`;
 			const subagentPrompt = prompt.render(subagentSystemPromptTemplate, {
 				agent: seanceAgent.systemPrompt,

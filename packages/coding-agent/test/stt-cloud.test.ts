@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as transcription from "@oh-my-pi/pi-ai/transcription";
 import type { TranscriptionResult } from "@oh-my-pi/pi-ai/transcription";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
 import { Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -44,11 +45,11 @@ function registryFor(model: Model) {
 		getError: () => undefined,
 		getAvailable: () => [model],
 		getAll: () => [model],
-		resolver: vi.fn(() => vi.fn().mockResolvedValue("cloud-key")),
+		resolver: vi.fn(() => vi.fn().mockResolvedValue("company-key")),
 	};
 }
 
-describe("STTController cloud transcription", () => {
+describe("STTController configured-endpoint transcription", () => {
 	let state: SettingsTestState | undefined;
 	let controller: STTController | undefined;
 
@@ -64,13 +65,25 @@ describe("STTController cloud transcription", () => {
 		restoreSettingsTestState(state);
 	});
 
-	it("buffers microphone PCM into a valid mono 16-bit WAV and commits the cloud transcript", async () => {
-		const model = getBundledModel("openai", "whisper-1");
-		settings.setModelRole("dictation", "openai/whisper-1");
+	it("buffers microphone PCM into a valid mono 16-bit WAV and commits the configured-endpoint transcript", async () => {
+		const model = buildModel({
+			id: "whisper-company",
+			name: "Company Whisper",
+			provider: "company",
+			api: "openai-transcriptions",
+			baseUrl: "https://transcribe.company.example/v1",
+			kind: "stt",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: null,
+			maxTokens: null,
+		});
+		settings.setModelRole("dictation", "company/whisper-company");
 		cfgSttLanguage.set(settings, "en");
 		const registry = registryFor(model);
 		const transcribe = vi.spyOn(transcription, "transcribeAudio").mockResolvedValue({
-			text: "cloud transcript",
+			text: "configured-endpoint transcript",
 			usage: ZERO_USAGE,
 		});
 		let onAudio: ((error: Error | null, samples: Float32Array) => void) | undefined;
@@ -92,7 +105,7 @@ describe("STTController cloud transcription", () => {
 		expect(stopCapture).toHaveBeenCalledTimes(1);
 		expect(transcribe).toHaveBeenCalledTimes(1);
 		const [calledModel, request, callOptions] = transcribe.mock.calls[0]!;
-		expect(calledModel).toBe(model);
+		expect(calledModel).toMatchObject(model);
 		expect(request).toMatchObject({
 			mimeType: "audio/wav",
 			fileName: "dictation.wav",
@@ -121,7 +134,7 @@ describe("STTController cloud transcription", () => {
 		expect(Array.from({ length: 5 }, (_, index) => view.getInt16(44 + index * 2, true))).toEqual([
 			-32_768, -16_384, 0, 16_383, 32_767,
 		]);
-		expect(editor.commitVolatileText).toHaveBeenCalledWith("cloud transcript");
+		expect(editor.commitVolatileText).toHaveBeenCalledWith("configured-endpoint transcript");
 		expect(options.onStateChange.mock.calls.map(([next]) => next)).toEqual(["recording", "transcribing", "idle"]);
 		expect(options.showStatus).toHaveBeenCalledWith("Transcribing...");
 	});
@@ -130,10 +143,22 @@ describe("STTController cloud transcription", () => {
 		{ manualSubmit: true, submissions: 0, deletions: 0 },
 		{ manualSubmit: undefined, submissions: 1, deletions: 1 },
 	])(
-		"honors the capture submit policy for cloud dictation (manualSubmit=$manualSubmit)",
+		"honors the capture submit policy for configured-endpoint dictation (manualSubmit=$manualSubmit)",
 		async ({ manualSubmit, submissions, deletions }) => {
-			const model = getBundledModel("openai", "whisper-1");
-			settings.setModelRole("dictation", "openai/whisper-1");
+			const model = buildModel({
+				id: "whisper-company",
+				name: "Company Whisper",
+				provider: "company",
+				api: "openai-transcriptions",
+				baseUrl: "https://transcribe.company.example/v1",
+				kind: "stt",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: null,
+				maxTokens: null,
+			});
+			settings.setModelRole("dictation", "company/whisper-company");
 			cfgSttSubmitTrigger.set(settings, "say-submit");
 			vi.spyOn(transcription, "transcribeAudio").mockResolvedValue({
 				text: "please review this submit.",
@@ -152,9 +177,21 @@ describe("STTController cloud transcription", () => {
 		},
 	);
 
-	it("aborts an in-flight cloud request when the controller is disposed", async () => {
-		const model = getBundledModel("openai", "whisper-1");
-		settings.setModelRole("dictation", "openai/whisper-1");
+	it("aborts an in-flight configured-endpoint request when the controller is disposed", async () => {
+		const model = buildModel({
+			id: "whisper-company",
+			name: "Company Whisper",
+			provider: "company",
+			api: "openai-transcriptions",
+			baseUrl: "https://transcribe.company.example/v1",
+			kind: "stt",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: null,
+			maxTokens: null,
+		});
+		settings.setModelRole("dictation", "company/whisper-company");
 		const registry = registryFor(model);
 		let requestSignal: AbortSignal | undefined;
 		const pending = Promise.withResolvers<TranscriptionResult>();
@@ -186,8 +223,20 @@ describe("STTController cloud transcription", () => {
 	});
 
 	it("keeps the mic off after a hold that begins and ends while the previous clip is transcribing", async () => {
-		const model = getBundledModel("openai", "whisper-1");
-		settings.setModelRole("dictation", "openai/whisper-1");
+		const model = buildModel({
+			id: "whisper-company",
+			name: "Company Whisper",
+			provider: "company",
+			api: "openai-transcriptions",
+			baseUrl: "https://transcribe.company.example/v1",
+			kind: "stt",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: null,
+			maxTokens: null,
+		});
+		settings.setModelRole("dictation", "company/whisper-company");
 		const transcribed = Promise.withResolvers<TranscriptionResult>();
 		vi.spyOn(transcription, "transcribeAudio").mockReturnValue(transcribed.promise);
 		const capture = vi.fn(() => ({ stop: vi.fn() }));
@@ -219,7 +268,7 @@ describe("STTController cloud transcription", () => {
 			stop,
 			cancel: vi.fn(),
 		});
-		const cloudTranscribe = vi.spyOn(transcription, "transcribeAudio");
+		const configuredEndpointTranscribe = vi.spyOn(transcription, "transcribeAudio");
 		let onAudio: ((error: Error | null, samples: Float32Array) => void) | undefined;
 		controller = new STTController(
 			callback => {
@@ -239,7 +288,7 @@ describe("STTController cloud transcription", () => {
 		expect(startStream).toHaveBeenCalledWith("whisper-base", expect.anything());
 		expect(pushAudio).toHaveBeenCalledWith(samples);
 		expect(stop).toHaveBeenCalledTimes(1);
-		expect(cloudTranscribe).not.toHaveBeenCalled();
+		expect(configuredEndpointTranscribe).not.toHaveBeenCalled();
 		expect(editor.commitVolatileText).toHaveBeenCalledWith("local transcript");
 	});
 });

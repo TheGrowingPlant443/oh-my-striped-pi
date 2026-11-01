@@ -11,7 +11,6 @@ import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { Usage } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
@@ -30,6 +29,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { Container, type TUI } from "@oh-my-pi/pi-tui";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 import { createInteractiveModeContext } from "./helpers/interactive-mode-context";
+import { getTestModel } from "./helpers/model-fixtures";
 
 import { cfgDisplayShowTokenUsage, cfgDisplayShowTurnTime } from "@oh-my-pi/pi-coding-agent/modes/settings";
 
@@ -456,7 +456,7 @@ describe("AgentSession synthetic follow-up marking", () => {
 		sharedDir = path.join(os.tmpdir(), `pi-turn-time-shared-${Snowflake.next()}`);
 		fs.mkdirSync(sharedDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(sharedDir, "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(sharedDir, "models.yml"));
 	});
 	afterAll(() => {
@@ -465,7 +465,7 @@ describe("AgentSession synthetic follow-up marking", () => {
 	});
 
 	it("marks a queued synthetic follow-up as a run-initiating developer message", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getTestModel("github-copilot");
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -493,7 +493,7 @@ describe("AgentSession synthetic follow-up marking", () => {
 		}
 	});
 	it("persists a user-attributed custom prompt with its original submission timestamp", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getTestModel("github-copilot");
 		const mock = createMockModel({
 			// Real provider delay: the session's internal settle timers use the
 			// platform clock, so fake timers would freeze both the submission and

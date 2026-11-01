@@ -19,7 +19,7 @@ import { type ChoiceQuestion, Effort, judgeQuestions, type Model, renderQuestion
 import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
-import { type JudgmentUsage, resolveJudge, sharedJudgmentCache } from "../judgment";
+import { type JudgmentUsage, resolveJudge } from "../judgment";
 import questionFile from "../prompts/judge/auto-thinking.json" with { type: "json" };
 import { clampAutoThinkingEffort } from "@oh-my-pi/pi-tui/thinking";
 import { preprocessTinyMessage } from "../tiny/message-preproc";
@@ -157,7 +157,6 @@ export async function classifyDifficulty(
 		purpose: "auto-thinking",
 		onUsage: deps.onUsage,
 		telemetry: deps.telemetry,
-		cache: sharedJudgmentCache(),
 	});
 	const solutionSpace = input.solutionSpace?.trim();
 	const state: Record<string, string> = solutionSpace

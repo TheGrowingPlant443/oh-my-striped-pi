@@ -101,8 +101,8 @@ it.each([
 	async ({ severity, continueSeverity, continues, continuation, immuneTurns, stop }) => {
 		const temp = TempDir.createSync("@pi-advisor-terminal-unwind-");
 		const auth = await AuthStorage.create(":memory:");
-		auth.keys.setRuntime("anthropic", "test-key");
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		auth.keys.setRuntime("github-copilot", "test-key");
+		const model = getBundledModel("github-copilot", "gpt-5.4");
 		if (!model) throw new Error("Expected bundled model");
 		const nextUserMarker = "NEXT_USER_CONTEXT_MARKER";
 		const terminalTurnEnd = Promise.withResolvers<void>();
@@ -125,7 +125,7 @@ it.each([
 
 		const primaryMock = createMockModel({
 			id: "terminal-unwind-primary",
-			provider: "anthropic",
+			provider: "github-copilot",
 			handler: async () => {
 				if (primaryCalls === 1) return toolResponse("step-1", "step");
 				if (primaryCalls === 2) return textResponse("terminal answer");
@@ -144,7 +144,7 @@ it.each([
 		});
 		const advisorMock = createMockModel({
 			id: "terminal-unwind-advisor",
-			provider: "anthropic",
+			provider: "github-copilot",
 			handler: async () => {
 				if (++advisorCalls === 1) {
 					advisorStarted.resolve();
@@ -196,7 +196,7 @@ it.each([
 			...(immuneTurns === 0 ? { "advisor.immuneTurns": 0 } : {}),
 			...(continueSeverity ? { "advisor.continueSeverity": continueSeverity } : {}),
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		const session = new AgentSession({
 			agent,
 			sessionManager: SessionManager.inMemory(),
@@ -305,8 +305,8 @@ it.each([
 it("continues once on a late nit at advisor.continueSeverity=nit without re-reviewing the continuation", async () => {
 	const temp = TempDir.createSync("@pi-advisor-terminal-unwind-");
 	const auth = await AuthStorage.create(":memory:");
-	auth.keys.setRuntime("anthropic", "test-key");
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+	auth.keys.setRuntime("github-copilot", "test-key");
+	const model = getBundledModel("github-copilot", "gpt-5.4");
 	if (!model) throw new Error("Expected bundled model");
 	const lateNote = "LATE_NIT_MARKER";
 	const primaryContexts: string[] = [];
@@ -315,13 +315,13 @@ it("continues once on a late nit at advisor.continueSeverity=nit without re-revi
 
 	const primaryMock = createMockModel({
 		id: "terminal-unwind-primary",
-		provider: "anthropic",
+		provider: "github-copilot",
 		responses: [textResponse("terminal answer"), textResponse("continuation answer")],
 		handler: () => textResponse("unexpected extra turn"),
 	});
 	const advisorMock = createMockModel({
 		id: "terminal-unwind-advisor",
-		provider: "anthropic",
+		provider: "github-copilot",
 		handler: () => textResponse("advisor quiet"),
 	});
 	const agent = new Agent({
@@ -356,7 +356,7 @@ it("continues once on a late nit at advisor.continueSeverity=nit without re-revi
 		"advisor.syncBacklog": "off",
 		"advisor.continueSeverity": "nit",
 	});
-	settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+	settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 	const session = new AgentSession({
 		agent,
 		sessionManager: SessionManager.inMemory(),

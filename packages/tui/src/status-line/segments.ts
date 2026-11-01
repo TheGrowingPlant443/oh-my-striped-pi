@@ -382,10 +382,6 @@ const modelSegment: StatusLineSegment = {
 			content += accentFg(ctx, "statusLineModel", tail);
 		}
 
-		// Anthropic usage-limit stage (wrap-up allowance or low priority): a
-		// warning-colored badge so past-the-limit service is never mistaken for normal.
-		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
-		if (slowModeLabel) content += theme.fg("warning", `${theme.sep.dot}${slowModeLabel}`);
 		return { content, visible: true };
 	},
 	describe(ctx) {
@@ -398,9 +394,7 @@ const modelSegment: StatusLineSegment = {
 		if (ctx.session.isFastModeActive() && theme.icon.fast) spans.push(span(` ${theme.icon.fast}`, token));
 		const level = ctx.options.model?.showThinkingLevel === false ? undefined : thinkingLevelWord(ctx.session);
 		if (level !== undefined) spans.push(span(" · ", "dim"), span(level, thinkingLevelToken(level)));
-		const slowModeLabel = ctx.session.getAnthropicSlowModeLabel?.();
-		if (slowModeLabel) spans.push(span(`${theme.sep.dot}${slowModeLabel}`, "warning"));
-		return segView(spans, "model", slowModeLabel ? "warning" : undefined);
+		return segView(spans, "model");
 	},
 };
 
@@ -1064,21 +1058,15 @@ const collabSegment: StatusLineSegment = {
 	},
 };
 
-const streamSegment: StatusLineSegment = {
-	id: "stream",
+const recordSegment: StatusLineSegment = {
+	id: "record",
 	render(ctx) {
-		const badges: string[] = [];
-		if (ctx.stream) badges.push(`● LIVE ${ctx.stream.viewers}`);
-		if (ctx.recording) badges.push("● REC");
-		if (badges.length === 0) return { content: "", visible: false };
-		return { content: theme.fg("thinkingHigh", badges.join(" ")), visible: true };
+		return ctx.recording
+			? { content: theme.fg("thinkingHigh", "● REC"), visible: true }
+			: { content: "", visible: false };
 	},
 	describe(ctx) {
-		const badges: string[] = [];
-		if (ctx.stream) badges.push(`LIVE ${ctx.stream.viewers}`);
-		if (ctx.recording) badges.push("REC");
-		if (badges.length === 0) return null;
-		return segView([span(badges.join(" "), "thinkingHigh")], "live", "error");
+		return ctx.recording ? segView([span("REC", "thinkingHigh")], "record", "error") : null;
 	},
 };
 
@@ -1152,21 +1140,9 @@ function pickUsageColor(percent: number): "muted" | "warning" | "error" {
 	return "muted";
 }
 
-/**
- * One quota window (`5h`, `1d`, `7d`, `mo`). The integer policy (round vs
- * floor) and the reset unit (minutes vs hours) stay explicit at each call site:
- * monthly floors like the Cursor/OpenCode dashboards, the rest round, and
- * short windows reset in minutes while long windows reset in hours.
- */
-function formatQuotaWindow(
-	ctx: SegmentContext,
-	label: string,
-	percent: number,
-	reset: number | undefined,
-	resetUnit: "m" | "h",
-	integer: "round" | "floor",
-): string {
-	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
+/** One quota window; short windows reset in minutes and long windows in hours. */
+function formatQuotaWindow(label: string, percent: number, reset: number | undefined, resetUnit: "m" | "h"): string {
+	const whole = Math.round(percent);
 	const pctText = theme.fg(pickUsageColor(percent), `${whole}%`);
 	const resetText = reset !== undefined ? theme.fg("muted", ` (${formatUsageReset(reset, resetUnit)})`) : "";
 	return `${label} ${pctText}${resetText}`;
@@ -1178,9 +1154,8 @@ function describeQuotaWindow(
 	percent: number,
 	reset: number | undefined,
 	resetUnit: "m" | "h",
-	integer: "round" | "floor",
 ): TspSpan[] {
-	const whole = integer === "floor" ? Math.floor(percent) : Math.round(percent);
+	const whole = Math.round(percent);
 	const spans = [span(`${label} `), span(`${whole}%`, pickUsageColor(percent))];
 	if (reset !== undefined) spans.push(span(` (${formatUsageReset(reset, resetUnit)})`, "muted"));
 	return spans;
@@ -1201,17 +1176,11 @@ function formatUsageReset(value: number, unit: "m" | "h"): string {
 	return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
 }
 
-/** Expiring saved resets outrank the usable/unusable color: red within 24 hours, yellow within 7 days. */
-function resetCreditsColor(resets: NonNullable<NonNullable<SegmentContext["usage"]>["resetCredits"]>): ThemeColor {
-	if (resets.expiring) return resets.expiring.tier === "imminent" ? "error" : "warning";
-	return resets.redeemableCount > 0 ? "success" : "warning";
-}
-
 const usageSegment: StatusLineSegment = {
 	id: "usage",
 	render(ctx) {
 		const u = ctx.usage;
-		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay && !u.monthly && !u.resetCredits)) {
+		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay)) {
 			return { content: "", visible: false };
 		}
 		const parts: string[] = [];
@@ -1220,70 +1189,31 @@ const usageSegment: StatusLineSegment = {
 			if (tier) parts.push(accentFg(ctx, "accent", tier));
 		}
 		if (u.fiveHour) {
-			parts.push(formatQuotaWindow(ctx, "5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
+			parts.push(formatQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m"));
 		}
 		if (u.daily) {
-			parts.push(formatQuotaWindow(ctx, "1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
+			parts.push(formatQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m"));
 		}
 		if (u.sevenDay) {
-			parts.push(formatQuotaWindow(ctx, "7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
-		}
-		if (u.monthly) {
-			// Monthly-subscription providers only (the normalizer gates the class).
-			// Cursor and QwenCloud floor used percents upstream (Cursor's dashboard
-			// shows 1.88 → "1% used"; OpenCode's endpoint emits floored integers).
-			parts.push(formatQuotaWindow(ctx, "mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
-		}
-		if (u.resetCredits) {
-			const resets = u.resetCredits;
-			let resetText = `✦ ${resets.bankedCount}`;
-			if (resets.redeemableCount !== resets.bankedCount) {
-				resetText += ` (${resets.redeemableCount} usable)`;
-			}
-			if (resets.expiryHours !== undefined) {
-				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
-				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
-			} else if (resets.expired) {
-				resetText += " expired";
-			}
-			if (resets.redeemableCount === 0 && resets.unavailableReason) {
-				const reason = truncateToWidth(sanitizeStatusText(resets.unavailableReason), TRUNCATE_LENGTHS.SHORT);
-				if (reason) resetText += ` ${reason}`;
-			}
-			parts.push(theme.fg(resetCreditsColor(resets), resetText));
+			parts.push(formatQuotaWindow("7d", u.sevenDay.percent, u.sevenDay.resetHours, "h"));
 		}
 		const content = withIcon(theme.icon.time, parts.join(theme.sep.dot));
 		return { content, visible: true };
 	},
 	describe(ctx) {
 		const u = ctx.usage;
-		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay && !u.monthly && !u.resetCredits)) return null;
+		if (!u || (!u.fiveHour && !u.daily && !u.sevenDay)) return null;
 		const parts: TspSpan[][] = [];
 		if (u.tier) {
 			const tier = sanitizeStatusText(u.tier);
 			if (tier) parts.push([span(tier, accentToken(ctx, "accent"))]);
 		}
 		if (u.fiveHour) {
-			parts.push(describeQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m", "round"));
+			parts.push(describeQuotaWindow("5h", u.fiveHour.percent, u.fiveHour.resetMinutes, "m"));
 		}
-		if (u.daily) parts.push(describeQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m", "round"));
+		if (u.daily) parts.push(describeQuotaWindow("1d", u.daily.percent, u.daily.resetMinutes, "m"));
 		if (u.sevenDay) {
-			parts.push(describeQuotaWindow("7d", u.sevenDay.percent, u.sevenDay.resetHours, "h", "round"));
-		}
-		if (u.monthly) parts.push(describeQuotaWindow("mo", u.monthly.percent, u.monthly.resetHours, "h", "floor"));
-		if (u.resetCredits) {
-			const resets = u.resetCredits;
-			let resetText = `✦ ${resets.bankedCount}`;
-			if (resets.redeemableCount !== resets.bankedCount) resetText += ` (${resets.redeemableCount} usable)`;
-			if (resets.expiryHours !== undefined) {
-				const expiring = resets.expiring ? `▲ ${resets.expiring.count} ` : "";
-				resetText += ` ${expiring}exp ${formatUsageReset(resets.expiryHours, "h")}`;
-			} else if (resets.expired) resetText += " expired";
-			if (resets.redeemableCount === 0 && resets.unavailableReason) {
-				const reason = sanitizeStatusText(resets.unavailableReason);
-				if (reason) resetText += ` ${reason}`;
-			}
-			parts.push([span(resetText, resetCreditsColor(resets))]);
+			parts.push(describeQuotaWindow("7d", u.sevenDay.percent, u.sevenDay.resetHours, "h"));
 		}
 		const spans: TspSpan[] = [];
 		for (const part of parts) {
@@ -1324,7 +1254,7 @@ export const SEGMENTS: Record<StatusLineSegmentId, StatusLineSegment> = {
 	session_name: sessionNameSegment,
 	usage: usageSegment,
 	collab: collabSegment,
-	stream: streamSegment,
+	record: recordSegment,
 	vim: vimSegment,
 };
 

@@ -29,10 +29,10 @@ describe("AgentSession.switchSession previous-context build", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!bundled) throw new Error("Expected built-in Copilot model to exist");
 		model = bundled;
 	});
 
@@ -207,42 +207,6 @@ describe("AgentSession.switchSession previous-context build", () => {
 		expect(sessionManager.getSessionFile()).toBe(previousSessionFile);
 		expect(sessionManager.getCwd()).toBe(sourceDir.path());
 	});
-	it("adopts a foreign replica without changing the local cwd", async () => {
-		const sourceDir = TempDir.createSync("@pi-switch-collab-source-");
-		const targetDir = TempDir.createSync("@pi-switch-collab-target-");
-		const extraDir = TempDir.createSync("@pi-switch-collab-extra-");
-		tempDirs.push(sourceDir, targetDir, extraDir);
-
-		const { session, sessionManager } = buildSession(sourceDir);
-		sessionManager.appendMessage({ role: "user", content: "source", timestamp: 1 });
-		await sessionManager.flush();
-		const targetManager = SessionManager.create(targetDir.path(), targetDir.path());
-		targetManager.appendMessage({ role: "user", content: "host snapshot", timestamp: 2 });
-		await targetManager.ensureOnDisk();
-		await targetManager.flush();
-		const targetSessionFile = targetManager.getSessionFile();
-		await targetManager.close();
-		expect(targetSessionFile).toBeString();
-
-		const processCwd = process.cwd();
-		const onCwdChange = vi.fn(async () => {
-			throw new Error("collab must not invoke cwd callback");
-		});
-		const switched = await session.switchSession(targetSessionFile!, {
-			preserveLocalCwd: true,
-			onCwdChange,
-		});
-
-		expect(switched).toBe(true);
-		expect(onCwdChange).not.toHaveBeenCalled();
-		expect(process.cwd()).toBe(processCwd);
-		expect(sessionManager.getSessionFile()).toBe(targetSessionFile);
-		expect(sessionManager.getCwd()).toBe(sourceDir.path());
-		expect(sessionManager.getRecordedCwd()).toBe(targetDir.path());
-		await sessionManager.addWorkspaceDirectory(extraDir.path());
-		expect(await Bun.file(targetSessionFile!).text()).not.toContain(extraDir.path());
-	});
-
 	it("fails closed when cwd rollback throws after changing it", async () => {
 		const sourceDir = TempDir.createSync("@pi-switch-cwd-error-source-");
 		const targetDir = TempDir.createSync("@pi-switch-cwd-error-target-");

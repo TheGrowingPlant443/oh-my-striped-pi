@@ -53,15 +53,15 @@ describe("web search directive pipeline", () => {
 
 	it("passes the parsed query to the role-selected provider and post-filters ignored constraints", async () => {
 		let seen: SearchParams | undefined;
-		const context = await stubRoleProvider("brave", async params => {
+		const context = await stubRoleProvider("firecrawl", async params => {
 			seen = params;
-			return { provider: "brave", sources: SOURCES };
+			return { provider: "firecrawl", sources: SOURCES };
 		});
 
 		const result = await runSearchQuery({ query: "guide site:docs.example.com" }, context);
 
 		expect(seen?.model.provider).toBe("web");
-		expect(seen?.model.id).toBe("brave");
+		expect(seen?.model.id).toBe("firecrawl");
 		expect(seen?.parsedQuery?.sites).toEqual(["docs.example.com"]);
 		expect(seen?.parsedQuery?.text).toBe("guide");
 		expect(result.details.response.sources.map(source => source.url)).toEqual(["https://docs.example.com/guide"]);
@@ -69,7 +69,7 @@ describe("web search directive pipeline", () => {
 	});
 
 	it("relaxes a constraint that matches nothing and leads the LLM text with a note", async () => {
-		const context = await stubRoleProvider("brave", async () => ({ provider: "brave", sources: SOURCES }));
+		const context = await stubRoleProvider("firecrawl", async () => ({ provider: "firecrawl", sources: SOURCES }));
 
 		const result = await runSearchQuery({ query: "guide site:nowhere.example" }, context);
 
@@ -79,48 +79,37 @@ describe("web search directive pipeline", () => {
 		);
 	});
 
-	it.each<[string, string, SearchProviderId]>([
-		["routes an X-only query to xAI ahead of the role's engine", "tern site:x.com", "xai"],
-		["keeps the role's engine for queries that are not X-only", "tern site:x.com site:github.com", "brave"],
-	])("%s", async (_caseName, query, expectedProvider) => {
-		const context = await stubRoleProvider("brave", async () => ({ provider: "brave", sources: SOURCES }));
-		context.authStorage.keys.setRuntime("xai", "test-xai-key");
-		vi.spyOn(provider, "getGroundedSearchProvider").mockImplementation(async grounding => ({
-			id: "xai",
-			label: grounding,
-			isAvailable: () => true,
-			isExplicitlyAvailable: () => true,
-			search: async () => ({ provider: "xai", sources: [{ title: "Post", url: "https://x.com/jack/status/20" }] }),
-		}));
+	it("keeps X-only queries on the selected independent search engine", async () => {
+		const context = await stubRoleProvider("firecrawl", async () => ({ provider: "firecrawl", sources: SOURCES }));
 
-		const result = await runSearchQuery({ query }, context);
+		const result = await runSearchQuery({ query: "tern site:x.com" }, context);
 
-		expect(result.details.response.provider).toBe(expectedProvider);
+		expect(result.details.response.provider).toBe("firecrawl");
 	});
 
 	it("uses a request model override instead of modelRoles.web", async () => {
-		const context = await stubRoleProvider("jina", async params => ({
-			provider: "jina",
-			sources: [{ title: params.model.id, url: "https://jina.example" }],
+		const context = await stubRoleProvider("firecrawl", async params => ({
+			provider: "firecrawl",
+			sources: [{ title: params.model.id, url: "https://firecrawl.example" }],
 		}));
-		const exaProvider: provider.SearchProvider = {
-			id: "exa",
-			label: "exa",
+		const searxngProvider: provider.SearchProvider = {
+			id: "searxng",
+			label: "searxng",
 			isAvailable: () => false,
 			isExplicitlyAvailable: () => true,
 			search: async params => ({
-				provider: "exa",
-				sources: [{ title: params.model.id, url: "https://exa.example" }],
+				provider: "searxng",
+				sources: [{ title: params.model.id, url: "https://searxng.example" }],
 			}),
 		};
 		context.getProvider.mockImplementation(async requested => {
-			if (requested === "exa") return exaProvider;
+			if (requested === "searxng") return searxngProvider;
 			throw new Error(`Unexpected provider: ${requested}`);
 		});
 
-		const result = await runSearchQuery({ query: "override", model: "web/exa" }, context);
+		const result = await runSearchQuery({ query: "override", model: "web/searxng" }, context);
 
-		expect(result.details.response.provider).toBe("exa");
-		expect(result.details.response.sources[0]?.title).toBe("exa");
+		expect(result.details.response.provider).toBe("searxng");
+		expect(result.details.response.sources[0]?.title).toBe("searxng");
 	});
 });

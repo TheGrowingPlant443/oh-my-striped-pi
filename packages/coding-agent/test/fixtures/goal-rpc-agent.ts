@@ -1,6 +1,5 @@
 import * as path from "node:path";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { cfgGoalContinuationModes } from "@oh-my-pi/pi-coding-agent/goals/settings";
@@ -9,6 +8,7 @@ import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { cfgAsyncEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { getTestModel } from "../helpers/model-fixtures";
 
 // Real SDK session (goal tool registered as in production), RPC dispatch and goal
 // runtime; only the model is scripted.
@@ -19,8 +19,9 @@ import { cfgAsyncEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
 // GOAL_RPC_SCRIPT="slow": the first turn stalls until the host aborts it or runs /goaltest-release.
 // GOAL_RPC_PLAN="1": the session starts in plan mode.
 const cwd = process.cwd();
+const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 const authStorage = await AuthStorage.create(path.join(cwd, "auth.db"));
-authStorage.keys.setRuntime("anthropic", "test-key");
+authStorage.keys.setRuntime(model.provider, "test-key");
 const modelRegistry = new ModelRegistry(authStorage, path.join(cwd, "models.yml"));
 const settings = await Settings.init({ inMemory: true, cwd });
 cfgAsyncEnabled.set(settings, false);
@@ -34,7 +35,7 @@ const { session } = await createAgentSession({
 	authStorage,
 	modelRegistry,
 	settings,
-	model: getBundledModel("anthropic", "claude-sonnet-4-5"),
+	model,
 	disableExtensionDiscovery: true,
 	skills: [],
 	contextFiles: [],

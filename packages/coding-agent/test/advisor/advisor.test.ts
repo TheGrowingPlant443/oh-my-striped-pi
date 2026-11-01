@@ -15,7 +15,8 @@ import type {
 } from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
 import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
 import * as AIError from "@oh-my-pi/pi-ai/error";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import {
 	AdviseTool,
 	type AdvisorAgent,
@@ -44,6 +45,20 @@ import { SecretObfuscator } from "../../src/secrets/obfuscator";
 import { getOpenAiRemoteCompactionPayload } from "../../src/session/session-context";
 import { formatSessionHistoryMarkdown } from "../../src/session/session-history-format";
 import { YieldQueue } from "../../src/session/yield-queue";
+
+const replayModelSpec: ModelSpec<"openai-responses"> = {
+	id: "gpt-5.4",
+	name: "Private native replay fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true },
+};
 
 /** Poll until the drain loop reaches the asserted state — waitForCatchup
  *  releases IMMEDIATELY on advisor failure (the primary must never park on a
@@ -3033,11 +3048,18 @@ describe("advisor", () => {
 					{ type: "plain", content: "OTHERSECRET", friendlyName: "TOKABC123" },
 					{ type: "regex", content: "tok_[a-z0-9]+", mode: "replace" },
 				]);
-				const model = getBundledModel("openai", "gpt-5.4");
-				if (!model) throw new Error("Expected bundled OpenAI replay model");
+				const model = buildModel(replayModelSpec);
 				const replayModel =
 					version === "codex"
-						? { ...model, provider: "openai-codex" as const, api: "openai-codex-responses" as const }
+						? {
+								...model,
+								provider: "openai-codex" as const,
+								api: "openai-codex-responses" as const,
+								remoteCompaction: {
+									enabled: true,
+									endpoint: "https://compact.company.invalid/responses/compact",
+								},
+							}
 						: model;
 				const promptInputs: Array<string | AgentMessage[]> = [];
 				const agent = makeAgent(promptInputs);
@@ -3190,8 +3212,7 @@ describe("advisor", () => {
 					{ type: "plain", content: "OTHERSECRET", friendlyName: "TOKABC123" },
 					{ type: "regex", content: "tok_[a-z0-9]+", mode: "replace", replacement: "[hidden]" },
 				]);
-				const model = getBundledModel("openai", "gpt-5.4");
-				if (!model) throw new Error("Expected bundled OpenAI replay model");
+				const model = buildModel(replayModelSpec);
 				const stalePrompt = obfuscator.obfuscate("remember OTHERSECRET");
 				expect(stalePrompt).toContain("TOKABC123_");
 				const compactionItem = { type: "compaction", encrypted_content: "opaque TOKABC123_" };
@@ -3315,8 +3336,7 @@ describe("advisor", () => {
 				{ type: "plain", content: "OTHERSECRET", friendlyName: "TOKABC123" },
 				{ type: "regex", content: "tok_[a-z0-9]+", mode: "replace" },
 			]);
-			const model = getBundledModel("openai", "gpt-5.4");
-			if (!model) throw new Error("Expected bundled OpenAI replay model");
+			const model = buildModel(replayModelSpec);
 			const promptInputs: Array<string | AgentMessage[]> = [];
 			const encodedPrompts: ResponseInput[] = [];
 			const maintenanceInputs: Array<Array<Record<string, unknown>>> = [];

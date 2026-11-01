@@ -1,9 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { Api, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
+import { type Api, Effort, type Model, type ProviderSessionState } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -36,12 +35,28 @@ describe("/fast targets the current model's service-tier family", () => {
 		tempDir.removeSync();
 	});
 
+	function nativeModel(provider: "anthropic" | "openai", id: string): Model<Api> {
+		return buildModel({
+			id,
+			name: id,
+			api: provider === "anthropic" ? "anthropic-messages" : "openai-responses",
+			provider,
+			baseUrl: provider === "anthropic" ? "https://api.anthropic.com" : "https://api.openai.com/v1",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 32_000,
+			serviceTiers: ["priority"],
+			thinking: {
+				mode: provider === "anthropic" ? "budget" : "effort",
+				efforts: [Effort.Low, Effort.Medium, Effort.High],
+			},
+		});
+	}
+
 	async function createSession(provider: "anthropic" | "openai", modelId: string): Promise<AgentSession> {
-		const model = getBundledModel(provider, modelId);
-		if (!model) {
-			throw new Error(`Expected bundled test model ${provider}/${modelId} to exist`);
-		}
-		return createSessionForModel(model);
+		return createSessionForModel(nativeModel(provider, modelId));
 	}
 
 	async function createSessionForModel(model: Model<Api>): Promise<AgentSession> {
@@ -67,8 +82,7 @@ describe("/fast targets the current model's service-tier family", () => {
 	});
 
 	it("keeps Anthropic priority enabled while an exact-model provider fallback makes it inactive", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled test model anthropic/claude-sonnet-4-5 to exist");
+		const model = nativeModel("anthropic", "claude-sonnet-4-5");
 		const session = await createSessionForModel(model);
 		session.setFastMode(true);
 		const state = {
@@ -108,33 +122,14 @@ describe("/fast targets the current model's service-tier family", () => {
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 				contextWindow: 400_000,
 				maxTokens: 64_000,
+				serviceTiers: ["priority"],
+				thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High] },
 			}),
 		);
 		expect(session.setFastMode(true)).toBe(true);
 		expect(session.serviceTierByFamily).toEqual({ openai: "priority" });
 		expect(session.isFastModeEnabled()).toBe(true);
 		expect(session.isFastModeActive()).toBe(true);
-	});
-
-	it("leaves Fireworks models on the dedicated Fireworks tier control", async () => {
-		const session = await createSessionForModel(
-			buildModel({
-				id: "gpt-oss-120b",
-				name: "GPT OSS 120B",
-				api: "openai-completions",
-				provider: "fireworks",
-				baseUrl: "https://api.fireworks.ai/inference/v1",
-				reasoning: true,
-				input: ["text"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 128_000,
-				maxTokens: 64_000,
-			}),
-		);
-		expect(session.setFastMode(true)).toBe(false);
-		expect(session.serviceTierByFamily).toEqual({});
-		expect(session.isFastModeEnabled()).toBe(false);
-		expect(session.isFastModeActive()).toBe(false);
 	});
 
 	it("clears only the current model's family when disabled", async () => {
@@ -151,54 +146,5 @@ describe("/fast targets the current model's service-tier family", () => {
 		expect(session.serviceTierByFamily.anthropic).toBe("priority");
 		expect(session.toggleFastMode()).toBe(false);
 		expect(session.serviceTierByFamily.anthropic).toBeUndefined();
-	});
-
-	const codexModel = (serviceTiers: string[]) =>
-		buildModel({
-			id: "gpt-6.1-sol",
-			name: "GPT-6.1 Sol",
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			baseUrl: "https://chatgpt.com/backend-api",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 272_000,
-			maxTokens: 128_000,
-			serviceTiers,
-		});
-
-	it("refuses Ultrafast on a Codex model that does not advertise it", async () => {
-		const session = await createSessionForModel(codexModel(["priority"]));
-		expect(session.setUltrafastMode(true)).toBe(false);
-		expect(session.serviceTierByFamily).toEqual({});
-		expect(session.isUltrafastModeEnabled()).toBe(false);
-	});
-
-	it("refuses /fast on a Codex model whose discovered tiers omit priority", async () => {
-		const session = await createSessionForModel(codexModel(["ultrafast"]));
-		expect(session.setFastMode(true)).toBe(false);
-		expect(session.serviceTierByFamily).toEqual({});
-		expect(session.isFastModeActive()).toBe(false);
-	});
-
-	it("keeps /fast on a Codex model whose discovered tier list is empty", async () => {
-		const session = await createSessionForModel(codexModel([]));
-		expect(session.setFastMode(true)).toBe(true);
-		expect(session.serviceTierByFamily).toEqual({ openai: "priority" });
-		expect(session.isFastModeActive()).toBe(true);
-		expect(session.setUltrafastMode(true)).toBe(false);
-	});
-
-	it("selects Ultrafast on an advertising Codex model and clears it with /fast off", async () => {
-		const session = await createSessionForModel(codexModel(["priority", "ultrafast"]));
-		expect(session.setUltrafastMode(true)).toBe(true);
-		expect(session.serviceTierByFamily).toEqual({ openai: "ultrafast" });
-		expect(session.isUltrafastModeEnabled()).toBe(true);
-		expect(session.isFastModeEnabled()).toBe(true);
-		expect(session.isFastModeActive()).toBe(true);
-		session.setFastMode(false);
-		expect(session.serviceTierByFamily).toEqual({});
-		expect(session.isFastModeActive()).toBe(false);
 	});
 });

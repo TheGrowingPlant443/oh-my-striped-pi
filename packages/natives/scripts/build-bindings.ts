@@ -26,11 +26,9 @@ import { generateEnumExports } from "./gen-enums";
 process.env.PCRE2_SYS_STATIC ??= "1";
 
 // Windows: cc-rs and rustc auto-locate cl.exe/link.exe through the VS
-// registry, but the cmake crate (opusic-sys' bundled Opus) needs cmake —
-// and its Ninja generator needs ninja — on PATH. VS Build Tools ships both
-// without exposing them, so outside a vcvars prompt the build dies on
-// "cmake not found". Resolve the VS install via vswhere and append its
-// CMake/Ninja dirs, keeping any user-provided tools ahead.
+// registry, but wasmtime-c-api-impl still needs cmake on PATH. VS Build Tools
+// ships CMake/Ninja without exposing them. Resolve the VS install via
+// vswhere and append its tool dirs, keeping user-provided tools ahead.
 if (process.platform === "win32" && (!Bun.which("cmake") || !Bun.which("ninja"))) {
 	const vcToolsComponent =
 		process.arch === "arm64"

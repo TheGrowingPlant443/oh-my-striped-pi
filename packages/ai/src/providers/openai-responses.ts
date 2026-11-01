@@ -11,10 +11,8 @@ import * as AIError from "../error";
 import { getEnvApiKey } from "../env-api-key";
 import type {
 	AssistantMessage,
-	CacheRetention,
 	Context,
 	Model,
-	OpenAICompat,
 	ProviderSessionState,
 	ServiceTier,
 	StreamFunction,
@@ -85,10 +83,7 @@ import type {
 import {
 	applyCommonResponsesSamplingParams,
 	applyOpenAIExtraBody,
-	applyOpenAIGatewayRouting,
 	applyResponsesCompatPolicy,
-	applyVercelResponsesCacheControls,
-	applyWireModelIdTransform,
 	buildResponsesDeltaInput,
 	buildResponsesInput,
 	clearOpenAIStrictToolsState,
@@ -100,11 +95,9 @@ import {
 	getOpenAIResponsesRoutingSessionId,
 	normalizeOpenAIPromptCacheKey,
 	getOpenAIStrictToolsScope,
-	getOpenRouterResponsesSessionId,
 	isCompiledGrammarTooLargeStrictError,
 	isOpenAIResponsesProgressEvent,
 	isStrictToolsDisabledForScope,
-	readOpenRouterRawMetadata,
 	type OpenAIPromptCacheOptions,
 	type OpenAIStrictToolsScope,
 	type OpenAIStrictToolsState,
@@ -117,7 +110,6 @@ import {
 	shouldDropAutoToolChoiceForReasoning,
 	shouldRetryWithoutStrictTools,
 } from "./openai-shared";
-import { readOpenRouterGenerationError } from "./openrouter-generation";
 import {
 	OPENAI_RESPONSES_PROVIDER_SESSION_STATE_PREFIX,
 	resetOpenAIResponsesChainState,
@@ -131,8 +123,6 @@ export interface OpenAIResponsesOptions extends StreamOptions {
 	serviceTier?: ServiceTier;
 	textVerbosity?: "low" | "medium" | "high";
 	toolChoice?: ToolChoice;
-	openrouterVariant?: string;
-	maxTokensExplicit?: boolean;
 	disableReasoning?: boolean;
 	/**
 	 * Stateful turns: chain via `previous_response_id` + delta input instead of
@@ -521,10 +511,7 @@ function isOpenAIResponsesStatefulEnabled(
 	if (model.compat.storeResponses === true && !storesResponsesServerSide(model, options)) return false;
 	if (options?.statefulResponses === false) return false;
 	if (options?.statefulResponses === true) return true;
-	// Default ON only against the official OpenAI API: chaining forces
-	// `store: true`, and third-party /v1/responses proxies routinely ignore or
-	// reject `previous_response_id`.
-	return $flag("PI_OPENAI_STATEFUL", model.compat.statefulResponses ?? model.compat.officialEndpoint);
+	return $flag("PI_OPENAI_STATEFUL", model.compat.statefulResponses ?? false);
 }
 
 function getOpenAIResponsesChainState(
@@ -621,8 +608,6 @@ function markOpenAIResponsesChainZeroDataRetention(chain: OpenAIResponsesChainSt
 	});
 }
 
-type OpenRouterAnthropicCacheControl = { type: "ephemeral"; ttl?: "1h" };
-
 type OpenAIResponsesSamplingParams = ResponseCreateParamsStreaming & {
 	top_p?: number;
 	top_k?: number;
@@ -631,23 +616,8 @@ type OpenAIResponsesSamplingParams = ResponseCreateParamsStreaming & {
 	repetition_penalty?: number;
 	session_id?: string;
 	stream_options?: { include_obfuscation?: boolean };
-	provider?: OpenAICompat["openRouterRouting"];
 	reasoning?: { effort?: string } | { enabled: false };
-	cache_control?: OpenRouterAnthropicCacheControl;
-	caching?: "auto";
-	cache_anchor_items?: number;
-	cache_ttl?: "5m" | "1h";
 };
-
-function maybeAddOpenRouterAnthropicCacheControl(
-	params: OpenAIResponsesSamplingParams,
-	model: Model<"openai-responses">,
-	cacheRetention: CacheRetention,
-): void {
-	if (cacheRetention === "none" || model.compat.cacheControlFormat !== "anthropic") return;
-	if (params.cache_control != null) return;
-	params.cache_control = cacheRetention === "long" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" };
-}
 
 /**
  * Generate function for OpenAI Responses API
@@ -709,9 +679,6 @@ const streamOpenAIResponsesOnce = (
 					messages: context.messages,
 					sessionId: options?.sessionId ?? routingSessionId,
 					promptCacheSessionId,
-					// The family affinity key rides only an explicit prompt-cache
-					// identity; the sessionId-derived cache-id fallback never does.
-					promptCacheAffinityKey: options?.promptCacheKey ? promptCacheSessionId : undefined,
 				});
 			const premiumRequestsTotal = copilotPremiumRequests;
 			const providerSessionState = getOpenAIResponsesProviderSessionState(model, options?.providerSessionState);
@@ -739,7 +706,8 @@ const streamOpenAIResponsesOnce = (
 			const { params, trailingScaffoldingItems } = builtParams;
 			let activeParams = params;
 			let activeTrailingScaffoldingItems = trailingScaffoldingItems;
-			const resolvedBaseUrl = (baseUrl ?? "https://api.openai.com/v1").replace(/\/+$/, "");
+			if (!baseUrl) throw new AIError.ConfigurationError("OpenAI request setup requires a base URL");
+			const resolvedBaseUrl = baseUrl.replace(/\/+$/, "");
 			const requestReasoningEffortFallbacks = new Map<string, OpenAIReasoningEffortFallback>();
 			const attemptedReasoningEffortFallbacks = new Set<string>();
 			let pendingReasoningEffortFallback: { key: string; fallback: OpenAIReasoningEffortFallback } | undefined;
@@ -1043,7 +1011,6 @@ const streamOpenAIResponsesOnce = (
 						onCompleted: () => {
 							sawTerminalResponseEvent = true;
 						},
-						requestServiceTier: options?.serviceTier,
 					});
 
 					const localAbortReason = abortTracker.getLocalAbortReason();
@@ -1057,32 +1024,6 @@ const streamOpenAIResponsesOnce = (
 							"OpenAI responses stream closed before a terminal response event was received",
 							{ provider: model.provider, kind: "incomplete-stream" },
 						);
-					}
-
-					// OpenRouter's Responses translation can hide a native failure behind
-					// "completed". Consult metadata only for truly empty stops, never
-					// for replayable reasoning or provider-hosted tool progress.
-					if (
-						model.compat.isOpenRouterHost &&
-						output.stopReason === "stop" &&
-						output.content.length === 0 &&
-						nativeOutputItems.length === 0 &&
-						!output.stopDetails &&
-						output.responseId
-					) {
-						const nativeError = await readOpenRouterGenerationError({
-							baseUrl: resolvedBaseUrl,
-							headers,
-							responseId: output.responseId,
-							outputTokens: output.usage.output,
-							reasoningTokens: output.usage.reasoningTokens,
-							fetch: options?.fetch,
-							signal: requestSignal,
-						});
-						if (abortTracker.wasCallerAbort()) throw new AIError.AbortError();
-						if (nativeError) {
-							throw new AIError.ProviderResponseError(nativeError, { provider: model.provider, kind: "output" });
-						}
 					}
 
 					if (output.stopReason === "aborted" || output.stopReason === "error") {
@@ -1161,7 +1102,6 @@ const streamOpenAIResponsesOnce = (
 										onCompleted: () => {
 											resumedSawTerminal = true;
 										},
-										requestServiceTier: options?.serviceTier,
 									},
 								);
 								const resumedLocalAbort = abortTracker.getLocalAbortReason();
@@ -1330,9 +1270,6 @@ const streamOpenAIResponsesOnce = (
 			if (AIError.isRequestBodyReadTimeout(result.status, result.message) && lastSubmittedRequestWasFullReplay) {
 				output.requestBodyReadTimeoutFullReplay = true;
 			}
-			// Some providers via OpenRouter include extra details here.
-			const rawMetadata = readOpenRouterRawMetadata(capturedErrorResponse);
-			if (rawMetadata) output.errorMessage += `\n${rawMetadata}`;
 			output.duration = performance.now() - startTime;
 			if (firstTokenTime) output.ttft = firstTokenTime - startTime;
 			stream.push({ type: "error", reason: output.stopReason, error: output });
@@ -1348,10 +1285,11 @@ const streamOpenAIResponsesOnce = (
  * loop. Transient stream failures are retried inside the attempt so stateful
  * Responses request metadata remains stable.
  */
-export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (model, context, options) =>
-	withReplaySafeStreamRetry(model, context, options, streamOpenAIResponsesOnce, {
+export const streamOpenAIResponses: StreamFunction<"openai-responses"> = (model, context, options) => {
+	return withReplaySafeStreamRetry(model, context, options, streamOpenAIResponsesOnce, {
 		retryEmptyCompletion: true,
 	});
+};
 
 function isResponsesPromptCacheableContentBlock(block: unknown): block is ResponseInputContent {
 	if (typeof block !== "object" || block === null || !("type" in block)) return false;
@@ -1608,11 +1546,7 @@ export function buildParams(
 
 	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
 	const promptCacheKey = getOpenAIPromptCacheKey(options);
-	const modelId = applyWireModelIdTransform(
-		model.requestModelId ?? model.id,
-		model.compat.wireModelIdMode,
-		options?.openrouterVariant,
-	);
+	const modelId = model.requestModelId ?? model.id;
 	const params: OpenAIResponsesSamplingParams = {
 		model: modelId,
 		input: messages,
@@ -1627,29 +1561,20 @@ export function buildParams(
 			!model.compat.supportsPromptCacheBreakpoints
 				? "24h"
 				: undefined,
-		// Gateway routing: OpenRouter-only Responses wire field for sticky upstream
-		// routing + observability grouping; no equivalent on direct OpenAI.
-		session_id: model.compat.isOpenRouterHost ? getOpenRouterResponsesSessionId(options) : undefined,
 		store: storesResponsesServerSide(model, options),
 		stream_options: model.compat.supportsObfuscationOptOut ? { include_obfuscation: false } : undefined,
 	};
 	if (options?.include?.length) params.include = Array.from(new Set(options.include));
-	maybeAddOpenRouterAnthropicCacheControl(params, model, cacheRetention);
 	const outputToken = resolveOpenAIOutputTokenParam({
 		field: "max_output_tokens",
 		maxTokens: options?.maxTokens,
-		maxTokensExplicit: options?.maxTokensExplicit ?? options?.maxTokens !== undefined,
 		modelMaxTokens: model.maxTokens,
 		omitMaxOutputTokens: model.omitMaxOutputTokens ?? false,
-		isOpenRouterHost: model.compat.isOpenRouterHost,
 		alwaysSendMaxTokens: model.compat.alwaysSendMaxTokens,
 		providerOutputClamp: resolveOpenAIResponsesOutputClamp(model),
 	});
 
 	applyCommonResponsesSamplingParams(params, { ...options, maxTokens: outputToken?.value }, model);
-	if (options?.textVerbosity && model.compat.officialEndpoint) {
-		params.text = { ...params.text, verbosity: options.textVerbosity };
-	}
 	// TODO: openai responses has no top-level `stop`/`stop_sequences`; surface via reasoning.stop?
 	// `StreamOptions.stopSequences` is intentionally dropped for this provider.
 	// TODO: openai responses has no top-level `frequency_penalty` field as of the current SDK;
@@ -1725,12 +1650,6 @@ export function buildParams(
 	}
 	applyResponsesStableEffort(model, params, messages, options, providerSessionState);
 
-	if (model.compat.isVercelGatewayHost) {
-		applyVercelResponsesCacheControls(params, model.compat, cacheRetention);
-	} else {
-		applyOpenAIGatewayRouting(params, model.compat);
-	}
-
 	applyOpenAIExtraBody(params, options?.extraBody);
 	applyOpenAIResponsesPromptCachePolicy(params, model, options, statefulCacheBaseline);
 
@@ -1799,9 +1718,7 @@ function minimizedResponsesEffort(
  * runtime path only consumes that metadata.
  * @internal Exported for tests.
  */
-export function supportsFreeformApplyPatch(
-	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
-): boolean {
+export function supportsFreeformApplyPatch(model: Model<"openai-responses">): boolean {
 	return model.applyPatchToolType === "freeform";
 }
 
@@ -1843,7 +1760,7 @@ export function mapOpenAIResponsesToolChoiceForTools(
 export function convertTools(
 	tools: Tool[],
 	strictMode: boolean,
-	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
+	model: Model<"openai-responses">,
 	onQuarantine: (toolName: string, schemaPath: string) => void = (toolName, schemaPath) =>
 		logger.warn(
 			`Tool "${toolName}" omitted from the openai-responses request: its parameter schema is invalid for this provider at ${schemaPath} (an enum/const value cannot match its declared type). Other tools are unaffected.`,

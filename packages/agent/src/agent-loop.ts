@@ -34,12 +34,7 @@ import {
 } from "@oh-my-pi/pi-ai/dialect";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { appendDuplicateSuffix, MAX_TOOL_CALL_ID_LENGTH } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import {
-	type CursorExecResolvedCarrier,
-	copyCursorExecResolved,
-	getStreamingPartialJson,
-	kCursorExecResolved,
-} from "@oh-my-pi/pi-ai/utils/block-symbols";
+import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { schemaDefinesProperty } from "@oh-my-pi/pi-ai/utils/schema/json-schema-validator";
 import { stamp } from "@oh-my-pi/pi-ai/utils/schema/stamps";
 import {
@@ -76,13 +71,7 @@ import {
 	startInvokeAgentSpan,
 } from "./telemetry";
 import { validateAgentToolArguments } from "./tool-arguments";
-import {
-	createAdditionalContextMessage,
-	isNonBlankContext,
-	joinAdditionalContext,
-	TOOL_RESULT_ADDITIONAL_CONTEXT,
-	type ToolResultWithAdditionalContext,
-} from "./tool-context";
+import { createAdditionalContextMessage, isNonBlankContext, joinAdditionalContext } from "./tool-context";
 import dsmlToolCallLeakPrompt from "./prompts/dsml-tool-call-leak.md" with { type: "text" };
 import type {
 	AgentContext,
@@ -409,7 +398,7 @@ function snapshotAssistantContentBlock(block: AssistantContentBlock): AssistantC
 		case "fallback":
 			return { ...block, from: { ...block.from }, to: { ...block.to } };
 		case "toolCall": {
-			const snap = {
+			return {
 				...block,
 				// Providers mutate streaming arguments in place (owned-stream, GLM)
 				// as well as replacing them, so containers are always copied; the
@@ -418,11 +407,6 @@ function snapshotAssistantContentBlock(block: AssistantContentBlock): AssistantC
 				arguments: cloneJsonTree(block.arguments),
 				providerMetadata: snapshotToolCallProviderMetadata(block.providerMetadata),
 			};
-			// Object spread copies enumerable symbols in Bun, but the Cursor
-			// exec-resolved marker is load-bearing for skip-on-dispatch — copy
-			// it explicitly so a projector/snapshot path cannot drop it.
-			copyCursorExecResolved(snap, block);
-			return snap;
 		}
 	}
 }
@@ -450,9 +434,8 @@ function snapshotAssistantMessage(message: AssistantMessage): AssistantMessage {
  * within a turn. A fresh snapshot therefore only needs to re-clone:
  *
  * - the block the current event targets (`changedIndex`),
- * - blocks still open (started but not ended) — Cursor's edit block merges
- *   `path`/`stream_content` into a live block without an event, so open blocks
- *   are re-cloned on every delta,
+ * - blocks still open (started but not ended), which providers may mutate
+ *   without a matching event,
  * - blocks appended since the previous snapshot.
  *
  * Every other (finalized) block is carried over from the previous snapshot by
@@ -670,18 +653,15 @@ export function agentLoop(
  * A harness that strips failed/aborted tool results in order to re-execute
  * the calls (e.g. `AgentSession.retry`'s tool replay) leaves the transcript
  * in this shape; {@link agentLoopContinue} resumes it by running those calls
- * before the next model call. Cursor exec-resolved blocks are excluded — the
- * provider already executed those server-side. `length`-truncated turns never
- * qualify: their trailing call arguments may be incomplete.
+ * before the next model call. `length`-truncated turns never qualify: their
+ * trailing call arguments may be incomplete.
  */
 export function unpairedToolCallTail(messages: readonly AgentMessage[]): AssistantMessage | undefined {
 	const tail = messages[messages.length - 1];
 	if (tail?.role !== "assistant") return undefined;
 	// Mirrors the loop's `runnableStop` rule for fresh turns.
 	if (tail.stopReason !== "toolUse" && tail.stopReason !== "stop") return undefined;
-	const hasRunnable = tail.content.some(
-		c => c.type === "toolCall" && (c as CursorExecResolvedCarrier)[kCursorExecResolved] !== true,
-	);
+	const hasRunnable = tail.content.some(c => c.type === "toolCall");
 	return hasRunnable ? tail : undefined;
 }
 
@@ -913,9 +893,8 @@ export function normalizeMessagesForProvider(
 	messages: Context["messages"],
 	model: AgentLoopConfig["model"],
 ): Context["messages"] {
-	// The anthropic and ollama transports apply `stripThinkingHistory` with their
-	// own turn-shape rules; chat completions has no wire-level handling, so the
-	// history is stripped here.
+	// Anthropic Messages applies its own turn-shape rules; chat completions
+	// has no wire-level handling, so the history is stripped here.
 	const compat = model.api === "openai-completions" ? model.compat : undefined;
 	if (!compat || !("stripThinkingHistory" in compat) || compat.stripThinkingHistory !== true) {
 		return messages;
@@ -1467,8 +1446,7 @@ async function runLoopBody(
 						message => {
 							const finalToolCalls = message.content.filter(
 								(content): content is Extract<AssistantMessage["content"][number], { type: "toolCall" }> =>
-									content.type === "toolCall" &&
-									(content as CursorExecResolvedCarrier)[kCursorExecResolved] !== true,
+									content.type === "toolCall",
 							);
 							if (
 								finalToolCalls.length === 0 ||
@@ -1553,13 +1531,7 @@ async function runLoopBody(
 					// Create placeholder tool results for any tool calls in the aborted message
 					// This maintains the tool_use/tool_result pairing that the API requires
 					type ToolCallContent = Extract<AssistantMessage["content"][number], { type: "toolCall" }>;
-					// Cursor exec-resolved blocks already have their toolResult buffered
-					// for out-of-band emission; a placeholder aborted result here would
-					// pair a duplicate to the same toolCallId (issue #4348 codex review).
-					const toolCalls = message.content.filter(
-						(c): c is ToolCallContent =>
-							c.type === "toolCall" && (c as CursorExecResolvedCarrier)[kCursorExecResolved] !== true,
-					);
+					const toolCalls = message.content.filter((c): c is ToolCallContent => c.type === "toolCall");
 					// Provider-built aborted messages (stream error events) carry no
 					// per-tool labels; derive them from a tool-scoped abort signal so
 					// only the matching call is blamed and siblings stay neutral.
@@ -1607,15 +1579,7 @@ async function runLoopBody(
 				// trailing tool_use may be truncated with incomplete arguments — those calls
 				// are abandoned below. (`error`/`aborted` already returned above.)
 				type ToolCallContent = Extract<AssistantMessage["content"][number], { type: "toolCall" }>;
-				// A Cursor exec-channel synthesized `toolCall` block carries
-				// `kCursorExecResolved` because Cursor already executed the tool
-				// server-side (via the bridge) and buffered the result for
-				// out-of-band emission — running it here again would duplicate the
-				// same side-effecting call (issue #4348 review by @chatgpt-codex-connector).
-				const toolCalls = message.content.filter(
-					(c): c is ToolCallContent =>
-						c.type === "toolCall" && (c as CursorExecResolvedCarrier)[kCursorExecResolved] !== true,
-				);
+				const toolCalls = message.content.filter((c): c is ToolCallContent => c.type === "toolCall");
 				const runnableStop = message.stopReason === "toolUse" || message.stopReason === "stop";
 				hasMoreToolCalls = runnableStop && toolCalls.length > 0;
 
@@ -1736,7 +1700,7 @@ async function runLoopBody(
 					pausedTurnContinuations < MAX_PAUSED_TURN_CONTINUATIONS
 				) {
 					// Non-terminal stop: the provider ended the response but not the turn
-					// (e.g. Codex `end_turn: false` on a commentary-only progress update).
+					// (e.g. a commentary-only progress update).
 					// Re-sample with the assistant message replayed so the model keeps
 					// working; the next round folds steering/asides in like any other
 					// mid-work turn.
@@ -1990,7 +1954,7 @@ async function prepareProviderCall(
 			tools: undefined,
 		};
 	}
-	// After `transformProviderContext`, so the recorded definitions are exactly what the provider receives.
+	// Record the definitions after transforms, exactly as sent to the provider.
 	if (config.sentToolDefinitions && llmContext.tools) {
 		config.sentToolDefinitions.record(llmContext.tools);
 		const inactiveTools = config.sentToolDefinitions.inactiveFor(llmContext.messages, llmContext.tools);
@@ -2104,50 +2068,6 @@ async function streamAssistantResponse(
 		return userOnResponse?.(response, modelInfo);
 	};
 
-	// Cursor executes its tools server-side during the stream and hands each
-	// result to `cursorOnToolResult`; the host persists them after the assistant
-	// message, so this loop never runs them and never sees them. A follow-up the
-	// loop picks up after this turn needs them in its own context, or the next
-	// request rebuilds this turn with every call unpaired. The host follows the
-	// results with one message carrying their passive context, so that is
-	// mirrored too. Entries are reserved synchronously so concurrent transforms
-	// keep their arrival order. When the server re-sends a call it already ran
-	// (issue #15749), the newer result replaces the earlier one, matching the
-	// single result the host persists.
-	const cursorToolResults: {
-		result: ToolResultMessage;
-		additionalContext: string | undefined;
-		/** The host transform, which the provider does not always await. */
-		pending: Promise<void>;
-	}[] = [];
-	const userCursorOnToolResult = config.cursorOnToolResult;
-	const collectCursorToolResult: AgentLoopConfig["cursorOnToolResult"] = userCursorOnToolResult
-		? async result => {
-				const superseded = cursorToolResults.findIndex(entry => entry.result.toolCallId === result.toolCallId);
-				if (superseded >= 0) cursorToolResults.splice(superseded, 1);
-				// Read before the transform, which may return a message without it.
-				const additionalContext = (result as ToolResultWithAdditionalContext)[TOOL_RESULT_ADDITIONAL_CONTEXT];
-				const { promise: pending, resolve: settle } = Promise.withResolvers<void>();
-				const entry = { result, additionalContext, pending };
-				cursorToolResults.push(entry);
-				try {
-					const settled = await userCursorOnToolResult(result);
-					if (settled) entry.result = settled;
-					return settled;
-				} finally {
-					settle();
-				}
-			}
-		: undefined;
-	// Like the host before it persists, wait for transforms still running so the
-	// next request carries the result the transcript stores.
-	const appendCursorToolResults = async (): Promise<void> => {
-		await Promise.all(cursorToolResults.map(entry => entry.pending));
-		for (const { result } of cursorToolResults) context.messages.push(result);
-		const additionalContext = joinAdditionalContext(cursorToolResults.map(entry => entry.additionalContext));
-		if (additionalContext !== undefined) context.messages.push(createAdditionalContextMessage(additionalContext));
-	};
-
 	const finishChat = async (message: AssistantMessage): Promise<void> => {
 		await finishChatSpan(telemetry, chatSpan, message, {
 			stepNumber: chatStepNumber,
@@ -2172,7 +2092,6 @@ async function streamAssistantResponse(
 				cwd: effectiveCwd,
 				signal: finalRequestSignal,
 				onResponse: captureOnResponse,
-				cursorOnToolResult: collectCursorToolResult,
 				liveSteering: providerCall.liveSteering,
 			});
 			if (promptToolWireTools && ownedDialect) {
@@ -2197,7 +2116,7 @@ async function streamAssistantResponse(
 			let turnSnapshot: AssistantMessage | null = null;
 			// Content indices of blocks that started streaming but have not ended
 			// yet — re-cloned on every delta because live blocks may be patched
-			// without a paired event (Cursor's silent edit-block merge).
+			// without a paired event.
 			const openBlocks = new Set<number>();
 			const completedToolCallIds = new Set<string>();
 			const argStreams = new Map<number, { id: string; stream: AgentToolArgStream }>();
@@ -2361,7 +2280,6 @@ async function streamAssistantResponse(
 						} else {
 							context.messages.push(finalMessage);
 						}
-						await appendCursorToolResults();
 						if (!addedPartial) {
 							stream.push({ type: "message_start", message: snapshotAssistantMessage(finalMessage) });
 						}
@@ -2638,7 +2556,6 @@ async function streamAssistantResponse(
 					context.messages.push(trailing);
 					stream.push({ type: "message_start", message: snapshotAssistantMessage(trailing) });
 				}
-				await appendCursorToolResults();
 				stream.push({ type: "message_end", message: snapshotAssistantMessage(trailing) });
 				await finishChat(trailing);
 				speculationSettled = true;
@@ -2990,9 +2907,7 @@ function formatToolNotFoundMessage(
  * trim test (`isMalformedToolCallId`): a whitespace-only id is minted like an
  * empty one, never kept — it would be dropped from provider replay together
  * with its result, the live/replay divergence this repair exists to close.
- * Cursor server-resolved blocks are never re-keyed (the provider correlates
- * their results out-of-band under its own ids) but their ids still join the
- * registry so no minted candidate collides with one. Idempotent: the message is
+ * Idempotent: the message is
  * marked repaired and re-entry is a no-op, so the Harmony path can repair
  * before its snapshots while the dispatch-time prepare sees the already-minted
  * ids and leaves them alone.
@@ -3004,7 +2919,7 @@ type ToolCallIdsRepairedCarrier = AssistantMessage & { [kToolCallIdsRepaired]?: 
 
 /**
  * Run-scoped registry of every tool-call id {@link ensureUniqueToolCallIds} has
- * kept, minted, or seen on a server-resolved block under one
+ * kept or minted under one
  * {@link AgentContext}. Keyed by the dispatch context (the same object every
  * `prepareToolCallDispatch` receives) so the uniqueness window spans every
  * assistant turn of the run rather than resetting per message. Each run gets a
@@ -3031,10 +2946,6 @@ function ensureUniqueToolCallIds(message: ToolCallIdsRepairedCarrier, dispatched
 	const seen = new Set<string>();
 	for (const block of content) {
 		if (block.type !== "toolCall") continue;
-		if ((block as CursorExecResolvedCarrier)[kCursorExecResolved] === true) {
-			if (block.id?.trim()) dispatchedIds.add(block.id);
-			continue;
-		}
 		if (block.id?.trim() && !seen.has(block.id) && !dispatchedIds.has(block.id)) {
 			seen.add(block.id);
 			dispatchedIds.add(block.id);
@@ -3086,7 +2997,6 @@ async function prepareToolCallDispatch(
 	const prepared = new Map<string, PreparedToolCall>();
 	for (const toolCall of assistantMessage.content) {
 		if (toolCall.type !== "toolCall") continue;
-		if ((toolCall as CursorExecResolvedCarrier)[kCursorExecResolved] === true) continue;
 		const tool = resolveToolForCall(context.tools, toolCall, resolveFallbackTool);
 		// A host fallback accepts aliases (`xd://recall`, a mis-separated MCP
 		// name) that providers reject when replayed as a function-call name.
@@ -3210,9 +3120,7 @@ async function speculativeFinalCalls(
 	await speculationCoordinator?.settleAdmissions();
 	const calls = new Map<string, AgentToolCall>();
 	for (const content of assistantMessage.content) {
-		if (content.type !== "toolCall" || (content as CursorExecResolvedCarrier)[kCursorExecResolved] === true) {
-			continue;
-		}
+		if (content.type !== "toolCall") continue;
 		const prepared = preparedDispatch.get(content.id);
 		if (
 			!prepared ||
@@ -3280,13 +3188,7 @@ async function executeToolCalls(
 		afterToolCall,
 	} = config;
 	type ToolCallContent = Extract<AssistantMessage["content"][number], { type: "toolCall" }>;
-	// Defensive: the outer loop already filters exec-resolved blocks before
-	// deciding to invoke `executeToolCalls`, but skip them here too so the
-	// guarantee lives with the code that would re-run the tool.
-	const toolCalls = assistantMessage.content.filter(
-		(c): c is ToolCallContent =>
-			c.type === "toolCall" && (c as CursorExecResolvedCarrier)[kCursorExecResolved] !== true,
-	);
+	const toolCalls = assistantMessage.content.filter((c): c is ToolCallContent => c.type === "toolCall");
 	const emittedToolResults: ToolResultMessage[] = [];
 	const toolCallInfos = toolCalls.map(call => ({ id: call.id, name: call.name }));
 	const batchId = `${assistantMessage.timestamp ?? Date.now()}_${toolCalls[0]?.id ?? "batch"}`;
@@ -3945,8 +3847,8 @@ async function executeToolCalls(
  * and history consumers can key on `__synthetic === true` to render or
  * classify these as "call emitted, not executed" instead of a real local
  * tool failure — the mislabeling this discriminator was introduced to fix
- * (#4321): a provider-side stream error after tool-call emission (e.g. Codex
- * websocket close) was surfaced by the CLI as if the local tool had failed.
+ * (#4321): a provider-side stream error after tool-call emission was surfaced
+ * by the CLI as if the local tool had failed.
  *
  * `source` names the state that prevented execution — either an assistant-side
  * turn termination (`assistant_stop_*`) or a mid-batch interrupt that skipped a

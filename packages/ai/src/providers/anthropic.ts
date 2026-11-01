@@ -1,31 +1,18 @@
 import {
 	anthropicApiVersionAcceptsSamplingParams,
-	isAnthropicSigningProxyUrl,
-	isOfficialAnthropicApiUrl,
-	resolveAnthropicApiVersion,
+	LEGACY_ANTHROPIC_API_VERSION,
 } from "@oh-my-pi/pi-catalog/compat/anthropic";
-import { hostMatchesUrl, isVertexRawPredictUrl, modelMatchesHost } from "@oh-my-pi/pi-catalog/hosts";
 import type { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { mapEffortToAnthropicAdaptiveEffort } from "@oh-my-pi/pi-catalog/model-thinking";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { calculateCost, getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { isAnthropicOAuthToken } from "@oh-my-pi/pi-catalog/utils";
 import { parseGitHubCopilotApiKey } from "@oh-my-pi/pi-catalog/wire/github-copilot";
-import {
-	$env,
-	$flag,
-	logger,
-	parseJsonWithRepair,
-	parseStreamingJsonThrottled,
-	readSseEvents,
-} from "@oh-my-pi/pi-utils";
+import { logger, parseJsonWithRepair, parseStreamingJsonThrottled, readSseEvents } from "@oh-my-pi/pi-utils";
 import { NO_AUTH_SENTINEL } from "../auth-retry";
 import { renderDemotedThinking } from "../dialect/demotion";
 import * as AIError from "../error";
 import { parseToolCallArguments } from "../utils/tool-call-arguments";
 import { waitForRetry } from "../utils/retry-wait";
-import { getEnvApiKey } from "../env-api-key";
+import { resolveProviderApiKey } from "../env-api-key";
 import { OUTPUT_FALLBACK_BUFFER } from "../stream";
 import { wrapFetchForRequestCompression } from "../utils/request-compression";
 import type {
@@ -90,11 +77,6 @@ import { withReplaySafeStreamRetry } from "../utils/empty-completion-retry";
 import { AssistantMessageEventStream } from "../utils/event-stream";
 import { finalizeErrorMessage, type RawHttpRequestDump } from "../utils/http-inspector";
 import { getStreamFirstEventTimeoutMs, getStreamIdleTimeoutMs, iterateWithIdleTimeout } from "../utils/idle-iterator";
-import {
-	ANTHROPIC_SLOW_USAGE_LIMIT,
-	ANTHROPIC_USAGE_LIMIT_HEADER,
-	parseAnthropicSlowModeHeaders,
-} from "./anthropic-slow-mode";
 import { notifyProviderResponse } from "../utils/provider-response";
 import { getHeadersFromError, getRetryAfterMsFromHeaders } from "../utils/retry-after";
 import { COMBINATOR_KEYS, NO_STRICT, toolWireSchema } from "../utils/schema";
@@ -123,19 +105,12 @@ import {
 	type MessageCreateParams,
 	type MessageCreateParamsStreaming,
 	type MessageParam,
-	type OutputConfig,
 	parseAnthropicInputTransformations,
 	type RawMessageStreamEvent,
 	THINKING_BINDING_CONTROLS_BETA,
 	type TextBlockParam,
-	type ThinkingConfigParam,
 } from "./anthropic-wire";
-import {
-	claudeCodeSystemInstruction,
-	adoptRequiredClaudeCodeVersion,
-	claudeToolPrefix,
-	getClaudeCodeVersion,
-} from "./claude-code-fingerprint";
+const claudeToolPrefix = "_";
 import {
 	buildCopilotDynamicHeaders,
 	getCachedCopilotIntegrationId,
@@ -146,29 +121,15 @@ import {
 } from "./github-copilot-headers";
 import { prepareAnthropicImageContext } from "./anthropic-images";
 import { isAnthropicNarrationSignature, servedModelFromAnthropicSignature } from "./anthropic-signature";
-import { getOpenAIPromptCacheKey } from "./openai-shared";
 import { applyInferenceHeaders } from "./inference-headers";
 import { redactSensitiveCredentials, transformMessages } from "./transform-messages";
 import { NON_VISION_IMAGE_PLACEHOLDER } from "./vision-guard";
 import {
 	injectedClientBaseUrl,
-	resolvesToOfficialAnthropicEndpoint,
 	supportsAnthropicCompaction,
 	supportsAnthropicCompactionOnClient,
 } from "./anthropic-compaction";
-import {
-	applyClaudeToolPrefix,
-	deriveClaudeDeviceId,
-	extractClaudeMetadataSessionId,
-	generateClaudeCloakingUserId,
-	isClaudeCloakingUserId,
-	readAnthropicMetadataAccountId,
-	readAnthropicMetadataString,
-	resolveAnthropicMetadataUserId,
-	stripClaudeToolPrefix,
-} from "./anthropic-identity";
-import { fitBedrockAnthropicPayload } from "./bedrock-anthropic";
-import { buildClaudeCodeTlsFetchOptions, resolveAnthropicBaseUrl } from "./anthropic-http-options";
+import { resolveAnthropicBaseUrl } from "./anthropic-http-options";
 import {
 	buildBetaHeader,
 	mergeAnthropicBetaHeader,
@@ -176,19 +137,13 @@ import {
 	midConversationToolChangesBeta,
 	midConversationOutputConfigBeta,
 	contextManagementBeta,
-	structuredOutputsBeta,
 	fallbackCreditBeta,
 	promptCachingScopeBeta,
 	extendedCacheTtlBeta,
-	fineGrainedToolStreamingBeta,
-	interleavedThinkingBeta,
 	fastModeBeta,
 	taskBudgetBeta,
 	effortBeta,
 	serverSideFallbackBeta,
-	buildClaudeCodeBetas,
-	buildAnthropicHeaders,
-	resolveAnthropicCustomHeadersForBaseUrl,
 	mergeHeaders,
 	normalizeExtraBetas,
 } from "./anthropic-headers";
@@ -200,18 +155,8 @@ import {
 	normalizeAnthropicBaseUrl,
 } from "./anthropic-state";
 
-export {
-	applyClaudeToolPrefix,
-	clearAnthropicFastModeFallback,
-	deriveClaudeDeviceId,
-	generateClaudeCloakingUserId,
-	isAnthropicFastModeFallbackDisabled,
-	isClaudeCloakingUserId,
-	normalizeAnthropicBaseUrl,
-	resolveAnthropicMetadataUserId,
-	stripClaudeToolPrefix,
-};
-export { resolvesToOfficialAnthropicEndpoint, supportsAnthropicCompaction, supportsAnthropicCompactionOnClient };
+export { clearAnthropicFastModeFallback, isAnthropicFastModeFallbackDisabled, normalizeAnthropicBaseUrl };
+export { supportsAnthropicCompaction, supportsAnthropicCompactionOnClient };
 
 /**
  * Redemption window of a refusal's `fallback_credit_token`. `stop_details`
@@ -229,22 +174,6 @@ const FALLBACK_CREDIT_TTL_MS = 5 * 60 * 1000;
 const promptCacheBetas: Record<string, true> = {
 	[extendedCacheTtlBeta]: true,
 	[promptCachingScopeBeta]: true,
-};
-
-/**
- * Betas withheld under the kill switch: they gate the pre-release body fields
- * it removes (Claude Code's gateway contract: context management, beta tool
- * fields, structured-output format, task budgets, tool search), plus the
- * thinking-binding and compaction controls omp also withholds.
- */
-const killSwitchBetas: Record<string, true> = {
-	[THINKING_BINDING_CONTROLS_BETA]: true,
-	[contextManagementBeta]: true,
-	[COMPACTION_BETA]: true,
-	[LEGACY_COMPACTION_BETA]: true,
-	[structuredOutputsBeta]: true,
-	[taskBudgetBeta]: true,
-	[midConversationToolChangesBeta]: true,
 };
 
 /**
@@ -525,14 +454,8 @@ function dropAnthropicStrictTools(params: MessageCreateParamsStreaming): void {
 function getCacheControl(
 	model: Model<"anthropic-messages">,
 	cacheRetention: CacheRetention | undefined,
-	isOAuthToken = false,
 ): { retention: CacheRetention; cacheControl?: AnthropicCacheControl } {
-	// Five-minute writes are the cheapest cache population strategy for pay-per-token API keys.
-	// For OAuth (Claude Code subscriber seats), match Claude Code's native policy by defaulting
-	// to 1h retention where supported, avoiding cold cache re-writes after 15m idle intervals.
-	// An explicit cacheRetention ('short', 'long', 'none') or PI_CACHE_RETENTION always takes precedence.
-	const defaultRetention = isOAuthToken && model.compat.supportsLongCacheRetention ? "long" : "short";
-	const retention = resolveCacheRetention(cacheRetention, defaultRetention);
+	const retention = resolveCacheRetention(cacheRetention, "short");
 	if (retention === "none") {
 		return { retention };
 	}
@@ -543,127 +466,14 @@ function getCacheControl(
 	};
 }
 
-// Claude Code mode: mimic the CLI's direct inference transport. Constants live
-// in the leaf module so registry/usage consumers avoid an init cycle.
-export * from "./claude-code-fingerprint";
-
-const CLAUDE_BILLING_HEADER_PREFIX = "x-anthropic-billing-header:";
-
-function createClaudeBillingHeader(firstUserMessageText: string): string {
-	// Fingerprint: SHA256(salt + msg[4] + msg[7] + msg[20] + version)[:3]
-	// Matches CC's computeFingerprint in utils/fingerprint.ts.
-	// Uses chars from the first conversational wire user turn (not the system prompt).
-	const k = [4, 7, 20].map(i => firstUserMessageText[i] ?? "0").join("");
-	const version = getClaudeCodeVersion();
-	const versionSuffix = Bun.SHA256.hash(`59cf53e54c78${k}${version}`, "hex").slice(0, 3);
-	// cch=00000: placeholder replaced with the real attestation hash by wrapFetchForCch
-	// before the request hits the wire (see below).
-	return `${CLAUDE_BILLING_HEADER_PREFIX} cc_version=${version}.${versionSuffix}; cc_entrypoint=cli; ${CCH_PLACEHOLDER_STR};`;
-}
-
-// cch attestation: XXHash64(body_with_placeholder, seed) low-20-bits, 5 hex chars.
-const CCH_SEED = 0x4d659218e32a3268n;
-const CCH_PLACEHOLDER_STR = "cch=00000";
-const cchEncoder = new TextEncoder();
-const CCH_PLACEHOLDER = cchEncoder.encode(CCH_PLACEHOLDER_STR);
-// Combined anchor for the billing-header placeholder inside system[0].
-// "system":[{"type":"text","text":"x-anthropic-billing-header:
-// Matches the exact JSON prefix of the first system block when
-// createClaudeBillingHeader injects system[0].  "messages" serializes before
-// "system" in Anthropic SDK payloads (~byte 29 vs ~byte 4705), so user content
-// in the messages array can never match this sequence.  User system prompt text
-// lives in system[2] and therefore also cannot match.
-const BILLING_SYSTEM_MARKER = cchEncoder.encode(`"system":[{"type":"text","text":"${CLAUDE_BILLING_HEADER_PREFIX}`);
-const CCH_BILLING_SEARCH_WINDOW = 150;
-
-function patchCch(body: Uint8Array): "patched" | "no-billing-header" | "unanchored" {
-	// Zero-copy Buffer view over the same memory; its `indexOf` is a native memmem,
-	// ~7.5x faster than a hand-rolled byte loop here — the marker sits ~99% through
-	// the body because `messages` serializes before `system`, so a JS scan would
-	// walk almost the entire payload (benchmarked: 563µs -> 75µs on a 1MB body).
-	const view = Buffer.from(body.buffer, body.byteOffset, body.byteLength);
-
-	// Find the combined system[0] + billing-header prefix marker.
-	const markerIdx = view.indexOf(BILLING_SYSTEM_MARKER);
-	if (markerIdx === -1) return "no-billing-header"; // no CC billing header injected
-
-	// Placeholder must sit within CCH_BILLING_SEARCH_WINDOW bytes after the marker.
-	const searchFrom = markerIdx + BILLING_SYSTEM_MARKER.length;
-	const idx = view.indexOf(CCH_PLACEHOLDER, searchFrom);
-	if (idx === -1 || idx - searchFrom > CCH_BILLING_SEARCH_WINDOW) return "unanchored";
-
-	// Hash the body with the placeholder in place (matches CC's in-place behaviour).
-	const h = Bun.hash.xxHash64(body, CCH_SEED);
-	const cch = (h & 0xfffffn).toString(16).padStart(5, "0");
-
-	for (let i = 0; i < 5; i++) body[idx + 4 + i] = cch.charCodeAt(i);
-	return "patched";
-}
-
-/**
- * Wraps a fetch implementation to patch the Claude Code billing-header `cch`
- * attestation into outgoing request bodies. Bodies without the placeholder
- * pass through untouched, so installing it on every OAuth flow is safe.
- */
-export function wrapFetchForCch(base: FetchImpl): FetchImpl {
-	return (input, init) => {
-		if (init?.body && typeof init.body === "string" && init.body.includes(CCH_PLACEHOLDER_STR)) {
-			const encoded = cchEncoder.encode(init.body);
-			if (patchCch(encoded) === "unanchored") {
-				// The OAuth billing placeholder is anchored to system[0] but we couldn't
-				// patch it — e.g. an `onPayload` hook reordered the first system block's keys
-				// so BILLING_SYSTEM_MARKER no longer matches. Send the body as-is (cch stays
-				// `00000`, the prior behaviour) rather than failing the request, but surface the
-				// fingerprint regression instead of letting it ship silently. A `cch=00000`
-				// literal in user content alone ("no-billing-header") is not a regression.
-				logger.warn("anthropic: cch billing placeholder present but not patched; sending unattested request");
-			}
-			return base(input, { ...init, body: encoded });
-		}
-		return base(input, init);
-	};
-}
-
-const UMANS_WEBSEARCH_PROVIDER_HEADER = "X-Umans-Websearch-Provider";
-const UMANS_WEBSEARCH_TOOL_NAME = "web_search";
-
-function normalizeUmansWebSearchProvider(value: string | undefined): "native" | "exa" | undefined {
-	const normalized = value?.trim().toLowerCase();
-	return normalized === "native" || normalized === "exa" ? normalized : undefined;
-}
-
-function getUmansWebSearchProvider(headers: Record<string, string> | undefined): "native" | "exa" | undefined {
-	const explicit = getHeaderCaseInsensitive(headers, UMANS_WEBSEARCH_PROVIDER_HEADER);
-	if (explicit !== undefined) return normalizeUmansWebSearchProvider(explicit);
-	return normalizeUmansWebSearchProvider($env.UMANS_WEBSEARCH_PROVIDER);
-}
-
-function getUmansWebSearchHeader(
-	model: Model<"anthropic-messages">,
-	headers: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-	if (!modelMatchesHost(model, "umans")) return undefined;
-	const provider = getUmansWebSearchProvider(headers);
-	return provider ? { [UMANS_WEBSEARCH_PROVIDER_HEADER]: provider } : undefined;
-}
-
-function shouldUseUmansGatewayWebSearch(name: string, enabled: boolean): boolean {
-	return enabled && name.toLowerCase() === UMANS_WEBSEARCH_TOOL_NAME;
-}
-
-function encodeAnthropicToolName(
-	name: string,
-	isOAuthToken: boolean,
-	escapeBuiltinToolNames: boolean,
-	useUmansGatewayWebSearch = false,
-): string {
-	if (shouldUseUmansGatewayWebSearch(name, useUmansGatewayWebSearch)) return name;
+function encodeAnthropicToolName(name: string, escapeBuiltinToolNames: boolean): string {
 	if (escapeBuiltinToolNames) return `${claudeToolPrefix}${name}`;
-	return isOAuthToken ? applyClaudeToolPrefix(name) : name;
+	return name;
 }
 
-function decodeAnthropicToolName(name: string, isOAuthToken: boolean, escapeBuiltinToolNames: boolean): string {
-	if (isOAuthToken || escapeBuiltinToolNames) return stripClaudeToolPrefix(name);
+function decodeAnthropicToolName(name: string, escapeBuiltinToolNames: boolean): string {
+	if (escapeBuiltinToolNames && name.toLowerCase().startsWith(claudeToolPrefix))
+		return name.slice(claudeToolPrefix.length);
 	return name;
 }
 
@@ -711,9 +521,7 @@ function convertContentBlocks(
 		}
 
 		let source: AnthropicImageSource;
-		if (block.providerFile?.provider === "anthropic" && block.providerFile.id) {
-			source = { type: "file", file_id: block.providerFile.id };
-		} else if (block.url) {
+		if (block.url) {
 			source = { type: "url", url: block.url };
 		} else {
 			const mediaType = normalizeAnthropicImageMediaType(block.mimeType);
@@ -808,8 +616,6 @@ export interface AnthropicOptions extends StreamOptions {
 	 * Other `ServiceTier` values are currently ignored on this provider.
 	 */
 	serviceTier?: ServiceTier;
-	/** Force OAuth bearer auth mode for proxy tokens that don't match Anthropic token prefixes. */
-	isOAuth?: boolean;
 	/**
 	 * Pre-built Anthropic Messages client. When provided, skips internal client
 	 * construction entirely. Accepts any structurally compatible client,
@@ -836,7 +642,6 @@ export type AnthropicClientOptionsArgs = {
 	interleavedThinking?: boolean;
 	headers?: Record<string, string>;
 	dynamicHeaders?: Record<string, string>;
-	isOAuth?: boolean;
 	hasTools?: boolean;
 	/** Whether a tool in ANTHROPIC_BUFFERED_INPUT_TOOLS is present; suppresses the request-wide fine-grained streaming beta. */
 	hasBufferedInputTools?: boolean;
@@ -844,10 +649,7 @@ export type AnthropicClientOptionsArgs = {
 	thinkingDisplay?: AnthropicThinkingDisplay;
 	disableStrictTools?: boolean;
 	/**
-	 * Withhold the prompt-cache betas (see `buildClaudeCodeBetas`). Set when the
-	 * request carries no breakpoint at all, and also when it carries breakpoints
-	 * stripped of `ttl`/`scope`: both betas govern those options, so a body
-	 * without them must advertise neither.
+	 * Withhold prompt-cache betas when breakpoints or their ttl/scope options are removed.
 	 */
 	dropPromptCacheBetas?: boolean;
 	fetch?: FetchImpl;
@@ -864,43 +666,16 @@ export type AnthropicClientOptionsArgs = {
 };
 
 export type AnthropicClientOptionsResult = {
-	isOAuthToken: boolean;
+	model: Pick<Model<"anthropic-messages">, "provider" | "api">;
 	apiKey: string | null;
 	authToken?: string | null;
-	baseURL?: string;
+	baseURL: string;
 	maxRetries: number;
 	maxRetryDelayMs?: number;
 	defaultHeaders: Record<string, string>;
 	fetch?: FetchImpl;
 	fetchOptions?: AnthropicFetchOptions;
 };
-
-function resolveEagerToolInputStreamingSupport(
-	model: Model<"anthropic-messages">,
-	effectiveBaseUrl: string | undefined,
-): boolean {
-	if (!model.compat.supportsEagerToolInputStreaming) return false;
-	// First-party Anthropic endpoints accept the per-tool flag.
-	if (isOfficialAnthropicApiUrl(effectiveBaseUrl)) return true;
-	// Non-official effective endpoint. `supportsEagerToolInputStreaming` may be
-	// stale-true here because compat is materialized once at build time and is
-	// never rebuilt for a baseUrl-only reroute — either a runtime provider
-	// override (`pi.registerProvider("anthropic", { baseUrl })`) or Foundry
-	// (`CLAUDE_CODE_USE_FOUNDRY`). Both leave the canonical model's resolved
-	// compat in place. `officialEndpoint` records whether compat was built for
-	// the canonical Anthropic URL, so only endpoints whose compat was authored
-	// for a non-official host (an explicit `compat.supportsEagerToolInputStreaming`
-	// opt-in on a custom `baseUrl`) still send the field.
-	return !model.compat.officialEndpoint;
-}
-
-function resolveAnthropicCustomHeaders(
-	model: Model<"anthropic-messages">,
-	baseUrl: string | undefined,
-): Record<string, string> | undefined {
-	if (!model.compat.firstPartyProvider) return undefined;
-	return resolveAnthropicCustomHeadersForBaseUrl(baseUrl);
-}
 
 const ANTHROPIC_MESSAGE_EVENTS: ReadonlySet<string> = new Set([
 	"message_start",
@@ -1470,12 +1245,8 @@ function fallbackServedModelFromUsage(source: AnthropicWireUsage): string | unde
 function resolveIterationModel(requestModel: Model<Api>, iterationModelId: string | null | undefined): Model<Api> {
 	const id = iterationModelId?.trim();
 	if (!id || id === requestModel.id) return requestModel;
-	// Bundled catalog lookup: only Anthropic provider entries are safe to
-	// reference (dated snapshots resolve to their alias entry when present).
-	if (requestModel.provider === "anthropic" && requestModel.api === "anthropic-messages") {
-		const bundled = getBundledModel("anthropic", id);
-		if (bundled?.api === "anthropic-messages") return bundled;
-	}
+	const bundled = getBundledModel(requestModel.provider, id);
+	if (bundled?.api === requestModel.api) return bundled;
 	return requestModel;
 }
 
@@ -1762,36 +1533,15 @@ function applyReportedInputTransformations(
  */
 export function maybeAddReplayUnsignedThinkingHint(model: Model<"anthropic-messages">, message: string): string {
 	if (!isInvalidThinkingSignatureError(message) || isThinkingPrefixBindingError(message)) return message;
-	if (model.compat.officialEndpoint) return message;
-	if (model.compatConfig?.replayUnsignedThinking !== undefined) return message;
+	if (!model.compat.replayUnsignedThinking || model.compatConfig?.replayUnsignedThinking !== undefined) return message;
 	const hint = `Provider "${model.provider}" looks like an Anthropic-compatible signing proxy: it rejected a replayed unsigned thinking block. Set \`compat.replayUnsignedThinking: false\` under \`providers.${model.provider}\` in your models.yml and retry. See https://github.com/can1357/oh-my-pi/issues/4297.`;
 	return `${hint}\n\n${message}`;
 }
-
-/**
- * A non-Anthropic transport that reuses this stream consumer: it owns the
- * request body and HTTP exchange, while events, usage, and errors keep the
- * source model's identity and pricing.
- */
-type AnthropicStreamTransport = {
-	sourceModel: Model<"bedrock-converse-stream">;
-	/** Encode reasoning-off; `forceThinkingOffFields` supplies the source model's explicit disabled form. */
-	forceThinkingOff: boolean;
-	forceThinkingOffFields?: Record<string, unknown>;
-	prefixMismatchBehavior?: "drop_block" | "error";
-	prepareRequest: (
-		params: MessageCreateParamsStreaming,
-		betas: readonly string[],
-	) => Promise<{ payload: unknown; rawRequestDump: RawHttpRequestDump }>;
-	createClient: (getPayload: () => unknown) => AnthropicMessagesClientLike;
-	prepareOptions: (options: AnthropicOptions) => AnthropicOptions;
-};
 
 const streamAnthropicOnce = (
 	model: Model<"anthropic-messages">,
 	context: Context,
 	options?: AnthropicOptions,
-	transport?: AnthropicStreamTransport,
 ): AssistantMessageEventStream => {
 	const stream = new AssistantMessageEventStream();
 
@@ -1799,7 +1549,7 @@ const streamAnthropicOnce = (
 		const startTime = performance.now();
 		let firstTokenTime: number | undefined;
 
-		const sourceModel = transport?.sourceModel ?? model;
+		const sourceModel = model;
 		const output: AssistantMessage = {
 			role: "assistant",
 			content: [],
@@ -1811,7 +1561,6 @@ const streamAnthropicOnce = (
 			timestamp: Date.now(),
 		};
 		let rawRequestDump: RawHttpRequestDump | undefined;
-		let transportPayload: unknown;
 		let activeAbortTracker = createAbortSourceTracker(options?.signal);
 
 		const onSseEvent = options?.onSseEvent;
@@ -1853,13 +1602,15 @@ const streamAnthropicOnce = (
 			// Built inside the try so a copilot credential/header failure surfaces as
 			// an error event instead of an unhandled rejection that leaves the stream
 			// (and any consumer awaiting `result()`) hanging forever.
-			if (transport) options = transport.prepareOptions(options ?? {});
-			const apiKey = options?.apiKey ?? getEnvApiKey(model.provider) ?? "";
+			if (model.provider !== "github-copilot" && !model.baseUrl?.trim()) {
+				throw new AIError.ConfigurationError("Anthropic-compatible request setup requires an explicit base URL");
+			}
+			const apiKey =
+				resolveProviderApiKey(model.provider, options?.apiKey) ??
+				(model.provider === "github-copilot" ? "" : NO_AUTH_SENTINEL);
 			const copilotApiKey = model.provider === "github-copilot" ? parseGitHubCopilotApiKey(apiKey) : undefined;
 			const copilotBaseUrl =
-				model.provider === "github-copilot"
-					? (resolveAnthropicBaseUrl(model, apiKey) ?? "https://api.anthropic.com")
-					: undefined;
+				model.provider === "github-copilot" ? resolveAnthropicBaseUrl(model, apiKey) : undefined;
 			const copilotCacheKey =
 				model.provider === "github-copilot" ? getCopilotIntegrationCacheKey(apiKey, copilotBaseUrl) : undefined;
 			const copilotCached =
@@ -1879,16 +1630,13 @@ const streamAnthropicOnce = (
 			if (copilotDynamicHeaders?.premiumRequests !== undefined) {
 				output.usage.premiumRequests = copilotDynamicHeaders.premiumRequests;
 			}
-			const baseUrl = copilotBaseUrl ?? resolveAnthropicBaseUrl(model, apiKey) ?? "https://api.anthropic.com";
-			const supportsEagerToolInputStreaming = resolveEagerToolInputStreamingSupport(model, baseUrl);
-			// A caller-owned client decides the endpoint itself (its `baseURL`, or an
-			// explicit opt-in); it receives the compaction beta per request. A transport
-			// exists only to compact, so its endpoint supports the beta.
-			const compactionSupported =
-				transport !== undefined ||
-				(options?.client
-					? supportsAnthropicCompactionOnClient(model, options.client)
-					: supportsAnthropicCompaction(model, baseUrl));
+			const baseUrl = copilotBaseUrl ?? resolveAnthropicBaseUrl(model, apiKey);
+			if (!baseUrl) throw new AIError.ConfigurationError("Anthropic request setup requires a base URL");
+			const supportsEagerToolInputStreaming = model.compat.supportsEagerToolInputStreaming;
+			// Injected clients receive required compaction betas per request.
+			const compactionSupported = options?.client
+				? supportsAnthropicCompactionOnClient(model, options.client)
+				: supportsAnthropicCompaction(model);
 			const providerSessionState = getAnthropicProviderSessionState(
 				options?.providerSessionState,
 				options?.client,
@@ -1920,71 +1668,43 @@ const streamAnthropicOnce = (
 			// every call site applies, so asking it is asking the wire body. False
 			// means no nested refusal is possible — `type` is mandatory and its only
 			// legal value is constant — and the ladder skips its first rung.
-			// Re-read per rung because `isOAuthToken` is resolved with the client.
 			const requestCarriesCacheControlOptions = (): boolean => {
-				const cacheControl = getCacheControl(model, options?.cacheRetention, isOAuthToken).cacheControl;
+				const cacheControl = getCacheControl(model, options?.cacheRetention).cacheControl;
 				return cacheControl !== undefined && (cacheControl.ttl !== undefined || cacheControl.scope !== undefined);
 			};
 			let dropAllThinking = droppedAllThinkingForSignature;
 			let prefixBindingRetryAttempted = false;
 			let latestTurnThinkingRetryAttempted = false;
-			// Claude Code's `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`; the wrapper
-			// already turned the gated compat off, this covers caller/frozen inputs.
-			const killSwitchActive = experimentalBetasDisabled(model);
 			// A live fallback-credit redemption replays its frozen body.
 			const frozenRedemption =
 				options?.fallbackCreditRedemption && Date.now() <= options.fallbackCreditRedemption.expiresAt
 					? options.fallbackCreditRedemption
 					: undefined;
-			// A body frozen before the kill switch was set still carries the fields
-			// it withholds; the credit token is bound to that body, so forfeit it
-			// and build a fresh request. Server tools that already ran would re-run
-			// and re-bill on a tokenless retry, so surface that case instead.
-			const frozenBody = frozenRedemption?.params;
-			// The redemption drops `fallbacks` before sending, so they cannot force a forfeit.
-			const forfeitFrozenForKillSwitch =
-				killSwitchActive &&
-				frozenBody !== undefined &&
-				carriesKillSwitchField({ ...frozenBody, fallbacks: undefined });
-			if (
-				forfeitFrozenForKillSwitch &&
-				frozenRedemption?.refusedContent?.some(block => block.type === "anthropicServerTool")
-			) {
-				throw new AIError.ConfigurationError(
-					"CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS was set after a refused turn that ran server tools; its fallback credit cannot be redeemed without the experimental fields the switch withholds.",
-				);
-			}
 			// Collected at most once, on first params build; a frozen redemption
 			// body never builds params.
 			let controlRecords: AnthropicControlRecord[] | undefined;
 			const getControlRecords = () => (controlRecords ??= collectAnthropicControlRecords(context.messages));
-			let prefixMismatchBehavior = transport
-				? transport.prefixMismatchBehavior
-				: model.thinking?.prefixBinding && model.compat.supportsThinkingBindingControls
+			let prefixMismatchBehavior =
+				model.thinking?.prefixBinding && model.compat.supportsThinkingBindingControls
 					? (options?.anthropicPrefixMismatchBehavior ?? "drop_block")
 					: undefined;
 			// The binding-controls beta follows the finalized body's
 			// `thinking.block_binding` per request (see below), not the client.
 			const controlBetas = resolveAnthropicControlBetas(model, undefined);
 			const mergedCallerHeaders = mergeHeaders(model.headers, options?.headers);
-			const umansGatewayWebSearchHeader = getUmansWebSearchHeader(model, mergedCallerHeaders);
 			// Base for the per-request beta override an injected client needs.
 			// `mergeAnthropicBetaHeader` seeds from the caller's own
 			// `anthropic-beta` value, so once breakpoints are dropped an unstripped
 			// base would re-attach the very cache beta the replay abandoned. Both
-			// prompt-cache betas govern `ttl`/`scope`, so the options rung has to
-			// strip them too. The kill switch's betas never ride, whatever the
-			// caller's header says. Read through a closure because both cache
-			// flags flip mid-turn.
+			// Strip cache betas whenever either cache flag flips mid-turn.
 			const callerBetaBaseHeaders = (): Record<string, string> => {
 				const headers =
 					dropCacheControl || dropCacheControlOptions
 						? stripHeaderBetas(mergedCallerHeaders, promptCacheBetas)
 						: mergedCallerHeaders;
-				return killSwitchActive ? stripHeaderBetas(headers, killSwitchBetas) : headers;
+				return headers;
 			};
-			// Keep fallback payloads aligned with the top-level Vertex effort gate:
-			// no nested effort field means the fallback scan cannot re-add its beta.
+			// A nested fallback must not restore an unsupported effort field.
 			let fallbacks = options?.fallbacks;
 			if (
 				!model.compat.supportsOutputEffort &&
@@ -2005,9 +1725,9 @@ const streamAnthropicOnce = (
 			let requestExtraBetas: readonly string[] = [];
 			let clientDefaultHeaders: Record<string, string> | undefined;
 			// Rebuild headers when a retry changes the advertised beta set.
-			const resolveClient = (): { client: AnthropicMessagesClientLike; isOAuthToken: boolean } => {
-				if (options?.client && !transport) {
-					return { client: options.client, isOAuthToken: false };
+			const resolveClient = (): { client: AnthropicMessagesClientLike; defaultHeaders?: Record<string, string> } => {
+				if (options?.client) {
+					return { client: options.client };
 				}
 				let extraBetas = normalizeExtraBetas(options?.betas);
 				if (dropCacheControl || dropCacheControlOptions) {
@@ -2016,7 +1736,7 @@ const streamAnthropicOnce = (
 				// Skip the fast-mode beta when this session already learned the
 				// endpoint+model rejects fast mode; `speed` is dropped from the params
 				// too (dropFastMode), so the request stays a faithful non-fast request.
-				if (wantsAnthropicFastMode(model, options) && !dropFastMode && !extraBetas.includes(fastModeBeta)) {
+				if (wantsAnthropicFastMode(model) && !dropFastMode && !extraBetas.includes(fastModeBeta)) {
 					extraBetas.push(fastModeBeta);
 				}
 				if (options?.taskBudget && !extraBetas.includes(taskBudgetBeta)) {
@@ -2032,7 +1752,6 @@ const streamAnthropicOnce = (
 				// so the effort field is dropped from the body there too (see buildParams)
 				// and advertising the beta would only earn a 400 (#5614).
 				const sendsAdaptiveEffortPin =
-					!transport?.forceThinkingOff &&
 					isAdaptiveOnlyThinking(model) &&
 					(options?.thinkingEnabled === false ||
 						(model.compat.supportsForcedToolChoice && isForcedToolChoice(options?.toolChoice)));
@@ -2049,14 +1768,10 @@ const streamAnthropicOnce = (
 				if (emitsEffortBeta && !extraBetas.includes(effortBeta)) {
 					extraBetas.push(effortBeta);
 				}
-				if (!isVertexRawPredictUrl(baseUrl)) {
-					for (const beta of controlBetas) {
-						if (!extraBetas.includes(beta)) extraBetas.push(beta);
-					}
+				for (const beta of controlBetas) {
+					if (!extraBetas.includes(beta)) extraBetas.push(beta);
 				}
-				// Vertex rawPredict takes betas in the body; other routes use the
-				// header. Legacy encrypted replay keeps its original beta.
-				if (compactionSupported && !isVertexRawPredictUrl(baseUrl)) {
+				if (compactionSupported) {
 					if (
 						(options?.anthropicCompaction !== undefined ||
 							contextReplaysAnthropicCompaction(context.messages, model, "signed")) &&
@@ -2086,24 +1801,18 @@ const streamAnthropicOnce = (
 				// header and the body can never disagree. Routes that honor
 				// `ttl: "1h"` without the beta and reject it (Vertex rawPredict,
 				// Factory's proxy) skip it: Vertex by URL, others via `extendedCacheTtlBeta: false`.
-				const isOAuth = options?.isOAuth ?? isAnthropicOAuthToken(apiKey);
 				if (
-					!isOAuth &&
 					!dropCacheControl &&
 					!dropCacheControlOptions &&
-					!isVertexRawPredictUrl(baseUrl) &&
 					model.compat.extendedCacheTtlBeta !== false &&
-					getCacheControl(model, options?.cacheRetention, isOAuth).cacheControl?.ttl === "1h" &&
+					getCacheControl(model, options?.cacheRetention).cacheControl?.ttl === "1h" &&
 					!extraBetas.includes(extendedCacheTtlBeta)
 				) {
 					extraBetas.push(extendedCacheTtlBeta);
 				}
-				if (!isOAuth && isOfficialAnthropicApiUrl(baseUrl) && !extraBetas.includes(fallbackCreditBeta)) {
-					extraBetas.push(fallbackCreditBeta);
-				}
 				// A forfeited frozen body is rebuilt fresh, so it keeps the betas
 				// computed above instead of the saved list describing the old body.
-				if (options?.fallbackCreditRedemption && !forfeitFrozenForKillSwitch) {
+				if (options?.fallbackCreditRedemption) {
 					const frozenBetas = (options.fallbackCreditRedemption.betas ?? []).filter(
 						b => !b.startsWith("server-side-fallback-"),
 					);
@@ -2136,16 +1845,8 @@ const streamAnthropicOnce = (
 						}
 					}
 				}
-				// Caller betas and a frozen redemption's beta list bypass compat.
-				if (killSwitchActive) extraBetas = extraBetas.filter(beta => killSwitchBetas[beta] !== true);
 
 				requestExtraBetas = extraBetas;
-				if (transport) {
-					return {
-						client: transport.createClient(() => transportPayload),
-						isOAuthToken: false,
-					};
-				}
 				clientArgs = {
 					model,
 					apiKey,
@@ -2154,7 +1855,6 @@ const streamAnthropicOnce = (
 					interleavedThinking: options?.interleavedThinking ?? true,
 					headers: options?.headers,
 					dynamicHeaders: copilotDynamicHeaders?.headers,
-					isOAuth: options?.isOAuth,
 					hasTools: !!context.tools?.length,
 					hasBufferedInputTools:
 						context.tools?.some(tool => ANTHROPIC_BUFFERED_INPUT_TOOLS.has(tool.name)) ?? false,
@@ -2164,10 +1864,7 @@ const streamAnthropicOnce = (
 					maxRetryDelayMs: options?.maxRetryDelayMs,
 					copilotCacheKey,
 					copilotCacheSnapshot: copilotCached ?? null,
-					sessionId:
-						options?.sessionId ??
-						extractClaudeMetadataSessionId(options?.metadata?.user_id) ??
-						options?.promptCacheKey,
+					sessionId: options?.sessionId ?? options?.promptCacheKey,
 					disableStrictTools,
 					dropPromptCacheBetas: dropCacheControl || dropCacheControlOptions,
 				};
@@ -2175,15 +1872,12 @@ const streamAnthropicOnce = (
 				clientDefaultHeaders = created.defaultHeaders;
 				return created;
 			};
-			let { client, isOAuthToken } = resolveClient();
+			let { client } = resolveClient();
 			const preparedContext = await prepareAnthropicImageContext(context, model);
 			const prepareParams = async (): Promise<MessageCreateParamsStreaming> => {
-				if (transport) rawRequestDump = undefined;
-				const built = buildParams(model, preparedContext, isOAuthToken, options, {
+				const built = buildParams(model, preparedContext, options, {
 					compactionSupported,
-					forceThinkingOff: transport?.forceThinkingOff,
 					disableStrictTools,
-					useUmansGatewayWebSearch: umansGatewayWebSearchHeader !== undefined,
 					forceDemoteUnsignedThinking,
 					supportsEagerToolInputStreaming,
 					prefixMismatchBehavior,
@@ -2193,32 +1887,8 @@ const streamAnthropicOnce = (
 					droppedThinkingBlocks: providerSessionState?.prefixDroppedThinkingBlocks,
 					controlRecords: getControlRecords(),
 					fallbacks,
-					effectiveBaseUrl: baseUrl,
 				});
 				let nextParams = built.params;
-				if (transport?.forceThinkingOffFields) {
-					const offFields = transport.forceThinkingOffFields;
-					if (offFields.thinking !== undefined) {
-						nextParams.thinking = offFields.thinking as MessageCreateParamsStreaming["thinking"];
-					}
-					const offOutputConfig = offFields.output_config;
-					if (isRecord(offOutputConfig)) {
-						nextParams.output_config = {
-							...nextParams.output_config,
-							...offOutputConfig,
-						} as MessageCreateParamsStreaming["output_config"];
-					}
-					const offBetas = Array.isArray(offFields.anthropic_beta)
-						? offFields.anthropic_beta.filter((beta): beta is string => typeof beta === "string")
-						: [];
-					if (isRecord(offOutputConfig) && offOutputConfig.effort !== undefined) {
-						offBetas.push(effortBeta);
-					}
-					if (offBetas.length > 0) {
-						const bodyParams = nextParams as { anthropic_beta?: string[] };
-						bodyParams.anthropic_beta = Array.from(new Set([...(bodyParams.anthropic_beta ?? []), ...offBetas]));
-					}
-				}
 				// The last build wins: a retry may rebuild with different controls.
 				if (built.requestControls) output.requestControls = built.requestControls;
 				else delete output.requestControls;
@@ -2228,47 +1898,20 @@ const streamAnthropicOnce = (
 				if (dropFastMode) {
 					dropAnthropicFastMode(nextParams);
 				}
-				const replacementPayload = transport ? undefined : await options?.onPayload?.(nextParams, model);
+				const replacementPayload = await options?.onPayload?.(nextParams, model);
 				if (replacementPayload !== undefined) {
 					nextParams = replacementPayload as typeof nextParams;
 				}
-				// After `onPayload`, so a hook cannot restore a field the switch withholds.
-				if (killSwitchActive) withholdKillSwitchFields(nextParams);
 				if (nextParams.compaction) stripCompactionIncompatibleParams(nextParams);
-				// After `onPayload`, so a hook cannot restore a field Bedrock rejects.
-				if (!transport && model.compat.bedrockMessagesApi) fitBedrockAnthropicPayload(nextParams);
-				// Vertex rawPredict carries betas in the body. The binding token omp
-				// adds is decided here, from the final params after any hook; a token
-				// the hook itself put in `anthropic_beta` is left as it is.
-				const bodyBetas = (nextParams as { anthropic_beta?: string[] }).anthropic_beta;
-				if (
-					isVertexRawPredictUrl(
-						options?.client !== undefined ? (injectedClientBaseUrl(options.client) ?? baseUrl) : baseUrl,
-					) &&
-					nextParams.thinking &&
-					carriesThinkingBinding(nextParams.thinking) &&
-					!bodyBetas?.includes(THINKING_BINDING_CONTROLS_BETA)
-				) {
-					(nextParams as { anthropic_beta?: string[] }).anthropic_beta = [
-						...(bodyBetas ?? []),
-						THINKING_BINDING_CONTROLS_BETA,
-					];
-				}
 				nextParams = toWellFormedDeep(nextParams) as typeof nextParams;
-				if (transport) {
-					const preparedRequest = await transport.prepareRequest(nextParams, requestExtraBetas);
-					transportPayload = preparedRequest.payload;
-					rawRequestDump = preparedRequest.rawRequestDump;
-				} else {
-					rawRequestDump = {
-						provider: model.provider,
-						api: output.api,
-						model: model.id,
-						method: "POST",
-						url: `${baseUrl}/v1/messages${isOAuthToken ? "?beta=true" : ""}`,
-						body: nextParams,
-					};
-				}
+				rawRequestDump = {
+					provider: model.provider,
+					api: output.api,
+					model: model.id,
+					method: "POST",
+					url: `${baseUrl}/v1/messages`,
+					body: nextParams,
+				};
 				return nextParams;
 			};
 			let usingFallbackCredit = false;
@@ -2277,7 +1920,7 @@ const streamAnthropicOnce = (
 			let params: MessageCreateParamsStreaming;
 			// Recheck expiry here: preparation (image resizing) is async, and an
 			// expired token must fall back to a fresh request as before.
-			if (frozenRedemption && !forfeitFrozenForKillSwitch && Date.now() <= frozenRedemption.expiresAt) {
+			if (frozenRedemption && Date.now() <= frozenRedemption.expiresAt) {
 				usingFallbackCredit = true;
 				const echoed =
 					frozenRedemption.prefillClaim !== false && frozenRedemption.refusedContent
@@ -2294,18 +1937,14 @@ const streamAnthropicOnce = (
 					api: output.api,
 					model: model.id,
 					method: "POST",
-					url: `${baseUrl}/v1/messages${isOAuthToken ? "?beta=true" : ""}`,
+					url: `${baseUrl}/v1/messages`,
 					body: params,
 				};
 			} else {
 				params = await prepareParams();
 			}
 			const seenInputTransformations = new Set<string>();
-			const idleTimeoutMs =
-				options?.streamIdleTimeoutMs ??
-				getStreamIdleTimeoutMs(
-					transport?.sourceModel.compat.streamIdleTimeoutMs ?? model.compat.streamIdleTimeoutMs,
-				);
+			const idleTimeoutMs = options?.streamIdleTimeoutMs ?? getStreamIdleTimeoutMs(model.compat.streamIdleTimeoutMs);
 			const firstEventTimeoutMs = options?.streamFirstEventTimeoutMs ?? getStreamFirstEventTimeoutMs(idleTimeoutMs);
 			const requestTimeoutMs =
 				firstEventTimeoutMs !== undefined && firstEventTimeoutMs > 0 ? firstEventTimeoutMs : undefined;
@@ -2423,26 +2062,6 @@ const streamAnthropicOnce = (
 				if (usingFallbackCredit) forfeitFallbackCredit(streamFailure);
 				return prepareParams();
 			};
-			// Subscription slow mode (Claude Code `/low-priority`): first-party OAuth
-			// requests only. Capacity waits are tracked per request so the caller's
-			// max-wait budget covers the whole wait, not one attempt.
-			const slowMode =
-				options?.anthropicSlowMode !== undefined &&
-				model.compat.firstPartyProvider &&
-				isOAuthToken &&
-				!options.client &&
-				isOfficialAnthropicApiUrl(baseUrl)
-					? options.anthropicSlowMode
-					: undefined;
-			// Slow-lane state is per Claude account: key it by the stored credential
-			// that served this request, else by a digest of the bearer.
-			const slowLane =
-				options?.credentialId !== undefined
-					? `cred:${options.credentialId}`
-					: `key:${Bun.hash(apiKey).toString(36)}`;
-			let slowWaitSinceMs: number | undefined;
-			let slowWaitAttempts = 0;
-			let sentSlow = false;
 			while (true) {
 				activeAbortTracker = createAbortSourceTracker(options?.signal);
 				const { requestSignal } = activeAbortTracker;
@@ -2456,9 +2075,7 @@ const streamAnthropicOnce = (
 				let injectedClientBetaHeaders: Record<string, string> | undefined;
 				// A caller-owned client targets its own endpoint: route betas by
 				// the client's URL when it exposes one, not the model's routing.
-				const injectedBetaRouteUrl =
-					options?.client !== undefined ? (injectedClientBaseUrl(options.client) ?? baseUrl) : baseUrl;
-				if (options?.client !== undefined && !isVertexRawPredictUrl(injectedBetaRouteUrl)) {
+				if (options?.client !== undefined) {
 					for (const beta of controlBetas) {
 						injectedClientBetaHeaders = mergeAnthropicBetaHeader(
 							injectedClientBetaHeaders ?? callerBetaBaseHeaders(),
@@ -2490,26 +2107,12 @@ const streamAnthropicOnce = (
 						);
 					}
 				}
-				sentSlow = slowMode?.isActive(slowLane) === true;
-				let perRequestHeaders: Record<string, string> | undefined =
-					umansGatewayWebSearchHeader || injectedClientBetaHeaders || options?.userProfileId || sentSlow
-						? {
-								...umansGatewayWebSearchHeader,
-								...injectedClientBetaHeaders,
-								...(options?.userProfileId ? { "anthropic-user-profile-id": options.userProfileId } : {}),
-								...(sentSlow ? { [ANTHROPIC_USAGE_LIMIT_HEADER]: ANTHROPIC_SLOW_USAGE_LIMIT } : {}),
-							}
-						: undefined;
+				let perRequestHeaders: Record<string, string> | undefined = injectedClientBetaHeaders;
 				if (usingFallbackCredit && options?.fallbackCreditRedemption?.betaHeader) {
 					const rawBetas = options.fallbackCreditRedemption.betaHeader
 						.split(",")
 						.map(b => b.trim())
-						.filter(
-							b =>
-								b &&
-								!b.startsWith("server-side-fallback-") &&
-								(!killSwitchActive || killSwitchBetas[b] !== true),
-						);
+						.filter(b => b && !b.startsWith("server-side-fallback-"));
 					if (!rawBetas.some(beta => beta.startsWith("fallback-credit-"))) {
 						rawBetas.push(fallbackCreditBeta);
 					}
@@ -2535,12 +2138,7 @@ const streamAnthropicOnce = (
 				}
 				// The binding-controls beta rides exactly with the finalized body's
 				// `thinking.block_binding`, unioned with the betas already chosen.
-				if (
-					!usingFallbackCredit &&
-					options?.client === undefined &&
-					!isVertexRawPredictUrl(baseUrl) &&
-					carriesThinkingBinding(params.thinking)
-				) {
+				if (!usingFallbackCredit && options?.client === undefined && carriesThinkingBinding(params.thinking)) {
 					perRequestHeaders = {
 						...perRequestHeaders,
 						...mergeAnthropicBetaHeader(
@@ -2559,7 +2157,6 @@ const streamAnthropicOnce = (
 				if (
 					!usingFallbackCredit &&
 					options?.client === undefined &&
-					!isVertexRawPredictUrl(baseUrl) &&
 					params.context_management?.edits.some(edit => edit.type === "clear_thinking_20251015")
 				) {
 					perRequestHeaders = {
@@ -2577,10 +2174,7 @@ const streamAnthropicOnce = (
 					maxRetries: 0,
 					...(perRequestHeaders ? { headers: perRequestHeaders } : {}),
 				};
-				const anthropicRequest: unknown =
-					isOAuthToken && client.beta
-						? client.beta.messages.create({ ...params, stream: true }, requestOptions)
-						: client.messages.create({ ...params, stream: true }, requestOptions);
+				const anthropicRequest: unknown = client.messages.create({ ...params, stream: true }, requestOptions);
 				let streamedReplayUnsafeContent = false;
 
 				try {
@@ -2611,10 +2205,6 @@ const streamAnthropicOnce = (
 						if (requestTimeout !== undefined) clearTimeout(requestTimeout);
 					}
 					await notifyProviderResponse(options, response, sourceModel, requestId);
-					if (slowMode) {
-						const slowSignal = parseAnthropicSlowModeHeaders(response.headers);
-						if (slowSignal) slowMode.observe(slowSignal, slowLane);
-					}
 					let sawEvent = false;
 					let sawMessageStart = false;
 					let sawTerminalEnvelope = false;
@@ -2839,13 +2429,7 @@ const streamAnthropicOnce = (
 									contentIndex: output.content.length - 1,
 									kind: "redactedThinking",
 								});
-							} else if (
-								isAnthropicServerToolHistoryBlock(event.content_block) &&
-								(umansGatewayWebSearchHeader === undefined ||
-									(event.content_block.type === "server_tool_use"
-										? event.content_block.name !== "web_search"
-										: event.content_block.type !== "web_search_tool_result"))
-							) {
+							} else if (isAnthropicServerToolHistoryBlock(event.content_block)) {
 								streamedReplayUnsafeContent = true;
 								const block: Block = {
 									type: "anthropicServerTool",
@@ -2863,11 +2447,7 @@ const streamAnthropicOnce = (
 								const block: Block = {
 									type: "toolCall",
 									id: event.content_block.id,
-									name: decodeAnthropicToolName(
-										event.content_block.name,
-										isOAuthToken,
-										model.compat.escapeBuiltinToolNames,
-									),
+									name: decodeAnthropicToolName(event.content_block.name, model.compat.escapeBuiltinToolNames),
 									arguments: event.content_block.input ?? {},
 									[kStreamingPartialJson]: "",
 									[kStreamingBlockIndex]: event.index,
@@ -3148,9 +2728,7 @@ const streamAnthropicOnce = (
 					break;
 				} catch (streamError) {
 					const localAbortReason = activeAbortTracker.getLocalAbortReason();
-					const preserveTransportStatus = transport && AIError.status(streamError) !== undefined;
-					const streamFailure = preserveTransportStatus ? streamError : (localAbortReason ?? streamError);
-					if (transport) throw streamFailure;
+					const streamFailure = localAbortReason ?? streamError;
 					if (
 						!disableStrictTools &&
 						firstTokenTime === undefined &&
@@ -3229,31 +2807,6 @@ const streamAnthropicOnce = (
 					}
 					const streamFailureMessage =
 						streamFailure instanceof Error ? streamFailure.message : String(streamFailure);
-					if (
-						isOAuthToken &&
-						clientArgs &&
-						firstTokenTime === undefined &&
-						adoptRequiredClaudeCodeVersion(streamFailure)
-					) {
-						logger.warn("anthropic: Claude Code version rejected as too old, retrying with required version", {
-							model: model.id,
-							version: getClaudeCodeVersion(),
-						});
-						client = createClient(model, { ...clientArgs, disableStrictTools }).client;
-						// The version only changes client headers; a redemption keeps its frozen body.
-						if (!usingFallbackCredit) params = await prepareParams();
-						providerRetryAttempt = 0;
-						output.content.length = 0;
-						output.model = sourceModel.id;
-						output.responseId = undefined;
-						output.upstreamModel = undefined;
-						output.errorMessage = undefined;
-						output.providerPayload = undefined;
-						output.usage = createEmptyUsage(copilotDynamicHeaders?.premiumRequests);
-						output.stopReason = "stop";
-						firstTokenTime = undefined;
-						continue;
-					}
 					if (
 						!prefixBindingRetryAttempted &&
 						options?.anthropicPrefixMismatchBehavior !== "error" &&
@@ -3404,7 +2957,7 @@ const streamAnthropicOnce = (
 					}
 					if (
 						!dropFastMode &&
-						wantsAnthropicFastMode(model, options) &&
+						wantsAnthropicFastMode(model) &&
 						firstTokenTime === undefined &&
 						AIError.isFastModeUnsupported(streamFailure)
 					) {
@@ -3456,7 +3009,7 @@ const streamAnthropicOnce = (
 						dropCacheControlOptions = true;
 						// Rebuild the client too: the retry must stop advertising the
 						// extended-cache-ttl beta, and that lives in the default headers.
-						({ client, isOAuthToken } = resolveClient());
+						({ client } = resolveClient());
 						params = await prepareParams();
 						providerRetryAttempt = 0;
 						output.content.length = 0;
@@ -3468,42 +3021,6 @@ const streamAnthropicOnce = (
 						output.stopReason = "stop";
 						firstTokenTime = undefined;
 						continue;
-					}
-					if (
-						slowMode &&
-						firstTokenTime === undefined &&
-						!streamedReplayUnsafeContent &&
-						!activeAbortTracker.wasCallerAbort()
-					) {
-						const failureStatus = (streamFailure as { status?: unknown } | null)?.status;
-						const httpStatus = typeof failureStatus === "number" ? failureStatus : undefined;
-						const failureText = streamFailure instanceof Error ? streamFailure.message : String(streamFailure);
-						const slowRetry = await slowMode.onFailure({
-							lane: slowLane,
-							httpStatus,
-							overloaded: httpStatus === 529 || failureText.includes("overloaded_error"),
-							signal: parseAnthropicSlowModeHeaders(getHeadersFromError(streamFailure)),
-							sentSlow,
-							waitedMs: slowWaitSinceMs === undefined ? 0 : Date.now() - slowWaitSinceMs,
-							attempts: slowWaitAttempts,
-						});
-						if (slowRetry) {
-							if (slowRetry.capacityWait) {
-								slowWaitSinceMs ??= Date.now();
-								slowWaitAttempts++;
-							}
-							logger.debug("anthropic: slow mode retry", {
-								model: model.id,
-								status: httpStatus,
-								delayMs: slowRetry.delayMs,
-								attempt: slowWaitAttempts,
-							});
-							if (slowRetry.delayMs > 0) {
-								await waitForRetry(options?.providerRetryWait, slowRetry.delayMs, options?.signal);
-							}
-							resetStreamOutputState();
-							continue;
-						}
 					}
 					if (
 						!dropCacheControl &&
@@ -3520,7 +3037,7 @@ const streamAnthropicOnce = (
 						dropCacheControl = true;
 						// Rebuild the client too: the retry must stop advertising the
 						// extended-cache-ttl beta, and that lives in the default headers.
-						({ client, isOAuthToken } = resolveClient());
+						({ client } = resolveClient());
 						params = await prepareParams();
 						providerRetryAttempt = 0;
 						output.content.length = 0;
@@ -3589,9 +3106,6 @@ const streamAnthropicOnce = (
 			}
 			output.duration = performance.now() - startTime;
 			if (firstTokenTime) output.ttft = firstTokenTime - startTime;
-			if (dropFastMode && model.compat.firstPartyProvider && options?.serviceTier === "priority") {
-				output.disabledFeatures = [...(output.disabledFeatures ?? []), "priority"];
-			}
 			if (forceDemoteUnsignedThinking && model.compat.replayUnsignedThinking) {
 				output.disabledFeatures = [...(output.disabledFeatures ?? []), "unsigned-thinking-replay"];
 			}
@@ -3643,7 +3157,7 @@ const streamAnthropicOnce = (
 			output.stopReason = result.stopReason;
 			output.errorStatus = result.status;
 			output.errorId = result.id;
-			output.errorMessage = transport ? result.message : maybeAddReplayUnsignedThinkingHint(model, result.message);
+			output.errorMessage = maybeAddReplayUnsignedThinkingHint(model, result.message);
 			output.duration = performance.now() - startTime;
 			if (firstTokenTime) output.ttft = firstTokenTime - startTime;
 			stream.push({
@@ -3662,97 +3176,11 @@ const streamAnthropicOnce = (
  * Public entry: retry benign empty completions before they reach the agent
  * loop. The inner attempt owns Anthropic provider-failure retries.
  */
-export const streamAnthropic: StreamFunction<"anthropic-messages"> = (model, context, options) =>
-	withReplaySafeStreamRetry(withoutDisabledExperimentalBetas(model), context, options, streamAnthropicOnce, {
+export const streamAnthropic: StreamFunction<"anthropic-messages"> = (model, context, options) => {
+	return withReplaySafeStreamRetry(model, context, options, streamAnthropicOnce, {
 		retryEmptyCompletion: true,
 	});
-
-/** Whether Claude Code's `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` applies to this model's provider. */
-function experimentalBetasDisabled(model: Model<"anthropic-messages">): boolean {
-	return model.compat.honorsClaudeCodeBetaKillSwitch === true && $flag("CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS");
-}
-
-/**
- * Whether a request body carries a field the kill switch withholds. A frozen
- * fallback-credit body that does cannot be redeemed under the switch. Defined
- * as "the sanitizer would change it" so detection and stripping cannot drift.
- */
-function carriesKillSwitchField(params: MessageCreateParamsStreaming): boolean {
-	const sanitized = structuredClone(params);
-	withholdKillSwitchFields(sanitized);
-	return !Bun.deepEquals(sanitized, params);
-}
-
-/**
- * Remove every field the kill switch withholds from a final request body, for
- * payloads an `onPayload` hook replaced after compat already shaped them, and
- * for the switch's fields compat has no axis for (task budgets). Compaction
- * blocks keep their readable summary as text, the same form an endpoint
- * without compaction support receives.
- */
-function withholdKillSwitchFields(params: MessageCreateParamsStreaming): void {
-	withholdKillSwitchControls(params);
-	delete params.context_management;
-	delete params.compaction;
-	// Server-side fallback entries carry their own per-attempt controls.
-	for (const entry of params.fallbacks ?? []) withholdKillSwitchControls(entry);
-	for (const tool of params.tools ?? []) {
-		if ("strict" in tool) delete tool.strict;
-		if ("defer_loading" in tool) delete tool.defer_loading;
-		if ("eager_input_streaming" in tool) delete tool.eager_input_streaming;
-	}
-	for (const message of params.messages) {
-		// Per-message `output_config` (mid-conversation effort) may carry the same controls.
-		if ("output_config" in message && message.output_config) withholdKillSwitchControls(message);
-		if (!Array.isArray(message.content)) continue;
-		for (let i = 0; i < message.content.length; i++) {
-			const block = message.content[i];
-			if (block.type === "compaction") message.content[i] = { type: "text", text: block.content };
-		}
-	}
-	if (params.anthropic_beta) {
-		params.anthropic_beta = params.anthropic_beta.filter(beta => killSwitchBetas[beta] !== true);
-	}
-}
-
-/** Withhold the kill switch's thinking/output controls on a body, fallback entry, or message. */
-function withholdKillSwitchControls(holder: { thinking?: ThinkingConfigParam; output_config?: OutputConfig }): void {
-	if (holder.thinking && "block_binding" in holder.thinking) delete holder.thinking.block_binding;
-	if (!holder.output_config) return;
-	delete holder.output_config.task_budget;
-	delete holder.output_config.format;
-	if (Object.keys(holder.output_config).length === 0) delete holder.output_config;
-}
-
-/**
- * Honor Claude Code's `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` kill switch on
- * providers whose compat opts in (`honors-claude-code-beta-kill-switch`).
- * Gateways behind `ANTHROPIC_BASE_URL` often reject pre-release body fields,
- * so the switch withholds what Claude Code's gateway contract lists — context
- * management, beta tool fields (`strict`, `defer_loading`,
- * `eager_input_streaming`), tool search (mid-conversation tool changes),
- * structured-output format, task budgets — plus `thinking.block_binding` and
- * server compaction (whose legacy replay needs a `context_management` edit),
- * together with their betas. Effort, adaptive thinking, interleaved thinking
- * and extended context stay, as in Claude Code. Applied through compat so every
- * request builder and retry rung sees one decision; {@link withholdKillSwitchFields}
- * and {@link killSwitchBetas} cover the rest where bodies and betas are finalized.
- */
-function withoutDisabledExperimentalBetas(model: Model<"anthropic-messages">): Model<"anthropic-messages"> {
-	if (!experimentalBetasDisabled(model)) return model;
-	return {
-		...model,
-		compat: {
-			...model.compat,
-			supportsContextManagement: false,
-			supportsThinkingBindingControls: false,
-			supportsServerCompaction: false,
-			disableStrictTools: true,
-			supportsEagerToolInputStreaming: false,
-			supportsMidConversationToolChanges: false,
-		},
-	};
-}
+};
 
 export type AnthropicSystemBlock = {
 	type: "text";
@@ -3760,57 +3188,16 @@ export type AnthropicSystemBlock = {
 	cache_control?: AnthropicCacheControl;
 };
 type SystemBlockOptions = {
-	includeClaudeCodeInstruction?: boolean;
 	extraInstructions?: string[];
-	/** Text of the first conversational wire user turn, used as the billing fingerprint seed. */
-	firstUserMessageText?: string;
-	/**
-	 * Cache lifetime shared by the OAuth system breakpoint and later message
-	 * breakpoints. Omitted → the identity block keeps its default `ephemeral`
-	 * breakpoint; see `dropCacheControl` to emit none at all.
-	 */
-	cacheControl?: AnthropicCacheControl;
-	/**
-	 * Emit no `cache_control` on any block: the endpoint rejected the field.
-	 * Distinct from an undefined `cacheControl`, which only means "default".
-	 */
-	dropCacheControl?: boolean;
 };
 
 export function buildAnthropicSystemBlocks(
 	systemPrompt: readonly string[] | undefined,
 	options: SystemBlockOptions = {},
 ): AnthropicSystemBlock[] | undefined {
-	const {
-		includeClaudeCodeInstruction = false,
-		extraInstructions = [],
-		firstUserMessageText,
-		cacheControl,
-		dropCacheControl = false,
-	} = options;
+	const { extraInstructions = [] } = options;
 	const sanitizedPrompts = normalizeSystemPrompts(systemPrompt);
 	const trimmedInstructions = extraInstructions.map(instruction => instruction.trim()).filter(Boolean);
-	const hasBillingHeader = sanitizedPrompts.some(prompt => prompt.startsWith(CLAUDE_BILLING_HEADER_PREFIX));
-
-	if (includeClaudeCodeInstruction && !hasBillingHeader) {
-		const identityBlock: AnthropicSystemBlock = { type: "text", text: claudeCodeSystemInstruction };
-		if (!dropCacheControl) {
-			identityBlock.cache_control = cacheControl ? cloneAnthropicCacheControl(cacheControl) : { type: "ephemeral" };
-		}
-		const blocks: AnthropicSystemBlock[] = [
-			{ type: "text", text: createClaudeBillingHeader(firstUserMessageText ?? "") },
-			identityBlock,
-		];
-
-		for (const instruction of trimmedInstructions) {
-			blocks.push({ type: "text", text: instruction });
-		}
-		for (const prompt of sanitizedPrompts) {
-			blocks.push({ type: "text", text: prompt });
-		}
-
-		return blocks;
-	}
 
 	const blocks: AnthropicSystemBlock[] = [];
 	for (const instruction of trimmedInstructions) {
@@ -3823,242 +3210,58 @@ export function buildAnthropicSystemBlocks(
 }
 
 export function buildAnthropicClientOptions(args: AnthropicClientOptionsArgs): AnthropicClientOptionsResult {
-	const {
-		model,
-		apiKey,
-		extraBetas = [],
-		stream = true,
-		interleavedThinking = true,
-		headers,
-		dynamicHeaders,
-		hasTools = false,
-		hasBufferedInputTools = false,
-		thinkingEnabled = false,
-		isOAuth,
-		maxRetryDelayMs,
-		sessionId,
-		disableStrictTools: disableStrictToolsOverride,
-		dropPromptCacheBetas = false,
-		copilotCacheKey,
-		copilotCacheSnapshot,
-	} = args;
-	const compat = model.compat;
-	const disableStrictTools = disableStrictToolsOverride ?? compat.disableStrictTools;
+	const { model, apiKey, extraBetas = [], stream = true, headers, dynamicHeaders, sessionId, maxRetryDelayMs } = args;
 	const baseUrl = resolveAnthropicBaseUrl(model, apiKey);
-	// Adaptive models (`supportsDisplay`) get native interleaved thinking on the
-	// official API, so only non-official signing routes need the beta (#6717).
-	// Two classifications feed the predicate: the effective URL, because Foundry
-	// and provider overrides can reroute a model without rebuilding its
-	// materialized compat, and non-official `compat.signingEndpoint`, because
-	// provider ids (e.g. ZenMux on a mirror URL) and explicit spec overrides on
-	// opaque proxies are authoritative even when the URL isn't recognized.
-	// Stale-official compat never qualifies: a canonical model rerouted to an
-	// unrecognized proxy keeps `officialEndpoint: true` (see
-	// resolveEagerToolInputStreamingSupport), and signing there is unknowable.
-	// Two signing routes still can't take the beta as this `anthropic-beta` HTTP
-	// header, so they're excluded: Vertex rawPredict accepts betas only in the
-	// JSON body (`anthropic_beta`) and 400s on the header (#5614), and GitHub
-	// Copilot rejects Anthropic betas outright — the `github-copilot` provider
-	// branch below strips them, but a custom provider id or a canonical model
-	// rerouted to `api.githubcopilot.com` / `copilot-api.*` reaches the generic
-	// header builder instead, so exclude those effective URLs here too.
-	const needsInterleavedBeta =
-		interleavedThinking &&
-		(!model.thinking?.supportsDisplay ||
-			(!isOfficialAnthropicApiUrl(baseUrl) &&
-				(isAnthropicSigningProxyUrl(baseUrl) || (compat.signingEndpoint && !compat.officialEndpoint)) &&
-				!isVertexRawPredictUrl(baseUrl ?? "") &&
-				!hostMatchesUrl(baseUrl, "githubCopilot")));
-	const oauthToken = isOAuth ?? isAnthropicOAuthToken(apiKey);
-	const supportsEagerToolInputStreaming = resolveEagerToolInputStreamingSupport(model, baseUrl);
-	// The beta streams every tool eagerly, so it is skipped when a tool needs buffered input.
-	const needsFineGrainedToolStreamingBeta =
-		hasTools && !hasBufferedInputTools && isOfficialAnthropicApiUrl(baseUrl) && !supportsEagerToolInputStreaming;
-	const foundryCustomHeaders = resolveAnthropicCustomHeaders(model, baseUrl);
-	const tlsFetchOptions = buildClaudeCodeTlsFetchOptions(model, baseUrl);
-	// Disable Bun's native ~300s pre-response fetch timeout (issue #2422).
-	// `AnthropicMessagesClient` already arms its own DEFAULT_TIMEOUT_MS timer
-	// per request, so the native ceiling can only short-circuit slow-prefill
-	// streams before the configured watchdog gets to govern them.
-	const fetchOptions: AnthropicFetchOptions = { ...tlsFetchOptions, timeout: false };
-	// Compression sits beneath the cch rewriter, which must hash the uncompressed
-	// body. Catalog rules scope it to verified hosts (official API, Copilot), so
-	// proxies pass through.
-	const baseFetch = wrapFetchForRequestCompression(args.fetch ?? fetch, model);
-	// Only OAuth requests inject the CC billing header; no API-key request can ever
-	// contain it, so there is no need to install the rewriter for those.
-	const cchFetch = oauthToken ? wrapFetchForCch(baseFetch) : baseFetch;
-	if (model.provider === "github-copilot") {
-		const copilotApiKey = parseGitHubCopilotApiKey(apiKey).accessToken;
-		// The GitHub Copilot Anthropic proxy doesn't accept Anthropic beta
-		// features. Forward only caller-supplied betas.
-		const betaFeatures = [...extraBetas];
-		const mergedCopilotHeaders = mergeHeaders(
-			{
-				Accept: stream ? "text/event-stream" : "application/json",
-				"Content-Type": "application/json",
-				"anthropic-version": resolveAnthropicApiVersion(baseUrl),
-				"Anthropic-Dangerous-Direct-Browser-Access": "true",
-				Authorization: `Bearer ${copilotApiKey}`,
-				...(betaFeatures.length > 0 ? { "anthropic-beta": buildBetaHeader([], betaFeatures) } : {}),
-			},
-			model.headers,
-			dynamicHeaders,
-			headers,
-		);
-		// Unlike the generic builder below, this branch has no enforced-key
-		// filter: a caller-supplied `anthropic-beta` lands in the default
-		// headers verbatim, cache betas included.
-		const defaultHeaders = dropPromptCacheBetas
-			? stripHeaderBetas(mergedCopilotHeaders, promptCacheBetas)
-			: mergedCopilotHeaders;
-		applyInferenceHeaders(defaultHeaders, {
-			provider: model.provider,
-			providerType: model.providerType,
-			protocol: "anthropic",
-			sessionId,
-		});
-
-		return {
-			isOAuthToken: false,
-			apiKey: null,
-			authToken: copilotApiKey,
-			baseURL: baseUrl,
-			maxRetries: 5,
-			maxRetryDelayMs,
-			defaultHeaders,
-			fetch: wrapFetchForCopilotFallback(
-				cchFetch,
-				true,
-				resolveCopilotRequestIdentity(headers),
-				copilotCacheKey ?? getCopilotIntegrationCacheKey(apiKey, baseUrl),
-				copilotCacheSnapshot,
-			),
-			fetchOptions,
-		};
-	}
-
-	const betaFeatures = [...extraBetas];
-	if (needsFineGrainedToolStreamingBeta) {
-		betaFeatures.push(fineGrainedToolStreamingBeta);
-	}
-	if (needsInterleavedBeta) {
-		betaFeatures.push(interleavedThinkingBeta);
-	}
-
-	const mergedRequestHeaders = mergeHeaders(
+	if (!baseUrl) throw new AIError.ConfigurationError("Anthropic request setup requires a base URL");
+	const copilot = model.provider === "github-copilot";
+	const token = copilot ? parseGitHubCopilotApiKey(apiKey).accessToken : apiKey;
+	const mergedHeaders = mergeHeaders(
+		{
+			Accept: stream ? "text/event-stream" : "application/json",
+			"Content-Type": "application/json",
+			"anthropic-version": LEGACY_ANTHROPIC_API_VERSION,
+			...(copilot ? { "Anthropic-Dangerous-Direct-Browser-Access": "true" } : {}),
+			...(token !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${token}` } : {}),
+			...(extraBetas.length ? { "anthropic-beta": buildBetaHeader([], extraBetas) } : {}),
+		},
 		model.headers,
-		foundryCustomHeaders,
-		getUmansWebSearchHeader(model, mergeHeaders(model.headers, headers)),
-		headers,
 		dynamicHeaders,
+		headers,
 	);
-	// `anthropic-beta` is an enforced key, so most endpoints drop a caller's
-	// value outright — but `allowAnthropicHeaderOverrides` lets it replace our
-	// built beta header wholesale, which would put a cache beta back on a
-	// breakpoint-free request.
-	// The kill switch's betas are stripped on the same channel.
-	const cacheStrippedHeaders = dropPromptCacheBetas
-		? stripHeaderBetas(mergedRequestHeaders, promptCacheBetas)
-		: mergedRequestHeaders;
-	const requestModelHeaders = experimentalBetasDisabled(model)
-		? stripHeaderBetas(cacheStrippedHeaders, killSwitchBetas)
-		: cacheStrippedHeaders;
-	const defaultHeaders = buildAnthropicHeaders({
-		apiKey,
-		baseUrl,
-		isOAuth: oauthToken,
-		extraBetas: betaFeatures,
-		stream,
-		modelHeaders: requestModelHeaders,
-		isCloudflareAiGateway: model.provider === "cloudflare-ai-gateway",
-		allowAnthropicHeaderOverrides: model.compat.allowAnthropicHeaderOverrides,
-		claudeCodeSessionId: sessionId,
-		claudeCodeBetas: oauthToken
-			? buildClaudeCodeBetas({
-					agentRequest: hasTools || thinkingEnabled,
-					thinkingRequest: thinkingEnabled,
-					disableStrictTools,
-					supportsContextManagement: model.compat.supportsContextManagement,
-					dropPromptCacheBetas,
-				})
-			: [],
-	});
+	const defaultHeaders = args.dropPromptCacheBetas ? stripHeaderBetas(mergedHeaders, promptCacheBetas) : mergedHeaders;
 	applyInferenceHeaders(defaultHeaders, {
 		provider: model.provider,
 		providerType: model.providerType,
 		protocol: "anthropic",
 		sessionId,
 	});
-
-	if (model.provider === "cloudflare-ai-gateway") {
-		return {
-			isOAuthToken: false,
-			apiKey: null,
-			authToken: null,
-			baseURL: baseUrl,
-			maxRetries: 5,
-			maxRetryDelayMs,
-			defaultHeaders,
-			fetch: cchFetch,
-			fetchOptions,
-		};
-	}
-
-	// OpenCode Go/Zen and Umans validate Anthropic-compatible API-key auth
-	// through `X-Api-Key`; bearer-only requests reach the endpoint but fail auth
-	// with `401 Missing API key` (#6510). Drop the auto-built `Authorization`
-	// header and keep `apiKey` so the client emits `X-Api-Key`.
-	if (model.provider === "opencode-go" || model.provider === "opencode-zen" || model.provider === "umans") {
-		delete defaultHeaders.Authorization;
-		return {
-			isOAuthToken: false,
-			apiKey,
-			authToken: null,
-			baseURL: baseUrl,
-			maxRetries: 5,
-			maxRetryDelayMs,
-			defaultHeaders,
-			fetch: cchFetch,
-			fetchOptions,
-		};
-	}
-
-	// Suppress the client-level `X-Api-Key` whenever an `Authorization` header
-	// already sits in `defaultHeaders` for a non-official, non-OAuth endpoint —
-	// either our auto-built `Bearer <apiKey>` or a caller-supplied custom auth
-	// scheme via `model.headers` (#3391). Adding a bonus `X-Api-Key` would force
-	// the proxy to deal with two competing credentials when the user explicitly
-	// asked for one.
-	const authorizationHeader = getHeaderCaseInsensitive(defaultHeaders, "Authorization");
-	// A keyless provider resolves to the `N/A` sentinel, for which no
-	// Authorization was built above; the client would otherwise inject a
-	// bogus `X-Api-Key: N/A` of its own.
-	const shouldSuppressClientApiKey =
-		!oauthToken &&
-		!model.compat.officialEndpoint &&
-		(typeof authorizationHeader === "string" || apiKey === NO_AUTH_SENTINEL);
-
+	const baseFetch = wrapFetchForRequestCompression(args.fetch ?? fetch, model);
 	return {
-		isOAuthToken: oauthToken,
-		apiKey: oauthToken || shouldSuppressClientApiKey ? null : apiKey,
-		authToken: oauthToken ? apiKey : undefined,
+		model,
+		apiKey: null,
+		authToken: token === NO_AUTH_SENTINEL ? null : token,
 		baseURL: baseUrl,
 		maxRetries: 5,
 		maxRetryDelayMs,
 		defaultHeaders,
-		fetch: cchFetch,
-		fetchOptions,
+		fetch: wrapFetchForCopilotFallback(
+			baseFetch,
+			copilot,
+			resolveCopilotRequestIdentity(headers),
+			args.copilotCacheKey ?? getCopilotIntegrationCacheKey(apiKey, baseUrl),
+			args.copilotCacheSnapshot,
+		),
+		fetchOptions: { timeout: false },
 	};
 }
 
 function createClient(
 	model: Model<"anthropic-messages">,
 	args: AnthropicClientOptionsArgs,
-): { client: AnthropicMessagesClient; isOAuthToken: boolean; defaultHeaders?: Record<string, string> } {
-	const { isOAuthToken: oauthToken, ...clientOptions } = buildAnthropicClientOptions({ ...args, model });
+): { client: AnthropicMessagesClient; defaultHeaders?: Record<string, string> } {
+	const clientOptions = buildAnthropicClientOptions({ ...args, model });
 	const client = new AnthropicMessagesClient(clientOptions);
-	return { client, isOAuthToken: oauthToken, defaultHeaders: clientOptions.defaultHeaders };
+	return { client, defaultHeaders: clientOptions.defaultHeaders };
 }
 
 /** The compaction request is a standalone summary call, not a generation turn. */
@@ -4508,23 +3711,6 @@ function resolveAnthropicAdaptiveEffort(
 	return mapEffortToAnthropicAdaptiveEffort(model, requestedEffort);
 }
 
-function extractClaudeCodeFirstWireUserMessageText(messages: readonly Message[]): string {
-	for (const message of messages) {
-		if ((message.role !== "user" && message.role !== "developer") || anthropicControlOf(message)) continue;
-		const { content } = message;
-		if (typeof content === "string") {
-			if (content.trim()) return content;
-			continue;
-		}
-		if (!Array.isArray(content)) continue;
-		for (const block of content) {
-			if (block.type === "text" && block.text.trim()) return block.text;
-		}
-		if (content.some(block => block.type === "image")) return "";
-	}
-	return "";
-}
-
 /**
  * Marks a developer message synthesized from {@link AnthropicRequestControls}
  * records. {@link convertAnthropicMessages} renders it as a bare
@@ -4841,21 +4027,19 @@ function insertAnthropicControlMarkers(messages: Message[], inserts: readonly An
 /** Wire `tool_addition`/`tool_removal` blocks for `changes`. */
 function anthropicToolChangeBlocks(
 	changes: readonly AnthropicToolChange[],
-	isOAuthToken: boolean,
 	model: Model<"anthropic-messages">,
 ): ContentBlockParam[] {
 	return changes.map((change): ContentBlockParam => ({
 		type: change.type,
 		tool: {
 			type: "tool_reference",
-			name: encodeAnthropicToolName(change.name, isOAuthToken, model.compat.escapeBuiltinToolNames),
+			name: encodeAnthropicToolName(change.name, model.compat.escapeBuiltinToolNames),
 		},
 	}));
 }
 
 type AnthropicParamBuildOptions = {
 	disableStrictTools: boolean;
-	useUmansGatewayWebSearch: boolean;
 	forceDemoteUnsignedThinking: boolean;
 	supportsEagerToolInputStreaming: boolean;
 	prefixMismatchBehavior?: "drop_block" | "error";
@@ -4885,22 +4069,11 @@ type AnthropicParamBuildOptions = {
 	 * and block replay inert. Defaults to the model's static resolution.
 	 */
 	compactionSupported?: boolean;
-	/** Omit thinking/effort controls entirely (a transport's reasoning-off request). */
-	forceThinkingOff?: boolean;
-	/**
-	 * Already-resolved effective endpoint for this request (reroutes applied).
-	 * Beta routing reads this instead of the spec URL so environment reroutes
-	 * land on the right channel. Defaults to `model.baseUrl`.
-	 */
-	effectiveBaseUrl?: string;
 };
 
-/**
- * Fast mode (`speed: "fast"` plus its beta): a KDL fast-mode SKU, or a
- * priority-tier request to first-party Anthropic.
- */
-function wantsAnthropicFastMode(model: Model<"anthropic-messages">, options: AnthropicOptions | undefined): boolean {
-	return model.compat.fastMode === true || (model.compat.firstPartyProvider && options?.serviceTier === "priority");
+/** Fast mode is an explicit model capability. */
+function wantsAnthropicFastMode(model: Model<"anthropic-messages">): boolean {
+	return model.compat.fastMode === true;
 }
 
 /**
@@ -4973,13 +4146,11 @@ export function shouldStripThinkingHistory(messages: readonly Message[]): boolea
 function buildParams(
 	model: Model<"anthropic-messages">,
 	context: Context,
-	isOAuthToken: boolean,
 	options: AnthropicOptions | undefined,
 	buildOptions: AnthropicParamBuildOptions,
 ): { params: MessageCreateParamsStreaming; requestControls: AnthropicRequestControls | undefined } {
 	const {
 		disableStrictTools,
-		useUmansGatewayWebSearch,
 		forceDemoteUnsignedThinking,
 		supportsEagerToolInputStreaming,
 		prefixMismatchBehavior,
@@ -4990,8 +4161,6 @@ function buildParams(
 		controlRecords,
 		fallbacks = options?.fallbacks,
 		compactionSupported = supportsAnthropicCompaction(model),
-		forceThinkingOff,
-		effectiveBaseUrl,
 	} = buildOptions;
 	// A session-scoped auto-demote (learned from a live signing 400) clones the
 	// resolved compat with `replayUnsignedThinking: false` so every subsequent
@@ -5003,21 +4172,12 @@ function buildParams(
 			: model;
 	const resolvedCacheControl = dropCacheControl
 		? undefined
-		: getCacheControl(model, options?.cacheRetention, isOAuthToken).cacheControl;
+		: getCacheControl(model, options?.cacheRetention).cacheControl;
 	const cacheControl =
 		dropCacheControlOptions && resolvedCacheControl ? { type: resolvedCacheControl.type } : resolvedCacheControl;
 
 	// Pre-compute system blocks so they occupy the right slot in the serialized body.
-	const shouldInjectClaudeCodeInstruction = isOAuthToken && model.compat.injectClaudeCodeInstruction !== false;
-	const firstUserMessageText = shouldInjectClaudeCodeInstruction
-		? extractClaudeCodeFirstWireUserMessageText(context.messages)
-		: "";
-	const systemBlocks = buildAnthropicSystemBlocks(context.systemPrompt, {
-		includeClaudeCodeInstruction: shouldInjectClaudeCodeInstruction,
-		firstUserMessageText,
-		cacheControl,
-		dropCacheControl,
-	});
+	const systemBlocks = buildAnthropicSystemBlocks(context.systemPrompt);
 
 	// An on-demand compaction request ends inside the conversation: it gets
 	// nothing live requests lack there, so it makes no tool or effort change.
@@ -5037,32 +4197,19 @@ function buildParams(
 	if (toolPlan.tools) {
 		tools = convertTools(
 			toolPlan.tools,
-			isOAuthToken,
 			disableStrictTools,
 			supportsEagerToolInputStreaming,
 			model.compat.escapeBuiltinToolNames,
-			useUmansGatewayWebSearch,
 		);
-	} else if (isOAuthToken) {
-		tools = [];
 	}
 
-	// Pre-compute metadata.
-	const metadataAccountId = readAnthropicMetadataAccountId(options?.metadata);
-	const metadataUserId = resolveAnthropicMetadataUserId(
-		readAnthropicMetadataString(options?.metadata, "user_id") ??
-			// Deliberately share the normalized affinity identity across Kimi's two transports.
-			(model.provider === "kimi-code" ? getOpenAIPromptCacheKey(options) : undefined),
-		isOAuthToken,
-		options?.sessionId,
-		metadataAccountId,
-	);
-	const metadata = metadataUserId ? { user_id: metadataUserId } : undefined;
+	const metadataUserId = options?.metadata?.user_id;
+	const metadata = typeof metadataUserId === "string" ? { user_id: metadataUserId } : undefined;
 
 	// Pre-compute thinking + output_config effort.
 	let thinking: MessageCreateParamsStreaming["thinking"] | undefined;
 	let outputConfigEffort: AnthropicOutputEffort | undefined;
-	if (!forceThinkingOff && model.reasoning) {
+	if (model.reasoning) {
 		const disabledThinking = model.compat.disabledThinking;
 		if (
 			options?.thinkingEnabled === false &&
@@ -5161,21 +4308,10 @@ function buildParams(
 		(thinking?.type === "disabled" || (thinking?.type === "enabled" && shouldStripThinkingHistory(context.messages)));
 	if (stripThinkingHistory && thinking?.type === "enabled") thinking = undefined;
 
-	// Pre-compute context_management. Send keep: "all" for every enabled or
-	// adaptive thinking request (OAuth + API-key) — not just OAuth. Without
-	// this directive Anthropic-compatible backends (Z.AI, Kimi, DeepSeek, …)
-	// strip the replayed thinking blocks `replayUnsignedThinking` puts back
-	// on the wire, so the model loses the prior reasoning chain across turns
-	// and the KV cache misses every turn (#3288). Narrowing this guard back
-	// to `isOAuthToken` regresses every API-key thinking provider. Skip
-	// injected clients because this code cannot add the required
-	// `context-management-2025-06-27` beta to caller-owned SDK clients.
-	// Providers that cannot deliver or accept context management disable it
-	// through model compatibility policy.
+	// Preserve thinking context across turns; injected clients own their required beta headers.
 	const shouldKeepThinkingContext =
 		!options?.client &&
 		model.compat.supportsContextManagement !== false &&
-		(effectiveBaseUrl === undefined || !isVertexRawPredictUrl(effectiveBaseUrl)) &&
 		(thinking?.type === "adaptive" || thinking?.type === "enabled");
 	// A new on-demand compaction request cannot carry context_management.
 	// Later turns carrying its signed block may keep clear_thinking as usual.
@@ -5227,7 +4363,6 @@ function buildParams(
 	const wireMessages = convertAnthropicMessages(
 		insertAnthropicControlMarkers(context.messages, [...toolPlan.inserts, ...effortPlan.inserts]),
 		effectiveModel,
-		isOAuthToken,
 		{
 			serverSideFallbackEnabled: !!fallbacks?.length,
 			replayCompaction: compactionSupported,
@@ -5269,27 +4404,6 @@ function buildParams(
 	// itself requests 128k on Opus 5.5.
 	const maxOutputTokens = anthropicOutputLimit(model);
 
-	// A caller-owned client targets its own endpoint: route body betas by the
-	// client's URL when it exposes one, not the model's routing. Otherwise the
-	// already-resolved effective URL wins over the spec URL so environment
-	// reroutes land on the right channel.
-	const vertexRequestUrl =
-		(options?.client !== undefined ? injectedClientBaseUrl(options.client) : undefined) ??
-		effectiveBaseUrl ??
-		model.baseUrl;
-	const vertexControlBetas = isVertexRawPredictUrl(vertexRequestUrl)
-		? resolveAnthropicControlBetas(model, undefined)
-		: [];
-	// Vertex rawPredict routes on-demand and legacy replay betas in the body.
-	if (isVertexRawPredictUrl(vertexRequestUrl)) {
-		if ((compactionRequest || signedReplay) && compactionSupported && !vertexControlBetas.includes(COMPACTION_BETA)) {
-			vertexControlBetas.push(COMPACTION_BETA);
-		}
-		if (legacyReplay && !compactionRequest && !vertexControlBetas.includes(LEGACY_COMPACTION_BETA)) {
-			vertexControlBetas.push(LEGACY_COMPACTION_BETA);
-		}
-	}
-
 	// Build params in the canonical field order: model → messages → system → tools →
 	// metadata → max_tokens → thinking → context_management/compaction → output_config → stream.
 	const params: MessageCreateParamsStreaming = {
@@ -5309,7 +4423,6 @@ function buildParams(
 		}),
 		...(outputConfig && { output_config: outputConfig }),
 		...(fallbacks?.length ? { fallbacks } : {}),
-		...(vertexControlBetas.length > 0 ? { anthropic_beta: vertexControlBetas } : {}),
 		stream: true,
 	};
 
@@ -5318,7 +4431,7 @@ function buildParams(
 	const thinkingType = params.thinking?.type;
 	const allowSamplingParams =
 		model.compat.supportsSamplingParams &&
-		anthropicApiVersionAcceptsSamplingParams(resolveAnthropicApiVersion(vertexRequestUrl)) &&
+		anthropicApiVersionAcceptsSamplingParams(LEGACY_ANTHROPIC_API_VERSION) &&
 		(thinkingType === undefined || thinkingType === "disabled");
 	if (allowSamplingParams && options?.temperature !== undefined) {
 		params.temperature = options.temperature;
@@ -5342,7 +4455,7 @@ function buildParams(
 			seqs.length > ANTHROPIC_STOP_SEQUENCES_MAX ? seqs.slice(0, ANTHROPIC_STOP_SEQUENCES_MAX) : seqs;
 	}
 
-	if (wantsAnthropicFastMode(model, options)) {
+	if (wantsAnthropicFastMode(model)) {
 		params.speed = "fast";
 	}
 
@@ -5352,12 +4465,7 @@ function buildParams(
 		} else if (options.toolChoice.name) {
 			params.tool_choice = {
 				...options.toolChoice,
-				name: encodeAnthropicToolName(
-					options.toolChoice.name,
-					isOAuthToken,
-					model.compat.escapeBuiltinToolNames,
-					useUmansGatewayWebSearch,
-				),
+				name: encodeAnthropicToolName(options.toolChoice.name, model.compat.escapeBuiltinToolNames),
 			};
 		}
 		// Claude Fable/Mythos 5 reject forced tool use outright ("tool_choice forces
@@ -5378,58 +4486,6 @@ function buildParams(
 	applyPromptCaching(params, cacheControl);
 
 	return { params, requestControls };
-}
-
-/** Project a Bedrock Converse model onto Anthropic Messages so the shared encoder resolves canonical wire compat. */
-function buildBedrockAnthropicEncoderModel(model: Model<"bedrock-converse-stream">): Model<"anthropic-messages"> {
-	const {
-		compat: _bedrockCompat,
-		compatConfig: _bedrockCompatConfig,
-		identity: _bedrockIdentity,
-		remoteCompaction: _bedrockRemoteCompaction,
-		...sharedSpec
-	} = model;
-	const spec: ModelSpec<"anthropic-messages"> = {
-		...sharedSpec,
-		api: "anthropic-messages",
-	};
-	return buildModel(spec);
-}
-
-/**
- * Route Bedrock's on-demand Anthropic compaction through the shared Messages
- * stream consumer while keeping source-provider identity and pricing.
- */
-export function streamBedrockAnthropicCompaction(
-	sourceModel: Model<"bedrock-converse-stream">,
-	context: Context,
-	options: AnthropicOptions,
-	prepareRequest: (
-		params: MessageCreateParamsStreaming,
-		betas: readonly string[],
-	) => Promise<{ payload: unknown; rawRequestDump: RawHttpRequestDump }>,
-	createClient: (getPayload: () => unknown) => AnthropicMessagesClientLike,
-	prepareOptions: (options: AnthropicOptions) => AnthropicOptions,
-	forceThinkingOffFields?: Record<string, unknown>,
-): AssistantMessageEventStream {
-	const anthropicModel = withoutDisabledExperimentalBetas(buildBedrockAnthropicEncoderModel(sourceModel));
-	const forceThinkingOff = options.reasoning === undefined;
-	const prefixMismatchBehavior =
-		!forceThinkingOff && anthropicModel.thinking?.prefixBinding && sourceModel.compat.supportsThinkingBindingControls
-			? (options.anthropicPrefixMismatchBehavior ?? "drop_block")
-			: undefined;
-	const compactionOptions = { ...options };
-	delete compactionOptions.toolChoice;
-	delete compactionOptions.fallbacks;
-	return streamAnthropicOnce(anthropicModel, context, compactionOptions, {
-		sourceModel,
-		forceThinkingOff,
-		forceThinkingOffFields,
-		prefixMismatchBehavior,
-		prepareOptions,
-		prepareRequest,
-		createClient,
-	});
 }
 
 const EMPTY_ERROR_TOOL_RESULT_TEXT = "Tool failed with no output.";
@@ -5581,7 +4637,6 @@ function collapseFallbackSegments(content: AssistantMessage["content"]): Assista
 export function convertAnthropicMessages(
 	messages: Message[],
 	model: Model<"anthropic-messages">,
-	isOAuthToken: boolean,
 	opts?: {
 		serverSideFallbackEnabled?: boolean;
 		replayCompaction?: boolean;
@@ -5696,7 +4751,7 @@ export function convertAnthropicMessages(
 		if (control) {
 			const controlParam: AnthropicMessageParam = {
 				role: "system",
-				content: anthropicToolChangeBlocks(control.toolChanges, isOAuthToken, model),
+				content: anthropicToolChangeBlocks(control.toolChanges, model),
 				...(control.effort ? { output_config: { effort: control.effort } } : {}),
 			};
 			controlParams.add(controlParam);
@@ -5770,7 +4825,7 @@ export function convertAnthropicMessages(
 			if (payload?.toolChanges && model.compat.supportsMidConversationToolChanges) {
 				const blocks: ContentBlockParam[] =
 					typeof content === "string" ? [{ type: "text", text: content }] : content;
-				blocks.push(...anthropicToolChangeBlocks(payload.toolChanges, isOAuthToken, model));
+				blocks.push(...anthropicToolChangeBlocks(payload.toolChanges, model));
 				content = blocks;
 			}
 			// User-attributed developer turns (text `@file` mentions, hidden extension
@@ -5795,13 +4850,7 @@ export function convertAnthropicMessages(
 			params.push(param);
 		} else if (msg.role === "assistant") {
 			const blocks: ContentBlockParam[] = [];
-			// The fallback boundary replays ONLY when both sides are aligned: the
-			// current request opted into the beta chain, and the target is
-			// official Anthropic (the only endpoint that accepts the block).
-			const content =
-				opts?.serverSideFallbackEnabled && model.compat.officialEndpoint
-					? msg.content
-					: collapseFallbackSegments(msg.content);
+			const content = collapseFallbackSegments(msg.content);
 			const hasSignedThinking = content.some(
 				block =>
 					block.type === "thinking" && !!block.thinkingSignature && block.thinkingSignature.trim().length > 0,
@@ -5891,7 +4940,7 @@ export function convertAnthropicMessages(
 					blocks.push({
 						type: "tool_use",
 						id: block.id,
-						name: encodeAnthropicToolName(block.name, isOAuthToken, model.compat.escapeBuiltinToolNames),
+						name: encodeAnthropicToolName(block.name, model.compat.escapeBuiltinToolNames),
 						// Always sanitize: the model itself can emit lone-surrogate escapes
 						// in tool-argument JSON (streamed out fine, rejected with a 400 on
 						// replay by Anthropic's strict UTF-8 validation). toWellFormedDeep
@@ -6776,11 +5825,9 @@ function buildAnthropicToolSchemaPlans(tools: Tool[], disableStrictTools = false
 
 function convertTools(
 	tools: Tool[],
-	isOAuthToken: boolean,
 	disableStrictTools = false,
 	supportsEagerToolInputStreaming = true,
 	escapeBuiltinToolNames = false,
-	useUmansGatewayWebSearch = false,
 ): AnthropicWireTool[] {
 	if (!tools) return [];
 	const schemaPlans = buildAnthropicToolSchemaPlans(tools, disableStrictTools);
@@ -6788,7 +5835,7 @@ function convertTools(
 	return tools.map((tool, index) => {
 		const plan = schemaPlans[index];
 		const baseTool = {
-			name: encodeAnthropicToolName(tool.name, isOAuthToken, escapeBuiltinToolNames, useUmansGatewayWebSearch),
+			name: encodeAnthropicToolName(tool.name, escapeBuiltinToolNames),
 			description: tool.description || "",
 			input_schema: plan.inputSchema,
 		};

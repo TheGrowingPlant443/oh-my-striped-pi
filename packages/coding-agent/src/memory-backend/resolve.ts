@@ -10,9 +10,7 @@ import { cfgMemoryBackend } from "./settings";
  *
  * Selection rules (single source of truth — every memory consumer routes
  * through this):
- *   - `memory.backend === "hindsight"`  → Hindsight remote memory
  *   - `memory.backend === "mnemopi"`  → local Mnemopi SQLite memory
- *   - `memory.backend === "sharpshooter"` → friction-gated project decision memory
  *   - `memory.backend === "local"`      → local rollout summary pipeline
  *   - everything else                   → no-op
  *
@@ -21,8 +19,8 @@ import { cfgMemoryBackend } from "./settings";
  */
 export async function resolveMemoryBackend(settings: Settings): Promise<MemoryBackend> {
 	const id = cfgMemoryBackend.get(settings);
-	if (id === "hindsight") return (await import("../hindsight/backend")).hindsightBackend;
 	if (id === "mnemopi") return (await import("../mnemopi/backend")).mnemopiBackend;
+	if (id === "hindsight") return (await import("../hindsight/backend")).hindsightBackend;
 	if (id === "sharpshooter") return (await import("../sharpshooter/backend")).sharpshooterBackend;
 	if (id === "local") return localBackend;
 	return offBackend;

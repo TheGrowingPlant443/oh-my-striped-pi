@@ -1,37 +1,74 @@
 # @oh-my-pi/collab-web
 
-Web client for [omp collab sessions](../../docs/collab.md). Paste a `/collab` link into the browser and you get the same live session guests see in the TUI: streaming transcript, tool-call cards, subagent panel with live transcripts, and a composer that prompts (or interrupts) the host agent.
+Private/local live collaboration browser client and shared React renderers for
+self-contained omp HTML session exports. No public relay or viewer is selected
+implicitly, and the browser entry has no hosted analytics or remote asset loader.
 
-## Quick start
+## Private/local collaboration
 
-```sh
-# dev server (Bun HTML dev server with HMR) — http://localhost:3000
-bun run dev
-
-# offline demo: local relay + scripted mock host; prints a ws://localhost link
-bun run mock-host
-```
-
-Host a session from any omp instance (`/collab`, or `/collab ws://localhost:7466` to use the mock relay), then paste the printed link into the connect screen. Deep links work too: `http://localhost:3000/#<roomId>.<key>` auto-connects on load.
-
-## Build & deploy
+Run the existing local relay and browser app from this package in separate terminals:
 
 ```sh
-bun run build   # static site in dist/
+bun scripts/local-relay.ts --port 7466
+bun --hot index.html
 ```
 
-`dist/` is a fully static SPA — host it anywhere. JS/CSS bundles are content-hashed; favicons, `manifest.webmanifest`, `robots.txt`, `sitemap.xml`, and `og-image.png` come from `public/` and are emitted at the site root under stable names (canonical URL: `https://my.omp.sh/`). Two runtime requirements:
+In an omp session, run `/collab ws://localhost:7466`. For browser links, configure
+`collab.webUrl` to the browser server's printed localhost URL before starting the
+room. Alternatively, configure `collab.relayUrl` to an operator-managed `wss://`
+relay and `collab.webUrl` to its private HTTPS browser deployment. If the browser
+is served at the relay's origin, `collab.webUrl` may remain empty: the browser URL
+is derived only from that explicitly selected relay.
 
-- **Secure context**: room keys are unwrapped with WebCrypto (`crypto.subtle`), which browsers expose only on `https://` or `localhost`.
-- **Relay reachability**: the client connects straight to the relay over WebSocket (`wss://` for anything that isn't localhost). The default relay is `wss://my.omp.sh`; bare `<roomId>.<key>` links resolve against it (legacy `<roomId>#<key>` and `%23`-mangled links still parse).
+`/collab view` creates read-only access; control links permit prompting,
+interrupting, agent commands, and answering host dialogs. `/join <link>` and
+`omp join <link>` join from another terminal; `/leave` leaves; `/collab stop`
+withdraws the hosted room. `omp collab list` exposes local metadata only;
+`omp collab link <instanceId|pid> [--view]` explicitly retrieves a capability link.
+Do not log or publish room links: anyone holding one can decrypt the session.
+Bare room/key links are rejected because they do not identify a relay.
 
-The room key never leaves the URL fragment — it is not sent to the relay or any server.
+Hosting is manual by default (`collab.autoStart: off`). The existing opt-in
+`view` and `control` auto-start modes require an explicitly configured relay;
+there is no public fallback. Discovery records and authenticated IPC endpoints
+are local to the machine, not publication to an external directory.
 
-## Architecture
+The restored relay is the original functional development/local server, not a
+mock host: it assigns peers, routes encrypted binary frames, enforces one host,
+and closes rooms on host disconnect. It now binds to localhost only. It has no
+deployment authentication, persistence, or operator-level room/guest quotas;
+do not expose this local helper as a hardened multi-tenant service. Company
+deployments must supply their own relay with the same contract and deployment
+controls. Plain WebSockets/HTTP are allowed only for localhost; remote endpoints
+require WSS/HTTPS. Browsers need a secure context for WebCrypto.
 
-- `src/lib/` — vendored wire codec (`codec.ts` AES-256-GCM, `link.ts` envelope + link grammar), `socket.ts` reconnecting relay socket, `client.ts` guest session store (`GuestClient` + immutable snapshots for `useSyncExternalStore`). Shared protocol shapes come from `@oh-my-pi/pi-wire`.
-- `src/components/` — `transcript/` (entries, markdown, tool cards), `agents/` (panel + transcript drawer), `shell/` (connect screen, header, composer, banners, toasts).
-- `src/tool-render/` — per-tool React renderers shared with coding-agent HTML session exports: one view per built-in tool, common `ToolView` chrome, theme-adaptive `tv-` design tokens, and an `<omp-tool-view>` web-component wrapper. The `ToolRenderHost` seam lets hosts wire agent-id chips to a sub-session view (drawer here, sidebar navigation in exports).
-- `scripts/` — `local-relay.ts` (content-blind relay on `Bun.serve`), `mock-host.ts` + `fixture.ts` (scripted host for offline dev), `build-export-viewer.ts` (bundles the tool/trace renderers, React, export shell and styles into a content-addressed JS file under `packages/coding-agent/export-assets/`; release CI publishes it to `build.stencil.so`).
+Session frames retain AES-256-GCM sealing and random room keys/write tokens.
+The relay sees peer routing metadata, not plaintext. Read-only enforcement is
+host-side; reconnect, snapshot chunking, bounded host replication, queue
+backpressure, session ownership and authenticated local discovery are retained.
 
-The package is intentionally standalone — no dependency on `@oh-my-pi/pi-coding-agent` at runtime or type level. Wire-shape drift is prevented by consuming the same `@oh-my-pi/pi-wire` contracts as the host, with sealed-frame interop still covered by `test/codec.test.ts`.
+
+## Generate the viewer
+
+```sh
+bun run gen:export-viewer
+```
+
+`scripts/build-export-viewer.ts` bundles the viewer used by
+`packages/coding-agent/src/export/html`. Exported HTML embeds the viewer and its
+Markdown, highlighting, styles, and session data rather than loading remote scripts.
+
+## Retained source graph
+
+- `src/export-standalone.ts` registers the viewer's browser components.
+- `src/tool-render/` provides tool cards and the `<omp-tool-view>` custom element.
+- `src/trace-render/` provides `<omp-session-trace>` using the local stats viewer.
+- `src/components/transcript/Markdown.tsx`, `math.ts`, and `src/lib/format.ts`
+  provide shared Markdown, math, and formatting support.
+
+These renderers depend on React, React DOM, KaTeX, the shared Markdown utilities,
+local stats components, and the shared tool intent-field contract from `pi-wire`.
+Tests cover private endpoint links, authenticated encryption, relay routing,
+guest state/permissions, reconnects, local discovery, Markdown, tool cards, and
+standalone viewer generation. HTML export and recording/playback remain local;
+hosted shares, QA, public streams/clips, and skill publication are not restored.

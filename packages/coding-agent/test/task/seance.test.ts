@@ -8,6 +8,7 @@ import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/sessi
 import { sessionDirForCwd } from "@oh-my-pi/pi-coding-agent/session/session-paths";
 import { resolveSeanceSource, restoreSeanceSession } from "@oh-my-pi/pi-coding-agent/task/seance";
 import { getAgentDir, getSessionsDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "../helpers/model-fixtures";
 
 function sessionHeader(id: string, cwd: string) {
 	return {
@@ -274,7 +275,9 @@ describe("seance cold restore", () => {
 	it("revives with whichever bundled read-only tools were persisted and refuses a contract without read", async () => {
 		const authStorage = await AuthStorage.create(":memory:");
 		try {
-			authStorage.keys.setRuntime("anthropic", "test-key");
+			const model = getTestModel("github-copilot");
+			const selector = `${model.provider}/${model.id}`;
+			authStorage.keys.setRuntime(model.provider, "test-key");
 			const modelRegistry = new ModelRegistry(authStorage);
 			using tempDir = TempDir.createSync("@omp-seance-restore-");
 			const cwd = tempDir.path();
@@ -284,14 +287,14 @@ describe("seance cold restore", () => {
 				// `glob.enabled: false` trimmed glob at spawn; `write` never belongs to a seance.
 				tools: ["read", "grep", "write", "yield"],
 				agent: "seance",
-				resolvedModel: "anthropic/claude-sonnet-4-5",
+				resolvedModel: selector,
 				restrictToolNames: true,
 				spawns: "",
 			};
 
 			await expect(restoreSeanceSession({ init, cwd, modelRegistry })).resolves.toEqual({
 				cwd,
-				modelPattern: "anthropic/claude-sonnet-4-5",
+				modelPattern: selector,
 				toolNames: ["read", "grep", "yield"],
 			});
 			await expect(

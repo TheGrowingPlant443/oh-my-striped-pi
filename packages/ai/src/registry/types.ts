@@ -53,7 +53,6 @@ export type ProviderModelDiscoveryPreparer = (config: ProviderModelDiscoveryConf
  * - `login` present ⇒ member of `OAuthProvider`, shown in the `/login` list
  *   (unless `showInLoginList === false`) and dispatchable via `AuthStorage.oauth.login`.
  * - `callbackPort` present ⇒ entry in the auth-broker `CALLBACK_PORTS` map.
- * - `pasteCodeFlow` ⇒ member of `PASTE_CODE_LOGIN_PROVIDERS`.
  *
  * Heavy OAuth flow modules MUST be reached through the lazy hook tables in
  * `./hooks` so they stay out of the eager startup graph.

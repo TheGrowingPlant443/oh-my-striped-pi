@@ -45,8 +45,6 @@ const compat: ResolvedOpenAICompat = {
 	qwenPreserveThinking: false,
 	qwenTemplateReasoningEffort: false,
 	requiresAssistantContentForToolCalls: false,
-	openRouterRouting: {},
-	vercelGatewayRouting: {},
 	extraBody: {},
 	supportsStrictMode: true,
 	toolStrictMode: "none",
@@ -54,9 +52,6 @@ const compat: ResolvedOpenAICompat = {
 	supportsSamplingParams: true,
 	supportsPenaltyAndStopParams: true,
 	alwaysSendMaxTokens: false,
-	isOpenRouterHost: false,
-	isVercelGatewayHost: false,
-	wireModelIdMode: "raw",
 	stripDeepseekSpecialTokens: false,
 	reasoningDeltasMayBeCumulative: false,
 	emptyLengthFinishIsContextError: false,
@@ -91,8 +86,8 @@ describe("openai-completions convertMessages", () => {
 			id: "gemma-4-31b",
 			name: "Gemma 4 31B",
 			api: "openai-completions",
-			provider: "cerebras",
-			baseUrl: "https://api.cerebras.ai/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text", "image"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -129,7 +124,7 @@ describe("openai-completions convertMessages", () => {
 	});
 
 	it("batches tool-result images without unsupported original-detail metadata", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -177,7 +172,7 @@ describe("openai-completions convertMessages", () => {
 		]);
 	});
 	it("serializes assistant tool-call turns with string content for strict OpenAI-compatible backends", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -219,7 +214,7 @@ describe("openai-completions convertMessages", () => {
 	});
 
 	it("generates fallback tool_call_id values when assistant/tool IDs normalize to empty", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -278,7 +273,7 @@ describe("openai-completions convertMessages", () => {
 	});
 
 	it("serializes string tool arguments into valid JSON objects", () => {
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = {
 			...baseModel,
 			api: "openai-completions",
@@ -317,22 +312,16 @@ describe("openai-completions convertMessages", () => {
 		const serializedArgs = assistantParam!.tool_calls![0].function.arguments;
 		expect(JSON.parse(serializedArgs)).toEqual({ path: "README.md" });
 	});
-	it("strips image_url content for DashScope compatible-mode text-only Qwen models (issue #1859)", () => {
-		// Reproduces the bailian/qwen3.7-max + dashscope.aliyuncs.com/compatible-mode
-		// 400 from issue #1859: even when a misconfigured `model.input` claims
-		// image support, sending an `image_url` part to a non-VL/Omni Qwen on
-		// the consumer DashScope endpoint server-errors with
-		// "Unexpected item type in content.". Verify both the synthesized user
-		// turn (text-only message) and the tool-result image batching path drop
-		// images for that combination, substituting the standard placeholder.
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+	it("strips user and tool-result images when the compatibility guard vetoes vision", () => {
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 		const model: Model<"openai-completions"> = buildModel({
 			id: "qwen3.7-max",
 			name: "qwen3.7-max",
-			provider: "alibaba-token-plan",
-			baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			api: "openai-completions",
 			reasoning: false,
+			compat: { stripImageInput: true },
 			// Wrong-but-realistic user config: claims vision capability even
 			// though qwen3.7-max on this endpoint is text-only upstream.
 			input: ["text", "image"],
@@ -370,8 +359,7 @@ describe("openai-completions convertMessages", () => {
 
 		const messages = convertMessages(model, context, compat);
 
-		// No converted turn carries an image_url part — the dashscope guard
-		// must veto both the user-content and tool-result-batching emit paths.
+		// The compatibility guard must veto user-content and tool-result batching.
 		for (const m of messages) {
 			if (Array.isArray(m.content)) {
 				for (const part of m.content as Array<{ type?: string }>) {
@@ -412,12 +400,12 @@ describe("openai-completions convertMessages", () => {
 		// sort below 3.8 — so the text-only override must stay limited to the
 		// known text-only families.
 		for (const id of ["qwen3.7-plus", "qwen-vl-max", "qwen3.8-max", "qwen3.8-max-preview", "qwen3.10-max"]) {
-			const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+			const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 			const model: Model<"openai-completions"> = buildModel({
 				id,
 				name: id,
-				provider: "alibaba-token-plan",
-				baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+				provider: "github-copilot",
+				baseUrl: "https://api.githubcopilot.com",
 				api: "openai-completions",
 				reasoning: false,
 				input: ["text", "image"],
@@ -460,18 +448,18 @@ describe("openai-completions convertMessages", () => {
 		// or custom models.yml misconfigures `input: ["text", "image"]`,
 		// convertMessages must never forward `image_url` parts.
 		const deepseekModelIds = [
-			{ id: "deepseek-v4-pro", provider: "deepseek", baseUrl: "https://api.deepseek.com/v1" },
-			{ id: "deepseek-v4-flash", provider: "deepseek", baseUrl: "https://api.deepseek.com/v1" },
-			{ id: "deepseek-chat", provider: "deepseek", baseUrl: "https://api.deepseek.com" },
-			{ id: "deepseek-reasoner", provider: "deepseek", baseUrl: "https://api.deepseek.com" },
-			{ id: "deepseek-ai/DeepSeek-V4-Pro", provider: "litellm", baseUrl: "https://llm-proxy.example.com/v1" },
+			{ id: "deepseek-v4-pro", provider: "github-copilot", baseUrl: "https://api.githubcopilot.com" },
+			{ id: "deepseek-v4-flash", provider: "github-copilot", baseUrl: "https://api.githubcopilot.com" },
+			{ id: "deepseek-chat", provider: "github-copilot", baseUrl: "https://api.githubcopilot.com" },
+			{ id: "deepseek-reasoner", provider: "github-copilot", baseUrl: "https://api.githubcopilot.com" },
+			{ id: "deepseek-ai/DeepSeek-V4-Pro", provider: "github-copilot", baseUrl: "https://llm-proxy.example.com/v1" },
 			// `vision` inside `revision` is a substring, not a multimodal token.
-			{ id: "deepseek-r1-revision-0528", provider: "litellm", baseUrl: "https://llm-proxy.example.com/v1" },
+			{ id: "deepseek-r1-revision-0528", provider: "github-copilot", baseUrl: "https://llm-proxy.example.com/v1" },
 			// `vision` inside `provisioned` is a substring, not a multimodal token.
-			{ id: "deepseek-v4-provisioned", provider: "litellm", baseUrl: "https://llm-proxy.example.com/v1" },
+			{ id: "deepseek-v4-provisioned", provider: "github-copilot", baseUrl: "https://llm-proxy.example.com/v1" },
 		];
 
-		const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">;
+		const baseModel = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">;
 
 		for (const spec of deepseekModelIds) {
 			const model: Model<"openai-completions"> = buildModel({
@@ -544,7 +532,12 @@ describe("openai-completions convertMessages", () => {
 		}
 	});
 	it("preserves image_url for the multimodal DeepSeek OCR model", () => {
-		const model = getBundledModel("novita", "deepseek/deepseek-ocr-2") as Model<"openai-completions">;
+		const model = buildModel({
+			...getBundledModel<"openai-completions">("github-copilot", "gpt-4o"),
+			id: "deepseek/deepseek-ocr-2",
+			input: ["text", "image"],
+			compat: { stripImageInput: false },
+		});
 		const context: Context = {
 			messages: [
 				{
@@ -572,7 +565,12 @@ describe("openai-completions convertMessages", () => {
 	it("preserves image_url for the multimodal DeepSeek vision SKU", () => {
 		// deepseek-v4-flash-vision-exp is genuinely multimodal: the blanket
 		// DeepSeek text-only guard must not strip its image parts.
-		const model = getBundledModel("deepseek", "deepseek-v4-flash-vision-exp") as Model<"openai-completions">;
+		const model = buildModel({
+			...getBundledModel<"openai-completions">("github-copilot", "gpt-4o"),
+			id: "deepseek-v4-flash-vision-exp",
+			input: ["text", "image"],
+			compat: { stripImageInput: false },
+		});
 		const context: Context = {
 			messages: [
 				{

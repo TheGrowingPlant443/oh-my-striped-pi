@@ -3,6 +3,7 @@
 // Autocomplete support
 export * from "./autocomplete";
 // Components
+export * from "./chat/collab-prompt-message";
 export * from "./chat/transcript-browser";
 export * from "./components/box";
 export * from "./components/cancellable-loader";

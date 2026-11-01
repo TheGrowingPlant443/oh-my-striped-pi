@@ -1,41 +1,34 @@
 import { describe, expect, it, vi } from "bun:test";
-import { streamAzureOpenAIResponses } from "@oh-my-pi/pi-ai/providers/azure-openai-responses";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { streamSimple } from "@oh-my-pi/pi-ai/stream";
 import type { Context, FetchImpl, Model, TextContent } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { waitForDelayOrAbort } from "./helpers";
 
-const openAIResponsesModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
-const openAICompletionsModel = {
-	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
-	api: "openai-completions",
-} satisfies Model<"openai-completions">;
-const azureOpenAIResponsesModel: Model<"azure-openai-responses"> = buildModel({
+const openAIResponsesModel = buildModel({
 	id: "gpt-5-mini",
 	name: "GPT-5 Mini",
-	api: "azure-openai-responses",
-	provider: "azure",
-	baseUrl: "https://example.openai.azure.com/openai/v1",
+	api: "openai-responses",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 400000,
-	maxTokens: 128000,
+	contextWindow: 128_000,
+	maxTokens: 16_384,
 });
-const ollamaChatModel: Model<"ollama-chat"> = buildModel({
-	id: "llama-local",
-	name: "llama-local",
-	api: "ollama-chat",
-	provider: "ollama",
-	baseUrl: "http://127.0.0.1:11434",
+const openAICompletionsModel = buildModel({
+	id: "gpt-4o-mini",
+	name: "GPT-4o Mini",
+	api: "openai-completions",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 128000,
-	maxTokens: 8192,
+	contextWindow: 128_000,
+	maxTokens: 16_384,
 });
 
 function baseContext(): Context {
@@ -240,18 +233,6 @@ function createOpenAICompletionsSuccessResponse(modelId: string): Response {
 	]);
 }
 
-function createOllamaChatSuccessResponse(): Response {
-	return new Response(
-		`${JSON.stringify({ message: { content: "Hello delayed" }, done: false })}\n${JSON.stringify({
-			done: true,
-			done_reason: "stop",
-			prompt_eval_count: 5,
-			eval_count: 2,
-		})}\n`,
-		{ status: 200 },
-	);
-}
-
 async function expectFirstEventTimeout(
 	run: (
 		streamFirstEventTimeoutMs: number,
@@ -388,36 +369,6 @@ describe("OpenAI-family first-event timeouts", () => {
 			}
 		}
 	});
-
-	it("lets PI_OPENAI_STREAM_IDLE_TIMEOUT_MS widen native Ollama first-event request setup", async () => {
-		const previousOpenAIIdleTimeout = Bun.env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS;
-		const previousGenericFirstEventTimeout = Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS;
-		Bun.env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS = "1500";
-		Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS = "20";
-		const fetchMock = createDelayedFetch(30, createOllamaChatSuccessResponse);
-
-		try {
-			const result = await streamSimple(ollamaChatModel, baseContext(), {
-				apiKey: "test-key",
-				fetch: fetchMock,
-			}).result();
-
-			expect(result.stopReason).toBe("stop");
-			expect(getFirstTextContent(result)).toMatchObject({ type: "text", text: "Hello delayed" });
-		} finally {
-			if (previousOpenAIIdleTimeout === undefined) {
-				delete Bun.env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS;
-			} else {
-				Bun.env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS = previousOpenAIIdleTimeout;
-			}
-			if (previousGenericFirstEventTimeout === undefined) {
-				delete Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS;
-			} else {
-				Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS = previousGenericFirstEventTimeout;
-			}
-		}
-	});
-
 	it("honors PI_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS even when caller pins streamIdleTimeoutMs", async () => {
 		const previousOpenAIFirstEventTimeout = Bun.env.PI_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS;
 		const previousGenericFirstEventTimeout = Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS;
@@ -529,53 +480,6 @@ describe("OpenAI-family first-event timeouts", () => {
 		expect(result.errorMessage).toBe("OpenAI completions stream timed out while waiting for the first event");
 		expect(cancelled).toBe(true);
 	});
-	it("surfaces the Azure OpenAI responses first-event timeout message", async () => {
-		await expectFirstEventTimeout(
-			(streamFirstEventTimeoutMs, fetchMock) =>
-				streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-					apiKey: "test-key",
-					azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-					azureApiVersion: "v1",
-					streamFirstEventTimeoutMs,
-					fetch: fetchMock,
-				}).result(),
-			"Azure OpenAI responses stream timed out while waiting for the first event",
-		);
-	});
-	it("times out Azure OpenAI responses before the stream opens and forwards the budget to the SDK request", async () => {
-		await expectRequestSetupTimeout(
-			(streamFirstEventTimeoutMs, fetchMock) =>
-				streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-					apiKey: "test-key",
-					azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-					azureApiVersion: "v1",
-					streamFirstEventTimeoutMs,
-					fetch: fetchMock,
-				}).result(),
-			"Azure OpenAI responses stream timed out while waiting for the first event",
-			createOpenAIResponsesSuccessResponse,
-		);
-	});
-
-	it("times out Azure responses streams that only emit no-progress status events", async () => {
-		const fetchMock: FetchImpl = (input: string | URL | Request, init?: RequestInit) =>
-			Promise.resolve(createNoProgressOpenAIResponsesStream(getRequestSignal(input, init)));
-
-		// The stall is retryable, so the retry stalls too; skip the real backoff between attempts.
-		const result = await streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-			apiKey: "test-key",
-			azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-			azureApiVersion: "v1",
-			streamFirstEventTimeoutMs: 1_000,
-			streamIdleTimeoutMs: 20,
-			fetch: fetchMock,
-			providerRetryWait: async () => {},
-		}).result();
-
-		expect(result.stopReason).toBe("error");
-		expect(result.errorMessage).toBe("Azure OpenAI responses stream stalled while waiting for the next event");
-	});
-
 	it("keeps caller aborts as aborted for OpenAI responses", async () => {
 		await expectCallerAbort(
 			(signal, streamFirstEventTimeoutMs, fetchMock) =>
@@ -601,22 +505,6 @@ describe("OpenAI-family first-event timeouts", () => {
 			"OpenAI completions stream timed out while waiting for the first event",
 		);
 	});
-
-	it("keeps caller aborts as aborted for Azure OpenAI responses", async () => {
-		await expectCallerAbort(
-			(signal, streamFirstEventTimeoutMs, fetchMock) =>
-				streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-					apiKey: "test-key",
-					azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-					azureApiVersion: "v1",
-					signal,
-					streamFirstEventTimeoutMs,
-					fetch: fetchMock,
-				}).result(),
-			"Azure OpenAI responses stream timed out while waiting for the first event",
-		);
-	});
-
 	it("does not arm the first-event watchdog before OpenAI responses stream setup finishes", async () => {
 		await expectDelayedRequestSetupSucceeds(
 			(streamFirstEventTimeoutMs, fetchMock) =>
@@ -675,21 +563,6 @@ describe("OpenAI-family first-event timeouts", () => {
 			vi.useRealTimers();
 		}
 	});
-
-	it("does not arm the first-event watchdog before Azure OpenAI responses setup finishes", async () => {
-		await expectDelayedRequestSetupSucceeds(
-			(streamFirstEventTimeoutMs, fetchMock) =>
-				streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-					apiKey: "test-key",
-					azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-					azureApiVersion: "v1",
-					streamFirstEventTimeoutMs,
-					fetch: fetchMock,
-				}).result(),
-			createOpenAIResponsesSuccessResponse,
-		);
-	});
-
 	it("errors when OpenAI responses stream closes without a terminal response event", async () => {
 		const incompleteResponse = createSseResponse([
 			{ type: "response.created", response: { id: "resp_incomplete" } },
@@ -770,51 +643,6 @@ describe("OpenAI-family first-event timeouts", () => {
 			textSignature: '{"v":1,"id":"msg_done"}',
 		});
 	});
-
-	it("errors when Azure OpenAI responses stream closes without a terminal response event", async () => {
-		const incompleteResponse = createSseResponse([
-			{ type: "response.created", response: { id: "resp_incomplete_azure" } },
-			{
-				type: "response.output_item.added",
-				item: {
-					type: "message",
-					id: "msg_incomplete_azure",
-					role: "assistant",
-					status: "in_progress",
-					content: [],
-				},
-			},
-			{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
-			{ type: "response.output_text.delta", delta: "Hello azure" },
-			{
-				type: "response.output_item.done",
-				item: {
-					type: "message",
-					id: "msg_incomplete_azure",
-					role: "assistant",
-					status: "completed",
-					content: [{ type: "output_text", text: "Hello azure" }],
-				},
-			},
-			// Intentionally no response.completed/incomplete — simulates premature provider disconnect.
-		]);
-		const fetchMock: FetchImpl = () => Promise.resolve(incompleteResponse);
-		const result = await streamAzureOpenAIResponses(azureOpenAIResponsesModel, baseContext(), {
-			apiKey: "test-key",
-			azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-			azureApiVersion: "v1",
-			fetch: fetchMock,
-		}).result();
-
-		expect(result.stopReason).toBe("error");
-		expect(result.errorMessage).toBe(
-			"Azure OpenAI responses stream closed before a terminal response event was received",
-		);
-		expect(result.content as unknown[]).toEqual([
-			{ type: "text", text: "Hello azure", textSignature: '{"v":1,"id":"msg_incomplete_azure"}' },
-		]);
-	});
-
 	it("handles response.incomplete as a valid terminal event (not premature closure)", async () => {
 		const incompleteResponse = createSseResponse([
 			{ type: "response.created", response: { id: "resp_length_limited" } },
@@ -858,11 +686,11 @@ describe("OpenAI-family first-event timeouts", () => {
 
 	it("honors streamIdleTimeoutMs from model.compat for OpenAI responses streams", async () => {
 		const customResponsesModel: Model<"openai-responses"> = buildModel({
-			id: "fugu-test",
-			name: "Fugu Test",
+			id: "idle-timeout-fixture",
+			name: "Idle Timeout Fixture",
 			api: "openai-responses",
-			provider: "sakana",
-			baseUrl: "https://api.sakana.ai/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -886,8 +714,8 @@ describe("OpenAI-family first-event timeouts", () => {
 			id: "slow-first-event",
 			name: "Slow First Event",
 			api: "openai-responses",
-			provider: "custom",
-			baseUrl: "https://example.com/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -906,14 +734,14 @@ describe("OpenAI-family first-event timeouts", () => {
 		expect(result.errorMessage).toBe("OpenAI responses stream timed out while waiting for the first event");
 	});
 
-	it("keeps a local first-event disable after SSE headers arrive", async () => {
+	it("keeps an explicit first-event disable after SSE headers arrive", async () => {
 		vi.useFakeTimers();
 		const localResponsesModel: Model<"openai-responses"> = buildModel({
-			id: "slow-local-prefill",
-			name: "Slow Local Prefill",
+			id: "first-event-disabled",
+			name: "First Event Disabled",
 			api: "openai-responses",
-			provider: "llama.cpp",
-			baseUrl: "http://127.0.0.1:8080/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

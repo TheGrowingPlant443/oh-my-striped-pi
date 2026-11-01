@@ -6,7 +6,7 @@ import type {
 } from "@oh-my-pi/pi-wire";
 import type { ReactNode } from "react";
 import { memo, useEffect, useMemo, useState } from "react";
-import { fmtCost, fmtDuration, fmtTokens, relTime } from "../../lib/format";
+import { fmtCost, formatDuration, fmtTokens, relTime } from "../../lib/format";
 import "./agents.css";
 
 /** Re-render tick so running-tool durations and relative times stay live. */
@@ -39,7 +39,7 @@ function activityLine(
 ): string {
 	if (p?.currentTool) {
 		const start = toolStartMs(p);
-		if (start !== null) return `${p.currentTool} · ${fmtDuration(Math.max(0, now - start))}`;
+		if (start !== null) return `${p.currentTool} · ${formatDuration(Math.max(0, now - start))}`;
 		return p.currentTool;
 	}
 	if (p?.lastIntent) return p.lastIntent;

@@ -31,7 +31,7 @@ describe("#2851 anthropic compat: github-copilot is a signing endpoint", () => {
 			spec({ provider: "github-copilot", baseUrl: "https://api.githubcopilot.com" }),
 		).compat;
 		expect(compat.replayUnsignedThinking).toBe(false);
-		expect(compat.officialEndpoint).toBe(false);
+		expect(compat.signingEndpoint).toBe(true);
 	});
 
 	it("also excludes github-copilot enterprise (copilot-api.*) hosts", () => {
@@ -46,11 +46,5 @@ describe("#2851 anthropic compat: github-copilot is a signing endpoint", () => {
 			spec({ provider: "custom", baseUrl: "https://llm.example.com/anthropic" }),
 		).compat;
 		expect(compat.replayUnsignedThinking).toBe(true);
-	});
-
-	it("still degrades unsigned thinking to text for official Anthropic", () => {
-		const compat = resolveModelPolicy(spec({ provider: "anthropic", baseUrl: "https://api.anthropic.com" })).compat;
-		expect(compat.replayUnsignedThinking).toBe(false);
-		expect(compat.officialEndpoint).toBe(true);
 	});
 });

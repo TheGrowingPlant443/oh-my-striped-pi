@@ -68,62 +68,50 @@ describe("auth-broker migrate", () => {
 		}
 	});
 
-	test("rerun skips an already-migrated org-only row instead of re-uploading a stale refresh token", async () => {
-		// Local row where login recovered neither email nor account: the org id
-		// is the only identity the broker snapshot can echo back.
+	test("rerun keeps a migrated company account's newer broker refresh token", async () => {
+		const provider = "company-account";
+		const credential = {
+			type: "oauth" as const,
+			access: "access-local",
+			refresh: "refresh-local-stale",
+			expires: Date.now() + 3_600_000,
+			accountId: "account-team-1111",
+		};
 		const localStore = await SqliteAuthCredentialStore.open(getAgentDbPath());
 		try {
-			await localStore.upsertAuthCredential("anthropic", {
-				type: "oauth",
-				access: "access-local",
-				refresh: "refresh-local-stale",
-				expires: Date.now() + 3_600_000,
-				orgId: TEAM_ORG,
-				orgName: "Team",
-			});
+			await localStore.upsertAuthCredential(provider, credential);
 		} finally {
 			localStore.close();
 		}
 
-		const firstRun = await runMigrateCapturingStdout();
-		expect(firstRun).toContain("uploaded");
-		const uploaded = brokerStore!.getOAuth("anthropic");
-		expect(uploaded?.refresh).toBe("refresh-local-stale");
-		expect(uploaded?.orgId).toBe(TEAM_ORG);
-
-		// The broker rotates the token after migration — its copy is now newer
-		// than the local one.
-		await brokerStore!.upsertAuthCredential("anthropic", {
-			type: "oauth",
+		expect(await runMigrateCapturingStdout()).toContain("uploaded");
+		expect(brokerStore!.getOAuth(provider)?.refresh).toBe(credential.refresh);
+		await brokerStore!.upsertAuthCredential(provider, {
+			...credential,
 			access: "access-rotated",
 			refresh: "refresh-rotated",
 			expires: Date.now() + 7_200_000,
-			orgId: TEAM_ORG,
-			orgName: "Team",
 		});
 		await brokerStorage!.credentials.reload();
 
-		// Rerun: the org-only row must be recognized as already migrated, not
-		// re-uploaded (which would clobber the broker's newer refresh token).
-		const secondRun = await runMigrateCapturingStdout();
-		expect(secondRun).toContain("already on broker");
-		expect(secondRun).toContain("Nothing to migrate");
-		const persisted = brokerStore!.getOAuth("anthropic");
-		expect(persisted?.refresh).toBe("refresh-rotated");
-		expect(brokerStore!.listAuthCredentials("anthropic")).toHaveLength(1);
+		const output = await runMigrateCapturingStdout();
+		expect(output).toContain("already on broker");
+		expect(output).toContain("Nothing to migrate");
+		expect(brokerStore!.getOAuth(provider)?.refresh).toBe("refresh-rotated");
+		expect(brokerStore!.listAuthCredentials(provider)).toHaveLength(1);
 	});
 
 	test.each([
 		{
-			provider: "google-antigravity",
+			provider: "company-project",
 			shared: "project",
-			identity: { projectId: "aicode-consumers" },
-			local: ["alice@gmail.com", "bob@gmail.com"],
+			identity: { projectId: "company-project" },
+			local: ["alice@example.com", "bob@example.com"],
 		},
 		{
-			provider: "openai-codex",
+			provider: "company-workspace",
 			shared: "workspace",
-			identity: { accountId: "ws-team-2222", orgId: "ws-team-2222" },
+			identity: { orgId: "workspace-team-2222" },
 			local: ["alice@example.com"],
 		},
 	])(
@@ -161,7 +149,7 @@ describe("auth-broker migrate", () => {
 			// Stored before its email was recovered, so keyed by account: uploading the
 			// local row would claim it and overwrite the broker's token.
 			held: "an email-less row keyed by account",
-			provider: "anthropic",
+			provider: "company-account",
 			onBroker: { accountId: "acct-3333", orgId: TEAM_ORG, orgName: "Team" },
 			local: { email: "alice@example.com", accountId: "acct-3333", orgId: TEAM_ORG, orgName: "Team" },
 		},
@@ -169,9 +157,9 @@ describe("auth-broker migrate", () => {
 			// Only the local row carries an account id, so the store keys the two apart:
 			// uploading would add a second row for the same account.
 			held: "a row keyed by email while the local one is keyed by account",
-			provider: "google-antigravity",
-			onBroker: { email: "alice@gmail.com", projectId: "aicode-consumers" },
-			local: { email: "alice@gmail.com", accountId: "acct-4444", projectId: "aicode-consumers" },
+			provider: "company-project",
+			onBroker: { email: "alice@example.com", projectId: "company-project" },
+			local: { email: "alice@example.com", accountId: "acct-4444", projectId: "company-project" },
 		},
 	])("keeps the broker's newer token for an account it holds as $held", async ({ provider, onBroker, local }) => {
 		await brokerStore!.upsertAuthCredential(provider, {

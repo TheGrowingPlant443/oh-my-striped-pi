@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { renderDemotedThinking } from "@oh-my-pi/pi-ai/dialect";
 import { convertAnthropicMessages, streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
 import type {
 	AssistantMessage,
@@ -11,29 +10,20 @@ import type {
 } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
-/**
- * Regression: Anthropic-compatible reasoning endpoints often emit `thinking`
- * blocks without a first-party Anthropic signature, but still expect those
- * blocks back as native `type: "thinking"` on continuation. Demoting unsigned
- * thinking to text strips the reasoning chain and can destabilize follow-up
- * tool-call argument serialization (the upstream cause behind #2005's `todo`
- * renderer crash).
- *
- * Official Anthropic remains conservative: unsigned thinking is demoted to text
- * there because the first-party API enforces signature-based integrity.
- */
+/** Explicit unsigned-wire overrides preserve reasoning and tool pairing; all paths sanitize UTF-8. */
 function makeModel(overrides: Partial<ModelSpec<"anthropic-messages">> = {}): Model<"anthropic-messages"> {
 	return buildModel({
 		api: "anthropic-messages",
-		provider: "custom-anthropic",
+		provider: "github-copilot",
 		id: "reasoning-model",
 		name: "Reasoning Anthropic-Compatible Model",
-		baseUrl: "https://llm.example.com/anthropic",
+		baseUrl: "https://api.githubcopilot.com",
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		maxTokens: 8_192,
 		contextWindow: 200_000,
 		reasoning: true,
+		compat: { signingEndpoint: false, replayUnsignedThinking: true },
 		...overrides,
 	} as ModelSpec<"anthropic-messages">);
 }
@@ -47,7 +37,7 @@ function makeAssistantThinking(thinking: string, tail: AssistantMessage["content
 		role: "assistant",
 		content: [{ type: "thinking", thinking, thinkingSignature: "" }, ...tail],
 		api: "anthropic-messages",
-		provider: "custom-anthropic",
+		provider: "github-copilot",
 		model: "reasoning-model",
 		usage: {
 			input: 0,
@@ -80,13 +70,13 @@ interface WireToolUseBlock {
 type WireBlock = WireThinkingBlock | WireTextBlock | WireToolUseBlock | { type: string; [key: string]: unknown };
 
 function assistantWireBlocks(messages: Message[], model: Model<"anthropic-messages">): WireBlock[] {
-	const params = convertAnthropicMessages(messages, model, false);
+	const params = convertAnthropicMessages(messages, model);
 	const assistant = params.find(p => p.role === "assistant");
 	return (assistant?.content as WireBlock[] | undefined) ?? [];
 }
 
-describe("Anthropic-compatible unsigned thinking replay (#2005)", () => {
-	it("preserves unsigned thinking for non-official reasoning endpoints", () => {
+describe("Anthropic unsigned replay compatibility overrides (#2005)", () => {
+	it("preserves unsigned thinking when explicitly enabled", () => {
 		const blocks = assistantWireBlocks(
 			[
 				makeUser("solve x"),
@@ -102,29 +92,6 @@ describe("Anthropic-compatible unsigned thinking replay (#2005)", () => {
 		expect(blocks[1]).toEqual({ type: "text", text: "Sure." });
 	});
 
-	it("sends context_management for API-key Anthropic-compatible thinking requests", async () => {
-		const { promise, resolve } = Promise.withResolvers<unknown>();
-		streamAnthropic(
-			makeModel(),
-			{ systemPrompt: [], messages: [makeUser("continue")] },
-			{
-				apiKey: "sk-ant-api-test",
-				signal: AbortSignal.abort(),
-				thinkingEnabled: true,
-				onPayload: payload => resolve(payload),
-			},
-		);
-
-		const payload = (await promise) as {
-			thinking?: { type?: string };
-			context_management?: { edits?: Array<{ type?: string; keep?: string }> };
-		};
-		expect(payload.thinking?.type).toBe("enabled");
-		expect(payload.context_management).toEqual({
-			edits: [{ type: "clear_thinking_20251015", keep: "all" }],
-		});
-	});
-
 	it("sanitizes lone surrogates in tool arguments regardless of origin API", () => {
 		const loneSurrogate = "broken \ud83d end";
 		const makeToolCallAssistant = (api: AssistantMessage["api"]): AssistantMessage => ({
@@ -138,7 +105,7 @@ describe("Anthropic-compatible unsigned thinking replay (#2005)", () => {
 				},
 			],
 			api,
-			provider: api === "anthropic-messages" ? "custom-anthropic" : "openai",
+			provider: "github-copilot",
 			model: "reasoning-model",
 			usage: {
 				input: 0,
@@ -212,50 +179,6 @@ describe("Anthropic-compatible unsigned thinking replay (#2005)", () => {
 		expect(body).toContain("\ufffd");
 	});
 
-	it("covers the Xiaomi MiMo Anthropic-compatible reporter configuration without provider allowlists", () => {
-		const model = makeModel({
-			provider: "user-custom",
-			id: "mimo-v2.5-pro",
-			name: "MiMo V2.5 Pro (Singapore)",
-			baseUrl: "https://token-plan-sgp.xiaomimimo.com/anthropic",
-			maxTokens: 131_072,
-			contextWindow: 1_048_576,
-		});
-		const blocks = assistantWireBlocks([makeUser(), makeAssistantThinking("hidden reasoning")], model);
-		expect(blocks[0]).toEqual({ type: "thinking", thinking: "hidden reasoning", signature: "" });
-	});
-
-	it("preserves legacy known non-signing endpoints even if model.reasoning is false", () => {
-		const model = makeModel({ provider: "custom", baseUrl: "https://api.deepseek.com/v1", reasoning: false });
-		const blocks = assistantWireBlocks([makeUser(), makeAssistantThinking("deepseek reasoning")], model);
-		expect(blocks[0]?.type).toBe("thinking");
-	});
-
-	it("still degrades unsigned thinking to text for official Anthropic", () => {
-		const model = makeModel({ provider: "anthropic", baseUrl: "https://api.anthropic.com" });
-		const blocks = assistantWireBlocks([makeUser(), makeAssistantThinking("internal scratch")], model);
-		expect(blocks[0]?.type).toBe("text");
-		expect((blocks[0] as WireTextBlock).text).toBe(renderDemotedThinking(model.id, "internal scratch"));
-	});
-
-	it("treats a missing baseUrl as official Anthropic (resolveAnthropicBaseUrl default)", () => {
-		// `isOfficialAnthropicApiUrl(undefined) === true` because the actual HTTP
-		// dispatch falls back to https://api.anthropic.com. Same-id custom
-		// overrides that only tweak model metadata (no baseUrl override) must
-		// not regress to native-thinking replay against the first-party API.
-		const model = makeModel({ provider: "anthropic", baseUrl: "" });
-		const blocks = assistantWireBlocks([makeUser(), makeAssistantThinking("internal scratch")], model);
-		expect(blocks[0]?.type).toBe("text");
-		expect((blocks[0] as WireTextBlock).text).toBe(renderDemotedThinking(model.id, "internal scratch"));
-	});
-
-	it("still degrades unsigned thinking to text for non-reasoning unknown endpoints", () => {
-		const model = makeModel({ reasoning: false, baseUrl: "https://plain.example.com/anthropic" });
-		const blocks = assistantWireBlocks([makeUser(), makeAssistantThinking("scratch")], model);
-		expect(blocks[0]?.type).toBe("text");
-		expect((blocks[0] as WireTextBlock).text).toBe(renderDemotedThinking(model.id, "scratch"));
-	});
-
 	it("keeps thinking → tool_use pairing intact across continuation conversion", () => {
 		const toolResult: ToolResultMessage = {
 			role: "toolResult",
@@ -273,7 +196,7 @@ describe("Anthropic-compatible unsigned thinking replay (#2005)", () => {
 			]),
 			toolResult,
 		];
-		const params = convertAnthropicMessages(messages, model, false);
+		const params = convertAnthropicMessages(messages, model);
 		expect(params.map(p => p.role)).toEqual(["user", "assistant", "user"]);
 		const assistantBlocks = params[1].content as WireBlock[];
 		expect(assistantBlocks[0]?.type).toBe("thinking");

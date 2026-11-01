@@ -55,7 +55,6 @@ export function createExtensionDashboardRuntime(options: {
 				session: onMcpToolsChanged ? { refreshMCPTools: onMcpToolsChanged } : undefined,
 				discovery: {
 					enableProjectConfig: cfgMcpEnableProjectConfig.get(settings),
-					filterExa: true,
 					filterBrowser: browserMcpFilterEnabled?.() ?? false,
 				},
 				onStatus: event => eventBus?.emit(MCP_CONNECTION_STATUS_EVENT_CHANNEL, event),

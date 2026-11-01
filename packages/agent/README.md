@@ -17,7 +17,7 @@ import { getModel } from "@oh-my-pi/pi-ai";
 const agent = new Agent({
 	initialState: {
 		systemPrompt: ["You are a helpful assistant."],
-		model: getModel("anthropic", "claude-sonnet-4-20250514"),
+		model: getModel("github-copilot", "gpt-4o"),
 	},
 });
 

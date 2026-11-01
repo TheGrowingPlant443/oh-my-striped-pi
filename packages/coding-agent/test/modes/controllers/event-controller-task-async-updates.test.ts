@@ -22,6 +22,7 @@ import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/eve
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
 import { UiHelpers } from "@oh-my-pi/pi-coding-agent/modes/utils/ui-helpers";
 import type { SessionContext } from "@oh-my-pi/pi-coding-agent/session/session-context";
+import type { AsyncJobSnapshot } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import type { TaskToolDetails } from "@oh-my-pi/pi-tui/tools/task";
 import { type BashToolDetails, formatBackgroundNotice } from "@oh-my-pi/pi-tui/tools/bash";
 import type { CoordinationDetails } from "@oh-my-pi/pi-tui/tools/wait";
@@ -69,12 +70,16 @@ describe("EventController async update finalization", () => {
 		resetSettingsForTest();
 	});
 
-	function createFixture(isStreaming = false) {
+	function createFixture(isStreaming = false, runningJobs: string[] = []) {
 		const pendingTools = new Map<string, ToolExecutionComponent>();
 		const ctx = createInteractiveModeContext({
 			pendingTools,
 			session: { isStreaming: true },
-			viewSession: { isStreaming },
+			viewSession: {
+				isStreaming,
+				getAsyncJobSnapshot: () =>
+					({ running: runningJobs.map(id => ({ id })), recent: [], delivery: {} }) as unknown as AsyncJobSnapshot,
+			},
 		});
 		return { controller: new EventController(ctx), pendingTools, chatContainer: ctx.chatContainer, ctx };
 	}
@@ -147,7 +152,7 @@ describe("EventController async update finalization", () => {
 	for (const arrival of ["early", "replay"] as const) {
 		for (const state of ["completed", "failed"] as const) {
 			it(`renders the ${state} outcome after a ${arrival} background task result`, async () => {
-				const { controller, pendingTools, chatContainer, ctx } = createFixture(true);
+				const { controller, pendingTools, chatContainer, ctx } = createFixture(true, ["Job1"]);
 				ctx.eventController = controller;
 				const helpers = new UiHelpers(ctx);
 				ctx.addMessageToChat = helpers.addMessageToChat.bind(helpers);
@@ -175,7 +180,6 @@ describe("EventController async update finalization", () => {
 						isError: false,
 						timestamp: 2,
 					};
-					ctx.viewSession.agent.getPendingToolResults = () => [result];
 					controller.resetTranscriptAnchors();
 					const assistant: AssistantMessage = {
 						role: "assistant",
@@ -183,7 +187,7 @@ describe("EventController async update finalization", () => {
 							{ type: "toolCall", id: "tc-task", name: "task", arguments: { tasks: [{ task: "work" }] } },
 						],
 						api: "anthropic-messages",
-						provider: "anthropic",
+						provider: "github-copilot",
 						model: "test",
 						stopReason: "toolUse",
 						timestamp: 1,
@@ -196,9 +200,8 @@ describe("EventController async update finalization", () => {
 							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 						},
 					};
-					helpers.renderSessionContext({ messages: [assistant] } as SessionContext);
+					helpers.renderSessionContext({ messages: [assistant, result] } as SessionContext);
 					controller.restorePendingToolResults();
-					ctx.viewSession.agent.getPendingToolResults = () => [];
 				}
 				const component = chatContainer.children.find(
 					(child): child is ToolExecutionComponent => child instanceof ToolExecutionComponent,

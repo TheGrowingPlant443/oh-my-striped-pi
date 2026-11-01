@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { Agent, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { Effort, type Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -10,6 +10,7 @@ import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { AUTO_THINKING, toReasoningEffort } from "@oh-my-pi/pi-tui/thinking";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 // `auto` is a session-level selector: the per-turn difficulty classifier runs
 // for the primary turn only, and `concreteThinkingLevel` erases `auto` when the
@@ -24,12 +25,43 @@ describe("advisor auto thinking level", () => {
 
 	beforeAll(() => {
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("google", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected bundled anthropic/claude-sonnet-4-5 to exist");
-		model = bundled;
+		model = buildModel({
+			provider: "company-advisor-primary",
+			id: "reasoning-reviewer",
+			name: "Company reasoning reviewer",
+			api: "anthropic-messages",
+			baseUrl: "https://advisor-primary.company.invalid",
+			reasoning: true,
+			thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		const fallback = buildModel({
+			provider: "company-advisor-backup",
+			id: "minimal-reviewer",
+			name: "Company minimal reviewer",
+			api: "openai-completions",
+			baseUrl: "https://advisor-backup.company.invalid",
+			reasoning: true,
+			thinking: { mode: "effort", efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High] },
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		for (const fixture of [model, fallback]) {
+			modelRegistry.registerProvider(fixture.provider, {
+				api: fixture.api,
+				apiKey: "test-key",
+				baseUrl: fixture.baseUrl,
+				models: [toProviderModelConfig(fixture)],
+			});
+		}
 	});
 
 	let session: AgentSession | undefined;
@@ -170,7 +202,7 @@ describe("advisor auto thinking level", () => {
 			{
 				"advisor.syncBacklog": "1",
 				"retry.baseDelayMs": 5,
-				"retry.fallbackChains": { advisor: ["google/gemini-2.5-flash:minimal"] },
+				"retry.fallbackChains": { advisor: ["company-advisor-backup/minimal-reviewer:minimal"] },
 			},
 			(m, context, options) => {
 				wire.push(`${m.id}:${options?.reasoning}`);
@@ -203,9 +235,9 @@ describe("advisor auto thinking level", () => {
 
 		await s.agent.prompt("quota fails over to the fallback");
 		await fellBack.promise;
-		expect(wire).toEqual([`${model.id}:${Effort.Low}`, "gemini-2.5-flash:minimal"]);
+		expect(wire).toEqual([`${model.id}:${Effort.Low}`, "minimal-reviewer:minimal"]);
 		s.setThinkingLevel(Effort.High);
-		expect(await review("primary now high")).toBe("gemini-2.5-flash:minimal");
+		expect(await review("primary now high")).toBe("minimal-reviewer:minimal");
 
 		// Cooldown over: the very review that restores the main model already
 		// runs at the primary's current level, not the pre-fallback `low`.
@@ -220,16 +252,19 @@ describe("advisor auto thinking level", () => {
 		{ name: "leaves unverified thinking unset", unverified: true, revertPolicy: "never" },
 	] as const) {
 		it(`a fixed-effort advisor on an :auto fallback ${name}`, async () => {
-			const provider = "meta";
+			const provider = "company-advisor-auto-fallback";
 			modelRegistry.registerProvider(provider, {
 				api: "openai-completions",
 				apiKey: "test-key",
-				baseUrl: "https://test.example.com",
+				baseUrl: "https://advisor-auto.company.invalid",
 				models: [
 					{
 						id: "fallback",
 						name: "Auto fallback",
 						reasoning: !unverified,
+						thinking: unverified
+							? undefined
+							: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High] },
 						input: ["text"],
 						supportsTools: true,
 						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

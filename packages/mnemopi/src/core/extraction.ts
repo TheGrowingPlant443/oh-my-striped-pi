@@ -1,15 +1,7 @@
 import { withLoopPhase } from "@oh-my-pi/pi-utils";
 import { getDiagnostics, safeForLog } from "./extraction/diagnostics";
 import { callHostLlm, getHostLlmBackend } from "./llm-backends";
-import {
-	callConfiguredCompletion,
-	callLocalLlm,
-	callRemoteLlm,
-	cleanOutput,
-	configuredLlmWillHandleCall,
-	llmAvailable,
-	type RemoteLlmOptions,
-} from "./local-llm";
+import { callConfiguredCompletion, cleanOutput, configuredLlmWillHandleCall } from "./local-llm";
 import { getMnemopiRuntimeOptions } from "./runtime-options";
 import { clipToWindow, DEFAULT_INPUT_CHARS } from "./text-window";
 
@@ -30,7 +22,7 @@ function envInt(name: string, defaultValue: number): number {
 }
 
 function llmEnabled(): boolean {
-	return envBool("MNEMOPI_LLM_ENABLED", true);
+	return getMnemopiRuntimeOptions()?.llm?.enabled ?? envBool("MNEMOPI_LLM_ENABLED", true);
 }
 
 function hostLlmEnabled(): boolean {
@@ -348,30 +340,8 @@ async function tryHostExtraction(prompt: string): Promise<[boolean, string | nul
 	return [true, text === "" ? null : text];
 }
 
-async function localFallback(
-	prompt: string,
-	sourceText: string,
-	diag = getDiagnostics(),
-): Promise<ExtractedFactCategories> {
+function localFallback(sourceText: string, diag = getDiagnostics()): ExtractedFactCategories {
 	diag.recordAttempt("local");
-	try {
-		const raw = await callLocalLlm(prompt);
-		if (raw !== null) {
-			const extracted = withLoopPhase("mnemopi.extract", () => parseExtractedFactCategories(cleanOutput(raw)));
-			const count = countExtractedFactCategories(extracted);
-			if (count > 0) {
-				diag.recordSuccess("local", count);
-				diag.recordCall({ succeeded: true });
-				return extracted;
-			}
-			diag.recordNoOutput("local");
-		}
-	} catch (exc) {
-		diag.recordFailure("local", exc, "local_llm_raised");
-		diag.recordCall({ succeeded: false });
-		return emptyFactCategories();
-	}
-	diag.recordFailure("local", undefined, "model_not_loaded");
 	const heuristic = heuristicExtractFacts(sourceText);
 	if (heuristic.length > 0) {
 		diag.recordSuccess("local", heuristic.length);
@@ -382,11 +352,8 @@ async function localFallback(
 	return emptyFactCategories();
 }
 
-/** Extract fact categories from text using configured, host, local, or remote LLMs. */
-export async function extractFactCategories(
-	text: string | null | undefined,
-	options: RemoteLlmOptions = {},
-): Promise<ExtractedFactCategories> {
+/** Extract fact categories using configured inference or local heuristics. */
+export async function extractFactCategories(text: string | null | undefined): Promise<ExtractedFactCategories> {
 	const diag = getDiagnostics();
 	if (typeof text !== "string" || text.trim() === "") {
 		return emptyFactCategories();
@@ -394,8 +361,8 @@ export async function extractFactCategories(
 	const input = clipToWindow(text, DEFAULT_INPUT_CHARS);
 	const prompt = withLoopPhase("mnemopi.extract", () => buildExtractionPrompt(input));
 
-	// Configured completion (host-injected runtime LLM, e.g. the coding-agent's smol
-	// or a local on-device model). Mirrors consolidation's precedence: when a
+	// Configured completion (managed model, callback, or explicit private HTTP endpoint).
+	// Mirrors consolidation's precedence: when a
 	// complete() fn is wired, it is the chosen path. Extraction is deterministic
 	// (temperature 0) so re-ingesting the same content does not create near-dupes.
 	if (configuredLlmWillHandleCall()) {
@@ -406,7 +373,7 @@ export async function extractFactCategories(
 				task: { kind: "memory-extraction", input },
 			});
 			if (typeof raw === "string" && raw.trim() !== "") {
-				const extracted = parseExtractedFactCategories(raw);
+				const extracted = parseExtractedFactCategories(cleanOutput(raw));
 				const count = countExtractedFactCategories(extracted);
 				if (count > 0) {
 					diag.recordSuccess("host", count);
@@ -421,7 +388,7 @@ export async function extractFactCategories(
 			console.warn(`extractFacts: configured completion raised: ${safeForLog(exc)}`);
 			return emptyFactCategories();
 		}
-		return localFallback(prompt, input, diag);
+		return localFallback(input, diag);
 	}
 
 	try {
@@ -429,7 +396,7 @@ export async function extractFactCategories(
 		if (attempted) {
 			diag.recordAttempt("host");
 			if (hostText !== null) {
-				const extracted = parseExtractedFactCategories(hostText);
+				const extracted = parseExtractedFactCategories(cleanOutput(hostText));
 				const count = countExtractedFactCategories(extracted);
 				if (count > 0) {
 					diag.recordSuccess("host", count);
@@ -438,7 +405,7 @@ export async function extractFactCategories(
 				}
 			}
 			diag.recordNoOutput("host");
-			return localFallback(prompt, input, diag);
+			return localFallback(input, diag);
 		}
 	} catch (exc) {
 		diag.recordAttempt("host");
@@ -448,43 +415,12 @@ export async function extractFactCategories(
 		return emptyFactCategories();
 	}
 
-	if (!llmAvailable()) {
-		diag.recordAttempt("local");
-		const heuristic = heuristicExtractFacts(input);
-		if (heuristic.length > 0) {
-			diag.recordSuccess("local", heuristic.length);
-			diag.recordCall({ succeeded: true });
-			return { ...emptyFactCategories(), facts: heuristic };
-		}
-		diag.recordFailure("local", undefined, "llm_unavailable_at_call_site");
-		diag.recordCall({ succeeded: false });
-		return emptyFactCategories();
-	}
-
-	diag.recordAttempt("remote");
-	try {
-		const raw = await callRemoteLlm(prompt, 0, options);
-		if (raw !== null) {
-			const extracted = withLoopPhase("mnemopi.extract", () => parseExtractedFactCategories(cleanOutput(raw)));
-			const count = countExtractedFactCategories(extracted);
-			if (count > 0) {
-				diag.recordSuccess("remote", count);
-				diag.recordCall({ succeeded: true });
-				return extracted;
-			}
-		}
-		diag.recordNoOutput("remote");
-	} catch (exc) {
-		diag.recordFailure("remote", exc, "remote_call_raised");
-		console.warn(`extractFacts: remote LLM raised: ${safeForLog(exc)}`);
-	}
-
-	return localFallback(prompt, input, diag);
+	return localFallback(input, diag);
 }
 
 /** Extract legacy flat fact strings from text. */
-export async function extractFacts(text: string | null | undefined, options: RemoteLlmOptions = {}): Promise<string[]> {
-	const extracted = await extractFactCategories(text, options);
+export async function extractFacts(text: string | null | undefined): Promise<string[]> {
+	const extracted = await extractFactCategories(text);
 	return flattenExtractedFactCategories(extracted).slice(0, FLAT_FACT_LIMIT);
 }
 

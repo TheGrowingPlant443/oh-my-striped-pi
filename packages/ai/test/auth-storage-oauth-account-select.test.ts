@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -6,7 +10,7 @@ import { withOAuthAccess } from "@oh-my-pi/pi-ai/auth-retry";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
 
-const PROVIDER = "unit-oauth-select";
+const PROVIDER = "github-copilot";
 
 function oauthCredential(suffix: string) {
 	return {

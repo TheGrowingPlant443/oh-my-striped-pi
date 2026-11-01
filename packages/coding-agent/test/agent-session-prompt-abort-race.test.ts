@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent, Model } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -47,10 +47,19 @@ describe("AgentSession prompt admission racing abort", () => {
 		} = {},
 	) {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected claude-sonnet-4-5 model to exist");
-		const model: Model = textOnly ? { ...bundled, input: ["text"] } : bundled;
+		authStorage.keys.setRuntime("company-prompt", "test-key");
+		const model: Model = buildModel({
+			id: textOnly ? "text-only" : "vision",
+			name: "Company prompt model",
+			provider: "company-prompt",
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid",
+			reasoning: false,
+			input: textOnly ? ["text"] : ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
 		const mock = createMockModel({ responses });
 		const agent = new Agent({
 			getApiKey: () => "test-key",

@@ -950,7 +950,7 @@ export class SessionManager {
 	#draftOnlySessionCleanupArmed = false;
 
 	/**
-	 * Collab replication tap: invoked for every appended entry with the
+	 * Append observer: invoked for every appended entry with the
 	 * in-memory (pre-blob-externalization) entry, so inline images survive.
 	 */
 	onEntryAppended?: (entry: SessionEntry) => void;
@@ -1110,7 +1110,7 @@ export class SessionManager {
 	/**
 	 * Hold this process's ownership claim on `#sessionId`, moving it off a
 	 * previous session. Only write paths claim, so the first process to write a
-	 * session owns it and inspection (`omp share`, `--export`, `render`) never
+	 * session owns it and inspection (`--export`, `render`) never
 	 * does. A failed claim is retried on the next write, so a writer takes over
 	 * once the owner closed the session or exited.
 	 */

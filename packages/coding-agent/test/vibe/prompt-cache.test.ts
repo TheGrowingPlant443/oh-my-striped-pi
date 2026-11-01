@@ -3,6 +3,7 @@ import type { Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
+import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import * as autoThinking from "@oh-my-pi/pi-coding-agent/auto-thinking/classifier";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -31,14 +32,20 @@ it("shares Vibe sibling cache routing by worker type while keeping conversations
 	// worker falls back to its provisional level at once.
 	vi.spyOn(autoThinking, "classifyDifficulty").mockRejectedValue(new Error("Network is disabled in this test"));
 	const authStorage = await AuthStorage.create(directory.join("auth.db"));
-	authStorage.keys.setRuntime("muse-code", JSON.stringify({ oauthAccessToken: "test-oauth", apiKey: "test-key" }));
-	const modelId = "muse-spark-1.3-contributor";
-	const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
-		fetch: async () => Response.json({ data: [{ id: modelId, object: "model", created: 0, owned_by: "meta" }] }),
-	});
-	await modelRegistry.refreshProvider("muse-code", "online");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
+	const modelId = "gpt-5.4";
+	const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"));
+	const resolve = catalogPolicy.resolveCatalogPolicy;
+	vi.spyOn(catalogPolicy, "resolveCatalogPolicy").mockImplementation(model => ({
+		...resolve(model),
+		sharedPromptCache: model.provider === "github-copilot" && model.id === modelId,
+	}));
 	const settings = Settings.isolated({
-		modelRoles: { default: `muse-code/${modelId}`, task: `muse-code/${modelId}`, smol: `muse-code/${modelId}` },
+		modelRoles: {
+			default: `github-copilot/${modelId}`,
+			task: `github-copilot/${modelId}`,
+			smol: `github-copilot/${modelId}`,
+		},
 		"task.structured": true,
 		"task.enableLsp": false,
 		"marketplace.autoUpdate": "off",
@@ -76,20 +83,16 @@ it("shares Vibe sibling cache routing by worker type while keeping conversations
 		handler: { content: [{ type: "toolCall", name: "yield", arguments: { data: { findings: [] } } }] },
 	});
 	const realStreamFactory = settingsStream.createSettingsAwareStreamFn;
-	vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((streamSettings, _base, slow) =>
-		realStreamFactory(
-			streamSettings,
-			(model, context, options) => {
-				const cacheOptions = {
-					sessionId: options?.sessionId,
-					promptCacheKey: options?.promptCacheKey,
-				};
-				const body = buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
-				requests.push({ key: body.prompt_cache_key, sessionId: options?.sessionId });
-				return mock.stream(model, context, options);
-			},
-			slow,
-		),
+	vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(streamSettings =>
+		realStreamFactory(streamSettings, (model, context, options) => {
+			const cacheOptions = {
+				sessionId: options?.sessionId,
+				promptCacheKey: options?.promptCacheKey,
+			};
+			const body = buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
+			requests.push({ key: body.prompt_cache_key, sessionId: options?.sessionId });
+			return mock.stream(model, context, options);
+		}),
 	);
 	try {
 		const registry = VibeSessionRegistry.global();

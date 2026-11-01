@@ -305,80 +305,52 @@ describe("buildSessionContext", () => {
 			expect((ctx.messages[1] as { content: string }).content).toBe("after compact");
 		});
 
-		it("attaches the signed Anthropic replay payload before the kept raw messages", () => {
+		it("attaches Copilot Anthropic native replay before the kept raw messages", () => {
 			const nativeCompaction: CompactionEntry = {
 				...compaction("3", "2", "Native summary", "2"),
 				preserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "github-copilot",
 						content: "Native summary",
 						signature: "sig_state",
-						model: "claude-fable-5",
+						model: "claude-sonnet-4.6",
 					},
 				},
 			};
-			const entries: SessionEntry[] = [
+			const ctx = buildSessionContext([
 				msg("1", null, "user", "first"),
 				msg("2", "1", "assistant", "response"),
 				nativeCompaction,
 				msg("4", "3", "user", "after compact"),
-			];
-			const ctx = buildSessionContext(entries);
-			// Summary, the kept assistant turn from firstKeptEntryId, then the new turn:
-			// the Anthropic block replaces nothing in the entry stream.
+			]);
 			expect(ctx.messages.map(message => message.role)).toEqual(["compactionSummary", "assistant", "user"]);
-			if (ctx.messages[0]?.role !== "compactionSummary") throw new Error("Expected compaction summary message");
-			expect(ctx.messages[0].summary).toBe("Native summary");
+			if (ctx.messages[0]?.role !== "compactionSummary") throw new Error("Expected compaction summary");
 			expect(ctx.messages[0].providerPayload).toEqual({
 				type: "anthropicCompaction",
-				provider: "anthropic",
+				provider: "github-copilot",
 				content: "Native summary",
 				signature: "sig_state",
 			});
 		});
 
-		it("replays new turns after an empty-tail snapshot with an earlier rewrite marker", () => {
+		it("replays new turns after an empty-tail native snapshot with an earlier rewrite marker", () => {
 			const snapshot = msg("1", null, "user", "summarized snapshot");
 			const newTurn = msg("2", "1", "assistant", "new assistant");
-			const compactionEntry: CompactionEntry = {
+			const nativeCompaction: CompactionEntry = {
 				...compaction("3", "2", "Snapshot summary", ""),
 				providerReplayThroughEntryId: "1",
 				preserveData: {
-					anthropicCompaction: { provider: "anthropic", content: "Snapshot summary", signature: "sig" },
+					anthropicCompaction: { provider: "github-copilot", content: "Snapshot summary", signature: "sig" },
 				},
 			};
-			const ctx = buildSessionContext([snapshot, newTurn, compactionEntry]);
+			const ctx = buildSessionContext([snapshot, newTurn, nativeCompaction]);
 			expect(ctx.messages.map(message => message.role)).toEqual(["compactionSummary", "assistant"]);
 			if (ctx.messages[0]?.role !== "compactionSummary") throw new Error("Expected compaction summary");
 			expect(ctx.messages[0].providerPayload).toMatchObject({ signature: "sig" });
 			expect(ctx.messages[0].historyRewriteAt).toBeLessThan(new Date(newTurn.timestamp).getTime());
 		});
 
-		it("keeps context notes behind a native Anthropic summary so its block opens the request", () => {
-			const notes: SessionEntry = {
-				type: "custom",
-				customType: "experimental_context_notes",
-				data: { version: 1, text: "Keep the rollback plan." },
-				id: "2",
-				parentId: "1",
-				timestamp: "2025-01-01T00:00:00Z",
-			};
-			const nativeCompaction: CompactionEntry = {
-				...compaction("3", "2", "Native summary", ""),
-				preserveData: {
-					anthropicCompaction: { provider: "anthropic", content: "Native summary", signature: "sig" },
-				},
-			};
-			const ctx = buildSessionContext([
-				msg("1", null, "user", "first"),
-				notes,
-				nativeCompaction,
-				msg("4", "3", "user", "after compact"),
-			]);
-			expect(ctx.messages.map(message => message.role)).toEqual(["compactionSummary", "custom", "user"]);
-		});
-
-		it("keeps context notes out of the fold between a native summary and its retained assistant turn", () => {
+		it.each([false, true])("keeps context notes behind the native replay fold (assistant tail: %s)", withTail => {
 			const notes: SessionEntry = {
 				type: "custom",
 				customType: "experimental_context_notes",
@@ -406,118 +378,67 @@ describe("buildSessionContext", () => {
 				},
 			};
 			const nativeCompaction: CompactionEntry = {
-				...compaction("5", "4", "Native summary", "3"),
+				...compaction("5", withTail ? "4" : "2", "Native summary", withTail ? "3" : ""),
 				preserveData: {
-					anthropicCompaction: { provider: "anthropic", content: "Native summary", signature: "sig" },
+					anthropicCompaction: { provider: "github-copilot", content: "Native summary", signature: "sig" },
 				},
 			};
 			const ctx = buildSessionContext([
 				msg("1", null, "user", "first"),
 				notes,
-				retained,
-				result,
+				...(withTail ? [retained, result] : []),
 				nativeCompaction,
 				msg("6", "5", "user", "after compact"),
 			]);
-			expect(ctx.messages.map(message => message.role)).toEqual([
-				"compactionSummary",
-				"assistant",
-				"toolResult",
-				"custom",
-				"user",
-			]);
+			expect(ctx.messages.map(message => message.role)).toEqual(
+				withTail
+					? ["compactionSummary", "assistant", "toolResult", "custom", "user"]
+					: ["compactionSummary", "custom", "user"],
+			);
 		});
 
-		it("predates native rewrite markers before the retained tail; summaries keep commit timestamps", () => {
-			// A rewrite marker newer than the tail strips the tail's bound
-			// thinking on the next request; native replay must not do that. The
-			// commit timestamp still retires the tail's pre-compaction usage.
-			// An assistant entry is saved when its stream ends, after the
-			// message's own (stream start) time; the marker precedes the latter.
-			const mayDay = new Date("2025-05-01T00:00:00Z").getTime();
-			const streamStart = mayDay - 6_000;
-			const retainedAssistant: SessionMessageEntry = {
-				type: "message",
-				id: "2",
-				parentId: "1",
-				timestamp: "2025-05-01T00:00:00Z",
-				message: {
-					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "kept reasoning", thinkingSignature: "sig" },
-						{ type: "text", text: "response" },
-					],
-					api: "anthropic-messages",
-					provider: "anthropic",
-					model: "claude-fable-5-1",
-					usage: {
-						input: 1,
-						output: 1,
-						cacheRead: 0,
-						cacheWrite: 0,
-						totalTokens: 2,
-						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-					},
-					stopReason: "stop",
-					timestamp: streamStart,
-				},
-			};
-			const tailUser = msg("4", "3", "user", "after compact");
+		it("predates native rewrite markers before retained thinking while keeping commit timestamps", () => {
+			const retained = msg("2", "1", "assistant", "response");
+			retained.timestamp = "2025-05-01T00:00:00Z";
+			const streamStart = new Date(retained.timestamp).getTime() - 6_000;
+			retained.message.timestamp = streamStart;
 			const nativeCompaction: CompactionEntry = {
 				...compaction("3", "2", "Native summary", "2"),
 				timestamp: "2025-06-01T00:00:00Z",
 				preserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "github-copilot",
 						content: "Native summary",
-						signature: "sig_state",
-						model: "claude-fable-5",
+						signature: "sig",
+						model: "claude-sonnet-4.6",
 						exactTail: true,
 					},
 				},
 			};
-			const entries: SessionEntry[] = [
-				msg("1", null, "user", "first"),
-				retainedAssistant,
-				nativeCompaction,
-				tailUser,
-			];
-			const ctx = buildSessionContext(entries);
-			expect(ctx.messages.map(message => message.role)).toEqual(["compactionSummary", "assistant", "user"]);
-			const summary = ctx.messages[0];
-			if (summary?.role !== "compactionSummary") throw new Error("Expected compaction summary message");
-			expect(summary.timestamp).toBe(new Date("2025-06-01T00:00:00Z").getTime());
+			const entries = [msg("1", null, "user", "first"), retained, nativeCompaction];
+			const summary = buildSessionContext(entries).messages[0];
+			if (summary?.role !== "compactionSummary") throw new Error("Expected compaction summary");
 			const [llmSummary] = defaultConvertToLlm([summary]);
 			if (llmSummary?.role !== "user") throw new Error("Expected user LLM message");
 			expect(llmSummary.historyRewriteAt).toBe(streamStart - 1);
-			expect(llmSummary.timestamp).toBe(summary.timestamp);
-
-			// A summary persisted before `exactTail` keeps its entry-time marker:
-			// thinking created after it was signed against that request.
-			const persisted: CompactionEntry = {
+			expect(llmSummary.timestamp).toBe(new Date(nativeCompaction.timestamp).getTime());
+			const legacy = {
 				...nativeCompaction,
 				preserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "github-copilot",
 						content: "Native summary",
-						signature: "sig_state",
-						model: "claude-fable-5",
+						signature: "sig",
+						model: "claude-sonnet-4.6",
 					},
 				},
 			};
-			const [legacySummary] = defaultConvertToLlm([
-				buildSessionContext([entries[0], retainedAssistant, persisted, tailUser]).messages[0],
-			]);
-			if (legacySummary?.role !== "user") throw new Error("Expected user LLM message");
-			expect(legacySummary.historyRewriteAt).toBe(mayDay - 1);
-
-			// A local compaction keeps the entry commit timestamp.
-			const localCtx = buildSessionContext(
-				entries.filter(entry => entry.id !== "3").concat({ ...nativeCompaction, preserveData: undefined }),
-			);
-			const localSummary = localCtx.messages[0];
-			if (localSummary?.role !== "compactionSummary") throw new Error("Expected compaction summary message");
-			expect(localSummary.timestamp).toBe(new Date("2025-06-01T00:00:00Z").getTime());
+			const legacySummary = buildSessionContext([entries[0], retained, legacy]).messages[0];
+			if (legacySummary?.role !== "compactionSummary") throw new Error("Expected legacy summary");
+			expect(legacySummary.historyRewriteAt).toBe(new Date(retained.timestamp).getTime() - 1);
+			const local = buildSessionContext([entries[0], retained, { ...nativeCompaction, preserveData: undefined }])
+				.messages[0];
+			expect(local.timestamp).toBe(new Date(nativeCompaction.timestamp).getTime());
 		});
 
 		it("caps snapcompact frame payload in LLM context but preserves transcript frames", () => {

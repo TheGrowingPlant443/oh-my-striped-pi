@@ -26,6 +26,7 @@ import {
 	type Model,
 	type OAuthRequestIdentity,
 } from "@oh-my-pi/pi-ai";
+import { getOAuthProvider } from "@oh-my-pi/pi-ai/oauth";
 import {
 	AuthBrokerClient,
 	loadAuthBrokerAccountPool,
@@ -47,7 +48,6 @@ import { getConfigRootDir, logger, VERSION } from "@oh-my-pi/pi-utils";
 import chalk from "@oh-my-pi/pi-utils/chalk";
 import { ModelRegistry } from "../config/model-registry";
 import { cfgDisabledProviders, cfgModelProviderOrder } from "../config/model-settings";
-import { resolveProviderModelReference } from "../config/model-resolver";
 import type { Settings } from "../config/settings";
 import {
 	type AuthBrokerClientConfig,
@@ -213,19 +213,10 @@ export function createAuthGatewayClientsReloader(
  * `/v1/messages`, `/v1/responses`, `/v1/pi/stream`), judge (`/v1/systemone`),
  * image (`/v1/images/*`), tts (`/v1/audio/speech`), stt
  * (`/v1/audio/transcriptions`), embedding (`/v1/embeddings`), rerank
- * (`/v1/rerank`), video (`/v1/videos/*`). Other kinds (tiny, search) have no
+ * (`/v1/rerank`). Other kinds (tiny, search, video) have no
  * wire and stay off the served catalog so `/v1/models` never advertises them.
  */
-const GATEWAY_MODEL_KINDS: readonly ModelKind[] = [
-	"chat",
-	"judge",
-	"image",
-	"tts",
-	"stt",
-	"embedding",
-	"rerank",
-	"video",
-];
+const GATEWAY_MODEL_KINDS: readonly ModelKind[] = ["chat", "judge", "image", "tts", "stt", "embedding", "rerank"];
 
 /** Every registry model of a kind the gateway can route, bundled catalog order within each kind. */
 export function gatewayRoutableModels(registry: ModelRegistry): Model<Api>[] {
@@ -328,10 +319,7 @@ export function resolveGatewayModel(
 		const admitted = tier.filter(accepts);
 		if (admitted.length > 0) return admitted.find(model => model.api === options?.api) ?? admitted[0];
 	}
-	const prefix = "openrouter/";
-	if (!id.startsWith(prefix)) return undefined;
-	const variant = resolveProviderModelReference("openrouter", id.slice(prefix.length), index.models);
-	return variant && accepts(variant) ? variant : undefined;
+	return undefined;
 }
 
 /**
@@ -456,6 +444,8 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 		trustProxyHeaders: flags.trustProxyHeaders,
 		version: VERSION,
 		resolveModel: (id, options) => resolveGatewayModel(id, index, options),
+		getApiKeyWithCredential: (provider, sessionId, options) =>
+			registry.getApiKeyWithCredentialForProvider(provider, sessionId, options),
 		listModels: () => index.qualified.values(),
 		excludeProviders: new Set(cfgDisabledProviders.get(settings)),
 		clients,
@@ -678,19 +668,6 @@ export async function runAuthGatewayCommand(cmd: AuthGatewayCommandArgs): Promis
 	}
 }
 
-/**
- * Provider API types that strict-mode chat probes intentionally skip:
- * - `bedrock-converse-stream` resolves credentials from the AWS env/profile, not the broker bearer.
- * - `google-vertex` uses Application Default Credentials; the broker bearer is not the right key.
- * - `cursor-agent` and `pi-native` (gateway forwarding) have transport quirks
- *   that make a bearer-only "ping" a poor signal.
- */
-const STRICT_PROBE_SKIPPED_APIS: ReadonlySet<Api> = new Set<Api>([
-	"bedrock-converse-stream",
-	"google-vertex",
-	"cursor-agent",
-]);
-
 /** Max chat models to try per credential before reporting failure. */
 const STRICT_PROBE_MAX_CANDIDATES = 4;
 
@@ -709,20 +686,17 @@ const RETRYABLE_MODEL_ERROR_RE =
 	/not[_ -]found|invalid[_ -]model|model[_ -]is[_ -]not[_ -]valid|no longer supported|deprecated|404|decommissioned/i;
 
 /**
- * Rank bundled chat models for a provider in probe order: cheapest first, then
- * by id for determinism. Filters out non-bearer-auth APIs (Vertex/Bedrock),
- * pi-native transport (would loop through the gateway), and placeholder /
- * router entries with negative/missing cost.
+ * Rank configured chat models for a provider in probe order: cheapest first,
+ * then by id for determinism. Excludes gateway loops and invalid cost or output limits.
  */
-function pickProbeCandidates(provider: string): Model<Api>[] {
-	const bundled = getBundledModels(provider as GeneratedProvider);
-	if (bundled.length === 0) return [];
-	const candidates = bundled.filter(model => {
+function pickProbeCandidates(provider: string, models?: readonly Model<Api>[]): Model<Api>[] {
+	const available =
+		models?.filter(model => model.provider === provider) ?? getBundledModels(provider as GeneratedProvider);
+	const candidates = available.filter(model => {
 		// Only chat models answer a chat-completion ping; judge/image/tts/stt
 		// rows would fail the probe regardless of credential health.
 		if (modelKind(model) !== "chat") return false;
 		if (model.transport === "pi-native") return false;
-		if (STRICT_PROBE_SKIPPED_APIS.has(model.api)) return false;
 		if (!model.input.includes("text")) return false;
 		const totalCost = (model.cost?.input ?? 0) + (model.cost?.output ?? 0);
 		if (!Number.isFinite(totalCost) || totalCost < 0) return false;
@@ -745,6 +719,15 @@ function pickProbeCandidates(provider: string): Model<Api>[] {
  */
 function composeProbeApiKey(provider: string, credential: CompletionProbeInput["credential"]): string {
 	if (credential.type === "api_key") return credential.apiKey;
+	const custom = getOAuthProvider(provider);
+	if (custom?.getApiKey) {
+		return custom.getApiKey({
+			...credential,
+			access: credential.accessToken,
+			refresh: credential.refreshToken ?? "",
+			expires: credential.expiresAt ?? 0,
+		});
+	}
 	// Structured providers expect a JSON credential blob (`{ token, projectId, … }`) rather than the raw token.
 	if (authPolicyFor(provider)?.apiKeyFormat !== "structured") return credential.accessToken;
 	return JSON.stringify({
@@ -804,11 +787,11 @@ async function probeOneModel(
  * Stops as soon as one model returns a successful response (the credential
  * authenticated against at least one model in the catalog).
  */
-export function createStrictCompletionProbe(): CompletionProbe {
+export function createStrictCompletionProbe(models?: readonly Model<Api>[]): CompletionProbe {
 	return async (input: CompletionProbeInput): Promise<CredentialCompletionResult> => {
-		const candidates = pickProbeCandidates(input.provider).slice(0, STRICT_PROBE_MAX_CANDIDATES);
+		const candidates = pickProbeCandidates(input.provider, models).slice(0, STRICT_PROBE_MAX_CANDIDATES);
 		if (candidates.length === 0) {
-			return { ok: null, reason: `no bearer-compatible probe model bundled for provider ${input.provider}` };
+			return { ok: null, reason: `no bearer-compatible probe model configured for provider ${input.provider}` };
 		}
 		const apiKey = composeProbeApiKey(input.provider, input.credential);
 		const oauthIdentity =
@@ -861,7 +844,7 @@ function formatCompletionStatus(completion: CredentialCompletionResult | undefin
  * dedicated diagnostic is the only way to see which credentials failed.
  *
  * Strict mode (`--strict`) additionally exercises each credential against a
- * cheap chat model from its provider's bundled catalog. This catches the case
+ * cheap chat model from its configured catalog. This catches the case
  * where the usage endpoint reports 200 but the chat endpoint 401s the same
  * bearer (revoked OAuth scope, mislabeled provider row, etc).
  */
@@ -893,7 +876,12 @@ async function runCheck(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 		const results = await storage.health.check({
 			excludeProviders: new Set(cfgDisabledProviders.get(settings)),
 			...(flags.strict
-				? { completionProbe: createStrictCompletionProbe(), completionTimeoutMs: STRICT_PROBE_OVERALL_TIMEOUT_MS }
+				? {
+						completionProbe: createStrictCompletionProbe(
+							gatewayRoutableModels(new ModelRegistry(storage, undefined, { settings })),
+						),
+						completionTimeoutMs: STRICT_PROBE_OVERALL_TIMEOUT_MS,
+					}
 				: {}),
 		});
 

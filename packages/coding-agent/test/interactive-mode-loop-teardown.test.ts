@@ -41,7 +41,7 @@ describe("InteractiveMode shutdown during a loop condition gate", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!model) throw new Error("expected bundled model");
 		session = new AgentSession({
 			agent: new Agent({ initialState: { model, systemPrompt: ["test"], tools: [], messages: [] } }),

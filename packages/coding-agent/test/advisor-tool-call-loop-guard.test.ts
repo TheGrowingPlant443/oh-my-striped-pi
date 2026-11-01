@@ -51,7 +51,7 @@ describe("advisor tool-call loop guard", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-advisor-tool-call-loop-guard-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -78,7 +78,7 @@ describe("advisor tool-call loop guard", () => {
 		advices?: { note: string; severity: "nit" | "concern" | "blocker" }[],
 	): { advisor: Agent; contexts: Context[]; reviewStarts: Context[] } {
 		const primaryMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [
 				...Array.from({ length: primaryToolSteps }, (_, index) => ({
 					content: [
@@ -95,7 +95,7 @@ describe("advisor tool-call loop guard", () => {
 				{ content: ["primary complete"] },
 			],
 		});
-		const advisorMock = createMockModel({ provider: "anthropic" });
+		const advisorMock = createMockModel({ provider: "github-copilot" });
 		const contexts: Context[] = [];
 		// One entry per scheduled review: a drain prompt's first stream call ends
 		// on the freshly appended Session-update user message, while continuation
@@ -177,7 +177,7 @@ describe("advisor tool-call loop guard", () => {
 			advisorConfigs:
 				advisorConfig === undefined ? undefined : Array.isArray(advisorConfig) ? advisorConfig : [advisorConfig],
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 		const advisor = session.getAdvisorAgent();
 		if (!advisor) throw new Error("Expected advisor agent to be active");
@@ -643,12 +643,12 @@ describe("advisor tool-call loop guard", () => {
 		// any test timeout. The final reviewer's own "strict" override IS waited:
 		// its note is already delivered when prompt() resolves.
 		const primaryMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [{ content: ["primary complete"] }],
 		});
 		let parkedReviewStarted = false;
 		const parkedMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [
 				() => {
 					parkedReviewStarted = true;
@@ -657,7 +657,7 @@ describe("advisor tool-call loop guard", () => {
 			],
 		});
 		const finalMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [
 				{
 					content: [
@@ -700,7 +700,7 @@ describe("advisor tool-call loop guard", () => {
 				},
 			],
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		await session.prompt("only update");
@@ -725,9 +725,12 @@ describe("advisor tool-call loop guard", () => {
 	async function promptStrictFinalReviewer(
 		reviewDelayMs: number,
 	): Promise<{ live: AgentSession; reviews: Context[] }> {
-		const primaryMock = createMockModel({ provider: "anthropic", responses: [{ content: ["primary complete"] }] });
+		const primaryMock = createMockModel({
+			provider: "github-copilot",
+			responses: [{ content: ["primary complete"] }],
+		});
 		const advisorMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [{ content: ["Reviewed."], delayMs: reviewDelayMs }],
 		});
 		const reviews: Context[] = [];
@@ -754,7 +757,7 @@ describe("advisor tool-call loop guard", () => {
 			advisorConfigs: [{ name: "Final reviewer", reviewMode: "agent-end", reviewInterval: 2 }],
 		});
 		session = live;
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(live.setAdvisorEnabled(true)).toBe(true);
 		await live.prompt("ship the retry change");
 		expect(reviews).toHaveLength(0);

@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { Api, AssistantMessage, ImageContent, Model } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockHandler } from "@oh-my-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { loadAdvisorTranscriptCosts } from "@oh-my-pi/pi-coding-agent/advisor/transcript-recorder";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -15,6 +16,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import * as imageVisionFallback from "@oh-my-pi/pi-coding-agent/utils/image-vision-fallback";
 import { Snowflake } from "@oh-my-pi/pi-utils";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 function createBtwAssistant(): AssistantMessage {
 	return {
@@ -80,7 +82,7 @@ describe("AgentSession.branchFromBtw", () => {
 		handler?: MockHandler;
 		model?: Model<Api>;
 	}) {
-		const model = options?.model ?? getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = options?.model ?? getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: options?.handler ?? (() => ({ content: ["unused"] })) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -92,7 +94,15 @@ describe("AgentSession.branchFromBtw", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false });
 		authStorage = await AuthStorage.create(":memory:");
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime(model.provider, "test-key");
+		if (model.provider === "company-btw-vision") {
+			modelRegistry.registerProvider(model.provider, {
+				api: model.api,
+				baseUrl: model.baseUrl,
+				apiKey: "test-key",
+				models: [toProviderModelConfig(model)],
+			});
+		}
 		session = new AgentSession({
 			agent,
 			sessionManager,
@@ -163,7 +173,18 @@ describe("AgentSession.branchFromBtw", () => {
 			.spyOn(imageVisionFallback, "describeAttachedImagesForTextModel")
 			.mockResolvedValue([{ type: "text", text: "A red square." }]);
 		const activeSession = await createSession({
-			model: { ...getBundledModel("anthropic", "claude-sonnet-4-5")!, input: [...input] },
+			model: buildModel({
+				id: "branch-image-model",
+				name: "Company branch image model",
+				provider: "company-btw-vision",
+				api: "openai-completions",
+				baseUrl: "https://company.example.invalid/v1",
+				reasoning: false,
+				input: [...input],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200_000,
+				maxTokens: 8192,
+			}),
 		});
 		activeSession.sessionManager.appendMessage({ role: "user", content: "seed", timestamp: Date.now() });
 		await activeSession.sessionManager.flush();
@@ -186,7 +207,7 @@ describe("AgentSession.branchFromBtw", () => {
 	});
 	it("does not record a late advisor turn into a /btw branch", async () => {
 		const activeSession = await createSession();
-		activeSession.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		activeSession.settings.setModelRole("advisor", "github-copilot/claude-sonnet-4.6");
 		activeSession.toggleAdvisorEnabled();
 		const advisor = activeSession.getAdvisorAgent();
 		if (!advisor) throw new Error("Expected advisor agent to exist");

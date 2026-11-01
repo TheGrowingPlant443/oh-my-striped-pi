@@ -1,9 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import type { MockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
 import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
 import { sessionResolveContext } from "@oh-my-pi/pi-coding-agent/internal-urls/context";
 import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
@@ -38,12 +38,12 @@ function preparedSession(sourceFile: string, sourceSessionId: string): PreparedS
 
 function makeModelRegistry(authStorage: AuthStorage, modelsPath: string, model: MockModel): ModelRegistry {
 	const registry = new ModelRegistry(authStorage, modelsPath);
-	vi.spyOn(registry, "getAvailable").mockReturnValue([model]);
-	vi.spyOn(registry, "getAvailableForProviders").mockReturnValue([model]);
-	vi.spyOn(registry, "getAll").mockReturnValue([model]);
-	vi.spyOn(registry, "find").mockImplementation((provider, id) =>
-		provider === model.provider && id === model.id ? model : undefined,
-	);
+	registry.registerProvider(model.provider, {
+		api: model.api,
+		baseUrl: model.baseUrl,
+		models: [model],
+	});
+	registerCustomApi(model.api, model.stream, MOCK_API_SOURCE);
 	return registry;
 }
 
@@ -100,7 +100,6 @@ afterEach(() => {
 	AgentRegistry.resetGlobalForTests();
 	IrcBus.resetGlobalForTests();
 	unregisterCustomApis(MOCK_API_SOURCE);
-	vi.restoreAllMocks();
 });
 
 describe("seance artifact lifecycle", () => {
@@ -152,7 +151,6 @@ describe("seance artifact lifecycle", () => {
 				{ content: [{ type: "toolCall", name: "yield", arguments: { data: { answer: "cold answer" } } }] },
 			],
 		});
-		registerMockApi(MOCK_API_SOURCE);
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime(mock.model.provider, "test-key");
 		const modelRegistry = makeModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), mock.model);
@@ -272,7 +270,6 @@ describe("seance artifact lifecycle", () => {
 			id: "seance-unstructured-lifecycle",
 			responses: [{ content: ["Initial unstructured answer"] }],
 		});
-		registerMockApi(MOCK_API_SOURCE);
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime(mock.model.provider, "test-key");
 		const modelRegistry = makeModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), mock.model);
@@ -448,7 +445,6 @@ describe("seance artifact lifecycle", () => {
 				content: [{ type: "toolCall", name: "yield", arguments: { data: { answer: id } } }],
 			})),
 		});
-		registerMockApi(MOCK_API_SOURCE);
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime(mock.model.provider, "test-key");
 		const modelRegistry = makeModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), mock.model);

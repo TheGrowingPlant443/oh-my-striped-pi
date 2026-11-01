@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { Message, Model } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -32,13 +32,13 @@ import * as snapcompact from "@oh-my-pi/snapcompact";
 describe.each([
 	{
 		label: "text-only",
-		provider: "aimlapi",
+		provider: "company-text",
 		id: "alibaba/qwen3-coder-480b-a35b-instruct",
 		reason: "alibaba/qwen3-coder-480b-a35b-instruct is text-only",
 	},
 	{
 		label: "wire-stripped",
-		provider: "venice",
+		provider: "company-stripped",
 		id: "deepseek-v4-1-flash",
 		reason: "deepseek-v4-1-flash's provider strips image input",
 	},
@@ -66,13 +66,30 @@ describe.each([
 		activeModel: Model;
 		notices: string[];
 	}> {
-		const activeModel = getBundledModel(provider, id);
-		if (!activeModel) throw new Error(`Expected bundled model ${provider}/${id}`);
+		const activeModel = buildModel({
+			provider,
+			id,
+			name: "Company fallback fixture",
+			api: "openai-completions",
+			baseUrl: "https://models.company.invalid/v1",
+			reasoning: false,
+			input: provider === "company-text" ? ["text"] : ["text", "image"],
+			compat: { stripImageInput: provider === "company-stripped" },
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 32_000,
+		});
 
 		tempDir = TempDir.createSync("@pi-manual-snapcompact-text-only-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		authStorage.keys.setRuntime(provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
+		modelRegistry.registerProvider(provider, {
+			apiKey: "test-key",
+			api: activeModel.api,
+			baseUrl: activeModel.baseUrl,
+			models: [{ ...activeModel, contextWindow: 200_000, maxTokens: 32_000 }],
+		});
 
 		const agent = new Agent({
 			initialState: { model: activeModel, systemPrompt: ["Test"], tools: [], messages: [] },

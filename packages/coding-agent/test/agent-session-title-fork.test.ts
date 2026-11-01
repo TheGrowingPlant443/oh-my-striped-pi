@@ -47,9 +47,9 @@ async function createSession(
 	{ autoTitle = true, todo = false }: { autoTitle?: boolean; todo?: boolean } = {},
 ): Promise<AgentSession> {
 	authStorage = await AuthStorage.create(":memory:");
-	authStorage.keys.setRuntime("anthropic", "test-key");
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected Copilot Claude fixture");
 	const sessionManager = SessionManager.inMemory();
 	const sessionSettings = Settings.isolated({
 		"compaction.enabled": false,

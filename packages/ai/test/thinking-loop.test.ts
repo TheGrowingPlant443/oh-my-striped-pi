@@ -404,8 +404,8 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	}
 
 	for (const { label, provider, id } of [
-		{ label: "Gemini", provider: "openrouter", id: "google/gemini-3.5-flash" },
-		{ label: "Grok 4.6", provider: "xai", id: "grok-4-6" },
+		{ label: "Gemini", provider: "local", id: "google/gemini-3.5-flash" },
+		{ label: "Grok 4.6", provider: "local", id: "grok-4-6" },
 	]) {
 		test(`terminates a ${label} loop with a retryable empty-content error`, async () => {
 			registerMockApi();
@@ -431,7 +431,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("drops the failed attempt from the terminal after a loop is detected", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			mock.push(loopingThinkingResponse());
 
 			const events = await collect(stream(mock.model, context()));
@@ -450,7 +450,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("passes a non-gemini model through untouched even when it loops", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "openai", id: "gpt-5.5" });
+			const mock = createMockModel({ provider: "local", id: "gpt-5.5" });
 			mock.push(loopingThinkingResponse());
 
 			const result = await stream(mock.model, context()).result();
@@ -465,7 +465,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("terminates the observed long-cycle Kiro text runaway", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "kiro", id: "gpt-5-6-sol" });
+			const mock = createMockModel({ provider: "local", id: "gpt-5-6-sol" });
 			mock.push({ content: [`Healthy lead sentence. ${OBSERVED_KIRO_CYCLE.repeat(6)}`] });
 
 			const result = await stream(mock.model, context()).result();
@@ -482,7 +482,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("detects the Kiro cycle across token-sized synthetic-provider deltas", async () => {
 		const model = {
 			api: "openai-completions",
-			provider: "synthetic",
+			provider: "github-copilot",
 			id: "gpt-5-6-sol",
 			name: "GPT 5.6 Sol",
 			baseUrl: "https://unused.example.com",
@@ -534,7 +534,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("does not trip on a healthy gemini turn that reasons then answers", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			mock.push({ content: [{ type: "thinking", thinking: distinctReasoning() }, "Here is the final answer."] });
 
 			const result = await stream(mock.model, context()).result();
@@ -549,7 +549,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("does not retry once a loop re-emerges after visible answer text (armed latch)", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			// Healthy reasoning, then visible answer text, then a runaway loop re-emitted
 			// as cumulative reasoning after `</think>` (the openai-completions shape).
 			mock.push({
@@ -573,7 +573,7 @@ describe("thinking-loop guard (stream wrapper)", () => {
 	test("guards the streamSimple custom-api path (agent default entrypoint)", async () => {
 		registerMockApi();
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			mock.push(loopingThinkingResponse());
 
 			const result = await streamSimple(mock.model, context()).result();
@@ -592,8 +592,8 @@ describe("thinking-loop guard (stream wrapper)", () => {
 describe("withThinkingLoopGuard (Vertex transport)", () => {
 	test("emits a retryable empty-content error for a looping Vertex Gemini stream", async () => {
 		const model = {
-			api: "google-vertex",
-			provider: "google-vertex",
+			api: "local-inference",
+			provider: "local",
 			id: "gemini-2.5-pro",
 			identity: classifyModel("google-vertex", "gemini-2.5-pro"),
 		} as unknown as Model<Api>;
@@ -622,7 +622,7 @@ describe("withThinkingLoopGuard (Vertex transport)", () => {
 });
 
 describe("thinking-loop error accounting", () => {
-	const model = createMockModel({ provider: "google-vertex", id: "gemini-2.5-pro" }).model;
+	const model = createMockModel({ provider: "local", id: "gemini-2.5-pro" }).model;
 	// The guard times attempts with `Date.now()`; a virtual clock keeps these assertions independent of host load.
 	let clock = 1_700_000_000_000;
 	beforeEach(() => {
@@ -648,8 +648,8 @@ describe("thinking-loop error accounting", () => {
 	const attempt = (responseId: string): AssistantMessage => ({
 		role: "assistant",
 		content: [],
-		api: "google-vertex",
-		provider: "google-vertex",
+		api: "local-inference",
+		provider: "local",
 		model: "gemini-2.5-pro",
 		responseId,
 		usage: usage(0, 0, 0),
@@ -786,8 +786,8 @@ describe("thinking-loop error accounting", () => {
 describe("withThinkingLoopGuard (thinking after toolcall)", () => {
 	test("trips on a thinking loop that continues after toolcall_start", async () => {
 		const model = {
-			api: "openai-responses",
-			provider: "xai-oauth",
+			api: "local-inference",
+			provider: "local",
 			id: "grok-4.6",
 			identity: classifyModel("xai-oauth", "grok-4.6"),
 		} as unknown as Model<Api>;
@@ -818,8 +818,8 @@ describe("withThinkingLoopGuard (thinking after toolcall)", () => {
 
 	test("re-arms thinking after thinking_end when more reasoning arrives after a tool call", async () => {
 		const model = {
-			api: "openai-responses",
-			provider: "xai-oauth",
+			api: "local-inference",
+			provider: "local",
 			id: "grok-4.6",
 			identity: classifyModel("xai-oauth", "grok-4.6"),
 		} as unknown as Model<Api>;
@@ -851,8 +851,8 @@ describe("withThinkingLoopGuard (thinking after toolcall)", () => {
 
 	test("does not re-arm thinking after visible answer text even if a tool call already started", async () => {
 		const model = {
-			api: "openai-responses",
-			provider: "xai-oauth",
+			api: "local-inference",
+			provider: "local",
 			id: "grok-4.6",
 			identity: classifyModel("xai-oauth", "grok-4.6"),
 		} as unknown as Model<Api>;
@@ -881,8 +881,8 @@ describe("withThinkingLoopGuard (thinking after toolcall)", () => {
 
 	test("does not latch thinking off on text_start before any visible answer text", async () => {
 		const model = {
-			api: "openai-responses",
-			provider: "xai-oauth",
+			api: "local-inference",
+			provider: "local",
 			id: "grok-4.6",
 			identity: classifyModel("xai-oauth", "grok-4.6"),
 		} as unknown as Model<Api>;
@@ -914,17 +914,17 @@ describe("withThinkingLoopGuard (thinking after toolcall)", () => {
 
 describe("isLoopGuardedModel", () => {
 	test("guards models with Gemini, DeepSeek, and xAI structured identity", () => {
-		const gemini = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" }).model;
-		const deepseek = createMockModel({ provider: "deepseek", id: "deepseek-reasoner" }).model;
-		const grok46 = createMockModel({ provider: "venice", id: "grok-4-6" }).model;
-		const cursorGrok46 = createMockModel({ provider: "cursor", id: "cursor-grok-4.6-high" }).model;
-		const grok460 = createMockModel({ provider: "venice", id: "grok-4.60" }).model;
-		const grok45 = createMockModel({ provider: "cursor", id: "cursor-grok-4.5-high" }).model;
-		const opaqueDeepseek = createMockModel({ provider: "deepseek", id: "opaque-model" }).model;
-		const other = createMockModel({ provider: "openai", id: "gpt-4o" }).model;
-		const openaiNamespacedGemini = createMockModel({ provider: "custom", id: "openai/gemini-pro" }).model;
-		const openaiNamespacedDeepseek = createMockModel({ provider: "custom", id: "openai/deepseek-r1" }).model;
-		const openaiNamespacedGrok = createMockModel({ provider: "custom", id: "openai/grok-4.6" }).model;
+		const gemini = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" }).model;
+		const deepseek = createMockModel({ provider: "local", id: "deepseek-reasoner" }).model;
+		const grok46 = createMockModel({ provider: "local", id: "grok-4-6" }).model;
+		const cursorGrok46 = createMockModel({ provider: "local", id: "cursor-grok-4.6-high" }).model;
+		const grok460 = createMockModel({ provider: "local", id: "grok-4.60" }).model;
+		const grok45 = createMockModel({ provider: "local", id: "cursor-grok-4.5-high" }).model;
+		const opaqueDeepseek = createMockModel({ provider: "local", id: "opaque-model" }).model;
+		const other = createMockModel({ provider: "local", id: "gpt-4o" }).model;
+		const openaiNamespacedGemini = createMockModel({ provider: "local", id: "openai/gemini-pro" }).model;
+		const openaiNamespacedDeepseek = createMockModel({ provider: "local", id: "openai/deepseek-r1" }).model;
+		const openaiNamespacedGrok = createMockModel({ provider: "local", id: "openai/grok-4.6" }).model;
 
 		expect(isLoopGuardedModel(gemini)).toBe(true);
 		expect(isLoopGuardedModel(deepseek)).toBe(true);
@@ -953,8 +953,8 @@ describe("isLoopGuardedModel", () => {
 describe("loop guard assistant prose/text loops", () => {
 	test("trips on assistant text/prose loop when checkAssistantContent is enabled", async () => {
 		const model = {
-			api: "openai-completions",
-			provider: "deepseek",
+			api: "local-inference",
+			provider: "local",
 			id: "deepseek-reasoner",
 			identity: classifyModel("deepseek", "deepseek-reasoner"),
 		} as unknown as Model<Api>;
@@ -988,8 +988,8 @@ describe("loop guard assistant prose/text loops", () => {
 
 	test("does not trip on assistant text loop when checkAssistantContent is false", async () => {
 		const model = {
-			api: "openai-completions",
-			provider: "deepseek",
+			api: "local-inference",
+			provider: "local",
 			id: "deepseek-reasoner",
 			identity: classifyModel("deepseek", "deepseek-reasoner"),
 		} as unknown as Model<Api>;
@@ -1110,7 +1110,7 @@ describe("thinking-loop retry budget (result path)", () => {
 		registerMockApi();
 		const waitSpy = spyOn(scheduler, "wait").mockResolvedValue(undefined);
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			for (let i = 0; i < 4; i++) mock.push(loopResponse());
 			const attempts: AssistantMessage[] = [];
 
@@ -1132,7 +1132,7 @@ describe("thinking-loop retry budget (result path)", () => {
 		registerMockApi();
 		const waitSpy = spyOn(scheduler, "wait").mockResolvedValue(undefined);
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			for (let i = 0; i < 4; i++) mock.push(loopResponse());
 
 			const result = await complete(mock.model, context());
@@ -1156,7 +1156,7 @@ describe("thinking-loop retry budget (result path)", () => {
 			opts?.signal?.throwIfAborted();
 		});
 		try {
-			const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+			const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 			mock.push(loopResponse());
 
 			await expect(completeSimple(mock.model, context(), { signal: controller.signal })).rejects.toThrow(
@@ -1177,7 +1177,7 @@ describe("thinking-loop retry budget (result path)", () => {
 		try {
 			let attempts = 0;
 			const mock = createMockModel({
-				provider: "openrouter",
+				provider: "local",
 				id: "google/gemini-3.5-flash",
 				handler: () => {
 					if (++attempts === 3) controller.abort(new Error("cancelled after final result"));
@@ -1196,11 +1196,11 @@ describe("thinking-loop retry budget (result path)", () => {
 	});
 
 	test("does not retry a contentful ThinkingLoop error (replay-unsafe output)", async () => {
-		const api = "contentful-loop-test";
+		const api = "local-inference";
 		let calls = 0;
 		const model = {
 			api,
-			provider: "test",
+			provider: "local",
 			id: "test-model",
 			name: "Test model",
 			baseUrl: "test://",
@@ -1254,7 +1254,7 @@ describe("loopGuard on mapped provider options", () => {
 	// A built-in API, so the request goes through mapOptionsForApi before stream() guards it.
 	const model = buildModel({
 		api: "openai-responses",
-		provider: "loop-guard-test",
+		provider: "github-copilot",
 		id: "loop-guard-test-model",
 		name: "Loop guard test model",
 		baseUrl: "https://unused.example.com/v1",

@@ -60,7 +60,7 @@ function baseAssistant(overrides?: Partial<AssistantMessage>): AssistantMessage 
 		role: "assistant",
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-sonnet-4-5",
 		usage: ZERO_USAGE,
 		stopReason: "stop",
@@ -91,7 +91,7 @@ describe("pi-native parseRequest", () => {
 
 	it("falls back to model.id when modelId is absent (streamProxy compat)", () => {
 		const parsed = parseRequest({
-			model: { id: "claude-opus-4-1", provider: "anthropic", api: "anthropic-messages" },
+			model: { id: "claude-opus-4-1", provider: "github-copilot", api: "anthropic-messages" },
 			context: baseContext,
 		});
 		expect(parsed.modelId).toBe("claude-opus-4-1");
@@ -128,7 +128,8 @@ describe("pi-native parseRequest", () => {
 				notARealField: "ignored",
 			},
 		});
-		expect(parsed.options).toEqual({ temperature: 0.2, cachedContent: "cachedContents/caller-owned-corpus" });
+		expect(parsed.options).toEqual({ temperature: 0.2 });
+		expect("cachedContent" in parsed.options).toBe(false);
 		expect("apiKey" in parsed.options).toBe(false);
 		expect("signal" in parsed.options).toBe(false);
 		expect("fetch" in parsed.options).toBe(false);
@@ -182,32 +183,6 @@ describe("pi-native parseRequest", () => {
 		expect(parsed.options.serviceTier).toBe("priority");
 		expect(parsed.options.cacheRetention).toBe("long");
 	});
-	it("preserves Bedrock guardrails in the canonical options bag", () => {
-		const parsed = parseRequest({
-			modelId: "amazon-bedrock/amazon.nova-lite-v1:0",
-			context: baseContext,
-			options: {
-				guardrailIdentifier: "arn:aws:bedrock:eu-west-1:123456789012:guardrail/example",
-				guardrailVersion: "7",
-				guardrailTrace: "enabled_full",
-			},
-		});
-
-		expect(parsed.options).toMatchObject({
-			guardrailIdentifier: "arn:aws:bedrock:eu-west-1:123456789012:guardrail/example",
-			guardrailVersion: "7",
-			guardrailTrace: "enabled_full",
-		});
-	});
-	it("preserves requestMetadata in the canonical options bag", () => {
-		const parsed = parseRequest({
-			modelId: "amazon-bedrock/amazon.nova-lite-v1:0",
-			context: baseContext,
-			options: { requestMetadata: { team: "growth" } },
-		});
-
-		expect(parsed.options.requestMetadata).toEqual({ team: "growth" });
-	});
 
 	it("rejects missing required fields", () => {
 		expect(() => parseRequest({ context: baseContext })).toThrow(/modelId/);
@@ -245,8 +220,8 @@ describe("pi-native gateway cache controls", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-pi-native-cache-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
-		const mock = createMockModel({ provider: "openrouter", id: "pi-native-cache" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ provider: "local", id: "pi-native-cache" });
 		const handle = startAuthGateway({
 			bind: "127.0.0.1:0",
 			bearerTokens: ["test-token"],
@@ -287,12 +262,12 @@ describe("pi-native gateway retry budgets", () => {
 	it("limits upstream OpenAI requests on persistent 429", async () => {
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-pi-native-retry-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openai", "test-key");
+		storage.keys.setRuntime("github-copilot", "test-key");
 		const model = buildModel({
 			id: "memory-429",
 			name: "Memory 429",
 			api: "openai-completions",
-			provider: "openai",
+			provider: "github-copilot",
 			baseUrl: "https://api.openai.test/v1",
 			reasoning: false,
 			input: ["text"],
@@ -321,7 +296,7 @@ describe("pi-native gateway retry budgets", () => {
 				method: "POST",
 				headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
 				body: JSON.stringify({
-					modelId: "openai/memory-429",
+					modelId: "github-copilot/memory-429",
 					context: baseContext,
 					options: { maxHttpAttempts: 3 },
 					stream: false,
@@ -342,8 +317,8 @@ describe("pi-native gateway reasoning flags", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-pi-native-reasoning-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
-		const mock = createMockModel({ provider: "openrouter", id: "pi-native-reasoning" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ provider: "local", id: "pi-native-reasoning" });
 		const handle = startAuthGateway({
 			bind: "127.0.0.1:0",
 			bearerTokens: ["test-token"],
@@ -385,7 +360,7 @@ describe("pi-native gateway usage attribution", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-pi-native-usage-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
+		storage.keys.setRuntime("local", "test-key");
 		const recorded: Array<{
 			provider: string;
 			model: string;
@@ -396,7 +371,7 @@ describe("pi-native gateway usage attribution", () => {
 		const spy = vi.spyOn(storage.usage, "observe").mockImplementation(entry => {
 			recorded.push(entry);
 		});
-		const mock = createMockModel({ provider: "openrouter", id: "pi-native-usage" });
+		const mock = createMockModel({ provider: "local", id: "pi-native-usage" });
 		const handle = startAuthGateway({
 			bind: "127.0.0.1:0",
 			bearerTokens: ["test-token"],
@@ -423,7 +398,7 @@ describe("pi-native gateway usage attribution", () => {
 			await attributed.json();
 			expect(recorded).toHaveLength(1);
 			expect(recorded[0]).toMatchObject({
-				provider: "openrouter",
+				provider: "local",
 				model: "pi-native-usage",
 				usage: { input: 100, output: 20, cacheRead: 5, cacheWrite: 2 },
 				costUsd: 0.75,

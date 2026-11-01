@@ -194,43 +194,9 @@ describe("GitHub Copilot Responses image detail clamp (#2822)", () => {
 		expect(await detailOnWire(model)).toBe("auto");
 	});
 
-	it("preserves `original` for non-Copilot Responses hosts (snapcompact native frames)", async () => {
-		const model = makeLongContextVariant({
-			api: "openai-responses",
-			provider: "openai",
-			baseUrl: "https://api.openai.com/v1",
-			headers: {},
-			id: "gpt-5.5",
-			requestModelId: "gpt-5.5",
-			name: "GPT-5.5",
-		});
-		expect(model.compat.supportsImageDetailOriginal).toBe(true);
-		expect(await detailOnWire(model)).toBe("original");
-	});
-
-	it("clamps `original` when only the base URL identifies Copilot (provider id differs)", async () => {
-		// A model pointed at the Copilot Responses host but labeled with a generic
-		// provider id must still degrade `original`. Detecting Copilot solely by the
-		// provider field would resolve `supportsImageDetailOriginal: true` here and
-		// reintroduce the HTTP 400 this clamp prevents; host-aware detection keeps it
-		// `false`.
-		const model = makeLongContextVariant({
-			api: "openai-responses",
-			provider: "openai",
-			baseUrl: "https://api.githubcopilot.com",
-			id: "gpt-5.5-1m",
-			requestModelId: "gpt-5.5",
-			name: "GPT-5.5 (1M)",
-		});
-		expect(model.compat.supportsImageDetailOriginal).toBe(false);
-		expect(await detailOnWire(model)).toBe("auto");
-	});
-
-	it("clamps native snapcompact frames on custom Responses hosts unless explicitly opted in", async () => {
+	it("honors an explicit original-image-detail compatibility override", async () => {
 		const spec = {
 			api: "openai-responses" as const,
-			provider: "custom",
-			baseUrl: "http://127.0.0.1:8080/v1",
 		};
 		expect(await detailOnWire(makeLongContextVariant(spec))).toBe("auto");
 		expect(
@@ -238,11 +204,9 @@ describe("GitHub Copilot Responses image detail clamp (#2822)", () => {
 		).toBe("original");
 	});
 
-	it("clamps original computer screenshots on custom Responses hosts", async () => {
+	it("clamps original computer screenshots on Copilot", async () => {
 		const model = makeLongContextVariant({
 			api: "openai-responses",
-			provider: "custom",
-			baseUrl: "http://127.0.0.1:8080/v1",
 		});
 		const context: Context = {
 			messages: [

@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:te
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -40,14 +41,18 @@ describe("AgentSession openai-completions provider session eviction", () => {
 	});
 
 	function completionsModel(provider: string, id: string): Model {
-		const model = modelRegistry.find(provider, id);
-		if (!model) {
-			throw new Error(`expected bundled openai-completions model ${provider}/${id}`);
-		}
-		if (model.api !== "openai-completions") {
-			throw new Error(`expected ${provider}/${id} to use openai-completions, got ${model.api}`);
-		}
-		return model;
+		return buildModel({
+			id,
+			name: id,
+			provider: `company-${provider}`,
+			api: "openai-completions",
+			baseUrl: provider === "moonshot" ? "" : `https://${provider}.company.invalid/v1`,
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128_000,
+			maxTokens: 16_384,
+		});
 	}
 
 	function completionsSessionKey(model: Model): string {
@@ -107,7 +112,7 @@ describe("AgentSession openai-completions provider session eviction", () => {
 		session = buildSession(moonshot);
 
 		const closeSpy = vi.fn();
-		const resolvedBaseUrlKey = `openai-completions:${moonshot.provider}:https://api.moonshot.cn/v1:${moonshot.id}`;
+		const resolvedBaseUrlKey = `openai-completions:${moonshot.provider}:https://gateway.company.invalid/v1:${moonshot.id}`;
 		session.providerSessionState.set(resolvedBaseUrlKey, {
 			close: closeSpy,
 		} satisfies ProviderSessionState);

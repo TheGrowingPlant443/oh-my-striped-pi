@@ -17,8 +17,8 @@ async function bootGateway(): Promise<GatewayHarness> {
 	registerMockApi();
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-response-headers-"));
 	const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-	storage.keys.setRuntime("openrouter", "test-key");
-	const mock = createMockModel({ provider: "openrouter", id: "mock/header-model" });
+	storage.keys.setRuntime("local", "test-key");
+	const mock = createMockModel({ provider: "local", id: "local/header-model" });
 	const handle = startAuthGateway({
 		bind: "127.0.0.1:0",
 		bearerTokens: ["gw-test-token"],
@@ -58,14 +58,14 @@ describe("auth-gateway diagnostic response headers", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Authorization: "Bearer gw-test-token" },
 				body: JSON.stringify({
-					model: "mock/header-model",
+					model: "local/header-model",
 					messages: [{ role: "user", content: "hi" }],
 					stream: false,
 				}),
 			});
 			expect(res.status).toBe(200);
 			expect(res.headers.get("x-litellm-response-cost")).toBe("0.0012");
-			expect(res.headers.get("x-litellm-model-id")).toBe("mock/header-model");
+			expect(res.headers.get("x-litellm-model-id")).toBe("local/header-model");
 			const duration = res.headers.get("x-litellm-response-duration-ms");
 			expect(duration).not.toBeNull();
 			expect(Number(duration)).toBeGreaterThanOrEqual(0);
@@ -86,7 +86,7 @@ describe("auth-gateway diagnostic response headers", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Authorization: "Bearer gw-test-token" },
 				body: JSON.stringify({
-					model: "mock/header-model",
+					model: "local/header-model",
 					messages: [{ role: "user", content: "send this" }],
 					tools: [
 						{
@@ -102,7 +102,7 @@ describe("auth-gateway diagnostic response headers", () => {
 				}),
 			});
 			expect(res.status).toBe(200);
-			expect(gw.mock.calls[0]?.options?.cursorExternalToolExecutor).toBe(true);
+			expect(gw.mock.calls[0]?.context.tools?.map(tool => tool.name)).toEqual(["send_message"]);
 		} finally {
 			await gw.close();
 		}
@@ -116,13 +116,13 @@ describe("auth-gateway diagnostic response headers", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Authorization: "Bearer gw-test-token" },
 				body: JSON.stringify({
-					model: "mock/header-model",
+					model: "local/header-model",
 					messages: [{ role: "user", content: "hi" }],
 					stream: true,
 				}),
 			});
 			expect(res.status).toBe(200);
-			expect(res.headers.get("x-litellm-model-id")).toBe("mock/header-model");
+			expect(res.headers.get("x-litellm-model-id")).toBe("local/header-model");
 			expect(res.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
 			expect(res.headers.get("x-litellm-response-cost")).toBeNull();
 			await res.text();

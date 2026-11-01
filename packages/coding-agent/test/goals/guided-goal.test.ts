@@ -14,6 +14,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { createTools, type Tool, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "../helpers/model-fixtures";
 
 function createToolSession(cwd: string, settings: Settings, overrides: Partial<ToolSession> = {}): ToolSession {
 	return {
@@ -46,10 +47,7 @@ async function createHarness(options?: { goalEnabled?: boolean }): Promise<Guide
 	});
 	const authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 	const modelRegistry = new ModelRegistry(authStorage);
-	const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-	if (!model) {
-		throw new Error("Expected claude-sonnet-4-5 to exist in registry");
-	}
+	const model = getTestModel("github-copilot");
 	const initialTools = await createTools(createToolSession(tempDir.path(), settings), ["read"]);
 	const toolRegistry = new Map<string, Tool>(initialTools.map(tool => [tool.name, tool] as const));
 	const session = new AgentSession({

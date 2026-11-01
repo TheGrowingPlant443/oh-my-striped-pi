@@ -151,11 +151,10 @@ func (v RedactedThinkingContent) MarshalJSON() ([]byte, error) {
 // Inline image; also the shape hosts send with prompts.
 type ImageContent struct {
 	// Base64-encoded image bytes.
-	Data         string                     `json:"data"`
-	MimeType     string                     `json:"mimeType"`
-	Detail       *ImageContentDetail        `json:"detail,omitempty"`
-	URL          *string                    `json:"url,omitempty"`
-	ProviderFile map[string]json.RawMessage `json:"providerFile,omitempty"`
+	Data     string              `json:"data"`
+	MimeType string              `json:"mimeType"`
+	Detail   *ImageContentDetail `json:"detail,omitempty"`
+	URL      *string             `json:"url,omitempty"`
 	// Extra holds undeclared keys and declared keys whose value did not decode (that field stays zero).
 	// Encoding writes them back, over a declared field with the same key.
 	Extra map[string]json.RawMessage `json:"-"`
@@ -173,7 +172,6 @@ func (v *ImageContent) decodeFrom(raw map[string]json.RawMessage) error {
 	d.required("mimeType", &out.MimeType)
 	d.optional("detail", &out.Detail)
 	d.optional("url", &out.URL)
-	d.optional("providerFile", &out.ProviderFile)
 	out.Extra = d.rest()
 	if d.err != nil {
 		return d.err
@@ -1813,7 +1811,6 @@ type ModelInfo struct {
 	MaxTokens              *int64                     `json:"maxTokens"`
 	Headers                map[string]string          `json:"headers,omitempty"`
 	PremiumMultiplier      *float64                   `json:"premiumMultiplier,omitempty"`
-	PreferWebsockets       *bool                      `json:"preferWebsockets,omitempty"`
 	ContextPromotionTarget *string                    `json:"contextPromotionTarget,omitempty"`
 	Priority               *int64                     `json:"priority,omitempty"`
 	Thinking               *ThinkingConfig            `json:"thinking,omitempty"`
@@ -1839,7 +1836,6 @@ func (v *ModelInfo) decodeFrom(raw map[string]json.RawMessage) error {
 	d.nullable("maxTokens", &out.MaxTokens)
 	d.optional("headers", &out.Headers)
 	d.optional("premiumMultiplier", &out.PremiumMultiplier)
-	d.optional("preferWebsockets", &out.PreferWebsockets)
 	d.optional("contextPromotionTarget", &out.ContextPromotionTarget)
 	d.optional("priority", &out.Priority)
 	d.optional("thinking", &out.Thinking)
@@ -2396,109 +2392,6 @@ func (v *SlowModeScope) UnmarshalJSON(data []byte) error {
 	return unknownValue("SlowModeScope", s)
 }
 
-// Requests are served on the provider's low-priority (slow) lane.
-type UsageLimitLowPriority struct {
-	// Epoch seconds when the limit that was hit resets.
-	ResetsAtSec float64 `json:"resetsAtSec"`
-	// Percent of the low-priority allowance still available, when reported.
-	AllowanceLeftPercent *int64 `json:"allowanceLeftPercent,omitempty"`
-}
-
-func (v *UsageLimitLowPriority) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "UsageLimitLowPriority", v.decodeFrom)
-}
-
-func (v *UsageLimitLowPriority) decodeFrom(raw map[string]json.RawMessage) error {
-	var out UsageLimitLowPriority
-	d := fieldDecoder{raw: raw, owner: "UsageLimitLowPriority"}
-	d.constant("stage", "low_priority")
-	d.required("resetsAtSec", &out.ResetsAtSec)
-	d.optional("allowanceLeftPercent", &out.AllowanceLeftPercent)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v UsageLimitLowPriority) MarshalJSON() ([]byte, error) {
-	type plain UsageLimitLowPriority
-	return encodeObject(plain(v), `"stage":"low_priority"`, nil)
-}
-
-// Requests run on a short wrap-up allowance past the limit.
-type UsageLimitWrapUp struct {
-	// Whether paid extra usage serves requests once the allowance is spent.
-	ExtraUsage bool `json:"extraUsage"`
-	// Epoch seconds when the limit that was hit resets, if reported.
-	ResetsAtSec *float64 `json:"resetsAtSec,omitempty"`
-}
-
-func (v *UsageLimitWrapUp) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "UsageLimitWrapUp", v.decodeFrom)
-}
-
-func (v *UsageLimitWrapUp) decodeFrom(raw map[string]json.RawMessage) error {
-	var out UsageLimitWrapUp
-	d := fieldDecoder{raw: raw, owner: "UsageLimitWrapUp"}
-	d.constant("stage", "wrap_up")
-	d.required("extraUsage", &out.ExtraUsage)
-	d.optional("resetsAtSec", &out.ResetsAtSec)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v UsageLimitWrapUp) MarshalJSON() ([]byte, error) {
-	type plain UsageLimitWrapUp
-	return encodeObject(plain(v), `"stage":"wrap_up"`, nil)
-}
-
-// Provider-neutral state of an account past its usage limit, discriminated by `stage`.
-type UsageLimitState struct {
-	// Value holds one variant, chosen by "stage" on decode.
-	Value UsageLimitStateVariant
-}
-
-// UsageLimitStateVariant is implemented by the types UsageLimitState can hold.
-type UsageLimitStateVariant interface {
-	isUsageLimitState()
-}
-
-func (UsageLimitLowPriority) isUsageLimitState() {}
-func (UsageLimitWrapUp) isUsageLimitState()      {}
-
-func (v UsageLimitState) MarshalJSON() ([]byte, error) {
-	return encodeVariant("UsageLimitState", v.Value)
-}
-
-func (v *UsageLimitState) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "UsageLimitState", v.decodeFrom)
-}
-
-func (v *UsageLimitState) decodeFrom(raw map[string]json.RawMessage) error {
-	tag, err := unionTag(raw, "UsageLimitState", "stage")
-	if err != nil {
-		return err
-	}
-	var value UsageLimitStateVariant
-	switch tag {
-	case "low_priority":
-		value, err = decodeVariant[UsageLimitLowPriority](raw)
-	case "wrap_up":
-		value, err = decodeVariant[UsageLimitWrapUp](raw)
-	default:
-		return unknownValue("UsageLimitState.stage", tag)
-	}
-	if err != nil {
-		return err
-	}
-	v.Value = value
-	return nil
-}
-
 type SessionState struct {
 	SessionID             string         `json:"sessionId"`
 	Model                 *ModelInfo     `json:"model,omitempty"`
@@ -2518,12 +2411,10 @@ type SessionState struct {
 	// `/slow` is on for the active model; always `false` when `slowModeSupported` is `false`.
 	SlowModeEnabled bool `json:"slowModeEnabled"`
 	// Where the active model's `/slow` lives; absent when unsupported.
-	SlowModeScope *SlowModeScope `json:"slowModeScope,omitempty"`
-	// Usage-limit stage of the active model's account; absent outside wrap-up and low priority.
-	UsageLimit         *UsageLimitState `json:"usageLimit,omitempty"`
-	TokensPerSecond    *float64         `json:"tokensPerSecond"`
-	MessageCount       int64            `json:"messageCount"`
-	QueuedMessageCount int64            `json:"queuedMessageCount"`
+	SlowModeScope      *SlowModeScope `json:"slowModeScope,omitempty"`
+	TokensPerSecond    *float64       `json:"tokensPerSecond"`
+	MessageCount       int64          `json:"messageCount"`
+	QueuedMessageCount int64          `json:"queuedMessageCount"`
 	// Background jobs or deliveries can still inject a follow-up and wake the session.
 	HasPendingAsyncWork bool `json:"hasPendingAsyncWork"`
 	// Idle with nothing queued or pending; same predicate as `session_settled`.
@@ -2561,7 +2452,6 @@ func (v *SessionState) decodeFrom(raw map[string]json.RawMessage) error {
 	d.defaulted("slowModeSupported", &out.SlowModeSupported, `false`)
 	d.defaulted("slowModeEnabled", &out.SlowModeEnabled, `false`)
 	d.optional("slowModeScope", &out.SlowModeScope)
-	d.optional("usageLimit", &out.UsageLimit)
 	d.defaulted("tokensPerSecond", &out.TokensPerSecond, `null`)
 	d.defaulted("messageCount", &out.MessageCount, `0`)
 	d.defaulted("queuedMessageCount", &out.QueuedMessageCount, `0`)
@@ -5058,161 +4948,6 @@ func (v SubagentEvent) MarshalJSON() ([]byte, error) {
 	return encodeObject(plain(v), `"type":"subagent_event"`, nil)
 }
 
-type LivePhase string
-
-const (
-	LivePhaseConnecting LivePhase = "connecting"
-	LivePhaseListening  LivePhase = "listening"
-	LivePhaseWorking    LivePhase = "working"
-	LivePhaseSpeaking   LivePhase = "speaking"
-	LivePhaseMuted      LivePhase = "muted"
-	LivePhaseError      LivePhase = "error"
-)
-
-func (v *LivePhase) UnmarshalJSON(data []byte) error {
-	s, err := decodeString(data, "LivePhase")
-	if err != nil {
-		return err
-	}
-	switch value := LivePhase(s); value {
-	case LivePhaseConnecting, LivePhaseListening, LivePhaseWorking, LivePhaseSpeaking, LivePhaseMuted, LivePhaseError:
-		*v = value
-		return nil
-	}
-	return unknownValue("LivePhase", s)
-}
-
-type LiveRole string
-
-const (
-	LiveRoleUser      LiveRole = "user"
-	LiveRoleAssistant LiveRole = "assistant"
-)
-
-func (v *LiveRole) UnmarshalJSON(data []byte) error {
-	s, err := decodeString(data, "LiveRole")
-	if err != nil {
-		return err
-	}
-	switch value := LiveRole(s); value {
-	case LiveRoleUser, LiveRoleAssistant:
-		*v = value
-		return nil
-	}
-	return unknownValue("LiveRole", s)
-}
-
-type LivePhaseEvent struct {
-	Phase LivePhase `json:"phase"`
-}
-
-func (v *LivePhaseEvent) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LivePhaseEvent", v.decodeFrom)
-}
-
-func (v *LivePhaseEvent) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LivePhaseEvent
-	d := fieldDecoder{raw: raw, owner: "LivePhaseEvent"}
-	d.constant("type", "live_phase")
-	d.required("phase", &out.Phase)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v LivePhaseEvent) MarshalJSON() ([]byte, error) {
-	type plain LivePhaseEvent
-	return encodeObject(plain(v), `"type":"live_phase"`, nil)
-}
-
-// Microphone (`input`) and speaker (`output`) RMS in [0, 1], at most every 100 ms.
-type LiveLevelsEvent struct {
-	Input  float64 `json:"input"`
-	Output float64 `json:"output"`
-}
-
-func (v *LiveLevelsEvent) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveLevelsEvent", v.decodeFrom)
-}
-
-func (v *LiveLevelsEvent) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveLevelsEvent
-	d := fieldDecoder{raw: raw, owner: "LiveLevelsEvent"}
-	d.constant("type", "live_levels")
-	d.required("input", &out.Input)
-	d.required("output", &out.Output)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v LiveLevelsEvent) MarshalJSON() ([]byte, error) {
-	type plain LiveLevelsEvent
-	return encodeObject(plain(v), `"type":"live_levels"`, nil)
-}
-
-// Accumulated text of one realtime turn; replaces earlier frames with the same `role` and `turn`.
-type LiveTranscriptEvent struct {
-	Role  LiveRole `json:"role"`
-	Turn  int64    `json:"turn"`
-	Text  string   `json:"text"`
-	Final bool     `json:"final"`
-}
-
-func (v *LiveTranscriptEvent) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveTranscriptEvent", v.decodeFrom)
-}
-
-func (v *LiveTranscriptEvent) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveTranscriptEvent
-	d := fieldDecoder{raw: raw, owner: "LiveTranscriptEvent"}
-	d.constant("type", "live_transcript")
-	d.required("role", &out.Role)
-	d.required("turn", &out.Turn)
-	d.required("text", &out.Text)
-	d.required("final", &out.Final)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v LiveTranscriptEvent) MarshalJSON() ([]byte, error) {
-	type plain LiveTranscriptEvent
-	return encodeObject(plain(v), `"type":"live_transcript"`, nil)
-}
-
-// Sent exactly once when a live session ends; `error` carries the failure cause.
-type LiveEndEvent struct {
-	Error *string `json:"error,omitempty"`
-}
-
-func (v *LiveEndEvent) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveEndEvent", v.decodeFrom)
-}
-
-func (v *LiveEndEvent) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveEndEvent
-	d := fieldDecoder{raw: raw, owner: "LiveEndEvent"}
-	d.constant("type", "live_end")
-	d.optional("error", &out.Error)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-func (v LiveEndEvent) MarshalJSON() ([]byte, error) {
-	type plain LiveEndEvent
-	return encodeObject(plain(v), `"type":"live_end"`, nil)
-}
-
 // State of one draft-only microphone capture.
 type DictationStateEvent struct {
 	CaptureID string                   `json:"captureId"`
@@ -6681,10 +6416,6 @@ func (AvailableCommandsUpdateEvent) isRpcNotification() {}
 func (SubagentLifecycleEvent) isRpcNotification()       {}
 func (SubagentProgressEvent) isRpcNotification()        {}
 func (SubagentEvent) isRpcNotification()                {}
-func (LivePhaseEvent) isRpcNotification()               {}
-func (LiveLevelsEvent) isRpcNotification()              {}
-func (LiveTranscriptEvent) isRpcNotification()          {}
-func (LiveEndEvent) isRpcNotification()                 {}
 func (DictationStateEvent) isRpcNotification()          {}
 func (DictationTranscriptEvent) isRpcNotification()     {}
 func (DictationEndEvent) isRpcNotification()            {}
@@ -6759,14 +6490,6 @@ func (v *RpcNotification) UnmarshalJSON(data []byte) error {
 		value, err = decodeVariant[SubagentProgressEvent](raw)
 	case "subagent_event":
 		value, err = decodeVariant[SubagentEvent](raw)
-	case "live_phase":
-		value, err = decodeVariant[LivePhaseEvent](raw)
-	case "live_levels":
-		value, err = decodeVariant[LiveLevelsEvent](raw)
-	case "live_transcript":
-		value, err = decodeVariant[LiveTranscriptEvent](raw)
-	case "live_end":
-		value, err = decodeVariant[LiveEndEvent](raw)
 	case "dictation_state":
 		value, err = decodeVariant[DictationStateEvent](raw)
 	case "dictation_transcript":
@@ -6886,10 +6609,6 @@ func (AvailableCommandsUpdateEvent) isRpcServerFrame() {}
 func (SubagentLifecycleEvent) isRpcServerFrame()       {}
 func (SubagentProgressEvent) isRpcServerFrame()        {}
 func (SubagentEvent) isRpcServerFrame()                {}
-func (LivePhaseEvent) isRpcServerFrame()               {}
-func (LiveLevelsEvent) isRpcServerFrame()              {}
-func (LiveTranscriptEvent) isRpcServerFrame()          {}
-func (LiveEndEvent) isRpcServerFrame()                 {}
 func (DictationStateEvent) isRpcServerFrame()          {}
 func (DictationTranscriptEvent) isRpcServerFrame()     {}
 func (DictationEndEvent) isRpcServerFrame()            {}
@@ -6974,14 +6693,6 @@ func (v *RpcServerFrame) UnmarshalJSON(data []byte) error {
 		value, err = decodeVariant[SubagentProgressEvent](raw)
 	case "subagent_event":
 		value, err = decodeVariant[SubagentEvent](raw)
-	case "live_phase":
-		value, err = decodeVariant[LivePhaseEvent](raw)
-	case "live_levels":
-		value, err = decodeVariant[LiveLevelsEvent](raw)
-	case "live_transcript":
-		value, err = decodeVariant[LiveTranscriptEvent](raw)
-	case "live_end":
-		value, err = decodeVariant[LiveEndEvent](raw)
 	case "dictation_state":
 		value, err = decodeVariant[DictationStateEvent](raw)
 	case "dictation_transcript":
@@ -7280,65 +6991,6 @@ func (v *CancelSubagentResult) decodeFrom(raw map[string]json.RawMessage) error 
 	var out CancelSubagentResult
 	d := fieldDecoder{raw: raw, owner: "CancelSubagentResult"}
 	d.required("cancelled", &out.Cancelled)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-type LiveStartResult struct {
-	Voice string `json:"voice"`
-}
-
-func (v *LiveStartResult) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveStartResult", v.decodeFrom)
-}
-
-func (v *LiveStartResult) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveStartResult
-	d := fieldDecoder{raw: raw, owner: "LiveStartResult"}
-	d.required("voice", &out.Voice)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-type LiveConnectResult struct {
-	Voice     string `json:"voice"`
-	SdpAnswer string `json:"sdpAnswer"`
-}
-
-func (v *LiveConnectResult) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveConnectResult", v.decodeFrom)
-}
-
-func (v *LiveConnectResult) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveConnectResult
-	d := fieldDecoder{raw: raw, owner: "LiveConnectResult"}
-	d.required("voice", &out.Voice)
-	d.required("sdpAnswer", &out.SdpAnswer)
-	if d.err != nil {
-		return d.err
-	}
-	*v = out
-	return nil
-}
-
-type LiveMuteResult struct {
-	Muted bool `json:"muted"`
-}
-
-func (v *LiveMuteResult) UnmarshalJSON(data []byte) error {
-	return decodeWith(data, "LiveMuteResult", v.decodeFrom)
-}
-
-func (v *LiveMuteResult) decodeFrom(raw map[string]json.RawMessage) error {
-	var out LiveMuteResult
-	d := fieldDecoder{raw: raw, owner: "LiveMuteResult"}
-	d.required("muted", &out.Muted)
 	if d.err != nil {
 		return d.err
 	}
@@ -7963,50 +7615,6 @@ type SteerSubagentCommand struct {
 // SteerSubagent sends "steer_subagent": Send a message to a running subagent as its user.
 func (c Commands) SteerSubagent(ctx context.Context, p SteerSubagentCommand) error {
 	return c.call(ctx, "steer_subagent", p, 0, nil)
-}
-
-// LiveStartCommand holds the parameters of "live_start".
-type LiveStartCommand struct {
-	Voice        *string `json:"voice,omitempty"`
-	Instructions *string `json:"instructions,omitempty"`
-}
-
-// LiveStart sends "live_start": Start a live voice session bound to this session; returns the voice in use.
-func (c Commands) LiveStart(ctx context.Context, p LiveStartCommand) (string, error) {
-	var out LiveStartResult
-	err := c.call(ctx, "live_start", p, 0, &out)
-	return out.Voice, err
-}
-
-// LiveConnectCommand holds the parameters of "live_connect".
-type LiveConnectCommand struct {
-	SdpOffer     string  `json:"sdpOffer"`
-	Voice        *string `json:"voice,omitempty"`
-	Instructions *string `json:"instructions,omitempty"`
-}
-
-// LiveConnect sends "live_connect": Start a live voice session whose audio runs on a caller-owned WebRTC peer: send its SDP offer, apply the returned answer.
-func (c Commands) LiveConnect(ctx context.Context, p LiveConnectCommand) (LiveConnectResult, error) {
-	var out LiveConnectResult
-	err := c.call(ctx, "live_connect", p, 0, &out)
-	return out, err
-}
-
-// LiveStop sends "live_stop": Stop the live voice session, if any.
-func (c Commands) LiveStop(ctx context.Context) error {
-	return c.call(ctx, "live_stop", nil, 0, nil)
-}
-
-// LiveMuteCommand holds the parameters of "live_mute".
-type LiveMuteCommand struct {
-	Muted *bool `json:"muted,omitempty"`
-}
-
-// LiveMute sends "live_mute": Set microphone mute, or toggle it when `muted` is omitted; returns the new state.
-func (c Commands) LiveMute(ctx context.Context, p LiveMuteCommand) (bool, error) {
-	var out LiveMuteResult
-	err := c.call(ctx, "live_mute", p, 0, &out)
-	return out.Muted, err
 }
 
 // DictationStartCommand holds the parameters of "dictation_start".

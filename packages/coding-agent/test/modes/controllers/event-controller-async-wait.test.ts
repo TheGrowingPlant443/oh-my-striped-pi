@@ -199,8 +199,8 @@ describe("EventController — ending the wait on a real session", () => {
 
 	it("folds a job result that lands after the wait was ended into context without starting a turn", async () => {
 		tempDir = TempDir.createSync("@pi-async-wait-esc-");
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected built-in Copilot model to exist");
 		const mock = createMockModel({
 			responses: [{ content: ["job started"], stopReason: "stop" }],
 			handler: () => ({ content: ["woke up after the job"], stopReason: "stop" }),
@@ -212,7 +212,7 @@ describe("EventController — ending the wait on a real session", () => {
 		});
 		const sessionManager = SessionManager.inMemory(tempDir.path());
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		manager = new AsyncJobManager({});
 		session = new AgentSession({
 			agent,

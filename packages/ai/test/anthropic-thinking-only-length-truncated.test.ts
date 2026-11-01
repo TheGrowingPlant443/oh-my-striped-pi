@@ -22,7 +22,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 describe("transformMessages drops thinking-only assistant turns", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-opus-4-7",
 		name: "Claude Opus 4.7",
 		baseUrl: "https://api.anthropic.com",
@@ -41,7 +41,7 @@ describe("transformMessages drops thinking-only assistant turns", () => {
 		role: "assistant",
 		content: [{ type: "thinking", thinking, thinkingSignature: signature }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		usage: {
 			input: 0,
@@ -63,7 +63,7 @@ describe("transformMessages drops thinking-only assistant turns", () => {
 			{ type: "toolCall", id: toolCallId, name: "read", arguments: { path: "x" } },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		usage: {
 			input: 0,
@@ -112,7 +112,7 @@ describe("transformMessages drops thinking-only assistant turns", () => {
 
 		// End-to-end: the wire-level Anthropic params must NOT have two adjacent
 		// `assistant` entries, which is the exact failure mode in the 400 dump.
-		const params = convertAnthropicMessages(messages, model, false);
+		const params = convertAnthropicMessages(messages, model);
 		for (let i = 1; i < params.length; i++) {
 			expect(
 				params[i].role === "assistant" && params[i - 1].role === "assistant",
@@ -166,7 +166,7 @@ describe("transformMessages drops thinking-only assistant turns", () => {
 				{ type: "text", text: "partial answer cut off mid-" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: {
 				input: 0,

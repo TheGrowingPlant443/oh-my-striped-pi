@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -52,7 +56,7 @@ describe("AuthStorage broker sentinel refresh", () => {
 	test("getOAuthAccess refreshes expired broker credentials through the store hook only", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
-		await authStorage.credentials.set("anthropic", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "broker-access-stale",
@@ -66,7 +70,7 @@ describe("AuthStorage broker sentinel refresh", () => {
 			throw new Error("provider-direct refresh must not be called");
 		});
 
-		const access = await authStorage.oauth.access("anthropic", "broker-session");
+		const access = await authStorage.oauth.access("github-copilot", "broker-session");
 
 		expect(access).toEqual({
 			accessToken: "broker-access-rotated",
@@ -78,7 +82,7 @@ describe("AuthStorage broker sentinel refresh", () => {
 		});
 		expect(brokerRefreshCalls).toBe(1);
 		expect(providerRefresh).not.toHaveBeenCalled();
-		const persisted = store.listAuthCredentials("anthropic");
+		const persisted = store.listAuthCredentials("github-copilot");
 		expect(persisted).toHaveLength(1);
 		expect(persisted[0]?.credential.type).toBe("oauth");
 		if (persisted[0]?.credential.type === "oauth") {
@@ -93,8 +97,8 @@ describe("AuthStorage broker sentinel refresh", () => {
 		});
 
 		await expect(
-			oauthUtils.getOAuthApiKey("anthropic", {
-				anthropic: {
+			oauthUtils.getOAuthApiKey("github-copilot", {
+				"github-copilot": {
 					access: "broker-access-stale",
 					refresh: REMOTE_REFRESH_SENTINEL,
 					expires: Date.now() - 60_000,

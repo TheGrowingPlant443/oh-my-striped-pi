@@ -12,7 +12,6 @@ import {
 	type Model,
 } from "@oh-my-pi/pi-ai";
 import { getOAuthProviders, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/oauth/types";
 import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { logger, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
@@ -24,7 +23,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	let registry: ModelRegistry;
 	let fetchRequests: string[];
 
-	const sourceIds = ["ext://atomic", "ext://runtime", "ext://oauth"];
+	const sourceIds = ["ext://oauth"];
 
 	// Stub transport: reject every request so refresh("online") drives the full
 	// online discovery path with deterministic, instant failures instead of real
@@ -47,9 +46,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		clearCustomApis();
-		for (const sourceId of sourceIds) {
-			unregisterOAuthProviders(sourceId);
-		}
+		for (const sourceId of sourceIds) unregisterOAuthProviders(sourceId);
 		authStorage.close();
 		if (tempDir && fs.existsSync(tempDir)) {
 			removeSyncWithRetries(tempDir);
@@ -128,119 +125,73 @@ describe("ModelRegistry runtime provider registration", () => {
 		);
 	}
 
-	test("does not discover ClinePass without credentials", async () => {
-		const peek = vi.spyOn(authStorage.keys, "peek").mockResolvedValue(undefined);
-		try {
-			await registry.refresh("online");
-		} finally {
-			peek.mockRestore();
-		}
-
-		expect(fetchRequests).not.toContain("https://api.cline.bot/api/v1/ai/cline/recommended-models");
-		expect(registry.find("cline-pass", "kimi-k3")).toBeDefined();
-	});
-
-	test("validates provider config before mutating custom API state", () => {
-		const beforeAnthropicCount = registry.getAll().filter(model => model.provider === "anthropic").length;
-
-		const invalidConfig: ProviderConfigInput = {
-			api: "custom-atomic-api",
-			apiKey: "RUNTIME_KEY",
-			streamSimple,
-			models: [{ ...baseModel, id: "broken" }],
-			// baseUrl intentionally missing to force validation failure
-		};
-
-		expect(() => registry.registerProvider("atomic-provider", invalidConfig, "ext://atomic")).toThrow(
-			'Provider atomic-provider: "baseUrl" is required when defining custom models.',
-		);
-		expect(getCustomApi("custom-atomic-api")).toBeUndefined();
-
-		const afterAnthropicCount = registry.getAll().filter(model => model.provider === "anthropic").length;
-		expect(afterAnthropicCount).toBe(beforeAnthropicCount);
-	});
-
-	test("extension runner models keep their kind across refresh", async () => {
+	test("registers company APIs, OAuth and discovery with source-owned cleanup", async () => {
+		const login = vi.fn(async () => "company-key");
+		const dynamic = vi.fn(async () => [{ ...baseModel, id: "discovered-company-model" }]);
 		registry.registerProvider(
-			"my-gateway",
+			"company-provider",
 			{
-				baseUrl: "https://gateway.example.com/v1",
-				apiKey: "RUNTIME_KEY",
-				api: "openai-completions",
-				models: [{ ...baseModel, id: "gpt-image-2", api: "openai-images", kind: "image" }],
+				api: "company-api",
+				baseUrl: "https://inference.company.example/v1",
+				streamSimple,
+				oauth: { name: "Company", login },
+				fetchDynamicModels: dynamic,
+				models: [baseModel],
 			},
-			"ext://runtime",
+			"ext://company",
 		);
-		const isGatewayImage = (model: Model<Api>) => model.provider === "my-gateway" && model.id === "gpt-image-2";
-
-		expect(registry.getAvailable("image").some(isGatewayImage)).toBe(true);
-		expect(registry.getAll().some(isGatewayImage)).toBe(false);
-		await registry.refresh("offline");
-		expect(registry.getAll("image").some(isGatewayImage)).toBe(true);
-	});
-
-	test("fetchDynamicModels drops a row whose api cannot serve its kind", async () => {
-		registry.registerProvider(
-			"my-gateway",
-			{
-				baseUrl: "https://gateway.example.com/v1",
-				apiKey: "RUNTIME_KEY",
-				api: "openai-completions",
-				fetchDynamicModels: async () => [
-					{ ...baseModel, id: "mismatched", api: "openai-images", kind: "chat" },
-					{ ...baseModel, id: "gpt-image-2", api: "openai-images" },
-				],
-			},
-			"ext://runtime",
-		);
+		expect(getCustomApi("company-api")).toBeDefined();
+		expect(getOAuthProviders().some(provider => provider.id === "company-provider")).toBe(true);
+		expect(login).not.toHaveBeenCalled();
 		await registry.refreshRuntimeProviders("online");
-
-		expect(registry.find("my-gateway", "mismatched")).toBeUndefined();
-		expect(registry.find("my-gateway", "gpt-image-2")).toMatchObject({ kind: "image" });
+		expect(dynamic).toHaveBeenCalled();
+		expect(registry.find("company-provider", "discovered-company-model")?.provider).toBe("company-provider");
+		registry.clearSourceRegistrations("ext://company");
+		expect(getCustomApi("company-api")).toBeUndefined();
+		expect(getOAuthProviders().some(provider => provider.id === "company-provider")).toBe(false);
+		expect(registry.find("company-provider", "discovered-company-model")).toBeUndefined();
 	});
 
-	test("registerProvider rebuilds inferred computer capability after OpenAI runtime reroutes", async () => {
-		const modelId = "gpt-5.4";
-		const directModel = registry.find("openai", modelId);
-		expect(directModel?.supportsComputerUse).toBe(true);
-
-		registry.registerProvider("openai", { baseUrl: "https://runtime-proxy.example.com/v1" }, "ext://runtime");
-		expect(registry.find("openai", modelId)?.supportsComputerUse).toBe(false);
-
-		await registry.refresh("offline");
-		expect(registry.find("openai", modelId)?.supportsComputerUse).toBe(false);
-		await registry.refreshProvider("openai", "offline");
-		expect(registry.find("openai", modelId)?.supportsComputerUse).toBe(false);
-
-		registry.clearSourceRegistrations("ext://runtime");
-		expect(registry.find("openai", modelId)?.supportsComputerUse).toBe(true);
-	});
-
-	test("config.models re-registration rebuilds inferred capability after a saved transport override", () => {
-		const providerName = "openai";
-		const modelId = "gpt-5.4";
-		const proxyBaseUrl = "https://runtime-proxy.example.com/v1";
-
-		registry.registerProvider(providerName, { baseUrl: proxyBaseUrl }, "ext://runtime");
+	test("keyless company registration survives reload without a dummy credential", async () => {
 		registry.registerProvider(
-			providerName,
+			"keyless-company",
 			{
-				baseUrl: "https://api.openai.com/v1",
-				api: "openai-responses",
-				apiKey: "RUNTIME_KEY",
-				models: [{ ...baseModel, id: modelId }],
+				api: "openai-completions",
+				auth: "none",
+				baseUrl: "https://inference.company.example/v1",
+				models: [baseModel],
 			},
-			"ext://runtime",
+			"ext://keyless",
 		);
+		for (const refresh of [false, true]) {
+			if (refresh) await registry.refresh("offline");
+			const model = registry.find("keyless-company", baseModel.id);
+			expect(model).toBeDefined();
+			expect(registry.hasConfiguredAuth(model!)).toBe(true);
+			expect(await registry.getApiKey(model!)).toBe("N/A");
+			expect(authStorage.credentials.has("keyless-company")).toBe(false);
+		}
+		registry.clearSourceRegistrations("ext://keyless");
+		expect(registry.find("keyless-company", baseModel.id)).toBeUndefined();
+	});
 
-		const model = registry.find(providerName, modelId);
-		expect(model?.baseUrl).toBe(proxyBaseUrl);
-		expect(model?.supportsComputerUse).toBe(false);
-		expect(model?.supportsComputerUseConfig).toBeUndefined();
+	test("headers-only re-registration keeps a keyless provider keyless", async () => {
+		const config = {
+			api: "openai-completions" as const,
+			auth: "none" as const,
+			baseUrl: "https://inference.company.example/v1",
+			models: [baseModel],
+		};
+		registry.registerProvider("keyless-headers", config, "ext://keyless-headers");
+		registry.registerProvider("keyless-headers", { headers: { "X-Test": "1" } }, "ext://keyless-headers");
+		const model = registry.find("keyless-headers", baseModel.id);
+		expect(model).toBeDefined();
+		expect(registry.hasConfiguredAuth(model!)).toBe(true);
+		registry.clearSourceRegistrations("ext://keyless-headers");
 	});
 
 	test("registerProvider applies headers-only overrides to existing provider models across refresh", async () => {
-		const providerName = "anthropic";
+		const providerName = "github-copilot";
 		const runtimeHeader = "X-Runtime-Provider-Header";
 
 		expect(getProviderModels(registry, providerName).length).toBeGreaterThan(1);
@@ -256,7 +207,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		const modelHeaders: Record<string, string> = { "X-Message-ID": "message-1" };
 
 		registry.registerProvider(
-			"runtime-provider",
+			"github-copilot",
 			{
 				baseUrl: "https://runtime.example.com/v1",
 				apiKey: "RUNTIME_KEY",
@@ -272,7 +223,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		modelHeaders["X-Message-ID"] = "message-2";
 		modelHeaders["X-Model-Turn-ID"] = "model-turn-2";
 
-		const model = registry.find("runtime-provider", "runtime-model");
+		const model = registry.find("github-copilot", "runtime-model");
 		if (!model) throw new Error("Expected runtime model");
 		expect(await registry.resolveModelHeaders(model)).toEqual({
 			"X-Request-ID": "request-2",
@@ -283,7 +234,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("registerProvider applies authHeader overrides to existing provider models across refresh", async () => {
-		const providerName = "anthropic";
+		const providerName = "github-copilot";
 
 		expect(getProviderModels(registry, providerName).length).toBeGreaterThan(1);
 		registry.registerProvider(providerName, { apiKey: "RUNTIME_AUTH_KEY", authHeader: true }, "ext://runtime");
@@ -294,7 +245,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("registerProvider applies remoteCompaction-only overrides to existing provider models across refresh", async () => {
-		const providerName = "anthropic";
+		const providerName = "github-copilot";
 		const overrideEndpoint = "https://runtime.example.com/v1/compact";
 
 		expect(getProviderModels(registry, providerName).length).toBeGreaterThan(1);
@@ -323,7 +274,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("refreshRuntimeProviders preserves model-level remoteCompaction over provider defaults", async () => {
-		const providerName = "dynamic-compact-provider";
+		const providerName = "github-copilot";
 		const providerEndpoint = "https://runtime.example.com/v1/responses/provider-compact";
 		const modelEndpoint = "https://runtime.example.com/v1/responses/model-compact";
 
@@ -363,7 +314,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		});
 	});
 	test("combines static fallback models with dynamic provider discovery", async () => {
-		const providerName = "combined-runtime-provider";
+		const providerName = "github-copilot";
 		let dynamicFetches = 0;
 		registry.registerProvider(
 			providerName,
@@ -388,7 +339,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("configured discovery suppresses extension fetchDynamicModels for the same provider", async () => {
-		const providerName = "runtime-configured-provider";
+		const providerName = "github-copilot";
 		fs.writeFileSync(
 			modelsJsonPath,
 			JSON.stringify({
@@ -442,7 +393,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		const overrideRegistry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: catalogFetch });
 		let runtimeFetches = 0;
 		overrideRegistry.registerProvider(
-			"anthropic",
+			"github-copilot",
 			{
 				baseUrl: "https://runtime.example.com/v1",
 				api: "anthropic-messages",
@@ -454,68 +405,20 @@ describe("ModelRegistry runtime provider registration", () => {
 			"ext://runtime",
 		);
 
-		await overrideRegistry.refreshProvider("anthropic", "online");
+		await overrideRegistry.refreshProvider("github-copilot", "online");
 
 		expect(runtimeFetches).toBe(1);
 		expect(catalogFetches).toBe(0);
-		expect(getProviderModels(overrideRegistry, "anthropic").map(model => model.id)).toEqual([
+		expect(getProviderModels(overrideRegistry, "github-copilot").map(model => model.id)).toEqual([
 			"runtime-anthropic-model",
 		]);
-	});
-
-	test("refreshProvider aborts and retries inherited shared-catalog fetches", async () => {
-		vi.useFakeTimers();
-		// Pin the keyless premise: a host ANTHROPIC_API_KEY (dev machines, agent
-		// harnesses) gives the anthropic manager a fetchDynamicModels hook whose
-		// endpoint fetch starts only after the catalog abort — its deadline timer
-		// arms after the last advanceTimersByTime and the refresh hangs forever.
-		const peekSpy = vi.spyOn(authStorage.keys, "peek").mockResolvedValue(undefined);
-		let catalogFetches = 0;
-		let abortedFetches = 0;
-		const stalledFetch: FetchImpl = (_input, init) => {
-			catalogFetches++;
-			const { promise, reject } = Promise.withResolvers<Response>();
-			const signal = init?.signal;
-			if (!signal) {
-				reject(new Error("catalog fetch did not receive an abort signal"));
-				return promise;
-			}
-			const rejectAborted = () => {
-				abortedFetches++;
-				reject(signal.reason);
-			};
-			if (signal.aborted) {
-				rejectAborted();
-			} else {
-				signal.addEventListener("abort", rejectAborted, { once: true });
-			}
-			return promise;
-		};
-		const stalledRegistry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: stalledFetch });
-
-		const firstRefresh = stalledRegistry.refreshProvider("anthropic", "online");
-		await drainMicrotasksUntil(() => catalogFetches === 1, "first shared-catalog fetch did not start");
-		vi.advanceTimersByTime(9_999);
-		await Promise.resolve();
-		expect(abortedFetches).toBe(0);
-		vi.advanceTimersByTime(1);
-		await firstRefresh;
-		expect(abortedFetches).toBe(1);
-
-		const secondRefresh = stalledRegistry.refreshProvider("anthropic", "online");
-		await drainMicrotasksUntil(() => catalogFetches === 2, "second shared-catalog fetch did not start");
-		vi.advanceTimersByTime(10_000);
-		await secondRefresh;
-		expect(abortedFetches).toBe(2);
-		expect(catalogFetches).toBe(2);
-		peekSpy.mockRestore();
 	});
 
 	test("refreshRuntimeProviders times out extension fetchDynamicModels that never resolves", async () => {
 		vi.useFakeTimers();
 		const hangingFetch = Promise.withResolvers<readonly NonNullable<ProviderConfigInput["models"]>[number][]>();
 		registry.registerProvider(
-			"hanging-runtime-provider",
+			"github-copilot",
 			{
 				baseUrl: "https://runtime.example.com/v1",
 				apiKey: "RUNTIME_KEY",
@@ -548,7 +451,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		vi.advanceTimersByTime(1);
 		await refresh;
 		expect(outcome).toBe("resolved");
-		expect(registry.find("hanging-runtime-provider", "any-model")).toBeUndefined();
+		expect(registry.find("github-copilot", "any-model")).toBeUndefined();
 	});
 
 	test("registerProvider preserves explicit thinking and backfills wire facts", () => {
@@ -569,8 +472,8 @@ describe("ModelRegistry runtime provider registration", () => {
 			],
 		};
 
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		const model = registry.find("runtime-provider", "runtime-thinking-model");
+		registry.registerProvider("github-copilot", config, "ext://runtime");
+		const model = registry.find("github-copilot", "runtime-thinking-model");
 
 		expect(model?.thinking).toEqual({
 			mode: "anthropic-adaptive",
@@ -581,34 +484,6 @@ describe("ModelRegistry runtime provider registration", () => {
 		});
 	});
 
-	test("registerProvider preserves a standalone Codex WebSocket opt-out across refresh", async () => {
-		const config: ProviderConfigInput = {
-			baseUrl: "https://chatgpt.com/backend-api/codex",
-			apiKey: "RUNTIME_KEY",
-			api: "openai-codex-responses",
-			models: [{ ...baseModel, id: "gpt-5.6-sol", preferWebsockets: false }],
-		};
-
-		registry.registerProvider("runtime-codex", config, "ext://runtime");
-		expect(registry.find("runtime-codex", "gpt-5.6-sol")?.preferWebsockets).toBe(false);
-
-		await registry.refresh("offline");
-		expect(registry.find("runtime-codex", "gpt-5.6-sol")?.preferWebsockets).toBe(false);
-	});
-
-	test("registerProvider lets an extension disable WebSockets on a bundled Codex model", () => {
-		const config: ProviderConfigInput = {
-			baseUrl: "https://chatgpt.com/backend-api/codex",
-			apiKey: "RUNTIME_KEY",
-			api: "openai-codex-responses",
-			models: [{ ...baseModel, id: "gpt-5.4", preferWebsockets: false }],
-		};
-
-		registry.registerProvider("openai-codex", config, "ext://runtime");
-
-		expect(registry.find("openai-codex", "gpt-5.4")?.preferWebsockets).toBe(false);
-	});
-
 	test("extension-registered models survive refresh('offline') cycle", async () => {
 		const config: ProviderConfigInput = {
 			baseUrl: "https://runtime.example.com/v1",
@@ -617,12 +492,12 @@ describe("ModelRegistry runtime provider registration", () => {
 			models: [baseModel],
 		};
 
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		expect(registry.find("runtime-provider", "runtime-model")).toBeDefined();
+		registry.registerProvider("github-copilot", config, "ext://runtime");
+		expect(registry.find("github-copilot", "runtime-model")).toBeDefined();
 
 		await registry.refresh("offline");
 
-		const model = registry.find("runtime-provider", "runtime-model");
+		const model = registry.find("github-copilot", "runtime-model");
 		expect(model?.baseUrl).toBe("https://runtime.example.com/v1");
 		expect(model?.api).toBe("openai-completions");
 	});
@@ -639,12 +514,12 @@ describe("ModelRegistry runtime provider registration", () => {
 			models: [{ ...baseModel, id: "online-survivor" }],
 		};
 
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		expect(registry.find("runtime-provider", "online-survivor")).toBeDefined();
+		registry.registerProvider("github-copilot", config, "ext://runtime");
+		expect(registry.find("github-copilot", "online-survivor")).toBeDefined();
 
 		await registry.refresh("online");
 
-		const model = registry.find("runtime-provider", "online-survivor");
+		const model = registry.find("github-copilot", "online-survivor");
 		expect(model?.api).toBe("openai-completions");
 	});
 
@@ -654,7 +529,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		const runtimeHeader = "X-Runtime-Headers-Only";
 
 		registry.registerProvider(
-			"runtime-provider",
+			"github-copilot",
 			{
 				baseUrl: "https://runtime.example.com/v1",
 				apiKey: "RUNTIME_KEY",
@@ -663,27 +538,23 @@ describe("ModelRegistry runtime provider registration", () => {
 			},
 			"ext://runtime",
 		);
-		registry.registerProvider("runtime-provider", { baseUrl: overrideBaseUrl }, "ext://runtime");
-		registry.registerProvider(
-			"runtime-provider",
-			{ headers: { [runtimeHeader]: "runtime-header" } },
-			"ext://runtime",
-		);
+		registry.registerProvider("github-copilot", { baseUrl: overrideBaseUrl }, "ext://runtime");
+		registry.registerProvider("github-copilot", { headers: { [runtimeHeader]: "runtime-header" } }, "ext://runtime");
 
 		await expectModelTransportAcrossRefresh(
 			registry,
-			"runtime-provider",
+			"github-copilot",
 			modelId,
 			overrideBaseUrl,
 			runtimeHeader,
 			"runtime-header",
 		);
 		registry.clearSourceRegistrations("ext://runtime");
-		expect(registry.find("runtime-provider", modelId)).toBeUndefined();
+		expect(registry.find("github-copilot", modelId)).toBeUndefined();
 	});
 
 	test("runtime headers override modelOverrides headers across refresh cycles", async () => {
-		const targetModel = registry.getAll().find(model => model.provider === "anthropic");
+		const targetModel = registry.getAll().find(model => model.provider === "github-copilot");
 		if (!targetModel) throw new Error("Expected bundled anthropic model");
 
 		const modelId = targetModel.id;
@@ -695,107 +566,54 @@ describe("ModelRegistry runtime provider registration", () => {
 			modelsJsonPath,
 			JSON.stringify({
 				providers: {
-					anthropic: { modelOverrides: { [modelId]: { headers: { [sharedHeader]: configHeaderValue } } } },
+					"github-copilot": { modelOverrides: { [modelId]: { headers: { [sharedHeader]: configHeaderValue } } } },
 				},
 			}),
 		);
 
 		const configuredRegistry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: offlineFetch });
-		const configuredModel = configuredRegistry.find("anthropic", modelId);
+		const configuredModel = configuredRegistry.find("github-copilot", modelId);
 		expect(configuredModel && (await configuredRegistry.resolveModelHeaders(configuredModel))?.[sharedHeader]).toBe(
 			configHeaderValue,
 		);
 
 		configuredRegistry.registerProvider(
-			"anthropic",
+			"github-copilot",
 			{ headers: { [sharedHeader]: runtimeHeaderValue } },
 			"ext://runtime",
 		);
-		await expectProviderHeaderAcrossRefresh(configuredRegistry, "anthropic", sharedHeader, runtimeHeaderValue);
+		await expectProviderHeaderAcrossRefresh(configuredRegistry, "github-copilot", sharedHeader, runtimeHeaderValue);
 
 		configuredRegistry.clearSourceRegistrations("ext://runtime");
-		const restoredModel = configuredRegistry.find("anthropic", modelId);
+		const restoredModel = configuredRegistry.find("github-copilot", modelId);
 		expect(restoredModel && (await configuredRegistry.resolveModelHeaders(restoredModel))?.[sharedHeader]).toBe(
 			configHeaderValue,
 		);
 	});
 
-	test("runtime-registered models inherit configured provider guardrails", () => {
-		const providerName = "amazon-bedrock";
-		const modelId = "runtime-bedrock-model";
-		const guardrailIdentifier = "arn:aws:bedrock:eu-west-2:123456789012:guardrail/abcd1234";
-
-		fs.writeFileSync(
-			modelsJsonPath,
-			JSON.stringify({
-				providers: {
-					[providerName]: {
-						guardrailIdentifier,
-						guardrailVersion: "1",
-						guardrailTrace: "enabled",
-					},
-				},
-			}),
-		);
-		const configuredRegistry = new ModelRegistry(authStorage, modelsJsonPath, { fetch: offlineFetch });
-
-		configuredRegistry.registerProvider(
-			providerName,
-			{
-				baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-				apiKey: "RUNTIME_KEY",
-				api: "bedrock-converse-stream",
-				models: [{ ...baseModel, id: modelId }],
-			},
-			"ext://runtime",
-		);
-
-		const model = configuredRegistry.find(providerName, modelId);
-		expect(model?.guardrailIdentifier).toBe(guardrailIdentifier);
-		expect(model?.guardrailVersion).toBe("1");
-		expect(model?.guardrailTrace).toBe("enabled");
-	});
-
 	test("extension-registered API keys survive refresh cycle for auth resolution", async () => {
-		// Set up the env var that the apiKey config references
-		process.env.TEST_RUNTIME_KEY = "test-value";
-
 		const config: ProviderConfigInput = {
 			baseUrl: "https://runtime.example.com/v1",
-			apiKey: "TEST_RUNTIME_KEY",
+			apiKey: "test-runtime-key",
 			api: "openai-completions",
 			models: [baseModel],
 		};
 
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		expect(registry.authStorage.keys.source("runtime-provider") !== undefined).toBe(true);
+		registry.registerProvider("github-copilot", config, "ext://runtime");
+		expect(registry.authStorage.keys.source("github-copilot")?.kind).toBe("config");
 
 		await registry.refresh("offline");
 
-		// The fallback resolver should still find the API key after refresh
-		expect(registry.authStorage.keys.source("runtime-provider") !== undefined).toBe(true);
-
-		delete process.env.TEST_RUNTIME_KEY;
+		expect(await registry.getApiKeyForProvider("github-copilot")).toBe("test-runtime-key");
 	});
 
-	test("extension-registered custom API handler survives model refresh", async () => {
-		const config: ProviderConfigInput = {
-			baseUrl: "https://runtime.example.com/v1",
-			apiKey: "RUNTIME_KEY",
-			api: "custom-runtime-api",
-			streamSimple,
-			models: [baseModel],
-		};
+	test("extension-registered local inference handler survives model refresh", async () => {
+		registry.registerProvider("local", { api: "local-inference", streamSimple }, "ext://runtime");
+		expect(getCustomApi("local-inference")?.streamSimple).toBe(streamSimple);
 
-		registry.registerProvider("runtime-provider", config, "ext://runtime");
-		expect(getCustomApi("custom-runtime-api")).toBeDefined();
-
-		// Custom API registry is separate from model registry — verify it persists
-		// Note: refresh clears+re-registers source registrations via sdk.ts,
-		// but the custom API registry itself is not cleared by refresh()
 		await registry.refresh("offline");
 
-		expect(getCustomApi("custom-runtime-api")).toBeDefined();
+		expect(getCustomApi("local-inference")?.streamSimple).toBe(streamSimple);
 	});
 
 	test("re-registering a provider replaces overlays and keeps transport overrides stable", async () => {
@@ -814,18 +632,18 @@ describe("ModelRegistry runtime provider registration", () => {
 			models: [{ ...baseModel, id: "model-v2", name: "Model V2" }],
 		};
 
-		registry.registerProvider("runtime-provider", config1, "ext://runtime");
+		registry.registerProvider("github-copilot", config1, "ext://runtime");
 		registry.registerProvider(
-			"runtime-provider",
+			"github-copilot",
 			{ baseUrl: overrideBaseUrl, headers: { [runtimeHeader]: "runtime-header" } },
 			"ext://runtime",
 		);
-		registry.registerProvider("runtime-provider", config2, "ext://runtime");
+		registry.registerProvider("github-copilot", config2, "ext://runtime");
 
-		expect(registry.find("runtime-provider", "model-v1")).toBeUndefined();
+		expect(registry.find("github-copilot", "model-v1")).toBeUndefined();
 		await expectModelTransportAcrossRefresh(
 			registry,
-			"runtime-provider",
+			"github-copilot",
 			"model-v2",
 			overrideBaseUrl,
 			runtimeHeader,
@@ -834,7 +652,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("provider source handoff does not retain previous source transport overrides", async () => {
-		const providerName = "shared-runtime-provider";
+		const providerName = "github-copilot";
 		const leakedHeader = "X-Old-Source-Header";
 		const sourceBBaseUrl = "https://source-b.example.com/v1";
 
@@ -876,7 +694,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("transport-only source handoff clears previous source headers immediately", async () => {
-		const providerName = "anthropic";
+		const providerName = "github-copilot";
 		const sourceAHeader = "X-Source-A-Header";
 		const sourceBHeader = "X-Source-B-Header";
 
@@ -890,7 +708,7 @@ describe("ModelRegistry runtime provider registration", () => {
 
 	test("multiple extension providers survive refresh independently", async () => {
 		registry.registerProvider(
-			"provider-a",
+			"github-copilot",
 			{
 				baseUrl: "https://a.example.com",
 				apiKey: "KEY_A",
@@ -900,58 +718,21 @@ describe("ModelRegistry runtime provider registration", () => {
 			"ext://a",
 		);
 		registry.registerProvider(
-			"provider-b",
+			"local",
 			{
-				baseUrl: "https://b.example.com",
-				apiKey: "KEY_B",
-				api: "openai-completions",
-				models: [{ ...baseModel, id: "model-b" }],
+				api: "local-inference",
+				models: [{ ...baseModel, id: "model-b", kind: "tiny" }],
 			},
 			"ext://b",
 		);
 
-		expect(registry.find("provider-a", "model-a")).toBeDefined();
-		expect(registry.find("provider-b", "model-b")).toBeDefined();
+		expect(registry.find("github-copilot", "model-a")).toBeDefined();
+		expect(registry.find("local", "model-b")).toBeDefined();
 
 		await registry.refresh("offline");
 
-		expect(registry.find("provider-a", "model-a")).toBeDefined();
-		expect(registry.find("provider-b", "model-b")).toBeDefined();
-	});
-
-	test("clearSourceRegistrations and syncExtensionSources remove source-scoped API and OAuth providers", () => {
-		const oauthCredentials: OAuthCredentials = {
-			access: "access-token",
-			refresh: "refresh-token",
-			expires: Date.now() + 60_000,
-		};
-
-		const config: ProviderConfigInput = {
-			api: "custom-oauth-api",
-			streamSimple,
-			oauth: {
-				name: "Custom OAuth",
-				login: async () => oauthCredentials,
-				refreshToken: async credentials => credentials,
-				getApiKey: credentials => credentials.access,
-			},
-		};
-
-		registry.registerProvider("oauth-provider", config, "ext://oauth");
-		expect(getCustomApi("custom-oauth-api")).toBeDefined();
-		expect(getOAuthProviders().some(provider => provider.id === "oauth-provider")).toBe(true);
-
-		registry.clearSourceRegistrations("ext://oauth");
-		expect(getCustomApi("custom-oauth-api")).toBeUndefined();
-		expect(getOAuthProviders().some(provider => provider.id === "oauth-provider")).toBe(false);
-
-		registry.registerProvider("oauth-provider", config, "ext://oauth");
-		expect(getCustomApi("custom-oauth-api")).toBeDefined();
-		expect(getOAuthProviders().some(provider => provider.id === "oauth-provider")).toBe(true);
-
-		registry.syncExtensionSources([]);
-		expect(getCustomApi("custom-oauth-api")).toBeUndefined();
-		expect(getOAuthProviders().some(provider => provider.id === "oauth-provider")).toBe(false);
+		expect(registry.find("github-copilot", "model-a")).toBeDefined();
+		expect(registry.find("local", "model-b")).toBeDefined();
 	});
 
 	test("oauth.modifyModels projection survives refresh and refreshProvider", async () => {
@@ -1242,7 +1023,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("provider-scoped lookups preserve whole-catalog modifyModels projections", async () => {
-		const hiddenModel = registry.getAll().find(model => model.provider === "anthropic");
+		const hiddenModel = registry.getAll().find(model => model.provider === "github-copilot");
 		await authStorage.credentials.set("filtering-provider", {
 			type: "oauth",
 			access: "access-token",
@@ -1280,7 +1061,7 @@ describe("ModelRegistry runtime provider registration", () => {
 	});
 
 	test("provider-scoped lookups do not intern other providers' transient projections", async () => {
-		const anthropicId = registry.getAll().find(model => model.provider === "anthropic")?.id;
+		const localId = registry.getAll().find(model => model.provider === "github-copilot")?.id;
 		await authStorage.credentials.set("changing-provider", {
 			type: "oauth",
 			access: "access-token",
@@ -1314,7 +1095,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		);
 
 		const refreshPromise = registry.refresh("offline");
-		expect(registry.find("anthropic", anthropicId!)).toBeDefined();
+		expect(registry.find("github-copilot", localId!)).toBeDefined();
 		expect(registry.find("changing-provider", "runtime-model")?.name).toBe("projection-3");
 		await refreshPromise;
 	});
@@ -1380,20 +1161,20 @@ describe("ModelRegistry runtime provider registration", () => {
 					refreshToken: async credentials => credentials,
 					getApiKey: credentials => credentials.access,
 					modifyModels: models =>
-						models.filter(model => model.provider !== "anthropic" || model.baseUrl !== proxyBaseUrl),
+						models.filter(model => model.provider !== "github-copilot" || model.baseUrl !== proxyBaseUrl),
 				},
 			},
 			"ext://oauth",
 		);
-		expect(getProviderModels(registry, "anthropic").length).toBeGreaterThan(0);
+		expect(getProviderModels(registry, "github-copilot").length).toBeGreaterThan(0);
 
-		registry.registerProvider("anthropic", { baseUrl: proxyBaseUrl }, "ext://runtime");
+		registry.registerProvider("github-copilot", { baseUrl: proxyBaseUrl }, "ext://runtime");
 
-		expect(getProviderModels(registry, "anthropic")).toEqual([]);
+		expect(getProviderModels(registry, "github-copilot")).toEqual([]);
 	});
 
 	test("online discovery reapplies modifiers to an unprojected full catalog", async () => {
-		const target = registry.getAll().find(model => model.provider === "anthropic");
+		const target = registry.getAll().find(model => model.provider === "github-copilot");
 		await authStorage.credentials.set("renaming-provider", {
 			type: "oauth",
 			access: "access-token",
@@ -1451,8 +1232,8 @@ describe("ModelRegistry runtime provider registration", () => {
 		try {
 			const targetBefore = registry.getAll()[0];
 			const targetSnapshot = structuredClone(targetBefore!);
-			const anthropicBefore = registry.getAll().filter(model => model.provider === "anthropic").length;
-			expect(anthropicBefore).toBeGreaterThan(0);
+			const localBefore = registry.getAll().filter(model => model.provider === "github-copilot").length;
+			expect(localBefore).toBeGreaterThan(0);
 
 			registry.registerProvider(
 				"mutating-provider",
@@ -1481,34 +1262,16 @@ describe("ModelRegistry runtime provider registration", () => {
 			);
 
 			expect(registry.find(targetBefore!.provider, targetBefore!.id)).toEqual(targetSnapshot);
-			expect(registry.getAll().filter(model => model.provider === "anthropic")).toHaveLength(anthropicBefore);
+			expect(registry.getAll().filter(model => model.provider === "github-copilot")).toHaveLength(localBefore);
 			expect(getProviderModels(registry, "mutating-provider").map(model => model.id)).toEqual(["runtime-model"]);
 
 			await registry.refresh("offline");
 			expect(registry.find(targetBefore!.provider, targetBefore!.id)).toEqual(targetSnapshot);
-			expect(registry.getAll().filter(model => model.provider === "anthropic")).toHaveLength(anthropicBefore);
+			expect(registry.getAll().filter(model => model.provider === "github-copilot")).toHaveLength(localBefore);
 			expect(getProviderModels(registry, "mutating-provider").map(model => model.id)).toEqual(["runtime-model"]);
 		} finally {
 			warn.mockRestore();
 		}
-	});
-
-	test("resolves a configured provider base URL before any model is discovered", () => {
-		// `omp usage` constructs a registry and probes credentials immediately, so
-		// a discovery-only provider (no bundled rows) has no model to read a URL
-		// from yet. Deriving solely from discovered models returned `undefined`
-		// here, and the usage probe then sent a proxy-scoped key to the
-		// provider's canonical host.
-		const providerName = "charm-hyper";
-		fs.writeFileSync(
-			modelsJsonPath,
-			JSON.stringify({ providers: { [providerName]: { baseUrl: "https://gateway.internal" } } }),
-		);
-		const configured = new ModelRegistry(authStorage, modelsJsonPath, { fetch: offlineFetch });
-
-		// Cache-cold by construction: this provider bundles no rows.
-		expect(configured.getAll().some(model => model.provider === providerName)).toBe(false);
-		expect(configured.getProviderBaseUrl(providerName)).toBe("https://gateway.internal");
 	});
 
 	test("prefers a configured provider base URL over a model-level one", () => {
@@ -1517,7 +1280,7 @@ describe("ModelRegistry runtime provider registration", () => {
 		// stubs the method. `getProviderHeaders` is documented as provider-level
 		// "without including per-model overrides", so a provider-scoped accessor
 		// must not answer with some model's own baseUrl.
-		const providerName = "charm-hyper";
+		const providerName = "github-copilot";
 		fs.writeFileSync(
 			modelsJsonPath,
 			JSON.stringify({

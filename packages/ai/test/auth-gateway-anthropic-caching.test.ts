@@ -30,7 +30,7 @@ interface AnthropicResponse {
 	error?: { type: string; message: string };
 }
 
-const MODEL = Bun.env.OMP_E2E_ANTHROPIC_MODEL ?? "claude-sonnet-4-5";
+const MODEL = Bun.env.OMP_E2E_ANTHROPIC_MODEL ?? "github-copilot/claude-sonnet-4.5";
 
 const gateway = await checkAuthGatewayE2EAvailable();
 

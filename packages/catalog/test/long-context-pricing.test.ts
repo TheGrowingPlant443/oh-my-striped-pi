@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { calculateCost, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import type { Usage } from "@oh-my-pi/pi-catalog/types";
 
 function usage(fields: Pick<Usage, "input" | "output" | "cacheRead" | "cacheWrite">): Usage {
@@ -11,13 +12,24 @@ function usage(fields: Pick<Usage, "input" | "output" | "cacheRead" | "cacheWrit
 }
 
 describe("long-context pricing tier", () => {
-	// GPT-5.6 Sol carries a long-context tier: the tier rate applies to the
-	// ENTIRE request once total prompt input (input + cacheRead + cacheWrite)
-	// crosses the threshold, matching OpenAI's billing. Rates are derived from
-	// the bundled model so upstream price changes cannot mask a tier-selection
-	// regression; the contract under test is which rate set applies on each
-	// side of the boundary.
-	const sol = getBundledModel("openai", "gpt-5.6-sol");
+	const sol = buildModel({
+		id: "tiered-model",
+		name: "Tiered Model",
+		provider: "github-copilot",
+		api: "openai-responses",
+		baseUrl: "https://api.githubcopilot.com",
+		reasoning: false,
+		input: ["text"],
+		contextWindow: 1000000,
+		maxTokens: 128000,
+		cost: {
+			input: 2,
+			output: 10,
+			cacheRead: 0.2,
+			cacheWrite: 0,
+			longContext: { inputThreshold: 272000, input: 4, output: 20, cacheRead: 0.4, cacheWrite: 0 },
+		},
+	});
 	const standard = sol.cost;
 	const tier = sol.cost.longContext;
 	if (!tier) throw new Error("gpt-5.6-sol lost its long-context tier");
@@ -42,20 +54,5 @@ describe("long-context pricing tier", () => {
 			overThreshold.cost.input + overThreshold.cost.output + overThreshold.cost.cacheRead,
 			10,
 		);
-	});
-
-	it("prices subscription Codex SKUs with the same tier for cost attribution", () => {
-		const codexSol = getBundledModel("openai-codex", "gpt-5.6-sol");
-		const codexTier = codexSol.cost.longContext;
-		if (!codexTier) throw new Error("openai-codex gpt-5.6-sol lost its long-context tier");
-		const overThreshold = usage({
-			input: codexTier.inputThreshold + 28_000,
-			output: 1_000,
-			cacheRead: 0,
-			cacheWrite: 0,
-		});
-		calculateCost(codexSol, overThreshold);
-		expect(overThreshold.cost.input).toBeCloseTo((codexTier.input / 1e6) * overThreshold.input, 10);
-		expect(overThreshold.cost.output).toBeCloseTo((codexTier.output / 1e6) * 1_000, 10);
 	});
 });

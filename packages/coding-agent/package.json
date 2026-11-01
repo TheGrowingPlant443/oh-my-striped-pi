@@ -32,7 +32,6 @@
 		"!src/export/html/shell.html",
 		"!src/export/html/template.css",
 		"!src/export/html/template.js",
-		"!src/export/html/share-loader.js",
 		"dist/cli.js",
 		"dist/docs-index.generated.txt",
 		"dist/CHANGELOG-*.md",
@@ -195,14 +194,6 @@
 		"./edit/*": {
 			"types": "./src/edit/*.ts",
 			"import": "./src/edit/*.ts"
-		},
-		"./exa": {
-			"types": "./src/exa/index.ts",
-			"import": "./src/exa/index.ts"
-		},
-		"./exa/*": {
-			"types": "./src/exa/*.ts",
-			"import": "./src/exa/*.ts"
 		},
 		"./exec/*": {
 			"types": "./src/exec/*.ts",
@@ -379,14 +370,6 @@
 		"./memory-backend/*": {
 			"types": "./src/memory-backend/*.ts",
 			"import": "./src/memory-backend/*.ts"
-		},
-		"./hindsight": {
-			"types": "./src/hindsight/index.ts",
-			"import": "./src/hindsight/index.ts"
-		},
-		"./hindsight/*": {
-			"types": "./src/hindsight/*.ts",
-			"import": "./src/hindsight/*.ts"
 		},
 		"./modes": {
 			"types": "./src/modes/index.ts",

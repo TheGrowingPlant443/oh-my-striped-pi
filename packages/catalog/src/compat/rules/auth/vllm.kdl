@@ -1,4 +1,5 @@
 auth "vllm" {
+	allows-missing-api-key #true
 	name "vLLM (Local OpenAI-compatible)"
 	login "api-key" {
 		auth-url "https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html"

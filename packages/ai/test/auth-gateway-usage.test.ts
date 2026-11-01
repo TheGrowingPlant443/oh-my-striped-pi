@@ -19,8 +19,8 @@ test("excluded providers stay out of usage and credential health", async () => {
 		email,
 	});
 	const reports: UsageReport[] = [
-		{ provider: "anthropic", fetchedAt: now, limits: [], metadata: { email: "friend@example.com" } },
-		{ provider: "devin", fetchedAt: now, limits: [], metadata: { email: "owner@example.com" } },
+		{ provider: "github-copilot", fetchedAt: now, limits: [], metadata: { email: "friend@example.com" } },
+		{ provider: "local", fetchedAt: now, limits: [], metadata: { email: "owner@example.com" } },
 	];
 	vi.spyOn(brokerClient, "fetchUsage").mockResolvedValue({ generatedAt: now, reports });
 	const store = new RemoteAuthCredentialStore({
@@ -34,21 +34,21 @@ test("excluded providers stay out of usage and credential health", async () => {
 			credentials: [
 				{
 					id: 1,
-					provider: "anthropic",
+					provider: "github-copilot",
 					credential: oauth("friend@example.com"),
 					identityKey: "email:friend@example.com",
 					rotatesInMs: null,
 				},
 				{
 					id: 2,
-					provider: "devin",
+					provider: "local",
 					credential: oauth("owner@example.com"),
 					identityKey: "email:owner@example.com",
 					rotatesInMs: null,
 				},
 				{
 					id: 3,
-					provider: "openrouter",
+					provider: "local",
 					credential: { type: "api_key", key: "owner-key" },
 					identityKey: null,
 					rotatesInMs: null,
@@ -63,7 +63,7 @@ test("excluded providers stay out of usage and credential health", async () => {
 		bearerTokens: [],
 		storage,
 		resolveModel: () => undefined,
-		excludeProviders: new Set(["devin", "openrouter"]),
+		excludeProviders: new Set(["local"]),
 		version: "test",
 	});
 
@@ -74,7 +74,7 @@ test("excluded providers stay out of usage and credential health", async () => {
 		const check = (await (await fetch(`${handle.url}/v1/credentials/check`)).json()) as {
 			credentials: { id: number; provider: string }[];
 		};
-		expect(check.credentials.map(row => [row.id, row.provider])).toEqual([[1, "anthropic"]]);
+		expect(check.credentials.map(row => [row.id, row.provider])).toEqual([[1, "github-copilot"]]);
 	} finally {
 		await handle.close();
 		storage.close();

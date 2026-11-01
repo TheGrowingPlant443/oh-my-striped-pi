@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { Effort, type Model } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -29,16 +29,23 @@ describe("issue #775: per-model defaultLevel", () => {
 		tempDir.removeSync();
 	});
 
-	function getOpus() {
-		const model = getBundledModel("anthropic", "claude-opus-4-5");
-		if (!model) throw new Error("expected claude-opus-4-5");
-		return model;
-	}
-
-	function getSonnet() {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected claude-sonnet-4-5");
-		return model;
+	function companyModel(id: string): Model {
+		return buildModel({
+			id,
+			name: id,
+			provider: "company-thinking",
+			api: "anthropic-messages",
+			baseUrl: "https://thinking.company.invalid",
+			reasoning: true,
+			thinking: {
+				mode: "anthropic-adaptive",
+				efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh],
+			},
+			input: ["text"],
+			contextWindow: 128_000,
+			maxTokens: 8_192,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		});
 	}
 
 	async function createSession(initialModel: Model, settings: Settings) {
@@ -53,7 +60,7 @@ describe("issue #775: per-model defaultLevel", () => {
 		});
 		const authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime(initialModel.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 		session = new AgentSession({
 			agent,
@@ -65,8 +72,8 @@ describe("issue #775: per-model defaultLevel", () => {
 	}
 
 	it("setModel adopts model.thinking.defaultLevel when present", async () => {
-		const sonnet = getSonnet();
-		const opus = getOpus();
+		const sonnet = companyModel("initial");
+		const opus = companyModel("target");
 		const opusWithDefault: Model = {
 			...opus,
 			thinking: {
@@ -86,8 +93,8 @@ describe("issue #775: per-model defaultLevel", () => {
 	});
 
 	it("setModel preserves current level when model has no defaultLevel", async () => {
-		const sonnet = getSonnet();
-		const opus = getOpus();
+		const sonnet = companyModel("initial");
+		const opus = companyModel("target");
 
 		const settings = Settings.isolated({ defaultThinkingLevel: Effort.Medium });
 		await createSession(sonnet, settings);

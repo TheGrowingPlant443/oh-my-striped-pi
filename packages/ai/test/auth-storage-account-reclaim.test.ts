@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -5,22 +9,21 @@ import * as path from "node:path";
 import { type AuthAccountPolicies, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
 import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
-import type { UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
+import type { CredentialRankingStrategy, UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
 
 // Running sessions with a warm automatic pin and `reclaimAbovePct` on the
-// preferred account. The clock advances in short steps so Anthropic pins stay
-// warm (idle < 1 h); without reclaim they would stay on the backup.
+// preferred account. The clock advances in short steps so account pins stay
+// warm; without reclaim they would stay on the backup.
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const WEEK = 7 * 24 * HOUR;
 
-type Provider = "anthropic" | "openai-codex";
+type Provider = "github-copilot";
 
 function limit(provider: Provider, windowId: "5h" | "7d", used: number, resetsAt: number): UsageLimit {
 	return {
-		// Codex's strategy finds its windows by the `primary`/`secondary` id suffix.
-		id: `${provider}:${provider === "openai-codex" ? (windowId === "5h" ? "primary" : "secondary") : windowId}`,
+		id: `${provider}:${windowId}`,
 		label: windowId,
 		scope: { provider, windowId, shared: true },
 		window: { id: windowId, label: windowId, durationMs: windowId === "5h" ? 5 * HOUR : WEEK, resetsAt },
@@ -44,7 +47,6 @@ let clock = 0;
 
 /** Report for `accountId` with its 5h window at `fiveUsed` and weekly window at `weekUsed`. */
 function setUsage(provider: Provider, accountId: string, fiveUsed: number, weekUsed: number): void {
-	const exhausted = fiveUsed >= 1 || weekUsed >= 1;
 	usage.set(accountId, {
 		provider,
 		fetchedAt: Date.now(),
@@ -54,12 +56,16 @@ function setUsage(provider: Provider, accountId: string, fiveUsed: number, weekU
 		],
 		metadata: {
 			accountId,
-			...(provider === "openai-codex" ? { allowed: !exhausted, limitReached: exhausted } : {}),
 		},
 	});
 }
 
-async function setup(provider: Provider, policies: AuthAccountPolicies, accounts: string[]): Promise<AuthStorage> {
+async function setup(
+	provider: Provider,
+	policies: AuthAccountPolicies,
+	accounts: string[],
+	strategy?: CredentialRankingStrategy,
+): Promise<AuthStorage> {
 	if (!store) throw new Error("test setup failed");
 	const usageProvider: UsageProvider = {
 		id: provider,
@@ -71,6 +77,7 @@ async function setup(provider: Provider, policies: AuthAccountPolicies, accounts
 	const auth = new AuthStorage(store, {
 		usageProviderResolver: p => (p === provider ? usageProvider : undefined),
 		accountPolicies: policies,
+		rankingStrategyResolver: () => strategy,
 	});
 	await auth.credentials.set(
 		provider,
@@ -117,7 +124,7 @@ afterEach(async () => {
 });
 
 describe("accountPolicies reclaimAbovePct", () => {
-	const A = "anthropic" as const;
+	const A = "github-copilot" as const;
 	const policies = (reclaim: { reclaimAbovePct?: number } = { reclaimAbovePct: 40 }): AuthAccountPolicies => [
 		{ provider: A, account: { accountId: "a" }, priority: 10, reservePct: 15, ...reclaim },
 		{ provider: A, account: { accountId: "b" }, priority: 5 },
@@ -222,30 +229,8 @@ describe("accountPolicies reclaimAbovePct", () => {
 			{ type: "oauth", access: "x", refresh: "y", expires: Date.now() + WEEK, accountId: "a" },
 		]);
 		await expect(auth.keys.get(A, "S1")).rejects.toThrow(
-			"auth.accountPolicies[0].reclaimAbovePct requires a usage provider for anthropic",
+			"auth.accountPolicies[0].reclaimAbovePct requires a usage provider for github-copilot",
 		);
-	});
-	test("reclaims a Codex session whose pins never go cold", async () => {
-		const C = "openai-codex" as const;
-		const auth = await setup(
-			C,
-			[
-				{ provider: C, account: { accountId: "pro" }, priority: 10, reservePct: 20, reclaimAbovePct: 50 },
-				{ provider: C, account: { accountId: "team" }, priority: 5 },
-			],
-			["pro", "team"],
-		);
-		setUsage(C, "pro", 0.3, 0.5);
-		setUsage(C, "team", 0.1, 0.1);
-		expect(await next(auth, C, "S1")).toBe("pro");
-		await advance(auth, C, 10 * MIN);
-		setUsage(C, "pro", 0.3, 0.85);
-		expect(await next(auth, C, "S1")).toBe("team");
-		// A day later Pro's windows have reset.
-		await advance(auth, C, 24 * HOUR);
-		setUsage(C, "pro", 0, 0.05);
-		setUsage(C, "team", 0.2, 0.3);
-		expect(await next(auth, C, "S1")).toBe("pro");
 	});
 
 	test("rejects reclaimAbovePct at or below the effective reserve", async () => {
@@ -274,7 +259,7 @@ describe("accountPolicies reclaimAbovePct", () => {
 		expect(await next(auth, A, "S1")).toBe("b");
 	});
 
-	test("keeps the warm pin when ranking would hand the session to a sibling other than the reclaiming account", async () => {
+	test("keeps the warm pin when an explicit window-ranking strategy prefers a non-reclaiming sibling", async () => {
 		const auth = await setup(
 			A,
 			[
@@ -283,6 +268,13 @@ describe("accountPolicies reclaimAbovePct", () => {
 				{ provider: A, account: { accountId: "c" }, priority: 0 },
 			],
 			["a", "b", "c"],
+			{
+				findWindowLimits: report => ({
+					primary: report.limits.find(limit => limit.window?.id === "5h"),
+					secondary: report.limits.find(limit => limit.window?.id === "7d"),
+				}),
+				windowDefaults: { primaryMs: 5 * HOUR, secondaryMs: WEEK },
+			},
 		);
 		// S1 starts on B: A is inside its reserve and C's 5h window is hot.
 		setUsage(A, "a", 0.97, 0.1);

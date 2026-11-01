@@ -1,4 +1,3 @@
-import { getOAuthCredentialProvider } from "@oh-my-pi/pi-ai/oauth";
 import { runProviderSetupWizard as runProviderWizard } from "@oh-my-pi/pi-tui/setup/lazy";
 import type { SetupHost, SetupScene } from "@oh-my-pi/pi-tui/setup/scenes/types";
 import {
@@ -10,7 +9,6 @@ import {
 	type SetupSceneSelectionOptions,
 } from "@oh-my-pi/pi-tui/setup/wizard";
 import type { Settings } from "../config/settings";
-import { captureBrowserSession } from "../utils/browser-session";
 import { createModelBrowserSource } from "./model-browser-source";
 import type { InteractiveModeContext } from "./types";
 
@@ -65,8 +63,7 @@ export function createSetupHost(ctx: InteractiveModeContext): SetupHost {
 			await ctx.settings.flush();
 		},
 		refreshProvider: async provider => {
-			// An OAuth alias (`openai-codex-device`) stores its credential under the base provider.
-			await ctx.session.modelRegistry.refreshProvider(getOAuthCredentialProvider(provider), "online");
+			await ctx.session.modelRegistry.refreshProvider(provider, "online");
 			await ctx.refreshScopedModelsAfterLogin?.();
 		},
 		saveComposerShape: async shape => {
@@ -82,7 +79,6 @@ export function createSetupHost(ctx: InteractiveModeContext): SetupHost {
 		saveTheme: (mode, name) => {
 			(mode === "dark" ? cfgThemeDark : cfgThemeLight).set(ctx.settings, name);
 		},
-		captureBrowserSession,
 		openInBrowser: url => ctx.openInBrowser(url),
 		markComplete: version => markSetupWizardComplete(ctx.settings, version),
 		playWelcomeIntro: () => ctx.playWelcomeIntro(),

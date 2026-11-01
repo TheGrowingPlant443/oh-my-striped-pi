@@ -1,5 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { buildTransformedCodexRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import { describe, expect, it, vi } from "bun:test";
 import {
 	createOpenAIEffortControlState,
 	planStableOpenAIEffort,
@@ -8,8 +7,6 @@ import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-response
 import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import * as piUtils from "@oh-my-pi/pi-utils";
-import { createCodexModel } from "./helpers";
 
 /** Loose wire item for planner tests: replayed items carry output-only `status`/`id`. */
 interface TestItem {
@@ -132,168 +129,15 @@ describe("planStableOpenAIEffort", () => {
 	});
 });
 
-describe("openai-codex configuration_update", () => {
-	const TEST_INSTALLATION_ID = "00000000-0000-4000-8000-000000000001";
-
-	beforeEach(() => {
-		vi.spyOn(piUtils, "getInstallId").mockReturnValue(TEST_INSTALLATION_ID);
-	});
-
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
-	function turnContext(messages: Context["messages"]): Context {
-		return { systemPrompt: ["You are a helpful assistant."], messages };
-	}
-
-	const firstUser = { role: "user" as const, content: "one", timestamp: 1 };
-	const firstAssistant = {
-		role: "assistant" as const,
-		content: [{ type: "text" as const, text: "a" }],
-		api: "openai-codex-responses" as const,
-		provider: "openai-codex",
-		model: "gpt-6-astra",
-		usage: {
-			input: 1,
-			output: 1,
-			cacheRead: 0,
-			cacheWrite: 0,
-			totalTokens: 2,
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-		},
-		stopReason: "stop" as const,
-		timestamp: 2,
-	};
-	const secondUser = { role: "user" as const, content: "two", timestamp: 3 };
-	const secondAssistant = { ...firstAssistant, content: [{ type: "text" as const, text: "b" }], timestamp: 4 };
-
-	/** User turns and `configuration_update` items, in wire order. */
-	const shape = (input: readonly { type?: string | null; role?: string | null }[] | undefined) =>
-		(input ?? []).flatMap<unknown>(item =>
-			item.type === "configuration_update" ? [item] : item.role === "user" ? ["user"] : [],
-		);
-
-	it("plans side requests against a copy of the parent's updates", async () => {
-		const model = createCodexModel("gpt-6-astra");
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		const parent = { apiKey: "token", sessionId: "astra-parent", providerSessionState };
-		const side = { ...parent, sessionId: "astra-parent:side:1", parentSessionId: "astra-parent" };
-		const history = [firstUser, firstAssistant, secondUser, secondAssistant];
-		const sidePrompt = { role: "user" as const, content: "side", timestamp: 5 };
-
-		await buildTransformedCodexRequestBody(model, turnContext([firstUser]), { ...parent, reasoning: "high" });
-		const parentFollowUp = await buildTransformedCodexRequestBody(
-			model,
-			turnContext([firstUser, firstAssistant, secondUser]),
-			{ ...parent, reasoning: "medium" },
-		);
-		const plain = await buildTransformedCodexRequestBody(model, turnContext([...history, sidePrompt]), {
-			...side,
-			reasoning: "medium",
-		});
-		const minimized = await buildTransformedCodexRequestBody(model, turnContext([...history, sidePrompt]), {
-			...side,
-			reasoning: "medium",
-			minimizeEffort: true,
-		});
-		const parentNext = await buildTransformedCodexRequestBody(
-			model,
-			turnContext([...history, { role: "user", content: "three", timestamp: 6 }]),
-			{ ...parent, reasoning: "medium" },
-		);
-
-		for (const body of [parentFollowUp, plain, minimized, parentNext]) expect(body.reasoning?.effort).toBe("high");
-		expect(shape(parentFollowUp.input)).toEqual(["user", update("medium"), "user"]);
-		expect(shape(plain.input)).toEqual(["user", update("medium"), "user", "user"]);
-		expect(shape(minimized.input)).toEqual(["user", update("medium"), "user", update("low"), "user"]);
-		// Neither side request recorded its effort in the parent's state.
-		expect(shape(parentNext.input)).toEqual(["user", update("medium"), "user", "user"]);
-	});
-
-	it("keeps a minimized side request at the requested effort when the parent has no baseline", async () => {
-		// Lowering the request-level effort would forfeit the cached prefix.
-		const body = await buildTransformedCodexRequestBody(createCodexModel("gpt-6-astra"), turnContext([firstUser]), {
-			apiKey: "token",
-			sessionId: "fresh:side:1",
-			parentSessionId: "fresh",
-			providerSessionState: new Map<string, ProviderSessionState>(),
-			reasoning: "high",
-			minimizeEffort: true,
-		});
-		expect(body.reasoning?.effort).toBe("high");
-		expect(shape(body.input)).toEqual(["user"]);
-	});
-
-	it("keeps reasoning.effort stable for gpt-6-astra and inserts the update before the new user turn", async () => {
-		const model = createCodexModel("gpt-6-astra");
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		const options = { apiKey: "token", sessionId: "astra-session", providerSessionState };
-
-		const first = await buildTransformedCodexRequestBody(model, turnContext([firstUser]), {
-			...options,
-			reasoning: "low",
-		});
-		expect(first.reasoning?.effort).toBe("low");
-
-		const second = await buildTransformedCodexRequestBody(
-			model,
-			turnContext([firstUser, firstAssistant, secondUser]),
-			{ ...options, reasoning: "high" },
-		);
-		expect(second.reasoning?.effort).toBe("low");
-		const input = second.input ?? [];
-		const updateIndex = input.findIndex(item => item.type === "configuration_update");
-		expect(updateIndex).toBeGreaterThan(0);
-		expect(input[updateIndex]).toEqual(update("high"));
-		expect(input[updateIndex + 1]?.role).toBe("user");
-	});
-
-	it("sends the changed effort at the request level for models without configuration_update", async () => {
-		const model = createCodexModel("gpt-5.6-sol");
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		const options = { apiKey: "token", sessionId: "sol-session", providerSessionState };
-
-		await buildTransformedCodexRequestBody(model, turnContext([firstUser]), { ...options, reasoning: "low" });
-		const second = await buildTransformedCodexRequestBody(
-			model,
-			turnContext([firstUser, firstAssistant, secondUser]),
-			{ ...options, reasoning: "high" },
-		);
-		expect(second.reasoning?.effort).toBe("high");
-		expect(second.input?.some(item => item.type === "configuration_update")).toBe(false);
-	});
-
-	it("sends the changed effort at the request level for a Codex-transport endpoint that opts out", async () => {
-		// A custom Codex-compatible proxy serving the gpt-6-astra id but rejecting
-		// the item type: the models.yml override must switch the update off.
-		const model = createCodexModel("gpt-6-astra", {
-			provider: "cc-switch",
-			baseUrl: "http://127.0.0.1:8080/v1",
-			compat: { supportsConfigurationUpdate: false },
-		});
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		const options = { apiKey: "token", sessionId: "cc-switch-session", providerSessionState };
-
-		await buildTransformedCodexRequestBody(model, turnContext([firstUser]), { ...options, reasoning: "low" });
-		const second = await buildTransformedCodexRequestBody(
-			model,
-			turnContext([firstUser, firstAssistant, secondUser]),
-			{ ...options, reasoning: "high" },
-		);
-		expect(second.reasoning?.effort).toBe("high");
-		expect(second.input?.some(item => item.type === "configuration_update")).toBe(false);
-	});
-});
-
 describe("openai-responses configuration_update", () => {
 	const model: Model<"openai-responses"> = buildModel({
 		id: "gpt-6-astra",
 		name: "GPT-6 Astra",
 		api: "openai-responses",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
+		compat: { supportsConfigurationUpdate: true },
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 272_000,
@@ -375,8 +219,8 @@ describe("openai-responses configuration_update", () => {
 			id: "gpt-6-astra",
 			name: "GPT-6 Astra (proxy)",
 			api: "openai-responses",
-			provider: "astra-proxy",
-			baseUrl: "https://proxy.example.com/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

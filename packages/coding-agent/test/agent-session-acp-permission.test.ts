@@ -96,8 +96,7 @@ async function createSession(
 		persist?: boolean;
 	},
 ): Promise<AgentSession> {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 	const settings = Settings.isolated({ "compaction.enabled": false, ...settingsOverrides });
 	const sessionManager = options?.persist

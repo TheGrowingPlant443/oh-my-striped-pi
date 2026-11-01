@@ -4,7 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { type OAuthCredential, type UsageProvider, resolvedApiKeyBearer, withAuth } from "@oh-my-pi/pi-ai";
 import * as oauth from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthCredentials, OAuthProviderId } from "@oh-my-pi/pi-ai/oauth/types";
+import type { OAuthCredentials } from "@oh-my-pi/pi-ai/oauth/types";
+import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
@@ -15,9 +16,8 @@ describe("AuthStorage account rotation", () => {
 	let authStorage: AuthStorage;
 	let usageExhausted = false;
 
-	const stickyInvalidationSource = "auth-storage-rotation-issue-4982";
-	const targetProvider = "issue-4982-target" as OAuthProviderId;
-	const unrelatedProvider = "issue-4982-unrelated" as OAuthProviderId;
+	const targetProvider = "github-copilot";
+	const unrelatedProvider = "mcp_oauth:rotation-isolation";
 	let nextLoginCredential: OAuthCredentials | undefined;
 
 	const findSessionWhereFreshSelectionChanges = async (
@@ -47,17 +47,17 @@ describe("AuthStorage account rotation", () => {
 		throw new Error("expected at least one session whose fresh credential selection changes after login");
 	};
 	const usageProvider: UsageProvider = {
-		id: "openai-codex",
+		id: targetProvider,
 		async fetchUsage(params) {
 			const accountId = params.credential.accountId ?? "unknown";
 			return {
-				provider: "openai-codex",
+				provider: targetProvider,
 				fetchedAt: Date.now(),
 				limits: [
 					{
 						id: `requests-${accountId}`,
 						label: "Requests",
-						scope: { provider: "openai-codex", accountId },
+						scope: { provider: targetProvider, accountId },
 						amount: { unit: "requests", used: usageExhausted ? 100 : 10, limit: 100 },
 						status: usageExhausted ? "exhausted" : "ok",
 					},
@@ -67,37 +67,25 @@ describe("AuthStorage account rotation", () => {
 	};
 	const createRotationStorage = (dbPath: string) =>
 		AuthStorage.create(dbPath, {
-			usageProviderResolver: provider => (provider === "openai-codex" ? usageProvider : undefined),
+			usageProviderResolver: provider => (provider === targetProvider ? usageProvider : undefined),
 		});
 
 	beforeEach(async () => {
 		tempDir = "";
 		usageExhausted = false;
 		nextLoginCredential = undefined;
-		for (const provider of [targetProvider, unrelatedProvider]) {
-			oauth.registerOAuthProvider({
-				id: provider,
-				name: provider,
-				sourceId: stickyInvalidationSource,
-				async login() {
-					if (!nextLoginCredential) {
-						throw new Error(`missing queued OAuth credential for ${provider}`);
-					}
-					return nextLoginCredential;
-				},
-			});
-		}
+		const definition = getProviderDefinition(targetProvider);
+		if (!definition?.login || !definition.refreshToken) throw new Error("Expected built-in Copilot OAuth hooks");
+		vi.spyOn(definition, "login").mockImplementation(async () => {
+			if (!nextLoginCredential) throw new Error("missing queued Copilot credential");
+			return nextLoginCredential;
+		});
+		vi.spyOn(definition, "refreshToken").mockImplementation(async credential => credential);
 
 		authStorage = await createRotationStorage(":memory:");
 
-		// Stub the refresh path so AuthStorage doesn't hit a real OAuth endpoint
-		// when the credential lands inside the 60s skew. Returning the credential
-		// unchanged preserves deterministic access-token routing.
-		vi.spyOn(oauth, "refreshOAuthToken").mockImplementation(async (_provider, credential) => {
-			return credential;
-		});
-		vi.spyOn(oauth, "getOAuthApiKey").mockImplementation(async (_provider, credentials) => {
-			const credential = credentials["openai-codex"] as OAuthCredentials | undefined;
+		vi.spyOn(oauth, "getOAuthApiKey").mockImplementation(async (provider, credentials) => {
+			const credential = credentials[provider] as OAuthCredentials | undefined;
 			if (!credential) return null;
 			return {
 				apiKey: credential.access,
@@ -108,7 +96,6 @@ describe("AuthStorage account rotation", () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
-		oauth.unregisterOAuthProviders(stickyInvalidationSource);
 		authStorage.close();
 		if (tempDir && fs.existsSync(tempDir)) {
 			removeSyncWithRetries(tempDir);
@@ -116,7 +103,15 @@ describe("AuthStorage account rotation", () => {
 	});
 
 	test("returns a fallback key when every OAuth account is usage-limited", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		authStorage.close();
+		authStorage = await AuthStorage.create(":memory:", {
+			usageProviderResolver: () => usageProvider,
+			rankingStrategyResolver: () => ({
+				findWindowLimits: usage => ({ primary: usage.limits[0] }),
+				windowDefaults: { primaryMs: 60_000, secondaryMs: 60_000 },
+			}),
+		});
+		await authStorage.credentials.set(targetProvider, [
 			{
 				type: "oauth",
 				access: "access-1",
@@ -134,19 +129,20 @@ describe("AuthStorage account rotation", () => {
 		]);
 
 		const sessionId = "issue-55-session";
-		const firstKey = await authStorage.keys.get("openai-codex", sessionId);
+		const firstKey = await authStorage.keys.get(targetProvider, sessionId);
 		expect(firstKey).toMatch(/^access-/);
 
 		usageExhausted = true;
-		const { switched } = await authStorage.limits.markReached("openai-codex", sessionId);
+		await authStorage.usage.invalidate(targetProvider);
+		const { switched } = await authStorage.limits.markReached(targetProvider, sessionId);
 		expect(switched).toBe(true);
 
-		const exhaustedFallbackKey = await authStorage.keys.get("openai-codex", sessionId);
+		const exhaustedFallbackKey = await authStorage.keys.get(targetProvider, sessionId);
 		expect(exhaustedFallbackKey).toMatch(/^access-/);
 	});
 
 	test("usage-limit rotation can match the failed bearer when session stickiness is missing", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		await authStorage.credentials.set(targetProvider, [
 			{
 				type: "oauth",
 				access: "access-1",
@@ -164,12 +160,12 @@ describe("AuthStorage account rotation", () => {
 		]);
 
 		const sessionId = "missing-sticky-session";
-		const result = await authStorage.limits.markReached("openai-codex", sessionId, { apiKey: "access-1" });
+		const result = await authStorage.limits.markReached(targetProvider, sessionId, { apiKey: "access-1" });
 		expect(result.switched).toBe(true);
-		expect(await authStorage.keys.get("openai-codex", sessionId)).toBe("access-2");
+		expect(await authStorage.keys.get(targetProvider, sessionId)).toBe("access-2");
 	});
 	test("marks selected credential ineligible and rotates to sibling on usage limit", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		await authStorage.credentials.set(targetProvider, [
 			{
 				type: "oauth",
 				access: "access-A",
@@ -187,18 +183,19 @@ describe("AuthStorage account rotation", () => {
 		]);
 
 		const sessionId = "usage-limit-rotation-session";
-		const selectedA = await authStorage.keys.get("openai-codex", sessionId);
-		expect(selectedA).toBe("access-A");
+		const selected = await authStorage.keys.get(targetProvider, sessionId);
+		if (selected !== "access-A" && selected !== "access-B") throw new Error("Expected a selected OAuth credential");
 
-		const result = await authStorage.limits.markReached("openai-codex", sessionId, { apiKey: selectedA });
+		const result = await authStorage.limits.markReached(targetProvider, sessionId, { apiKey: selected });
 		expect(result.switched).toBe(true);
 
-		const selectedB = await authStorage.keys.get("openai-codex", sessionId);
-		expect(selectedB).toBe("access-B");
+		const sibling = selected === "access-A" ? "access-B" : "access-A";
+		expect(await authStorage.keys.get(targetProvider, sessionId)).toBe(sibling);
+		expect(await authStorage.keys.get(targetProvider, `${sessionId}-fresh`)).toBe(sibling);
 	});
 
 	test("usage-limit rotation trusts the failed bearer over stale session stickiness", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		await authStorage.credentials.set(targetProvider, [
 			{
 				type: "oauth",
 				access: "plus-access",
@@ -216,27 +213,20 @@ describe("AuthStorage account rotation", () => {
 		]);
 
 		const sessionId = "stale-sticky-session";
-		const stickyKey = await authStorage.keys.get("openai-codex", sessionId);
+		const stickyKey = await authStorage.keys.get(targetProvider, sessionId);
 		const failedKey = stickyKey === "plus-access" ? "k12-access" : "plus-access";
-		const result = await authStorage.limits.markReached("openai-codex", sessionId, { apiKey: failedKey });
+		const result = await authStorage.limits.markReached(targetProvider, sessionId, { apiKey: failedKey });
 		expect(result.switched).toBe(true);
-		expect(await authStorage.keys.get("openai-codex", sessionId)).toBe(stickyKey);
+		expect(await authStorage.keys.get(targetProvider, sessionId)).toBe(stickyKey);
 	});
 
 	test("ModelRegistry distinguishes forced renewal from provider 401 recovery", async () => {
 		let mints = 0;
-		oauth.registerOAuthProvider({
-			id: targetProvider,
-			name: targetProvider,
-			sourceId: stickyInvalidationSource,
-			async login() {
-				throw new Error("login is not used");
-			},
-			async refreshToken(credential) {
-				mints += 1;
-				return { ...credential, access: `mint-${mints}`, expires: Date.now() + 3_600_000 };
-			},
-			getApiKey: credential => credential.access,
+		const definition = getProviderDefinition(targetProvider);
+		if (!definition?.refreshToken) throw new Error("Expected built-in Copilot refresh hook");
+		vi.spyOn(definition, "refreshToken").mockImplementation(async credential => {
+			mints += 1;
+			return { ...credential, access: `mint-${mints}`, expires: Date.now() + 3_600_000 };
 		});
 		await authStorage.credentials.set(targetProvider, [
 			{ type: "oauth", access: "initial", refresh: "refresh", expires: Date.now() + 3_600_000 },
@@ -278,7 +268,7 @@ describe("AuthStorage account rotation", () => {
 			},
 			authStorage,
 		};
-		const resolver = createApiKeyResolver(registry, "openai-codex", {
+		const resolver = createApiKeyResolver(registry, targetProvider, {
 			sessionId: "concurrent-oauth-refresh",
 		});
 
@@ -307,9 +297,9 @@ describe("AuthStorage account rotation", () => {
 		const attemptedKeys: string[] = [];
 
 		await expect(
-			withAuth(createApiKeyResolver(registry, "openai-codex"), async key => {
+			withAuth(createApiKeyResolver(registry, targetProvider), async key => {
 				attemptedKeys.push(key);
-				throw Object.assign(new Error("You have hit your ChatGPT usage limit (pro plan). Try again later."), {
+				throw Object.assign(new Error("Account usage limit reached. Try again later."), {
 					status: 429,
 				});
 			}),
@@ -320,51 +310,30 @@ describe("AuthStorage account rotation", () => {
 	});
 
 	test("API key resolver waits out a sibling's sub-second block instead of surfacing a drained account's quota error", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		await authStorage.credentials.set(targetProvider, [
 			{ type: "oauth", access: "healthy", refresh: "r-h", expires: Date.now() + 3_600_000, accountId: "healthy" },
 			{ type: "oauth", access: "drained", refresh: "r-d", expires: Date.now() + 3_600_000, accountId: "drained" },
 		]);
 		// Park the drained account briefly so the request starts on the healthy one.
-		await authStorage.limits.markReached("openai-codex", undefined, { apiKey: "drained", retryAfterMs: 50 });
-		const googleRpc429 = (message: string, reason: string, retryDelay: string) =>
-			Object.assign(
-				new Error(
-					`Cloud Code Assist API error (429): ${JSON.stringify({
-						error: {
-							code: 429,
-							message,
-							status: "RESOURCE_EXHAUSTED",
-							details: [
-								{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason },
-								{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay },
-							],
-						},
-					})}`,
-				),
-				{ status: 429 },
-			);
+		await authStorage.limits.markReached(targetProvider, undefined, { apiKey: "drained", retryAfterMs: 50 });
 		const attemptedKeys: string[] = [];
 		const startedAt = Date.now();
 
 		const result = await withAuth(
-			new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true }).resolver("openai-codex"),
+			new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true }).resolver(targetProvider),
 			async key => {
 				attemptedKeys.push(key);
 				if (key === "drained") {
-					throw googleRpc429("Individual quota reached. Resets in 114h13m4s.", "QUOTA_EXHAUSTED", "411184.67s");
+					throw Object.assign(new Error("Account usage limit reached. retry-after-ms=411184670"), { status: 429 });
 				}
 				if (attemptedKeys.length === 1) {
-					throw googleRpc429(
-						"You have exhausted your capacity on this model. Resets in 0s.",
-						"RATE_LIMIT_EXCEEDED",
-						"0.3s",
-					);
+					throw Object.assign(new Error("Account usage limit reached. retry-after-ms=300"), { status: 429 });
 				}
 				return "ok";
 			},
 		);
 
-		// healthy → capacity 429 (blocked 0.3 s); drained frees first and fails for
+		// healthy → quota 429 (blocked 0.3 s); drained frees first and fails for
 		// days; the request then waits for, and resends, the healthy bearer.
 		expect(result).toBe("ok");
 		expect(attemptedKeys).toEqual(["healthy", "drained", "healthy"]);
@@ -372,20 +341,20 @@ describe("AuthStorage account rotation", () => {
 	});
 
 	test("API key resolver does not wait on a sibling blocked longer than a few seconds", async () => {
-		await authStorage.credentials.set("openai-codex", [
+		await authStorage.credentials.set(targetProvider, [
 			{ type: "oauth", access: "first", refresh: "r-1", expires: Date.now() + 3_600_000, accountId: "first" },
 			{ type: "oauth", access: "second", refresh: "r-2", expires: Date.now() + 3_600_000, accountId: "second" },
 		]);
-		await authStorage.limits.markReached("openai-codex", undefined, { apiKey: "second", retryAfterMs: 60_000 });
+		await authStorage.limits.markReached(targetProvider, undefined, { apiKey: "second", retryAfterMs: 60_000 });
 		const attemptedKeys: string[] = [];
 		const startedAt = Date.now();
 
 		await expect(
 			withAuth(
-				new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true }).resolver("openai-codex"),
+				new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true }).resolver(targetProvider),
 				async key => {
 					attemptedKeys.push(key);
-					throw Object.assign(new Error("You have hit your ChatGPT usage limit (pro plan). Try again later."), {
+					throw Object.assign(new Error("Account usage limit reached. Try again later."), {
 						status: 429,
 					});
 				},

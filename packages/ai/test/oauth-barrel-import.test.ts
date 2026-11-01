@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 const STATIC_IMPORT_FIXTURE = `${import.meta.dir}/fixtures/oauth-barrel-import.ts`;
 
 describe("OAuth barrel imports", () => {
-	it("loads with the Anthropic provider and auth storage while preserving public exports", async () => {
+	it("loads with the retained Anthropic wire transport and auth storage while preserving public exports", async () => {
 		const child = Bun.spawn([process.execPath, STATIC_IMPORT_FIXTURE], {
 			cwd: import.meta.dir,
 			stdout: "pipe",

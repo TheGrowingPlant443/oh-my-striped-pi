@@ -2,29 +2,21 @@ import { describe, expect, it } from "bun:test";
 import { type OpenAICompletionsOptions, streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamSimple } from "@oh-my-pi/pi-ai/stream";
 import type { AssistantMessage, Context, FetchImpl, Model, SimpleStreamOptions, Usage } from "@oh-my-pi/pi-ai/types";
-import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 const context: Context = { messages: [{ role: "user", content: "hello", timestamp: 0 }] };
 
-const openAI56ResponsesModel = getBundledModel<"openai-responses">("openai", "gpt-5.6");
-if (!openAI56ResponsesModel) throw new Error("Expected bundled OpenAI GPT-5.6 model");
-if (openAI56ResponsesModel.api !== "openai-responses") {
-	throw new Error(`Expected OpenAI Responses model, received ${openAI56ResponsesModel.api}`);
-}
-const {
-	compat: _responsesCompat,
-	remoteCompaction: _responsesRemoteCompaction,
-	...openAI56CompletionsSpec
-} = openAI56ResponsesModel;
-const openAI56CompletionsModel: Model<"openai-completions"> = {
-	...openAI56CompletionsSpec,
+const bundledModel = getBundledModel<"openai-completions">("github-copilot", "gpt-4o");
+const cacheModel = buildModel({
+	...bundledModel,
 	api: "openai-completions",
-	compat: resolveModelPolicy({
-		...openAI56CompletionsSpec,
-		api: "openai-completions",
-	}).compat,
-};
+	compat: {
+		...bundledModel.compatConfig,
+		supportsPromptCacheBreakpoints: true,
+		promptCacheBreakpointTtl: "30m",
+	},
+});
 
 const emptyUsage: Usage = {
 	input: 0,
@@ -41,7 +33,7 @@ function chatCompletionsSse(): Response {
 			id: "chatcmpl-affinity",
 			object: "chat.completion.chunk",
 			created: 0,
-			model: openAI56CompletionsModel.id,
+			model: cacheModel.id,
 			choices: [{ index: 0, delta, finish_reason: finishReason }],
 		});
 
@@ -53,7 +45,7 @@ function chatCompletionsSse(): Response {
 
 async function captureRequest(
 	options: OpenAICompletionsOptions,
-	requestModel: Model<"openai-completions"> = openAI56CompletionsModel,
+	requestModel: Model<"openai-completions"> = cacheModel,
 	requestContext: Context = context,
 ): Promise<{ headers: Headers; body: Record<string, unknown> }> {
 	let requestHeaders: Headers | undefined;
@@ -80,7 +72,7 @@ async function captureRequest(
 
 async function captureSimpleRequest(
 	options: SimpleStreamOptions,
-	requestModel: Model<"openai-completions"> = openAI56CompletionsModel,
+	requestModel: Model<"openai-completions"> = cacheModel,
 	requestContext: Context = context,
 ): Promise<{ headers: Headers; body: Record<string, unknown> }> {
 	let requestHeaders: Headers | undefined;
@@ -110,7 +102,7 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 	};
 
 	it("leaves the wire shape unchanged when the policy is unset", async () => {
-		const { body } = await captureRequest({ sessionId: "cache-key" }, openAI56CompletionsModel, historicalContext);
+		const { body } = await captureRequest({ sessionId: "cache-key" }, cacheModel, historicalContext);
 
 		expect(body).not.toHaveProperty("prompt_cache_options");
 		expect(body).not.toHaveProperty("prompt_cache_key");
@@ -121,8 +113,8 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "previous answer" }],
 			api: "openai-completions",
-			provider: "openai",
-			model: "gpt-5.6",
+			provider: "github-copilot",
+			model: cacheModel.id,
 			usage: emptyUsage,
 			stopReason: "stop",
 			timestamp: 1,
@@ -136,7 +128,7 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 		};
 		const { body } = await captureSimpleRequest(
 			{ sessionId: "cache-key", promptCache: { mode: "explicit" } },
-			openAI56CompletionsModel,
+			cacheModel,
 			textOnlyHistory,
 		);
 
@@ -155,7 +147,7 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 	it("leaves boundary selection automatic in implicit mode", async () => {
 		const { body } = await captureRequest(
 			{ sessionId: "cache-key", promptCache: { mode: "implicit" } },
-			openAI56CompletionsModel,
+			cacheModel,
 			historicalContext,
 		);
 
@@ -169,7 +161,7 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 			sent = true;
 			return chatCompletionsSse();
 		};
-		const result = await streamOpenAICompletions(openAI56CompletionsModel, context, {
+		const result = await streamOpenAICompletions(cacheModel, context, {
 			apiKey: "test-key",
 			promptCache: { mode: "implicit", ttl: "12h" },
 			fetch: fetchMock,
@@ -184,10 +176,10 @@ describe("OpenAI Chat Completions explicit prompt cache policy", () => {
 		const firstTurn: Context = {
 			messages: [{ role: "user", content: "only prompt", timestamp: 0 }],
 		};
-		const first = await captureRequest({ promptCache: { mode: "explicit" } }, openAI56CompletionsModel, firstTurn);
+		const first = await captureRequest({ promptCache: { mode: "explicit" } }, cacheModel, firstTurn);
 		const none = await captureRequest(
 			{ promptCache: { mode: "explicit", breakpoint: "none" } },
-			openAI56CompletionsModel,
+			cacheModel,
 			historicalContext,
 		);
 

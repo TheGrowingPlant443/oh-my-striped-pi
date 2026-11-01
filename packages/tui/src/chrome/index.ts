@@ -1,5 +1,6 @@
 // Shared chat/overlay chrome: borders, panels, transcript container, diff and error blocks.
 export * from "./chat-block";
+export * from "./collab-qrcode";
 export * from "./context-thresholds";
 export * from "./countdown-timer";
 export * from "./diff";
@@ -10,6 +11,7 @@ export * from "./message-divider";
 export * from "./message-frame";
 export * from "./message-notice";
 export * from "./overlay-box";
+export * from "./qrcode";
 export * from "./segment-track";
 export * from "./select-list-mouse-routing";
 export * from "./selector-helpers";

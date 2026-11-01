@@ -6,7 +6,7 @@ import type { ComposerProps } from "../src/components/shell/Composer";
 import { Composer, shouldSubmitOnEnter } from "../src/components/shell/Composer";
 import { encodeBase64Url } from "../src/lib/link";
 
-const LINK = `roomroomroom1234#${encodeBase64Url(new Uint8Array(32))}`;
+const LINK = `ws://localhost:7466/r/roomroomroom1234#${encodeBase64Url(new Uint8Array(32))}`;
 const client = new GuestClient(LINK, "tester");
 
 function props(uiRequest: ComposerProps["uiRequest"]): ComposerProps {

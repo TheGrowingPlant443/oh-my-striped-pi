@@ -1,9 +1,11 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as path from "node:path";
 import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { type Api, type AssistantMessage, type Context, Effort, type ImageContent, type Model } from "@oh-my-pi/pi-ai";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import * as requestSize from "@oh-my-pi/pi-catalog/compat/request-size";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { type CreateAgentSessionResult, createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -17,24 +19,88 @@ import { AUTO_THINKING, resolveProvisionalAutoLevel } from "@oh-my-pi/pi-tui/thi
 import { TempDir } from "@oh-my-pi/pi-utils";
 import * as snapcompact from "@oh-my-pi/snapcompact";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
+
+const thinkingModelSpec = {
+	id: "company-thinking",
+	name: "Company Thinking",
+	api: "openai-completions",
+	provider: "company-thinking",
+	baseUrl: "https://thinking.company.invalid/v1",
+	reasoning: true,
+	thinking: {
+		mode: "effort",
+		efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.Max],
+		defaultLevel: Effort.Max,
+	},
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 64_000,
+} satisfies ModelSpec<"openai-completions">;
+
+const frameModelSpec = {
+	id: "company-vision",
+	name: "Company Vision",
+	api: "anthropic-messages",
+	provider: "company-no-budget",
+	baseUrl: "https://vision.company.invalid",
+	reasoning: false,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 64_000,
+} satisfies ModelSpec<"anthropic-messages">;
+const budgetFrameModelSpec = {
+	...frameModelSpec,
+	provider: "company-budget",
+	baseUrl: "https://budget-vision.company.invalid",
+} satisfies ModelSpec<"anthropic-messages">;
+const nextBudgetFrameModelSpec = { ...budgetFrameModelSpec, id: "company-vision-next" };
+const otherFrameModelSpec = {
+	...frameModelSpec,
+	provider: "company-other-no-budget",
+	baseUrl: "https://other-vision.company.invalid",
+};
+
+function registerArchiveModels(modelRegistry: ModelRegistry): void {
+	for (const models of [
+		[budgetFrameModelSpec, nextBudgetFrameModelSpec],
+		[frameModelSpec],
+		[otherFrameModelSpec],
+	] as const) {
+		const model = models[0];
+		modelRegistry.registerProvider(model.provider, {
+			api: model.api,
+			baseUrl: model.baseUrl,
+			apiKey: "test-key",
+			models: [...models],
+		});
+	}
+}
 
 describe("AgentSession model persistence", () => {
 	let tempDir: TempDir;
 	let session: AgentSession | undefined;
 	let sessionSettings: Settings;
-	// Auth storage (SQLite DB) and the model registry are immutable across these tests:
-	// every test sets the same anthropic/zai runtime keys and only ever reads the bundled model
-	// list. Building them once avoids ~12 SQLite opens + registry constructions.
+	// Shared auth and registry keep SDK resume and selector fixtures on the same model catalog.
 	let sharedDir: TempDir;
 	let sharedAuthStorage: AuthStorage;
 	let sharedModelRegistry: ModelRegistry;
+	let restoreArchiveBudget: (() => void) | undefined;
 
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-model-persistence-shared-");
 		sharedAuthStorage = await AuthStorage.create(path.join(sharedDir.path(), "auth.db"));
-		sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
-		sharedAuthStorage.keys.setRuntime("zai", "test-key");
+		sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 		sharedModelRegistry = new ModelRegistry(sharedAuthStorage, path.join(sharedDir.path(), "models.yml"));
+		sharedModelRegistry.registerProvider(thinkingModelSpec.provider, {
+			api: thinkingModelSpec.api,
+			baseUrl: thinkingModelSpec.baseUrl,
+			apiKey: "test-key",
+			models: [thinkingModelSpec],
+		});
+		registerArchiveModels(sharedModelRegistry);
 	});
 
 	afterAll(() => {
@@ -47,6 +113,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	afterEach(async () => {
+		restoreArchiveBudget?.();
+		restoreArchiveBudget = undefined;
 		if (session) {
 			await session.dispose();
 			session = undefined;
@@ -54,14 +122,20 @@ describe("AgentSession model persistence", () => {
 		tempDir.removeSync();
 	});
 
-	function getAnthropicModelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
-		if (!model) throw new Error(`Expected anthropic model ${id} to exist`);
-		return model;
+	function getCopilotModel(id: string): Model<Api> {
+		return getTestModel("github-copilot", model => model.id === id);
 	}
 
 	function modelValue(model: Model<Api>): string {
 		return `${model.provider}/${model.id}`;
+	}
+
+	function useArchiveByteBudget(): void {
+		// Exercise archive sizing independently of removed hosted-provider budget policies.
+		const budget = spyOn(requestSize, "resolveInlineImageByteBudget").mockImplementation(model =>
+			model.provider === budgetFrameModelSpec.provider ? 24_000_000 : undefined,
+		);
+		restoreArchiveBudget = () => budget.mockRestore();
 	}
 
 	async function writeRoleModelSession(
@@ -107,7 +181,7 @@ describe("AgentSession model persistence", () => {
 		const model =
 			options?.initialModel ??
 			options?.selectInitialModel?.(modelRegistry.getAvailable()) ??
-			getAnthropicModelOrThrow("claude-sonnet-4-5");
+			getCopilotModel("claude-sonnet-4.5");
 		const agent = new Agent({
 			initialState: {
 				model,
@@ -165,8 +239,8 @@ describe("AgentSession model persistence", () => {
 		return result;
 	}
 	it("switches the active model without persisting by default", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const nextModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const nextModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 
 		const created = await createSession({
@@ -189,8 +263,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("persists the default role when explicitly requested", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const nextModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const nextModel = getCopilotModel("claude-sonnet-4.6");
 
 		const created = await createSession({
 			initialModel: defaultModel,
@@ -204,8 +278,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("switches the active model even when the live context is over the target window", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const nextModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const nextModel = getCopilotModel("claude-sonnet-4.6");
 
 		const created = await createSession({
 			initialModel: defaultModel,
@@ -223,8 +297,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("cycles role models without rewriting configured roles", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const slowModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const slowModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const slowRoleValue = `${modelValue(slowModel)}:high`;
 
@@ -246,8 +320,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("cycles role models backward from the current role", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const slowModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const slowModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const slowRoleValue = modelValue(slowModel);
 
@@ -294,8 +368,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores the last active role model when switching sessions", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const smolModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const smolModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const smolRoleValue = modelValue(smolModel);
 
@@ -312,8 +386,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores the last active role model during startup resume", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const smolModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const smolModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const smolRoleValue = modelValue(smolModel);
 		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, smolRoleValue);
@@ -324,10 +398,10 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("falls back to the saved default model when switch-session role restore is unavailable", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const previousModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const previousModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
-		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, "anthropic/not-loaded-anymore");
+		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, "company-missing/not-loaded-anymore");
 
 		const created = await createSession({
 			initialModel: previousModel,
@@ -340,8 +414,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores the saved default model when switch-session last role is fallback", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const fallbackModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const fallbackModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const targetSessionFile = await writeRoleModelSession(
 			defaultRoleValue,
@@ -360,10 +434,10 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("falls back to the saved default model when startup role restore is unavailable", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const settingsFallbackModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const settingsFallbackModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
-		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, "anthropic/not-loaded-anymore");
+		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, "company-missing/not-loaded-anymore");
 		const settings = Settings.isolated();
 		settings.setModelRole("default", modelValue(settingsFallbackModel));
 
@@ -373,8 +447,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores the saved default model when startup last role is fallback", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const fallbackModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const fallbackModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const targetSessionFile = await writeRoleModelSession(
 			defaultRoleValue,
@@ -390,8 +464,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores a temporary model when switching sessions", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const temporaryModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const temporaryModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, modelValue(temporaryModel), "temporary");
 
@@ -406,8 +480,8 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("restores a temporary model during startup resume", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const temporaryModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
+		const temporaryModel = getCopilotModel("claude-sonnet-4.6");
 		const defaultRoleValue = modelValue(defaultModel);
 		const targetSessionFile = await writeRoleModelSession(defaultRoleValue, modelValue(temporaryModel), "temporary");
 		const settings = Settings.isolated();
@@ -419,7 +493,7 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("activates auto thinking on startup resume when modelRoles.default carries an explicit :auto suffix", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
 		const targetSessionFile = await writeRoleModelSession(
 			modelValue(defaultModel),
 			modelValue(defaultModel),
@@ -435,8 +509,7 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("keeps DEFAULT-role auto thinking on a fresh session when the model declares defaultLevel (#16370)", async () => {
-		const model = getBundledModel("zai", "glm-5.3");
-		if (!model) throw new Error("Expected zai/glm-5.3 to exist");
+		const model = buildModel(thinkingModelSpec);
 		expect(model.thinking?.defaultLevel).toBe(Effort.Max);
 		// The /model hub stores DEFAULT-role `auto` as a bare role plus `defaultThinkingLevel: auto`.
 		const settings = Settings.isolated({ defaultThinkingLevel: AUTO_THINKING });
@@ -467,12 +540,13 @@ describe("AgentSession model persistence", () => {
 
 	it("marks an incomplete process-exit transcript aborted during SDK resume without dropping history", async () => {
 		const sessionManager = SessionManager.create(tempDir.path(), path.join(tempDir.path(), "interrupted"));
+		const interruptedModel = getCopilotModel("claude-sonnet-4.5");
 		const interruptedAssistant: AssistantMessage = {
 			role: "assistant",
 			content: [{ type: "toolCall", id: "call_read", name: "read", arguments: { path: "state.txt" } }],
-			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			api: interruptedModel.api,
+			provider: interruptedModel.provider,
+			model: interruptedModel.id,
 			usage: {
 				input: 1,
 				output: 1,
@@ -524,7 +598,7 @@ describe("AgentSession model persistence", () => {
 	});
 
 	it("marks a first user-message process-exit tail aborted with the selected model", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
 		const settings = Settings.isolated();
 		settings.setModelRole("default", modelValue(defaultModel));
 		const sessionManager = SessionManager.create(tempDir.path(), path.join(tempDir.path(), "interrupted-user"));
@@ -583,7 +657,7 @@ describe("AgentSession model persistence", () => {
 		return encodeRawPng(new Uint8Array(pixels.buffer), 800, 500, 3).toString("base64");
 	}
 
-	/** Appends a 4.8 MB three-frame archive: over the 3 MB default, inside half of Anthropic's 24 MB inline-image budget. */
+	/** Appends a 4.8 MB three-frame archive: over the 3 MB default, inside half the fixture's 24 MB budget. */
 	function appendFrameArchive(sessionManager: SessionManager, firstKeptEntryId: string): void {
 		const frame = (seed: number) => ({
 			data: framePng(seed),
@@ -609,12 +683,13 @@ describe("AgentSession model persistence", () => {
 		return summary.blocks?.filter(block => block.type === "image").length ?? 0;
 	}
 
-	/** Resumes a session whose archive was compacted on the official Anthropic API. */
+	/** Resumes a session archived under the larger frame budget. */
 	async function resumeArchivedSession(
 		authStorage: AuthStorage,
 		modelRegistry: ModelRegistry,
 	): Promise<CreateAgentSessionResult> {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
+		useArchiveByteBudget();
+		const defaultModel = buildModel(budgetFrameModelSpec);
 		const settings = Settings.isolated();
 		settings.setModelRole("default", modelValue(defaultModel));
 		const sessionManager = SessionManager.create(tempDir.path(), path.join(tempDir.path(), "archived"));
@@ -650,17 +725,15 @@ describe("AgentSession model persistence", () => {
 		expect(archiveImages(result.session.messages)).toBe(3);
 	});
 
-	/** Switches a session archived on the official Anthropic API to `target`, then returns the archive frames of its next request. */
+	/** Switches a byte-budgeted private archive to `target`, then returns the archive frames of its next request. */
 	async function archiveFramesAfterSwitch(
 		target: Model<Api>,
 		switchModel: (session: AgentSession, target: Model<Api>) => Promise<unknown>,
 	): Promise<ImageContent[]> {
 		const authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		try {
-			for (const provider of ["anthropic", "openrouter", "amazon-bedrock"]) {
-				authStorage.keys.setRuntime(provider, "test-key");
-			}
 			const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+			registerArchiveModels(modelRegistry);
 			const result = await resumeArchivedSession(authStorage, modelRegistry);
 			session = result.session;
 			const summary = session.messages.find(message => message.role === "compactionSummary");
@@ -694,10 +767,10 @@ describe("AgentSession model persistence", () => {
 	}
 
 	it.each([
-		["setModel", getBundledModel("openrouter", "anthropic/claude-sonnet-4.5")],
-		["setModelTemporary", getBundledModel("amazon-bedrock", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")],
+		["setModel", buildModel(frameModelSpec)],
+		["setModelTemporary", buildModel(otherFrameModelSpec)],
 	] as const)(
-		"after %s from the official Anthropic API to a host without a byte budget, the next request carries only the newest archive frame",
+		"after %s from a byte-budgeted private host to a host without a byte budget, the next request carries only the newest archive frame",
 		async (switchPath, target) => {
 			const frames = await archiveFramesAfterSwitch(target, (active, model) =>
 				switchPath === "setModel"
@@ -712,40 +785,36 @@ describe("AgentSession model persistence", () => {
 		},
 	);
 
-	it("keeps every archive frame in the next request after a switch between official Anthropic models", async () => {
-		const frames = await archiveFramesAfterSwitch(
-			getAnthropicModelOrThrow("claude-sonnet-4-5-20250929"),
-			(active, model) => active.setModel(model),
+	it("keeps every archive frame in the next request after a switch between byte-budgeted private models", async () => {
+		const frames = await archiveFramesAfterSwitch(buildModel(nextBudgetFrameModelSpec), (active, model) =>
+			active.setModel(model),
 		);
 
 		expect(frames).toHaveLength(3);
 	});
 
 	it.each([
-		["a proxy to the official Anthropic API", "anthropic-proxy", "anthropic", 3],
-		["the official Anthropic API to a proxy", "anthropic", "anthropic-proxy", 1],
+		[
+			"an unbudgeted private host to a budgeted private host",
+			frameModelSpec.provider,
+			budgetFrameModelSpec.provider,
+			3,
+		],
+		[
+			"a budgeted private host to an unbudgeted private host",
+			budgetFrameModelSpec.provider,
+			frameModelSpec.provider,
+			1,
+		],
 	] as const)(
 		"switching sessions from %s installs the archive at the resumed model's frame payload budget",
 		async (_, fromProvider, toProvider, frames) => {
-			const modelsPath = path.join(tempDir.path(), "models.yml");
-			await Bun.write(
-				modelsPath,
-				`providers:
-  anthropic-proxy:
-    api: anthropic-messages
-    baseUrl: https://anthropic-proxy.example.com
-    apiKey: test-key
-    models:
-      - id: claude-sonnet-4-5
-        input: [text, image]
-        contextWindow: 200000
-        maxTokens: 64000
-`,
-			);
-			const modelRegistry = new ModelRegistry(sharedAuthStorage, modelsPath);
+			useArchiveByteBudget();
+			const modelRegistry = new ModelRegistry(sharedAuthStorage, path.join(tempDir.path(), "models.yml"));
+			registerArchiveModels(modelRegistry);
 			const findModel = (provider: string): Model<Api> => {
-				const model = modelRegistry.find(provider, "claude-sonnet-4-5");
-				if (!model) throw new Error(`Expected ${provider}/claude-sonnet-4-5`);
+				const model = modelRegistry.find(provider, frameModelSpec.id);
+				if (!model) throw new Error(`Expected ${provider}/${frameModelSpec.id}`);
 				return model;
 			};
 			const targetModel = findModel(toProvider);
@@ -796,7 +865,7 @@ describe("AgentSession model persistence", () => {
 	);
 
 	it("marks an interrupted first turn aborted when switching sessions", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
+		const defaultModel = getCopilotModel("claude-sonnet-4.5");
 		const created = await createSession({ initialModel: defaultModel, persist: true });
 		const targetFile = path.join(tempDir.path(), "switch-interrupted-user.jsonl");
 		const timestamp = "2026-07-11T02:20:08.800Z";
@@ -846,23 +915,23 @@ describe("AgentSession model persistence", () => {
 		expect(
 			getRestorableSessionModels(
 				{
-					default: "anthropic/claude-sonnet-4-5",
-					temporary: "anthropic/claude-sonnet-4-6",
+					default: "github-copilot/claude-sonnet-4.5",
+					temporary: "github-copilot/claude-sonnet-4.6",
 				},
 				"temporary",
 			),
-		).toEqual(["anthropic/claude-sonnet-4-6", "anthropic/claude-sonnet-4-5"]);
+		).toEqual(["github-copilot/claude-sonnet-4.6", "github-copilot/claude-sonnet-4.5"]);
 	});
 
 	it("lists only the default model for ephemeral fallback restores", () => {
 		expect(
 			getRestorableSessionModels(
 				{
-					default: "anthropic/claude-sonnet-4-5",
-					[EPHEMERAL_MODEL_CHANGE_ROLE]: "anthropic/claude-sonnet-4-6",
+					default: "github-copilot/claude-sonnet-4.5",
+					[EPHEMERAL_MODEL_CHANGE_ROLE]: "github-copilot/claude-sonnet-4.6",
 				},
 				EPHEMERAL_MODEL_CHANGE_ROLE,
 			),
-		).toEqual(["anthropic/claude-sonnet-4-5"]);
+		).toEqual(["github-copilot/claude-sonnet-4.5"]);
 	});
 });

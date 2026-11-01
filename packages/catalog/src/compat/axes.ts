@@ -11,7 +11,6 @@
  */
 import type { Effort } from "../effort";
 import { MODEL_KINDS, type ThinkingControlMode } from "../types";
-import { FACTORY_DROID_UPSTREAMS } from "../wire/factory-droid";
 
 /** Value shape a directive accepts (see `rules/README.md`). */
 export type AxisShape = "scalar" | "array" | "object";
@@ -20,15 +19,7 @@ export type AxisShape = "scalar" | "array" | "object";
 export type AxisSet = "wire" | "thinking" | "catalog";
 
 /** Resolved compat record families a wire axis may be assigned onto. */
-export type CompatRecordName =
-	| "openai"
-	| "openai-responses"
-	| "anthropic"
-	| "bedrock"
-	| "devin"
-	| "google"
-	| "request"
-	| "ollama";
+export type CompatRecordName = "openai" | "openai-responses" | "anthropic" | "request" | "ollama";
 
 /** One axis definition: resolved key, namespace, shape, and applicability. */
 export interface AxisDef {
@@ -116,15 +107,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 		"budget-effort",
 	]),
 	"anthropic-tool-streaming-beta": wire("anthropicToolStreamingBeta", ["request"]),
-	"openai-platform-header": wire("openaiPlatformHeader", ["request"]),
-	"responses-cache-retention": wire("responsesCacheRetention", ["request"]),
-	"responses-verbosity": wire("responsesVerbosity", ["request"], "scalar", ["low"]),
-	"responses-service-tier": wire("responsesServiceTier", ["request"], "scalar", ["priority"]),
-	"responses-parallel-tool-calls": wire("responsesParallelToolCalls", ["request"]),
-	"responses-safety-identifier": wire("responsesSafetyIdentifier", ["request"]),
-	"responses-tool-choice-auto": wire("responsesToolChoiceAuto", ["request"]),
-	"routing-session-lock": wire("routingSessionLock", ["request"]),
-	"google-thinking": wire("googleThinking", ["request"], "scalar", ["level", "level-medium"]),
 	// ── wire: OpenAI-compatible surfaces (chat completions + Responses) ──
 	"allows-synthetic-reasoning-content-for-tool-calls": wire("allowsSyntheticReasoningContentForToolCalls", OAI),
 	"always-send-max-tokens": wire("alwaysSendMaxTokens", OAI),
@@ -144,7 +126,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"native-kimi-k3-reasoning": wire("nativeKimiK3Reasoning", ["openai"]),
 	"omit-reasoning-effort": wire("omitReasoningEffort", OAI),
 	"prompt-cache-breakpoint-ttl": wire("promptCacheBreakpointTtl", OAI, "scalar", ["30m"]),
-	"prompt-cache-session-header": wire("promptCacheSessionHeader", OAI, "scalar", ["x-grok-conv-id"]),
 	"qwen-preserve-thinking": wire("qwenPreserveThinking", ["openai"]),
 	"reject-root-object-union": wire("rejectRootObjectUnion", OAI),
 	"retry-without-strict-on-grammar-error": wire("retryWithoutStrictOnGrammarError", OAI),
@@ -159,9 +140,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 		"omit",
 		"lowest-effort",
 		"none-effort",
-		"openrouter-enabled-false",
-		"cline-enabled-false",
-		"venice-disable-thinking",
 		"zai-thinking-disabled",
 		"qwen-enable-thinking-false",
 		"qwen-template-false",
@@ -190,11 +168,10 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 		"dsml",
 		"qwen",
 		"thinking",
-		"harmony",
 	]),
 	"supports-developer-role": wire("supportsDeveloperRole", OAI),
 	"supports-image-detail-original": wire("supportsImageDetailOriginal", ["openai-responses"]),
-	"supports-long-prompt-cache-retention": wire("supportsLongPromptCacheRetention", [...OAI, "bedrock"]),
+	"supports-long-prompt-cache-retention": wire("supportsLongPromptCacheRetention", OAI),
 	"supports-multiple-system-messages": wire("supportsMultipleSystemMessages", ["openai"]),
 	"supports-named-tool-choice": wire("supportsNamedToolChoice", OAI),
 	"supports-obfuscation-opt-out": wire("supportsObfuscationOptOut", ["openai-responses"]),
@@ -213,7 +190,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"template-reasoning-effort": wire("qwenTemplateReasoningEffort", ["openai"]),
 	"thinking-format": wire("thinkingFormat", OAI, "scalar", [
 		"openai",
-		"openrouter",
 		"zai",
 		"kimi",
 		"qwen",
@@ -225,22 +201,14 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"tool-strict-mode": wire("toolStrictMode", ["openai"], "scalar", ["all_strict", "none", "mixed"]),
 	"uses-openai-tool-call-id-limit": wire("usesOpenAIToolCallIdLimit", OAI),
 	"when-thinking": wire("whenThinking", ["openai"], "object"),
-	"wire-model-id-mode": wire("wireModelIdMode", OAI, "scalar", [
-		"raw",
-		"cline-pass",
-		"firepass",
-		"fireworks",
-		"openrouter",
-	]),
 	"zai-reasoning-effort-dialect": wire("zaiReasoningEffortDialect", ["openai"]),
 
 	// ── wire: anthropic-messages ──
-	"bedrock-messages-api": wire("bedrockMessagesApi", ["anthropic"]),
 	"allow-anthropic-header-overrides": wire("allowAnthropicHeaderOverrides", ["anthropic"]),
 	"disable-adaptive-thinking": wire("disableAdaptiveThinking", ["anthropic"]),
 	"disable-strict-tools": wire("disableStrictTools", ["anthropic"]),
 	"between-tools-effort": wire("betweenToolsEffort", ["anthropic"], "scalar", ["low", "medium", "high"]),
-	"disabled-thinking": wire("disabledThinking", ["anthropic", "bedrock"], "scalar", [
+	"disabled-thinking": wire("disabledThinking", ["anthropic"], "scalar", [
 		"omit",
 		"disabled",
 		"adaptive",
@@ -250,12 +218,10 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"escape-builtin-tool-names": wire("escapeBuiltinToolNames", ["anthropic"]),
 	"extended-cache-ttl-beta": wire("extendedCacheTtlBeta", ["anthropic"]),
 	"fast-mode": wire("fastMode", ["anthropic"]),
-	"first-party-provider": wire("firstPartyProvider", ["anthropic"]),
 	"honors-claude-code-beta-kill-switch": wire("honorsClaudeCodeBetaKillSwitch", ["anthropic"]),
 	"inject-claude-code-instruction": wire("injectClaudeCodeInstruction", ["anthropic"]),
-	"max-image-dimension": wire("maxImageDimension", ["anthropic", "google"]),
-	"max-image-payload-bytes": wire("maxImagePayloadBytes", ["anthropic", "google"]),
-	"official-endpoint": wire("officialEndpoint", ["anthropic", "openai-responses"]),
+	"max-image-dimension": wire("maxImageDimension", ["anthropic"]),
+	"max-image-payload-bytes": wire("maxImagePayloadBytes", ["anthropic"]),
 	"replay-unsigned-thinking": wire("replayUnsignedThinking", ["anthropic"]),
 	"requires-thinking-enabled": wire("requiresThinkingEnabled", ["anthropic"]),
 	"requires-thinking-presence": wire("requiresThinkingPresence", ["anthropic"]),
@@ -269,34 +235,12 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"supports-mid-conversation-system": wire("supportsMidConversationSystem", ["anthropic"]),
 	"supports-mid-conversation-tool-changes": wire("supportsMidConversationToolChanges", ["anthropic"]),
 	"supports-per-message-effort": wire("supportsPerMessageEffort", ["anthropic"]),
-	"supports-server-compaction": wire("supportsServerCompaction", ["anthropic", "bedrock"]),
+	"supports-server-compaction": wire("supportsServerCompaction", ["anthropic"]),
 	"supports-between-tools-thinking": wire("supportsBetweenToolsThinking", ["anthropic"]),
-	"supports-thinking-binding-controls": wire("supportsThinkingBindingControls", ["anthropic", "bedrock"]),
+	"supports-thinking-binding-controls": wire("supportsThinkingBindingControls", ["anthropic"]),
 	"supports-turn-scoped-system": wire("supportsTurnScopedSystem", ["anthropic"]),
 
-	// ── wire: bedrock-converse-stream ──
-	"prompt-cache-maximum-checkpoints": wire("promptCacheMaximumCheckpoints", ["bedrock"]),
-	"prompt-cache-minimum-tokens": wire("promptCacheMinimumTokens", ["bedrock"]),
-	"prompt-cache-mode": wire("promptCacheMode", ["bedrock"], "scalar", ["none", "automatic", "explicit"]),
-
-	// ── wire: devin-agent ──
-	"model-router": wire("modelRouter", ["devin"]),
-	"supports-parallel-tool-calls": wire("supportsParallelToolCalls", ["devin"]),
-	"trust-explicit-thinking-only": wire("trustExplicitThinkingOnly", [...OAI, "devin"]),
-
-	// ── wire: google APIs ──
-	"antigravity-claude-tool-mode": wire("antigravityClaudeToolMode", ["google"]),
-	"antigravity-usage-label": wire("antigravityUsageLabel", ["google"]),
-	"cca-legacy-parameters-schema": wire("ccaLegacyParametersSchema", ["google"]),
-	"claude-thinking-beta-header": wire("claudeThinkingBetaHeader", ["google"]),
-	"drop-unsigned-thinking": wire("dropUnsignedThinking", ["google"]),
-	"flash-stream-leak-workaround": wire("flashStreamLeakWorkaround", ["google"]),
-	"multimodal-function-response": wire("multimodalFunctionResponse", ["google"]),
-	"requires-skip-thought-signature": wire("requiresSkipThoughtSignature", ["google"]),
-	"requires-skip-thought-signature-on-first-function-call": wire("requiresSkipThoughtSignatureOnFirstFunctionCall", [
-		"google",
-	]),
-	"supports-function-part-id": wire("supportsFunctionPartId", ["google"]),
+	"trust-explicit-thinking-only": wire("trustExplicitThinkingOnly", OAI),
 
 	// ── wire: shared across surfaces ──
 	/**
@@ -311,17 +255,13 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	 * retiring the block on the first mismatch, so this axis decides where
 	 * mid-stream retirement is attempted, not whether it is safe.
 	 */
-	"stream-revision": wire("streamRevision", [...OAI, "bedrock"], "scalar", ["none", "possible"]),
-	"stream-first-event-timeout-ms": wire("streamFirstEventTimeoutMs", [...OAI, "google"]),
-	"stream-idle-timeout-ms": wire("streamIdleTimeoutMs", [...OAI, "anthropic", "bedrock", "google"]),
-	"strip-image-input": wire("stripImageInput", [...OAI, "anthropic", "google"]),
-	"supports-forced-tool-choice": wire("supportsForcedToolChoice", [...OAI, "anthropic", "bedrock"]),
-	"supports-sampling-params": wire("supportsSamplingParams", [...OAI, "anthropic", "bedrock", "devin", "google"]),
-	"thinking-loop-guard": wire("thinkingLoopGuard", [...OAI, "anthropic", "google"], "scalar", [
-		"gemini",
-		"deepseek",
-		"xai",
-	]),
+	"stream-revision": wire("streamRevision", OAI, "scalar", ["none", "possible"]),
+	"stream-first-event-timeout-ms": wire("streamFirstEventTimeoutMs", OAI),
+	"stream-idle-timeout-ms": wire("streamIdleTimeoutMs", [...OAI, "anthropic"]),
+	"strip-image-input": wire("stripImageInput", [...OAI, "anthropic"]),
+	"supports-forced-tool-choice": wire("supportsForcedToolChoice", [...OAI, "anthropic"]),
+	"supports-sampling-params": wire("supportsSamplingParams", [...OAI, "anthropic"]),
+	"thinking-loop-guard": wire("thinkingLoopGuard", [...OAI, "anthropic"], "scalar", ["gemini", "deepseek", "xai"]),
 
 	// ── thinking control surface ──
 	"thinking-default-level": { key: "defaultLevel", set: "thinking", shape: "scalar", values: EFFORTS },
@@ -462,13 +402,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	"edit-revision": { key: "editRevision", set: "catalog", shape: "scalar" },
 	"input-modalities": { key: "inputModalities", set: "catalog", shape: "array", values: ["text", "image"] },
 	kind: { key: "kind", set: "catalog", shape: "scalar", values: MODEL_KINDS },
-	"web-search": {
-		key: "webSearch",
-		set: "catalog",
-		shape: "scalar",
-		values: ["gemini", "anthropic", "codex", "xai", "openrouter", "openai"],
-	},
-	"web-search-model": { key: "webSearchModel", set: "catalog", shape: "scalar" },
 	/**
 	 * Revision suffix the host appends to the model's id (Vertex `@default`): a
 	 * `provider/id` selector written without it names this model exactly.
@@ -483,13 +416,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	 * counts them. Unassigned: unknown host, held to a conservative floor.
 	 */
 	"image-count-budget": { key: "imageCountBudget", set: "catalog", shape: "scalar" },
-	/**
-	 * Replaces `image-count-budget` while the request reaches the official
-	 * endpoint (pi-ai `reachesBudgetedHost`): a limit measured or documented
-	 * for the host's own endpoint, which a custom `baseUrl` or an
-	 * `ANTHROPIC_BASE_URL`/`FOUNDRY_BASE_URL` reroute (proxy, gateway) need not share.
-	 */
-	"official-image-count-budget": { key: "officialImageCountBudget", set: "catalog", shape: "scalar" },
 	/**
 	 * Opt-in: the reader may get a fresh `read` result as snapcompact frames
 	 * (`snapcompact.toolResults`), because it edits as exactly from frames as
@@ -506,17 +432,6 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	 * and newest tool result's images past `inline-image-byte-budget` while they alone fit this limit.
 	 */
 	"request-body-byte-limit": { key: "requestBodyByteLimit", set: "catalog", shape: "scalar" },
-	/**
-	 * Opt-in: the host budgets above apply whenever the request reaches the provider's own catalog endpoint
-	 * (`endpoint-hosts`, or an unset `baseUrl`), for a hosted gateway whose compat names no official endpoint.
-	 * Unassigned: they apply only on the official endpoint (pi-ai `reachesOfficialEndpoint`).
-	 */
-	"catalog-endpoint-budgets": {
-		key: "catalogEndpointBudgets",
-		set: "catalog",
-		shape: "scalar",
-		values: [true, false],
-	},
 	/**
 	 * Supported formats and size bounds for judgment-request images; `mime-types`
 	 * is comma-separated because object payloads have no array shape.
@@ -555,6 +470,7 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 	/** Most output tokens the host serves: a larger reported `maxTokens` (and Antigravity per-SKU `maxOutputTokens`) is lowered to it; an unknown one stays unknown. */
 	"max-tokens-ceiling": { key: "maxTokensCeiling", set: "catalog", shape: "scalar" },
 	"long-context-cost": { key: "longContext", set: "catalog", shape: "object" },
+	"premium-multiplier": { key: "premiumMultiplier", set: "catalog", shape: "scalar" },
 	"prompt-cache": { key: "promptCache", set: "catalog", shape: "object" },
 	/**
 	 * The lane rewards routing related requests — Task siblings, forks, explicit
@@ -600,108 +516,21 @@ export const AXES: Readonly<Record<string, AxisDef>> = {
 		shape: "scalar",
 		values: ["free", "included", "variable", "unknown"],
 	},
-	"requires-cursor-tool-schema-projection": {
-		key: "requiresCursorToolSchemaProjection",
-		set: "catalog",
-		shape: "scalar",
-	},
 	"requires-tool-result-image-hoisting": {
 		key: "requiresToolResultImageHoisting",
 		set: "catalog",
 		shape: "scalar",
 	},
 	"supports-assistant-prefill": { key: "supportsAssistantPrefill", set: "catalog", shape: "scalar" },
-	/**
-	 * Ordered Anthropic model ids forwarded as the server-side `fallbacks`
-	 * chain when the user opts in. Each must appear in the requested model's
-	 * `allowed_fallback_models` (GET /v1/models/{id}); anything else is a 400.
-	 */
-	"server-side-fallback-models": { key: "serverSideFallbackModels", set: "catalog", shape: "array" },
-	/**
-	 * Anthropic model ids a refusal's `fallback_credit_token` may be redeemed
-	 * on (the refused model's permitted fallback targets). Unordered; a retry
-	 * on any other model cannot redeem the credit.
-	 */
-	"fallback-credit-targets": { key: "fallbackCreditTargets", set: "catalog", shape: "array" },
 	priority: { key: "priority", set: "catalog", shape: "scalar" },
 	"service-tier-cost": { key: "serviceTierCost", set: "catalog", shape: "object" },
 	"time-based-cost": { key: "timeBased", set: "catalog", shape: "object" },
-
-	// ── catalog: routed-subscription registry ──
-	// A gateway whose proxy fans one model out to several upstreams (Factory
-	// Droid). Consumed through `./factory-droid`; `api-routes` picks the wire
-	// and `quota-tiers` the billing pool.
-	/** Ordered upstream rotation; the first entry is the default `x-api-provider`. */
-	"upstream-rotation": { key: "upstreamRotation", set: "catalog", shape: "array", values: FACTORY_DROID_UPSTREAMS },
-	/**
-	 * Upstreams eligible to serve one inference region. The provider-wide rule
-	 * is the upstream serving table; a model rule replaces it (the native
-	 * region override), and a bare directive means the region never serves it.
-	 */
-	"region-upstreams-global": {
-		key: "regionUpstreamsGlobal",
-		set: "catalog",
-		shape: "array",
-		values: FACTORY_DROID_UPSTREAMS,
-		emptyArray: true,
-	},
-	"region-upstreams-us": {
-		key: "regionUpstreamsUs",
-		set: "catalog",
-		shape: "array",
-		values: FACTORY_DROID_UPSTREAMS,
-		emptyArray: true,
-	},
-	"region-upstreams-eu": {
-		key: "regionUpstreamsEu",
-		set: "catalog",
-		shape: "array",
-		values: FACTORY_DROID_UPSTREAMS,
-		emptyArray: true,
-	},
-	/** EU inference limits (`context-window`, `max-tokens`) where the region narrows the default. */
-	"region-limits-eu": { key: "regionLimitsEu", set: "catalog", shape: "object" },
-	/**
-	 * Subscription credit rates: `input` is the per-token credit weight shown
-	 * as the model's multiplier; `output` and `cache-read` multiply it.
-	 */
-	"credit-rates": { key: "creditRates", set: "catalog", shape: "object" },
-	/**
-	 * List price borrowed from a bundled catalog row: provider id, then the
-	 * row id when it differs from the model's own. Absent means no list price.
-	 */
-	"list-price-from": { key: "listPriceFrom", set: "catalog", shape: "array" },
-	/** Provider family whose live routing defaults apply to the model. */
-	"routing-family": {
-		key: "routingFamily",
-		set: "catalog",
-		shape: "scalar",
-		values: ["anthropic", "openai", "google", "factory", "xai"],
-	},
-	/** Other ids organization policy may use for the model. */
-	"policy-aliases": { key: "policyAliases", set: "catalog", shape: "array" },
-	/**
-	 * Account gates: `feature-flag` must be on to list the model,
-	 * `deprecation-flag` hides it once on, `requires-explicit-opt-in` hides it
-	 * without an org policy, and `base-variant` marks a fast tier of that model.
-	 */
-	entitlement: { key: "entitlement", set: "catalog", shape: "object" },
-	/** The native default when the caller picks no effort is thinking off. */
-	"default-reasoning-off": { key: "defaultReasoningOff", set: "catalog", shape: "scalar", values: [true, false] },
 };
 
 /** Records applicable to each API family; used by `resolve.ts` when applying wire axes. */
 export const API_COMPAT_RECORDS: Readonly<Record<string, readonly CompatRecordName[]>> = {
-	"ollama-chat": ["ollama"],
 	"openai-completions": ["openai"],
-	openrouter: ["openai", "openai-responses"],
 	"openai-responses": ["openai-responses"],
-	"azure-openai-responses": ["openai-responses"],
-	"openai-codex-responses": ["openai-responses"],
 	"anthropic-messages": ["anthropic"],
-	"bedrock-converse-stream": ["bedrock"],
-	"devin-agent": ["devin"],
-	"google-generative-ai": ["google"],
-	"google-vertex": ["google"],
-	"google-gemini-cli": ["google"],
+	"ollama-chat": ["ollama"],
 };

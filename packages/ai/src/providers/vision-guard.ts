@@ -1,4 +1,3 @@
-import { $env } from "@oh-my-pi/pi-utils";
 import type { Api, ImageContent, Model, TextContent } from "../types";
 
 export const NON_VISION_IMAGE_PLACEHOLDER = "[image omitted: model does not support vision]";
@@ -36,9 +35,9 @@ export function joinTextWithImagePlaceholder(text: string, omittedImages: boolea
  * misconfigured provider descriptors or user model entries (e.g. text-only
  * DashScope Qwen SKUs, DeepSeek models) whose endpoints reject `image_url`.
  */
-export function isOpenAICompletionsVisionSupported(model: Model<"openai-completions" | "openrouter">): boolean {
+export function isOpenAICompletionsVisionSupported(model: Model<"openai-completions">): boolean {
 	if (!model.input.includes("image")) return false;
-	if (model.compat.stripImageInput) return false;
+	if (model.compat?.stripImageInput) return false;
 	return true;
 }
 
@@ -48,9 +47,7 @@ export function isOpenAICompletionsVisionSupported(model: Model<"openai-completi
  * The `pi-native` transport forwards the original context (images included) to
  * the gateway, which resolves its own model server-side, so the Chat
  * Completions guard below never runs client-side and the declared input
- * applies. Otherwise the OpenAI Chat Completions path applies the text-only
- * guard, as does the OpenRouter chat fallback (`PI_OPENROUTER_RESPONSES=0`,
- * which dispatches `openrouter` models through `streamOpenAICompletions`);
+ * applies. Otherwise the Chat Completions path applies the text-only guard;
  * every other API ships the modalities the model declares. Callers that report
  * or gate on the wire (for example the `omp models` table) read this
  * predicate; declared capability reads `model.input`.
@@ -62,7 +59,6 @@ export function sendsImageInputOnWire(model: Model<Api>): boolean {
 }
 
 /** True for the transports that encode through the Chat Completions guard. */
-function isGuardedCompletionsTransport(model: Model<Api>): model is Model<"openai-completions" | "openrouter"> {
-	if (model.api === "openai-completions") return true;
-	return model.api === "openrouter" && $env.PI_OPENROUTER_RESPONSES === "0";
+function isGuardedCompletionsTransport(model: Model<Api>): model is Model<"openai-completions"> {
+	return model.api === "openai-completions";
 }

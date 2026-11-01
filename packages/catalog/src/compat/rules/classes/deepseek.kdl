@@ -1,23 +1,7 @@
 // Model-lineage compat for "deepseek"; regenerated from the frozen census using class taxonomy selectors.
 
 class "deepseek" {
-	on "aiand" "aimlapi" "alibaba-token-plan" "baseten" "coreweave" "deepseek" "fireworks" \
-		"huggingface" "kilo" "nanogpt" "novita" "nvidia" "opencode-go" "opencode-zen" "together" \
-		"venice" "wafer-serverless" "zenmux" {
-		family "pro" {
-			thinking-efforts "low" "high" "max"
-		}
-	}
-	on "aiand" "aimlapi" "coreweave" "deepseek" "fireworks" "gmi-cloud" "huggingface" "kilo" \
-		"nanogpt" "novita" "nvidia" "ollama-cloud" "opencode-go" "opencode-zen" "openrouter" \
-		"together" "venice" "wafer-serverless" "zenmux" {
-		family "flash" {
-			thinking-efforts "low" "high" "max"
-		}
-	}
-	// DeepSeek V4 ladders are model properties: the wire-exact low/high/max
-	// scale holds on every host (medium/xhigh fold into high). OpenRouter's
-	// non-Flash V4 route exposes only high, except the dated -0813 SKU.
+	// DeepSeek V4 uses the wire-exact low/high/max scale on every host.
 	family "pro" {
 		thinking-efforts "low" "high" "max"
 	}
@@ -35,40 +19,6 @@ class "deepseek" {
 	}
 	family "reasoner" {
 		thinking-efforts "high" "max"
-	}
-	on "openrouter" {
-		family "pro" {
-			thinking-efforts "high"
-			models "*deepseek-v4-pro-0813*" {
-				thinking-efforts "low" "high" "max"
-			}
-		}
-		family "v4" {
-			thinking-efforts "high"
-		}
-		family "r1" {
-			thinking-efforts "high"
-		}
-		family "v3" {
-			thinking-efforts "high"
-		}
-		family "reasoner" {
-			thinking-efforts "high"
-		}
-	}
-	on "alibaba-token-plan" "deepseek" {
-		supports-developer-role #false
-	}
-	// Replaces the provider-keyed leaked chat-template special-token strip.
-	on "nvidia" "deepseek" {
-		strip-deepseek-special-tokens #true
-	}
-	on "deepseek" "opencode-go" {
-		family "pro" {
-			max-tokens-field "max_tokens"
-			reasoning-content-field "reasoning_content"
-			requires-reasoning-content-for-tool-calls #true
-		}
 	}
 	strip-image-input #true
 	models token="ocr" {
@@ -97,11 +47,6 @@ class "deepseek" {
 	models "*deepseek-flash" priority=10 {
 		strip-image-input #false
 	}
-	// DSML is the model's own tool-call grammar, not a host quirk: any server
-	// running DeepSeek's chat template without (or with a broken) tool parser
-	// leaks it into content — hosted gateways, local backends, and custom
-	// providers alike. On hosts that parse it the healer sees no markup.
-	stream-markup-healing-pattern "dsml"
 	thinking-loop-guard "deepseek"
 	// V4 reasoning reaches omp as its plaintext trace on every host, and the
 	// revision pins the weights (flash 4.0 / 4.1, pro 4.0). Earlier lineages
@@ -115,21 +60,6 @@ class "deepseek" {
 	// Later Flash releases stay on their wire fallback until measured.
 	family "flash" {
 		revision ">=4.1 <4.2" {
-			image-tokenization {
-				regime "deepseek-patch"
-				verified #true
-				patch-size 14
-				downsample 3
-				max-tokens 1024
-				min-pixels 295936
-			}
-		}
-	}
-	// DeepSeek's API retired the V4.0 vision preview and serves its legacy id
-	// with the current Flash (api-docs.deepseek.com/guides/vision); hosts that
-	// still run the preview keep their fallback.
-	on "deepseek" {
-		models "deepseek-v4-flash-vision-exp" {
 			image-tokenization {
 				regime "deepseek-patch"
 				verified #true

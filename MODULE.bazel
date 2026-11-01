@@ -189,21 +189,8 @@ crate.from_cargo(
     ],
 )
 
-# opusic-sys builds its bundled Opus via `cmake` and selects Ninja from PATH.
-# The target-specific toolchain keeps MSVC cross builds on the wrapper
-# compiler/linker; CFLAGS keeps Zig cross builds free of host UBSan links.
-crate.annotation(
-    build_script_env = {
-        "CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_msvc": "$${pwd}/external/+msvc_cc_repository+msvc_cc/toolchain.cmake",
-        "CMAKE_TOOLCHAIN_FILE_aarch64_pc_windows_msvc": "$${pwd}/external/+msvc_cc_repository+msvc_cc_arm64/toolchain.cmake",
-        "CFLAGS": "-fno-sanitize=undefined",
-        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/run/current-system/sw/bin",
-    },
-    crate = "opusic-sys",
-)
-
 # wasmtime-c-api-impl (tree-sitter's `wasm` feature) runs `cmake -P` to install
-# the C API headers tree-sitter compiles against; same host PATH as opusic-sys.
+# the C API headers tree-sitter compiles against.
 crate.annotation(
     build_script_env = {
         "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/run/current-system/sw/bin",
@@ -279,21 +266,12 @@ msvc_cc(
 # rules_rust build-script runner. The leading entry is the canonical repo path
 # of @msvc_cc (`+<repo rule>+<name>`) — keep in sync if the rule or repo in
 # this section is ever renamed. On non-msvc targets the dir simply does not
-# exist and the rest of the PATH matches the opusic-sys annotation above.
+# exist; the rest of the PATH supplies the host build tools.
 crate.annotation(
     build_script_env = {
         "PATH": "$${pwd}/external/+msvc_cc_repository+msvc_cc/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
     },
     crate = "blake3",
-)
-# ring 0.17 compiles windows-aarch64 C/asm with GNU-driver `clang` from PATH
-# (never clang-cl); @msvc_cc_arm64's bin/clang wrapper translates the toolchain
-# CFLAGS and adds the xwin includes. Absent (and unused) for other targets.
-crate.annotation(
-    build_script_env = {
-        "PATH": "$${pwd}/external/+msvc_cc_repository+msvc_cc_arm64/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin",
-    },
-    crate = "ring",
 )
 # --- end msvc cross toolchain ---------------------------------------------------
 

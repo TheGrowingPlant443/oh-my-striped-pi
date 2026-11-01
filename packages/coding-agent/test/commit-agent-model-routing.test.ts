@@ -23,8 +23,8 @@ afterEach(() => {
 
 describe("agentic commit model routing", () => {
 	it("runs the parent commit agent on the selected commit model", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-opus-4-5");
-		const smolModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+		const smolModel = getBundledModel("github-copilot", "gpt-5-mini");
 		if (!primaryModel || !smolModel) throw new Error("Expected bundled commit test models");
 
 		authStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")));

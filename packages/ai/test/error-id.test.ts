@@ -7,7 +7,7 @@ function message(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
 		role: "assistant",
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-sonnet-4-5",
 		usage: {
 			input: 0,
@@ -34,7 +34,7 @@ describe("error-id classification", () => {
 	it("classifies OpenAI stream_read_error as transient", () => {
 		const assistant = message({
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			errorMessage: "Error Code stream_read_error: stream_read_error",
 		});
@@ -52,54 +52,12 @@ describe("error-id classification", () => {
 	});
 
 	it.each([
-		"Transport error reading Codex response body: error decoding response body",
-		"Anthropic stream error (api_error): Transport error reading Codex response body: error decoding response body",
-	])("retries Codex HTTP body transport failures: %s", errorMessage => {
-		const error = new AIError.ProviderResponseError(errorMessage, { provider: "anthropic", kind: "output" });
-		for (const id of [
-			AIError.classify(error, "anthropic-messages"),
-			AIError.classifyMessage(message({ errorMessage })),
-		]) {
-			expect(AIError.is(id, AIError.Flag.Transient)).toBe(true);
-			expect(AIError.is(id, AIError.Flag.UsageLimit)).toBe(false);
-			expect(AIError.retriable(id)).toBe(true);
-		}
-		expect(AIError.isProviderRetryableError(error)).toBe(true);
-		expect(AIError.isStreamReadErrorText(errorMessage)).toBe(false);
-	});
-
-	it.each([400, 401, 403])("keeps Codex body-read diagnostics on HTTP %s terminal", errorStatus => {
-		const errorMessage = "Transport error reading Codex response body: error decoding response body";
-		const error = new AIError.ProviderHttpError(errorMessage, errorStatus);
-		const wrapped = new AIError.ProviderHttpError("Request rejected", errorStatus, {
-			cause: new Error(errorMessage),
-		});
-		for (const id of [
-			AIError.classify(error, "anthropic-messages"),
-			AIError.classify(wrapped, "anthropic-messages"),
-			AIError.classifyMessage(message({ errorMessage, errorStatus })),
-			AIError.classifyMessage(message({ errorMessage: `${errorStatus} ${errorMessage}` })),
-		]) {
-			expect(AIError.is(id, AIError.Flag.Transient)).toBe(false);
-			expect(AIError.retriable(id)).toBe(false);
-		}
-		expect(AIError.isProviderRetryableError(error)).toBe(false);
-	});
-
-	it.each([408, 429, 500])("allows Codex body-read recovery on HTTP %s", errorStatus => {
-		const errorMessage = "Transport error reading Codex response body: error decoding response body";
-		const error = new AIError.ProviderHttpError(errorMessage, errorStatus);
-		expect(AIError.retriable(AIError.classifyMessage(message({ errorMessage, errorStatus })))).toBe(true);
-		expect(AIError.isProviderRetryableError(error)).toBe(true);
-	});
-
-	it.each([
 		"error decoding response body",
 		"Anthropic stream error (api_error): invalid response",
 		"Failed to parse tool call arguments as JSON",
 		"Anthropic stream error (authentication_error): 401 Unauthorized",
 	])("does not infer a transport retry from unrelated failures: %s", errorMessage => {
-		const error = new AIError.ProviderResponseError(errorMessage, { provider: "anthropic", kind: "output" });
+		const error = new AIError.ProviderResponseError(errorMessage, { provider: "github-copilot", kind: "output" });
 		const id = AIError.classifyMessage(message({ errorMessage }));
 		expect(AIError.is(id, AIError.Flag.Transient)).toBe(false);
 		expect(AIError.retriable(id)).toBe(false);
@@ -211,7 +169,7 @@ describe("error-id classification", () => {
 
 	it("keeps provider content filters non-retryable", () => {
 		const error = new AIError.ProviderResponseError("Provider returned error finish_reason: content_filter", {
-			provider: "openrouter",
+			provider: "github-copilot",
 			kind: "content-blocked",
 		});
 		const id = AIError.classify(error, "openai-responses");
@@ -221,87 +179,12 @@ describe("error-id classification", () => {
 		expect(AIError.retriable(id)).toBe(false);
 	});
 
-	it("classifies Codex cyber approval denials as account-scoped policy blocks", () => {
-		const assistant = message({
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			model: "gpt-5.6-sol",
-			errorMessage:
-				"Codex error event: This content was flagged for possible cybersecurity risk. Join Trusted Access for Cyber. (code=cyber_policy)",
-		});
-		const id = AIError.classifyMessage(assistant);
-		expect(AIError.is(id, AIError.Flag.AccountPolicy)).toBe(true);
-		expect(AIError.is(id, AIError.Flag.ContentBlocked)).toBe(true);
-		expect(AIError.retriable(id)).toBe(false);
-	});
-
-	it("classifies only the matching Codex ChatGPT-account model entitlement denial as account policy", () => {
-		const errorMessage =
-			"The 'gpt-daybreak-blue-latest' model is not supported when using Codex with a ChatGPT account. (code=invalid_request_error)";
-		const denial = message({
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			model: "gpt-daybreak-blue-latest",
-			errorStatus: 400,
-			errorMessage,
-		});
-		const denialId = AIError.classifyMessage(denial);
-		expect(AIError.is(denialId, AIError.Flag.AccountPolicy)).toBe(true);
-		expect(AIError.is(denialId, AIError.Flag.ContentBlocked)).toBe(true);
-		expect(AIError.retriable(denialId)).toBe(false);
-		expect(AIError.codexChatGPTAccountPolicyModel(denial)).toBe("gpt-daybreak-blue-latest");
-		expect(AIError.isCodexChatGPTAccountPolicyError(denial, denial.provider, denial.model)).toBe(true);
-
-		for (const mismatch of [
-			message({
-				api: "openai-codex-responses",
-				provider: "openrouter",
-				model: "gpt-daybreak-blue-latest",
-				errorStatus: 400,
-				errorMessage,
-			}),
-			message({
-				api: "openai-codex-responses",
-				provider: "openai-codex",
-				model: "gpt-5.3-codex",
-				errorStatus: 400,
-				errorMessage,
-			}),
-		]) {
-			const mismatchId = AIError.classifyMessage(mismatch);
-			expect(AIError.is(mismatchId, AIError.Flag.AccountPolicy)).toBe(false);
-			expect(AIError.isCodexChatGPTAccountPolicyError(mismatch, mismatch.provider, mismatch.model)).toBe(false);
-		}
-
-		const genericUnsupported = message({
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			model: "some-unsupported-model",
-			errorStatus: 400,
-			errorMessage: "The 'some-unsupported-model' model is not supported. (code=invalid_request_error)",
-		});
-		const genericId = AIError.classifyMessage(genericUnsupported);
-		expect(AIError.is(genericId, AIError.Flag.AccountPolicy)).toBe(false);
-		expect(AIError.codexChatGPTAccountPolicyModel(genericUnsupported)).toBeUndefined();
-
-		const oversizedModel = "m".repeat(257);
-		const oversized = message({
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			model: oversizedModel,
-			errorStatus: 400,
-			errorMessage: `The '${oversizedModel}' model is not supported when using Codex with a ChatGPT account.`,
-		});
-		expect(AIError.codexChatGPTAccountPolicyModel(oversized)).toBeUndefined();
-		expect(AIError.is(AIError.classifyMessage(oversized), AIError.Flag.AccountPolicy)).toBe(false);
-	});
-
 	it("classifies Anthropic permission and oauth organization policy denials as account policy without content blocked", () => {
 		const errorMessage =
 			'403 {"type":"error","error":{"type":"permission_error","message":"OAuth authentication is currently not allowed for this organization.","details":{"error_code":"oauth_not_allowed_for_organization"}},"request_id":"req_011CfDQosvzzsyor4jWjLsz8"}';
 		const denial = message({
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-sonnet-4-5",
 			errorStatus: 403,
 			errorMessage,
@@ -312,6 +195,9 @@ describe("error-id classification", () => {
 		expect(AIError.retriable(denialId)).toBe(false);
 		expect(AIError.isAccountPolicyError(denial)).toBe(true);
 		expect(AIError.isAuthRetryableError(denial)).toBe(true);
+
+		const otherProtocol = message({ api: "openai-completions", errorStatus: 403, errorMessage });
+		expect(AIError.is(AIError.classifyMessage(otherProtocol), AIError.Flag.AccountPolicy)).toBe(false);
 
 		const typedError = new AIError.AnthropicApiError(403, errorMessage, new Headers(), {
 			code: "oauth_not_allowed_for_organization",
@@ -343,7 +229,7 @@ describe("error-id classification", () => {
 		const relayedMessage =
 			'Connect error resource_exhausted: Error [details: {"error":"ERROR_RATE_LIMITED_CHANGEABLE","details":{"title":"Named models unavailable","detail":"Free plans can only use Auto."}}]';
 		const relayedId = AIError.classifyMessage(
-			message({ provider: "openrouter", model: "cursor-grok-4.6", errorMessage: relayedMessage }),
+			message({ provider: "github-copilot", model: "cursor-grok-4.6", errorMessage: relayedMessage }),
 		);
 		expect(AIError.is(relayedId, AIError.Flag.AccountPolicy)).toBe(false);
 		expect(AIError.is(relayedId, AIError.Flag.ContentBlocked)).toBe(false);
@@ -415,7 +301,7 @@ describe("error-id classification", () => {
 	it("retries Go closed-connection transport errors forwarded by a gateway (#15385)", () => {
 		const errorMessage = "read tcp 127.0.0.1:9426->127.0.0.1:9050: use of closed network connection";
 		const id = AIError.classifyMessage(
-			message({ api: "openai-completions", provider: "custom-gateway", model: "mimo", errorId: 0, errorMessage }),
+			message({ api: "openai-completions", provider: "github-copilot", model: "mimo", errorId: 0, errorMessage }),
 		);
 		expect(AIError.is(id, AIError.Flag.Transient)).toBe(true);
 		expect(AIError.retriable(id)).toBe(true);
@@ -425,10 +311,10 @@ describe("error-id classification", () => {
 	it("retries remote Python HTTP/2 internal and refused stream resets", () => {
 		for (const code of [2, 7]) {
 			const assistant = message({
-				api: "openai-codex-responses",
-				provider: "openai-codex",
+				api: "openai-responses",
+				provider: "github-copilot",
 				errorId: 0,
-				errorMessage: `Codex error event: <StreamReset stream_id:1283, error_code:${code}, remote_reset:True> (code=api_error)`,
+				errorMessage: `Gateway error: <StreamReset stream_id:1283, error_code:${code}, remote_reset:True> (code=api_error)`,
 			});
 			expect(AIError.retriable(AIError.classifyMessage(assistant))).toBe(true);
 		}
@@ -442,9 +328,9 @@ describe("error-id classification", () => {
 			"error_code:2",
 		]) {
 			const assistant = message({
-				api: "openai-codex-responses",
-				provider: "openai-codex",
-				errorMessage: `Codex error event: <StreamReset stream_id:1283, ${details}> (code=api_error)`,
+				api: "openai-responses",
+				provider: "github-copilot",
+				errorMessage: `Gateway error: <StreamReset stream_id:1283, ${details}> (code=api_error)`,
 			});
 			expect(AIError.retriable(AIError.classifyMessage(assistant))).toBe(false);
 		}
@@ -452,13 +338,13 @@ describe("error-id classification", () => {
 
 	it("keeps generic API and chunk-format errors outside transient recovery", () => {
 		for (const errorMessage of [
-			"Codex error event: invalid chunk header (code=api_error)",
-			"Codex error event: malformed chunk footer (code=api_error)",
-			"Codex error event: invalid request body (code=api_error)",
+			"Gateway error: invalid chunk header (code=api_error)",
+			"Gateway error: malformed chunk footer (code=api_error)",
+			"Gateway error: invalid request body (code=api_error)",
 		]) {
 			const assistant = message({
-				api: "openai-codex-responses",
-				provider: "openai-codex",
+				api: "openai-responses",
+				provider: "github-copilot",
 				errorMessage,
 			});
 			expect(AIError.retriable(AIError.classifyMessage(assistant))).toBe(false);

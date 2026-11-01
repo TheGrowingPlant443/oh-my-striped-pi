@@ -544,6 +544,7 @@ exit 64
 			env: {
 				PATH: Bun.env.PATH ?? "",
 				HOME: shellDir,
+				XDG_CONFIG_HOME: path.join(shellDir, ".config"),
 			},
 			prefix: undefined,
 		});
@@ -631,6 +632,7 @@ exit 64
 		if (!zshPath) {
 			return;
 		}
+		await Bun.write(path.join(tempDir, ".zshrc"), "");
 		cfgShellPath.set(Settings.instance, zshPath);
 		vi.spyOn(Settings.prototype, "getShellConfig").mockReturnValue({
 			shell: zshPath,

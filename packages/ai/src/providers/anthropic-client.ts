@@ -26,15 +26,13 @@ import { AnthropicApiError, AnthropicConnectionError, AnthropicConnectionTimeout
 
 export { AnthropicApiError, AnthropicConnectionError, AnthropicConnectionTimeoutError };
 
-import type { FetchImpl } from "../types";
+import type { FetchImpl, Model } from "../types";
 import type { MessageCreateParams } from "./anthropic-wire";
 
 /** Default pre-response timeout, matching the SDK's 10-minute default. */
 const DEFAULT_TIMEOUT_MS = 600_000;
 /** Default retry budget, matching the SDK's default. */
 const DEFAULT_MAX_RETRIES = 2;
-/** Endpoint every request targets when the caller supplies no `baseURL`. */
-const DEFAULT_BASE_URL = "https://api.anthropic.com";
 const INITIAL_RETRY_DELAY_S = 0.5;
 const MAX_RETRY_DELAY_S = 8;
 
@@ -76,11 +74,12 @@ export type AnthropicFetchOptions = RequestInit & {
 };
 
 export interface AnthropicClientOptions {
+	model: Pick<Model<"anthropic-messages">, "provider" | "api">;
 	/** Sent as `X-Api-Key` unless the header is already present in `defaultHeaders`. */
 	apiKey?: string | null;
 	/** Sent as `Authorization: Bearer <token>` unless the header is already present in `defaultHeaders`. */
 	authToken?: string | null;
-	baseURL?: string | null;
+	baseURL: string;
 	maxRetries?: number;
 	/**
 	 * Maximum delay in milliseconds to wait for a server-directed retry. If the
@@ -187,7 +186,6 @@ export class AnthropicMessages {
  */
 export interface AnthropicMessagesClientLike {
 	messages: { create(params: MessageCreateParams, options?: AnthropicRequestOptions): unknown };
-	beta?: { messages: { create(params: MessageCreateParams, options?: AnthropicRequestOptions): unknown } };
 	/**
 	 * Endpoint the client targets, when it exposes one. SDK-style clients
 	 * (`Anthropic`, `AnthropicVertex`) and {@link AnthropicMessagesClient}
@@ -199,7 +197,6 @@ export interface AnthropicMessagesClientLike {
 
 export class AnthropicMessagesClient implements AnthropicMessagesClientLike {
 	readonly messages: AnthropicMessages;
-	readonly beta: { readonly messages: AnthropicMessages };
 	#http: AnthropicHttpClient;
 	/** Endpoint shared with the HTTP transport. */
 	get baseURL(): string {
@@ -209,7 +206,6 @@ export class AnthropicMessagesClient implements AnthropicMessagesClientLike {
 	constructor(options: AnthropicClientOptions) {
 		this.#http = new AnthropicHttpClient(options);
 		this.messages = new AnthropicMessages(this, "/v1/messages");
-		this.beta = { messages: new AnthropicMessages(this, "/v1/messages?beta=true") };
 	}
 
 	request(path: string, params: MessageCreateParams, options?: AnthropicRequestOptions): AnthropicApiRequest {
@@ -223,8 +219,9 @@ export class AnthropicHttpClient {
 	readonly baseURL: string;
 
 	constructor(options: AnthropicClientOptions) {
+		if (!options.baseURL.trim()) throw new AIError.ConfigurationError("Anthropic request setup requires a base URL");
 		this.#options = options;
-		this.baseURL = options.baseURL ?? DEFAULT_BASE_URL;
+		this.baseURL = options.baseURL;
 	}
 
 	#buildHeaders(requestHeaders?: Record<string, string>): Record<string, string> {

@@ -33,8 +33,8 @@ function fakeHost(options?: {
 	return {
 		link: "relay.example.com/r/full-control",
 		viewLink: "relay.example.com/r/read-only",
-		webLink: options?.webLink ?? "https://my.omp.sh/#full-control",
-		webViewLink: options?.webViewLink ?? "https://my.omp.sh/#read-only",
+		webLink: options?.webLink ?? "https://collab.company.example/#full-control",
+		webViewLink: options?.webViewLink ?? "https://collab.company.example/#read-only",
 		participants: [{ name: "host", role: "host" }],
 		access: options?.access ?? "control",
 	} as unknown as NonNullable<InteractiveModeContext["collabHost"]>;
@@ -74,7 +74,10 @@ async function createRuntimeHarness(options?: { collabHost?: NonNullable<Interac
 }
 
 function mockStartedHostLinks(
-	host = fakeHost({ webLink: "https://my.omp.sh/#started-full", webViewLink: "https://my.omp.sh/#started-view" }),
+	host = fakeHost({
+		webLink: "https://collab.company.example/#started-full",
+		webViewLink: "https://collab.company.example/#started-view",
+	}),
 ) {
 	return vi.spyOn(CollabHost.prototype, "start").mockImplementation(function (this: CollabHost): Promise<void> {
 		Object.defineProperties(this, {
@@ -93,8 +96,8 @@ describe("/collab slash command QR code rendering", () => {
 		const harness = await createRuntimeHarness({ collabHost: fakeHost({ access: "view" }) });
 		await executeBuiltinSlashCommand("/collab status", harness.runtime);
 		const text = harness.showStatus.mock.calls[0]?.[0] as string;
-		expect(text).toContain("my.omp.sh/#read-only");
-		expect(text).not.toContain("my.omp.sh/#full-control");
+		expect(text).toContain("collab.company.example/#read-only");
+		expect(text).not.toContain("collab.company.example/#full-control");
 	});
 
 	it("starts hosting and prints a one-shot full-control QR", async () => {
@@ -106,7 +109,7 @@ describe("/collab slash command QR code rendering", () => {
 		expect(handled).toBe(true);
 
 		const statusText = harness.showStatus.mock.calls[0]?.[0] as string;
-		expect(statusText).toContain("my.omp.sh/#started-full");
+		expect(statusText).toContain("collab.company.example/#started-full");
 		const presented = harness.present.mock.calls[0]?.[0] as readonly unknown[];
 
 		const component = presented[1] as CollabQrCodeComponent;
@@ -123,14 +126,14 @@ describe("/collab slash command QR code rendering", () => {
 		expect(handled).toBe(true);
 
 		const statusText = harness.showStatus.mock.calls[0]?.[0] as string;
-		expect(statusText).toContain("my.omp.sh/#started-view");
-		expect(statusText).not.toContain("my.omp.sh/#started-full");
+		expect(statusText).toContain("collab.company.example/#started-view");
+		expect(statusText).not.toContain("collab.company.example/#started-full");
 		const presented = harness.present.mock.calls[0]?.[0] as readonly unknown[];
 
 		const component = presented[1] as CollabQrCodeComponent;
 		const fallback = component.render(10).join("\n");
-		expect(fallback).toContain("https://my.omp.sh/#started-view");
-		expect(fallback).not.toContain("https://my.omp.sh/#started-full");
+		expect(fallback).toContain("https://collab.company.example/#started-view");
+		expect(fallback).not.toContain("https://collab.company.example/#started-full");
 	});
 
 	it("prints the active full-control browser QR when hosting", async () => {
@@ -140,7 +143,7 @@ describe("/collab slash command QR code rendering", () => {
 
 		expect(handled).toBe(true);
 		const statusText = harness.showStatus.mock.calls[0]?.[0] as string;
-		expect(statusText).toContain("my.omp.sh/#full-control");
+		expect(statusText).toContain("collab.company.example/#full-control");
 		const presented = harness.present.mock.calls[0]?.[0] as readonly unknown[];
 
 		const component = presented[1] as CollabQrCodeComponent;
@@ -160,7 +163,7 @@ describe("/collab slash command QR code rendering", () => {
 		expect(harness.ctx.collabHost?.access).toBe("control");
 		const statusText = harness.showStatus.mock.calls[0]?.[0] as string;
 
-		expect(statusText).toContain("my.omp.sh/#started-full");
+		expect(statusText).toContain("collab.company.example/#started-full");
 	});
 
 	it("re-prints the view link of a view-only room for /collab view without restarting", async () => {
@@ -172,12 +175,12 @@ describe("/collab slash command QR code rendering", () => {
 		expect(previous?.stopped).toBe(false);
 
 		const statusText = harness.showStatus.mock.calls[0]?.[0] as string;
-		expect(statusText).toContain("my.omp.sh/#read-only");
+		expect(statusText).toContain("collab.company.example/#read-only");
 	});
 
 	it("prints a one-shot read-only browser QR when hosting", async () => {
-		const webLink = "https://my.omp.sh/#full-control";
-		const webViewLink = "https://my.omp.sh/#read-only";
+		const webLink = "https://collab.company.example/#full-control";
+		const webViewLink = "https://collab.company.example/#read-only";
 		const harness = await createRuntimeHarness({ collabHost: fakeHost({ webLink, webViewLink }) });
 
 		const handled = await executeBuiltinSlashCommand("/collab view", harness.runtime);
@@ -196,7 +199,7 @@ describe("/collab slash command QR code rendering", () => {
 	});
 
 	it("keeps the browser URL on the first status row so transcript clipping cannot hide it", async () => {
-		const webLink = `https://my.omp.sh/#${"long-collab-token".repeat(8)}`;
+		const webLink = `https://collab.company.example/#${"long-collab-token".repeat(8)}`;
 		const harness = await createRuntimeHarness({ collabHost: fakeHost({ webLink }) });
 
 		const handled = await executeBuiltinSlashCommand("/collab", harness.runtime);
@@ -211,7 +214,7 @@ describe("/collab slash command QR code rendering", () => {
 
 describe("CollabQrCodeComponent transcript height clipping", () => {
 	it("renders the full half-block symbol when the viewport allocates enough rows", () => {
-		const component = new CollabQrCodeComponent("https://my.omp.sh/#clip-test");
+		const component = new CollabQrCodeComponent("https://collab.company.example/#clip-test");
 		const full = component.render(120);
 
 		expect(full.join("\n")).toMatch(/\x1b\[(?:47|40)m/);
@@ -221,7 +224,7 @@ describe("CollabQrCodeComponent transcript height clipping", () => {
 	});
 
 	it("does not render a quiet-zone white line when the transcript clips to one row", () => {
-		const component = new CollabQrCodeComponent("https://my.omp.sh/#clip-test");
+		const component = new CollabQrCodeComponent("https://collab.company.example/#clip-test");
 		const full = component.render(120);
 		const first = full[0] ?? "";
 		expect(first).toMatch(/\x1b\[(?:47|40)m/);
@@ -230,16 +233,16 @@ describe("CollabQrCodeComponent transcript height clipping", () => {
 		const clipped = component.render(120);
 		expect(clipped).toHaveLength(1);
 
-		expect(clipped[0]).toContain("my.omp.sh/#clip-test");
+		expect(clipped[0]).toContain("collab.company.example/#clip-test");
 
 		expect(clipped[0]).not.toMatch(/\x1b\[(?:47|40)m/);
 	});
 
 	it("keeps the browser URL as the emergency one-row transcript representation", () => {
-		const component = new CollabQrCodeComponent("https://my.omp.sh/#clip-test");
+		const component = new CollabQrCodeComponent("https://collab.company.example/#clip-test");
 		component.setTranscriptAllocation(1);
 		const row = component.renderTranscriptBlockEmergencyRow(10);
 		expect(visibleWidth(row)).toBeLessThanOrEqual(10);
-		expect(row).toContain("https://my.omp.sh/#clip-test");
+		expect(row).toContain("https://collab.company.example/#clip-test");
 	});
 });

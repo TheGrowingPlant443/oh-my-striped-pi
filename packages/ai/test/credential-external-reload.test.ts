@@ -1,3 +1,7 @@
+import { beforeEach } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEach(() => mockOAuthApiKey());
+afterEach(() => resetOAuthMocks());
 import { afterEach, describe, expect, it } from "bun:test";
 import {
 	type AuthCredential,
@@ -22,7 +26,7 @@ function oauthRow(id: number): StoredAuthCredential {
 		expires: Date.now() + 60 * 60_000,
 		accountId: `account-${id}`,
 	};
-	return { id, provider: "anthropic", credential, disabledCause: null };
+	return { id, provider: "github-copilot", credential, disabledCause: null };
 }
 
 interface ExternalStore {
@@ -102,19 +106,23 @@ describe("credential pool visibility across processes", () => {
 
 		// Rotation attributes the failure to the session's pinned credential, so
 		// establish the pin the way a real turn does.
-		expect(await storage.keys.get("anthropic", "session-1")).toBe("access-1");
+		expect(await storage.keys.get("github-copilot", "session-1")).toBe("access-1");
 
 		const usageLimitError = Object.assign(new Error("429 usage limit reached"), { status: 429 });
 
 		// Sole account is spent: nothing to rotate onto.
-		expect((await storage.limits.rotate("anthropic", "session-1", { error: usageLimitError })).switched).toBe(false);
+		expect((await storage.limits.rotate("github-copilot", "session-1", { error: usageLimitError })).switched).toBe(
+			false,
+		);
 
 		commitExternally(oauthRow(2));
 
 		// The new account is usable, so the same session must switch to it rather
 		// than report the provider exhausted.
-		expect((await storage.limits.rotate("anthropic", "session-1", { error: usageLimitError })).switched).toBe(true);
-		expect(await storage.keys.get("anthropic", "session-1")).toBe("access-2");
+		expect((await storage.limits.rotate("github-copilot", "session-1", { error: usageLimitError })).switched).toBe(
+			true,
+		);
+		expect(await storage.keys.get("github-copilot", "session-1")).toBe("access-2");
 	});
 
 	it("selects an account another process added, with no rotation in between", async () => {
@@ -125,12 +133,12 @@ describe("credential pool visibility across processes", () => {
 		await storage.credentials.reload();
 
 		// A session that started before any account existed.
-		expect(await storage.oauth.access("anthropic", "session-1")).toBeUndefined();
+		expect(await storage.oauth.access("github-copilot", "session-1")).toBeUndefined();
 
 		commitExternally(oauthRow(1));
 
 		// Selection alone must see the new row: no usage-limit error, no rotation.
-		expect(await storage.keys.get("anthropic", "session-1")).toBe("access-1");
+		expect(await storage.keys.get("github-copilot", "session-1")).toBe("access-1");
 	});
 
 	it("makes an externally added account visible to non-refreshing discovery", async () => {
@@ -142,7 +150,7 @@ describe("credential pool visibility across processes", () => {
 
 		commitExternally(oauthRow(1));
 
-		expect(await storage.keys.peek("anthropic")).toBe("access-1");
+		expect(JSON.parse((await storage.keys.peek("github-copilot"))!).token).toBe("access-1");
 	});
 
 	it("resolves OAuth access for an account another process added", async () => {
@@ -153,11 +161,11 @@ describe("credential pool visibility across processes", () => {
 		await storage.credentials.reload();
 
 		// `withOAuthAccess` consumers start here rather than at `getApiKey`.
-		expect(await storage.oauth.access("anthropic", "session-1")).toBeUndefined();
+		expect(await storage.oauth.access("github-copilot", "session-1")).toBeUndefined();
 
 		commitExternally(oauthRow(1));
 
-		const resolved = await storage.oauth.access("anthropic", "session-1");
+		const resolved = await storage.oauth.access("github-copilot", "session-1");
 		expect(resolved?.accessToken).toBe("access-1");
 	});
 
@@ -176,7 +184,7 @@ describe("credential pool visibility across processes", () => {
 		const afterInitialLoad = listCalls;
 
 		const usageLimitError = Object.assign(new Error("429 usage limit reached"), { status: 429 });
-		await storage.limits.rotate("anthropic", "session-1", { error: usageLimitError });
+		await storage.limits.rotate("github-copilot", "session-1", { error: usageLimitError });
 
 		// An unchanged store is a `PRAGMA data_version` read, never a re-list.
 		expect(listCalls).toBe(afterInitialLoad);
@@ -189,20 +197,20 @@ describe("credential pool visibility across processes", () => {
 		storages.push(storage);
 		await storage.credentials.reload();
 
-		// Pin the session to the first row, the way a real turn does.
-		expect(await storage.keys.get("anthropic", "session-1")).toBe("access-1");
-
-		// The pool is an index-ordered snapshot, so deleting the pinned row moves
-		// the sibling into its slot.
-		removeExternally(1);
+		// Pin whichever account the selector chooses; initial pool ordering is not part of this contract.
+		const pinned = await storage.keys.get("github-copilot", "session-1");
+		if (pinned === undefined) throw new Error("expected pinned OAuth bearer");
+		expect(["access-1", "access-2"]).toContain(pinned);
+		const pinnedId = pinned === "access-1" ? 1 : 2;
+		const siblingId = pinnedId === 1 ? 2 : 1;
+		removeExternally(pinnedId);
 
 		const usageLimitError = Object.assign(new Error("429 usage limit reached"), { status: 429 });
-		const switched = await storage.limits.rotate("anthropic", "session-1", { error: usageLimitError });
+		const switched = await storage.limits.rotate("github-copilot", "session-1", { error: usageLimitError });
 
-		// The failure belongs to an account that is gone; the sibling that took
-		// index 0 must not be blocked for it.
+		// The failure belongs to an account that is gone, not the surviving sibling.
 		expect(switched.switched).toBe(false);
-		expect([...blocks.keys()].filter(key => key.startsWith("2:"))).toEqual([]);
+		expect([...blocks.keys()].filter(key => key.startsWith(`${siblingId}:`))).toEqual([]);
 	});
 
 	it("keeps a block on its own account after another process removes an earlier row", async () => {
@@ -217,13 +225,13 @@ describe("credential pool visibility across processes", () => {
 		await storage.credentials.reload();
 
 		const limited = { retryAfterMs: 60 * 60_000, credentialId: 2 };
-		expect((await storage.limits.markReached("anthropic", undefined, limited)).switched).toBe(true);
+		expect((await storage.limits.markReached("github-copilot", undefined, limited)).switched).toBe(true);
 
 		// Removing row 1 shifts rows 2 and 3 down one slot in the snapshot.
 		removeExternally(1);
 
 		// Row 3 was never limited: row 2's block must not follow its old slot onto it.
-		expect((await storage.limits.markReached("anthropic", undefined, limited)).switched).toBe(true);
-		expect(await storage.keys.get("anthropic")).toBe("access-3");
+		expect((await storage.limits.markReached("github-copilot", undefined, limited)).switched).toBe(true);
+		expect(await storage.keys.get("github-copilot")).toBe("access-3");
 	});
 });

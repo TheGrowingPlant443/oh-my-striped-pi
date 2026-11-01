@@ -7,21 +7,11 @@ import {
 import { withMnemopiRuntimeOptions } from "@oh-my-pi/pi-mnemopi/core/runtime-options";
 import { logger } from "@oh-my-pi/pi-utils";
 
-const ENV_KEYS = [
-	"NODE_ENV",
-	"BUN_ENV",
-	"MNEMOPI_NO_EMBEDDINGS",
-	"MNEMOPI_EMBEDDING_MODEL",
-	"MNEMOPI_EMBEDDING_API_URL",
-	"MNEMOPI_EMBEDDING_API_KEY",
-	"OPENROUTER_BASE_URL",
-	"OPENROUTER_API_KEY",
-	"OPENAI_API_KEY",
-] as const;
+const ENV_KEYS = ["NODE_ENV", "BUN_ENV", "MNEMOPI_NO_EMBEDDINGS", "MNEMOPI_EMBEDDING_MODEL"] as const;
 
 type EnvKey = (typeof ENV_KEYS)[number];
 
-/** Force the local-fastembed path: not a test runtime, local model, no API config. */
+/** Force the local-fastembed path outside the test-runtime shortcut. */
 async function withLocalModelEnv<T>(fn: () => Promise<T>): Promise<T> {
 	const snapshot: Partial<Record<EnvKey, string>> = {};
 	for (const key of ENV_KEYS) {

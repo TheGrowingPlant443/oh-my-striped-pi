@@ -22,7 +22,6 @@ import {
 } from "@oh-my-pi/pi-ai";
 import { streamSimple } from "@oh-my-pi/pi-ai/stream";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -50,6 +49,20 @@ import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
 import { requestBodyText } from "@oh-my-pi/pi-ai/utils/request-body";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
+
+const companyModelSpec = {
+	id: "company-side-model",
+	name: "Company Side Model",
+	api: "anthropic-messages",
+	provider: "company",
+	baseUrl: "https://inference.company.invalid",
+	reasoning: false,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 8192,
+} satisfies ModelSpec<"anthropic-messages">;
 
 function createAgent(): Agent {
 	return new Agent({
@@ -112,7 +125,7 @@ describe("AgentSession message pipeline", () => {
 	function sideSession(chunks: string[], finalFlush = false): AgentSession {
 		const session = new AgentSession({
 			agent: new Agent({
-				initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+				initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 			}),
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "compaction.enabled": false }),
@@ -139,7 +152,10 @@ describe("AgentSession message pipeline", () => {
 				initialState: {
 					model,
 					systemPrompt: ["system prompt"],
-					messages: [{ role: "user", content: "Fix the issue", timestamp: 1 }, createAssistantMessage("Fixed.")],
+					messages: [
+						{ role: "user", content: "Fix the issue", timestamp: 1 },
+						{ ...createAssistantMessage("Fixed."), api: model.api, provider: model.provider, model: model.id },
+					],
 					tools: [],
 				},
 			}),
@@ -219,7 +235,7 @@ describe("AgentSession message pipeline", () => {
 		let delivered = 0;
 		const session = new AgentSession({
 			agent: new Agent({
-				initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+				initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 			}),
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "compaction.enabled": false }),
@@ -254,7 +270,7 @@ describe("AgentSession message pipeline", () => {
 		const controller = new AbortController();
 		controller.abort();
 		const agent = new Agent({
-			initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+			initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 		});
 		const contextSpy = vi.spyOn(agent, "buildSideRequestContext");
 		let calls = 0;
@@ -280,7 +296,7 @@ describe("AgentSession message pipeline", () => {
 		const entered = Promise.withResolvers<void>();
 		const session = new AgentSession({
 			agent: new Agent({
-				initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+				initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 			}),
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "compaction.enabled": false }),
@@ -328,7 +344,7 @@ describe("AgentSession message pipeline", () => {
 	});
 
 	it("rejects a side turn when its model instance changes during context preparation", async () => {
-		const initialModel = getBundledModel("openai", "gpt-4o-mini");
+		const initialModel = getTestModel("github-copilot");
 		const agent = new Agent({ initialState: { model: initialModel, systemPrompt: [], tools: [] } });
 		const entered = Promise.withResolvers<void>();
 		const resume = Promise.withResolvers<void>();
@@ -361,7 +377,7 @@ describe("AgentSession message pipeline", () => {
 	});
 
 	it("rejects a side turn when its session changes during context preparation", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getTestModel("github-copilot");
 		const agent = new Agent({ initialState: { model, systemPrompt: [], tools: [] } });
 		const entered = Promise.withResolvers<void>();
 		const resume = Promise.withResolvers<void>();
@@ -430,7 +446,7 @@ describe("AgentSession message pipeline", () => {
 			const runner = new ExtensionRunner([extension], runtime, manager.getCwd(), manager, registry);
 			const session = new AgentSession({
 				agent: new Agent({
-					initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+					initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 				}),
 				sessionManager: manager,
 				settings: Settings.isolated({ "compaction.enabled": false }),
@@ -509,7 +525,7 @@ describe("AgentSession message pipeline", () => {
 			const runner = new ExtensionRunner([extension], runtime, manager.getCwd(), manager, registry);
 			const session = new AgentSession({
 				agent: new Agent({
-					initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+					initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 				}),
 				sessionManager: manager,
 				settings: Settings.isolated({ "compaction.enabled": false }),
@@ -596,7 +612,7 @@ describe("AgentSession message pipeline", () => {
 			});
 			const session = new AgentSession({
 				agent: new Agent({
-					initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+					initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 				}),
 				sessionManager: manager,
 				settings: Settings.isolated({ "compaction.enabled": false }),
@@ -641,7 +657,7 @@ describe("AgentSession message pipeline", () => {
 		let inferences = 0;
 		const session = new AgentSession({
 			agent: new Agent({
-				initialState: { model: getBundledModel("openai", "gpt-4o-mini"), systemPrompt: [], tools: [] },
+				initialState: { model: getTestModel("github-copilot"), systemPrompt: [], tools: [] },
 			}),
 			sessionManager: manager,
 			settings: Settings.isolated({ "compaction.enabled": false }),
@@ -1101,7 +1117,7 @@ describe("AgentSession message pipeline", () => {
 				},
 			}),
 			sessionManager,
-			settings: Settings.isolated({ "compaction.enabled": false, "providers.openaiWebsockets": "on" }),
+			settings: Settings.isolated({ "compaction.enabled": false }),
 			modelRegistry,
 		});
 		sessions.push(session);
@@ -1128,7 +1144,6 @@ describe("AgentSession message pipeline", () => {
 		expect(capturedOptions?.promptCacheKey).toBe(promptCacheKey);
 		expect(capturedOptions?.sessionId).toStartWith(`${cacheSessionId}:side:`);
 		expect(capturedOptions?.sessionId).not.toBe(cacheSessionId);
-		expect(capturedOptions?.preferWebsockets).toBe(true);
 		expect(capturedOptions?.providerSessionState).toBe(session.providerSessionState);
 	});
 
@@ -1136,7 +1151,7 @@ describe("AgentSession message pipeline", () => {
 		const model = buildModel({
 			id: "side-stream-model",
 			name: "Side Stream Model",
-			api: "anthropic",
+			api: "anthropic-messages",
 			provider: "test-provider",
 			baseUrl: "",
 			reasoning: false,
@@ -1245,7 +1260,7 @@ describe("AgentSession message pipeline", () => {
 		const model = buildModel({
 			id: "side-stream-model",
 			name: "Side Stream Model",
-			api: "anthropic",
+			api: "anthropic-messages",
 			provider: "test-provider",
 			baseUrl: "",
 			reasoning: false,
@@ -1353,7 +1368,7 @@ describe("AgentSession message pipeline", () => {
 	);
 
 	it("caches the persisted reply rather than the prediction-only prompt on Anthropic side turns", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = buildModel(companyModelSpec);
 		const { session, bodies } = capturingAnthropicSideSession(model);
 		await expect(session.runEphemeralTurn({ promptText: "Predict the next user message." })).rejects.toThrow();
 		expect(bodies).toHaveLength(1);
@@ -1365,7 +1380,7 @@ describe("AgentSession message pipeline", () => {
 	});
 
 	it("caches reusable /btw topic history through its latest side question", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = buildModel(companyModelSpec);
 		const { session, bodies } = capturingAnthropicSideSession(model);
 		await expect(
 			session.runEphemeralTurn({ promptText: "First question", conversationKey: "btw:topic" }),
@@ -1403,8 +1418,8 @@ describe("AgentSession message pipeline", () => {
 			id: "text-only-side-test",
 			name: "Text Only",
 			api: "anthropic-messages",
-			provider: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			provider: companyModelSpec.provider,
+			baseUrl: companyModelSpec.baseUrl,
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1453,29 +1468,19 @@ describe("AgentSession message pipeline", () => {
 	});
 
 	it.each([
-		["Antigravity fixed-profile transport", getBundledModel("google-antigravity", "claude-sonnet-4-6")],
-		...(["cursor-agent", "gitlab-duo-agent"] as const).map(
-			api =>
-				[
-					api,
-					buildModel({ ...getBundledModel("openai", "gpt-4o"), api, provider: "custom", compat: undefined }),
-				] as const,
-		),
 		[
-			"Ollama Cloud",
+			"Ollama proxy",
 			buildModel({
-				...getBundledModel("openai", "gpt-4o"),
+				...companyModelSpec,
 				api: "ollama-chat",
-				provider: "ollama-cloud",
 				omitMaxOutputTokens: true,
 			}),
 		],
 		[
 			"Completions proxy",
 			buildModel({
-				...getBundledModel("openai", "gpt-4o"),
+				...companyModelSpec,
 				api: "openai-completions",
-				provider: "custom",
 				omitMaxOutputTokens: true,
 			}),
 		],
@@ -1516,58 +1521,45 @@ describe("AgentSession message pipeline", () => {
 	});
 
 	it.each([
-		[
-			"Bedrock",
-			buildModel({
-				...getBundledModel("amazon-bedrock", "global.anthropic.claude-opus-4-6-v1"),
-				thinking: { mode: "budget", efforts: [Effort.Medium] },
-			}),
-			true,
-		],
-		[
-			"Gemini CLI",
-			buildModel({
-				...getBundledModel("google-gemini-cli", "gemini-2.5-pro"),
-				thinking: { mode: "budget", efforts: [Effort.Medium] },
-			}),
-			false,
-		],
-		[
-			"Anthropic",
-			buildModel({
-				...getBundledModel("anthropic", "claude-haiku-4-5-20251001"),
-				thinking: { mode: "budget", efforts: [Effort.Medium] },
-			}),
-			true,
-		],
-	] as const)("preserves a capped %s side turn", async (_name, model, canDisableThinking) => {
-		let capturedOptions: SimpleStreamOptions | undefined;
-		const session = new AgentSession({
-			agent: new Agent({ initialState: { model, systemPrompt: ["system prompt"], messages: [], tools: [] } }),
-			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "compaction.enabled": false }),
-			modelRegistry: createModelRegistryStub() as never,
-			sideStreamFn: (_model, _context, options) => {
-				capturedOptions = options;
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(() => {
-					const message = createAssistantMessage("bounded answer");
-					stream.push({ type: "text_delta", contentIndex: 0, delta: "bounded answer", partial: message });
-					stream.push({ type: "done", reason: "stop", message });
-				});
-				return stream;
-			},
-		});
-		sessions.push(session);
+		["optional budget thinking", false, false, true],
+		["mandatory budget thinking", true, false, false],
+		["suppressible mandatory budget thinking", true, true, true],
+	] as const)(
+		"preserves a capped %s side turn",
+		async (_name, requiresEffort, suppressWhenOff, canDisableThinking) => {
+			const model = buildModel({
+				...companyModelSpec,
+				reasoning: true,
+				thinking: { mode: "budget", efforts: [Effort.Medium], requiresEffort, suppressWhenOff },
+			});
+			let capturedOptions: SimpleStreamOptions | undefined;
+			const session = new AgentSession({
+				agent: new Agent({ initialState: { model, systemPrompt: ["system prompt"], messages: [], tools: [] } }),
+				sessionManager: SessionManager.inMemory(),
+				settings: Settings.isolated({ "compaction.enabled": false }),
+				modelRegistry: createModelRegistryStub() as never,
+				sideStreamFn: (_model, _context, options) => {
+					capturedOptions = options;
+					const stream = new AssistantMessageEventStream();
+					queueMicrotask(() => {
+						const message = createAssistantMessage("bounded answer");
+						stream.push({ type: "text_delta", contentIndex: 0, delta: "bounded answer", partial: message });
+						stream.push({ type: "done", reason: "stop", message });
+					});
+					return stream;
+				},
+			});
+			sessions.push(session);
 
-		const turn = session.runEphemeralTurn({ promptText: "Question?", maxTokens: 32 });
-		if (!canDisableThinking) {
-			await expect(turn).rejects.toThrow("requires budget thinking");
-			return;
-		}
-		await turn;
-		expect(capturedOptions).toMatchObject({ maxTokens: 32, disableReasoning: true });
-	});
+			const turn = session.runEphemeralTurn({ promptText: "Question?", maxTokens: 32 });
+			if (!canDisableThinking) {
+				await expect(turn).rejects.toThrow("requires budget thinking");
+				return;
+			}
+			await turn;
+			expect(capturedOptions).toMatchObject({ maxTokens: 32, disableReasoning: true });
+		},
+	);
 
 	it.each([
 		["adaptive thinking", "anthropic-adaptive", ThinkingLevel.Medium, true],
@@ -1578,7 +1570,8 @@ describe("AgentSession message pipeline", () => {
 		async (_label, mode, level, preserves) => {
 			const captured: (SimpleStreamOptions | undefined)[] = [];
 			const model = buildModel({
-				...getBundledModel("anthropic", "claude-haiku-4-5-20251001"),
+				...companyModelSpec,
+				reasoning: true,
 				thinking: { mode, efforts: [Effort.Medium] },
 			});
 			const session = new AgentSession({
@@ -1610,13 +1603,18 @@ describe("AgentSession message pipeline", () => {
 	);
 
 	it.each([
-		["a per-message-effort model with a recorded effort", "claude-sonnet-5-5", true, "low"],
-		["a per-message-effort model without a recorded effort", "claude-sonnet-5-5", false, undefined],
-		["a model without per-message effort", "claude-sonnet-4-6", false, undefined],
+		["a per-message-effort model with a recorded effort", true, true, "low"],
+		["a per-message-effort model without a recorded effort", true, false, undefined],
+		["a model without per-message effort", false, false, undefined],
 	] as const)(
 		"minimizes side-turn effort on %s only where the cached prefix and top-level reasoning stay put",
-		async (_label, id, recorded, controlEffort) => {
-			const model = getBundledModel("anthropic", id);
+		async (_label, perMessageEffort, recorded, controlEffort) => {
+			const model = buildModel({
+				...companyModelSpec,
+				reasoning: true,
+				thinking: { mode: "anthropic-adaptive", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+				compat: { supportsMidConversationSystem: true, supportsPerMessageEffort: perMessageEffort },
+			});
 			const reply = {
 				...createAssistantMessage("Fixed."),
 				api: model.api,
@@ -1671,47 +1669,6 @@ describe("AgentSession message pipeline", () => {
 		},
 	);
 
-	it("rejects a tool-free Bedrock side turn with historical tool blocks before inference", async () => {
-		const agent = new Agent({
-			initialState: {
-				model: getBundledModel("amazon-bedrock", "global.anthropic.claude-opus-4-6-v1"),
-				systemPrompt: ["system prompt"],
-				messages: [],
-				tools: [],
-			},
-		});
-		vi.spyOn(agent, "buildSideRequestContext").mockResolvedValue({
-			messages: [
-				{
-					role: "toolResult",
-					toolCallId: "read-1",
-					toolName: "read",
-					content: [{ type: "text", text: "historical result" }],
-					isError: false,
-					timestamp: 1,
-				},
-			],
-			tools: [],
-		});
-		let calls = 0;
-		const session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "compaction.enabled": false }),
-			modelRegistry: createModelRegistryStub() as never,
-			sideStreamFn: () => {
-				calls++;
-				return new AssistantMessageEventStream();
-			},
-		});
-		sessions.push(session);
-
-		await expect(session.runEphemeralTurn({ promptText: "Question?", tools: false })).rejects.toThrow(
-			"cannot support tools: false with historical tool calls",
-		);
-		expect(calls).toBe(0);
-	});
-
 	it.each([
 		["expands", "short-secret"],
 		["shrinks", "long-secret-".repeat(100)],
@@ -1726,7 +1683,7 @@ describe("AgentSession message pipeline", () => {
 		const outbound = obfuscateProviderContext(obfuscator, context);
 		const plainBytes = Buffer.byteLength(JSON.stringify(context), "utf8");
 		const outboundBytes = Buffer.byteLength(JSON.stringify(outbound), "utf8");
-		const agent = new Agent({ initialState: { model: getBundledModel("openai", "gpt-4o-mini") } });
+		const agent = new Agent({ initialState: { model: getTestModel("github-copilot") } });
 		vi.spyOn(agent, "buildSideRequestContext").mockResolvedValue(context);
 		let capturedContext: Context | undefined;
 		const session = new AgentSession({
@@ -1770,7 +1727,7 @@ describe("AgentSession message pipeline", () => {
 			let calls = 0;
 			const session = new AgentSession({
 				agent: new Agent({
-					initialState: { model: getBundledModel("openai", "gpt-4o-mini"), messages: [], tools: [] },
+					initialState: { model: getTestModel("github-copilot"), messages: [], tools: [] },
 				}),
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ "compaction.enabled": false }),
@@ -1799,7 +1756,7 @@ describe("AgentSession message pipeline", () => {
 		const session = new AgentSession({
 			agent: new Agent({
 				initialState: {
-					model: getBundledModel("openai", "gpt-4o-mini"),
+					model: getTestModel("github-copilot"),
 					systemPrompt: ["system prompt"],
 					messages: [],
 					tools: [],
@@ -1887,56 +1844,6 @@ describe("AgentSession message pipeline", () => {
 		expect(capturedOptions?.promptCacheKey).toBe(cacheSessionId);
 		expect(capturedOptions?.sessionId).toStartWith(`${cacheSessionId}:side:`);
 		expect(resolver).toHaveBeenCalledWith(model, cacheSessionId);
-	});
-
-	it("applies configured OpenRouter routing variant to ephemeral side-channel options", async () => {
-		const api = "test-ephemeral-openrouter-variant";
-		let capturedOptions: SimpleStreamOptions | undefined;
-		registerCustomApi(api, (_model, _context, options) => {
-			capturedOptions = options;
-			const stream = new AssistantMessageEventStream();
-			queueMicrotask(() => {
-				const message = createAssistantMessage("Answer");
-				stream.push({ type: "text_delta", contentIndex: 0, delta: "Answer", partial: message });
-				stream.push({ type: "done", reason: "stop", message });
-			});
-			return stream;
-		});
-
-		const model = buildModel({
-			id: "anthropic/claude-sonnet-4",
-			name: "OpenRouter Model",
-			api,
-			provider: "openrouter",
-			baseUrl: "",
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 4096,
-			maxTokens: 1024,
-		} as ModelSpec<Api>) as Model<Api>;
-		const session = new AgentSession({
-			agent: new Agent({
-				initialState: {
-					model,
-					systemPrompt: ["system prompt"],
-					messages: [],
-					tools: [],
-				},
-			}),
-			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({
-				"compaction.enabled": false,
-				"providers.openrouterVariant": "nitro",
-			}),
-			modelRegistry: createModelRegistryStub() as never,
-		});
-		sessions.push(session);
-
-		const result = await session.runEphemeralTurn({ promptText: "Question?" });
-
-		expect(result.replyText).toBe("Answer");
-		expect(capturedOptions?.openrouterVariant).toBe("nitro");
 	});
 
 	it("snapshots and obfuscates ephemeral history before asynchronous context conversion", async () => {
@@ -3283,45 +3190,6 @@ describe("AgentSession message pipeline", () => {
 		const forkedPrompt = contexts[1]!.systemPrompt?.join("\n") ?? "";
 		const occurrences = forkedPrompt.split(injected).length - 1;
 		expect(occurrences).toBe(1);
-	});
-
-	it("rejects Cursor tool opt-out before dispatch, including custom provider names", async () => {
-		let calls = 0;
-		const session = new AgentSession({
-			agent: new Agent({
-				initialState: {
-					model: buildModel({
-						...getBundledModel("openai", "gpt-4o"),
-						api: "cursor-agent",
-						provider: "custom",
-						id: "opaque-model",
-						compat: undefined,
-					}),
-					messages: [],
-					tools: [],
-				},
-			}),
-			sessionManager: SessionManager.inMemory(),
-			settings: Settings.isolated({ "compaction.enabled": false }),
-			modelRegistry: createModelRegistryStub() as never,
-			sideStreamFn: () => {
-				calls++;
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(() => {
-					const message = createAssistantMessage("Answer");
-					stream.push({ type: "text_delta", contentIndex: 0, delta: "Answer", partial: message });
-					stream.push({ type: "done", reason: "stop", message });
-				});
-				return stream;
-			},
-		});
-		sessions.push(session);
-		await expect(session.runEphemeralTurn({ promptText: "Question?", tools: false })).rejects.toThrow(
-			"does not support tools: false",
-		);
-		expect(calls).toBe(0);
-		expect((await session.runEphemeralTurn({ promptText: "Question?" })).replyText).toBe("Answer");
-		expect(calls).toBe(1);
 	});
 
 	it.each([undefined, false] as const)("ephemeral tool catalog with tools=%s", async tools => {

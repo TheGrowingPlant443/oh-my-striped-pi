@@ -17,7 +17,7 @@ import { YAML } from "bun";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "../../helpers/settings-test-state";
 
-const model = (id: string) => getBundledModel("anthropic", id) as Model;
+const model = (id: string) => getBundledModel("github-copilot", id) as Model;
 
 // Settings writes made through the model hub, driven through the controller's real hub callbacks.
 describe("SelectorController model hub writes", () => {
@@ -30,7 +30,7 @@ describe("SelectorController model hub writes", () => {
 		state = beginSettingsTest();
 		tempDir = TempDir.createSync("@pi-selector-model-writes-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -84,7 +84,7 @@ describe("SelectorController model hub writes", () => {
 		await Bun.write(overlayPath, YAML.stringify({ retry: { fallbackChains: { smol: ["overlay/cheap"] } } }));
 		// The global instance, as in the app: the hub's status text reads the global settings.
 		const settings = await Settings.init({ agentDir, cwd: tempDir.path(), configFiles: [overlayPath] });
-		const { controller, showError } = start(settings, model("claude-sonnet-4-5"));
+		const { controller, showError } = start(settings, model("claude-sonnet-4.5"));
 
 		openModelHub(controller).onFallbackChainChange?.("slow", ["user/slow-fallback"]);
 		await settings.flush();
@@ -98,24 +98,24 @@ describe("SelectorController model hub writes", () => {
 		const agentDir = tempDir.join("agent");
 		await Bun.write(
 			tempDir.join(".omp", "config.yml"),
-			YAML.stringify({ modelRoles: { default: "anthropic/claude-opus-4-5" } }),
+			YAML.stringify({ modelRoles: { default: "github-copilot/claude-opus-4.5" } }),
 		);
 		const settings = await Settings.init({ agentDir, cwd: tempDir.path() });
 		// The session moved off the configured default earlier (an in-session pick).
-		const { controller, showError } = start(settings, model("claude-sonnet-4-5"));
+		const { controller, showError } = start(settings, model("claude-sonnet-4.5"));
 
 		// The hub shows the project default as assigned, so picking it sends unassign.
 		await openModelHub(controller).onUnassign("default");
 
 		expect(showError).not.toHaveBeenCalled();
-		expect(session?.model?.id).toBe("claude-opus-4-5");
+		expect(session?.model?.id).toBe("claude-opus-4.5");
 	});
 
 	it("refreshes the open hub once a confirmed compaction point has moved the model to its extended window", async () => {
 		const settings = await Settings.init({ agentDir: tempDir.join("agent"), cwd: tempDir.path() });
-		const { controller, showError } = start(settings, model("claude-sonnet-4-5"));
+		const { controller, showError } = start(settings, model("claude-sonnet-4.5"));
 		const registry = session!.modelRegistry;
-		const terra = registry.find("openai", "gpt-5.6-terra");
+		const terra = registry.find("github-copilot", "gpt-5.6-terra");
 		if (!terra) throw new Error("Expected bundled gpt-5.6-terra");
 		const refreshed = Promise.withResolvers<number | null | undefined>();
 		vi.spyOn(modelHubModule, "ModelHubComponent").mockImplementation(function (...args: unknown[]) {
@@ -126,7 +126,7 @@ describe("SelectorController model hub writes", () => {
 			return {
 				// The window the hub would re-read when it refreshes.
 				refreshAfterExternalMutation: () =>
-					refreshed.resolve(registry.find("openai", "gpt-5.6-terra")?.contextWindow),
+					refreshed.resolve(registry.find("github-copilot", "gpt-5.6-terra")?.contextWindow),
 				dispose: () => {},
 			};
 		} as never);

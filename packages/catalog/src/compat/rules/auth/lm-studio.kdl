@@ -1,4 +1,5 @@
 auth "lm-studio" {
+	allows-missing-api-key #true
 	name "LM Studio (Local OpenAI-compatible)"
 	login "api-key" {
 		prompt "Optional: Paste LM Studio API key (to customize endpoint URL, set LM_STUDIO_BASE_URL env var)" placeholder="lm-studio-local"

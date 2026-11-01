@@ -24,7 +24,7 @@ import * as path from "node:path";
 import type { TUI } from "@oh-my-pi/pi-tui";
 import { isEnoent } from "@oh-my-pi/pi-utils";
 import { STREAM_FLUSH_INTERVAL_MS, StreamPaintEncoder } from "./paint-encoder";
-import { isDimension, isSessionFrame, type StreamScreenFrame } from "./protocol";
+import { isDimension, isScreenFrame, type StreamScreenFrame } from "./protocol";
 import type { StreamRedactor } from "./redactor";
 
 export const RECORDING_VERSION = 1;
@@ -102,14 +102,7 @@ export function parseRecording(text: string): Recording {
 	if (header.ompcast !== RECORDING_VERSION) throw new Error(`unsupported recording version ${header.ompcast}`);
 	const events: RecordingEvent[] = [];
 	for (const [index, line] of lines.entries()) {
-		if (
-			!Array.isArray(line) ||
-			line.length !== 2 ||
-			!isDimension(line[0]) ||
-			!isSessionFrame(line[1]) ||
-			line[1].t === "hello" ||
-			line[1].t === "paused"
-		) {
+		if (!Array.isArray(line) || line.length !== 2 || !isDimension(line[0]) || !isScreenFrame(line[1])) {
 			throw new Error(`malformed recording event on line ${index + 2}`);
 		}
 		events.push({ at: line[0], frame: line[1] });

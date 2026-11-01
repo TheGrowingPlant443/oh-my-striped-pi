@@ -164,6 +164,36 @@ describe("HTML export Markdown", () => {
 		expect(rendered.querySelector("ol > li > strong")?.textContent).toBe("nested");
 	});
 
+	test("preserves links without loading remote images or executing transcript HTML", () => {
+		const rendered = renderMarkdown(
+			'[ordinary](https://example.test/page)\n\n![remote](https://example.test/image.png)\n\n<img src="https://example.test/raw.png" onerror="alert(1)">\n\n[unsafe](javascript:alert(1))',
+		);
+		expect(rendered.querySelectorAll("img, script")).toHaveLength(0);
+		expect(rendered.querySelector('a[href="https://example.test/page"]')?.textContent).toBe("ordinary");
+		expect(rendered.querySelector('a[href="https://example.test/image.png"]')?.textContent).toBe("remote");
+		expect(rendered.querySelector('a[href^="javascript:"]')).toBeNull();
+		expect(rendered.textContent).toContain('<img src="https://example.test/raw.png"');
+	});
+
+	test("preserves embedded Markdown images offline", () => {
+		const image = renderMarkdown("![embedded](data:image/png;base64,aGVsbG8=)").querySelector("img");
+		expect(image?.getAttribute("src")).toBe("data:image/png;base64,aGVsbG8=");
+		expect(image?.getAttribute("alt")).toBe("embedded");
+	});
+
+	test("does not let quotes in image or link Markdown break out of attributes", () => {
+		const rendered = renderMarkdown(
+			'![x" onerror="alert(1)](data:image/png;base64,AA==)\n\n[a](https://example.test/p "t\\" onmouseover=\\"alert(1)")\n\n[b](https://example.test/q?a=1"onfocus="alert(1))\n\n![y" onclick="alert(1)](https://example.test/i.png)',
+		);
+		const elements = [...rendered.querySelectorAll("img, a")];
+		expect(elements.length).toBeGreaterThan(0);
+		for (const element of elements) {
+			const names = Array.from(element.attributes, attribute => attribute.name);
+			expect(names.every(name => ["src", "alt", "href", "title", "target", "rel"].includes(name))).toBe(true);
+		}
+		expect(rendered.querySelector("img")?.getAttribute("alt")).toBe('x" onerror="alert(1)');
+	});
+
 	test("renders bold inline code before indented code blocks in ordered lists", () => {
 		const rendered = renderMarkdown(`1. **\`Crew Ship\`** — description
    \`\`\`json

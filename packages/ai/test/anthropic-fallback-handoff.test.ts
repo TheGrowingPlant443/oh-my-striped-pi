@@ -16,8 +16,8 @@ const model: Model<"anthropic-messages"> = buildModel({
 	id: "claude-fable-5",
 	name: "Claude Fable 5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
@@ -187,9 +187,9 @@ describe("server-side fallback handoff", () => {
 
 	it.each([
 		{
-			label: "with the boundary when the request opts in",
+			label: "without an unsupported native boundary even when opted in",
 			withFallbacks: true,
-			expected: ["text", "fallback", "thinking", "text", "tool_use"],
+			expected: ["text", "thinking", "text", "tool_use"],
 		},
 		{
 			label: "without the boundary when it does not",

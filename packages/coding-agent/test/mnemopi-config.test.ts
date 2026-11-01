@@ -32,9 +32,9 @@ describe("loadMnemopiConfig embedding variant resolution", () => {
 		expect(
 			embeddingModelFor({
 				"mnemopi.embeddingVariant": "multilingual",
-				"mnemopi.embeddingModel": "openai/text-embedding-3-small",
+				"mnemopi.embeddingModel": "BAAI/bge-large-en-v1.5",
 			}),
-		).toBe("openai/text-embedding-3-small");
+		).toBe("BAAI/bge-large-en-v1.5");
 	});
 
 	it("ignores a blank override and falls back to the variant", () => {
@@ -73,9 +73,7 @@ describe("loadMnemopiConfig embedding variant resolution", () => {
 		const previous = Bun.env.MNEMOPI_EMBEDDING_MODEL;
 		Bun.env.MNEMOPI_EMBEDDING_MODEL = "BAAI/bge-large-en-v1.5";
 		try {
-			expect(embeddingModelFor({ "mnemopi.embeddingModel": "openai/text-embedding-3-small" })).toBe(
-				"openai/text-embedding-3-small",
-			);
+			expect(embeddingModelFor({ "mnemopi.embeddingModel": "BAAI/bge-base-en-v1.5" })).toBe("BAAI/bge-base-en-v1.5");
 		} finally {
 			if (previous === undefined) delete Bun.env.MNEMOPI_EMBEDDING_MODEL;
 			else Bun.env.MNEMOPI_EMBEDDING_MODEL = previous;
@@ -90,5 +88,30 @@ describe("loadMnemopiConfig database path resolution", () => {
 
 		expect(mnemopiConfigFor({ "mnemopi.dbPath": "" }, agentDir).dbPath).toBe(defaultPath);
 		expect(mnemopiConfigFor({ "mnemopi.dbPath": " \t " }, agentDir).dbPath).toBe(defaultPath);
+	});
+});
+
+describe("loadMnemopiConfig private endpoint configuration", () => {
+	it("keeps private inference settings independent from managed-role selection", () => {
+		const config = mnemopiConfigFor({
+			"mnemopi.llmMode": "remote",
+			"mnemopi.llmBaseUrl": "http://llm.internal/v1",
+			"mnemopi.llmModel": "company-memory",
+			"mnemopi.llmApiKey": "llm-token",
+			"mnemopi.embeddingApiUrl": "http://embeddings.internal/v1",
+			"mnemopi.embeddingApiKey": "embedding-token",
+			"mnemopi.embeddingModel": "company-embed",
+		});
+		expect(config).toMatchObject({
+			llmMode: "remote",
+			llmBaseUrl: "http://llm.internal/v1",
+			llmModel: "company-memory",
+			llmApiKey: "llm-token",
+			providerOptions: {
+				embeddingApiUrl: "http://embeddings.internal/v1",
+				embeddingApiKey: "embedding-token",
+				embeddingModel: "company-embed",
+			},
+		});
 	});
 });

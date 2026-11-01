@@ -17,7 +17,8 @@ import {
 import * as ai from "@oh-my-pi/pi-ai";
 import { encodeTextSignatureV1 } from "@oh-my-pi/pi-ai/providers/openai-shared";
 import type { AssistantMessage, Model, ProviderPayload, Usage } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { buildSessionContext } from "@oh-my-pi/pi-coding-agent/session/session-context";
 import type {
 	CompactionEntry,
@@ -29,9 +30,39 @@ import type {
 import { parseSessionEntries } from "@oh-my-pi/pi-coding-agent/session/session-loader";
 import { migrateSessionEntries } from "@oh-my-pi/pi-coding-agent/session/session-migrations";
 import { mockFetch } from "./helpers/fetch-mock";
+import { getTestModel } from "./helpers/model-fixtures";
 import { e2eApiKey } from "./utilities";
 
 const tokenizer = new Tokenizer();
+
+const summaryModelSpec: ModelSpec<"anthropic-messages"> = {
+	id: "claude-sonnet-4-5",
+	name: "Private summary fixture",
+	api: "anthropic-messages",
+	provider: "anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 16_384,
+	compat: { supportsServerCompaction: false },
+	remoteCompaction: { enabled: false },
+};
+
+const remoteModelSpec: ModelSpec<"openai-responses"> = {
+	id: "gpt-5.1",
+	name: "Private Responses compaction fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true, v2StreamingEnabled: false },
+};
 
 // ============================================================================
 // Test fixtures
@@ -402,8 +433,7 @@ describe("Tokenizer.countMessage excludeEncryptedReasoning (compaction floor)", 
 
 describe("bigint tool arguments", () => {
 	it("preserves exact values through local compaction estimation and summary rendering", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const toolCallMessage: AssistantMessage = {
 			...createAssistantMessage("", createMockUsage(1_000, 100)),
@@ -460,8 +490,7 @@ describe("bigint tool arguments", () => {
 
 describe("remote compaction setting", () => {
 	it("forwards an explicit initiator override to local summarization requests", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const entries: SessionEntry[] = [
 			createMessageEntry(createUserMessage("Turn 1")),
@@ -496,10 +525,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("uses local summarization when remote compaction is disabled", async () => {
-		const model = getBundledModel("openai", "gpt-4o");
-		if (!model) {
-			throw new Error("Expected openai/gpt-4o model to exist");
-		}
+		const model = buildModel(remoteModelSpec);
 
 		const entries: SessionEntry[] = [
 			createMessageEntry(createUserMessage("Turn 1")),
@@ -544,10 +570,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("preserves prior compaction items and encrypted reasoning for OpenAI remote compaction", async () => {
-		const model = getBundledModel("openai", "gpt-5.1");
-		if (!model) {
-			throw new Error("Expected openai/gpt-5.1 model to exist");
-		}
+		const model = buildModel(remoteModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Older turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Older answer"));
@@ -642,8 +665,7 @@ describe("remote compaction setting", () => {
 		});
 	});
 	it("prefers persisted assistant native history snapshots for OpenAI remote compaction", async () => {
-		const model = getBundledModel("openai", "gpt-5.1");
-		if (!model) throw new Error("Expected openai/gpt-5.1 model to exist");
+		const model = buildModel(remoteModelSpec);
 
 		const assistantHistory = [
 			{ type: "message", role: "user", content: [{ type: "input_text", text: "Canonical user" }] },
@@ -690,21 +712,11 @@ describe("remote compaction setting", () => {
 		]);
 	});
 
-	it("uses the explicitly configured Codex compact endpoint for openai-codex models", async () => {
-		const baseModel = getBundledModel("openai", "gpt-5.1");
-		if (!baseModel) throw new Error("Expected openai/gpt-5.1 model to exist");
-
-		const model: Model = {
-			...baseModel,
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			baseUrl: "https://chatgpt.com/backend-api",
-			remoteCompaction: {
-				...baseModel.remoteCompaction,
-				enabled: true,
-				endpoint: "https://chatgpt.com/backend-api/codex/responses/compact",
-			},
-		};
+	it("uses the explicitly configured private compact endpoint", async () => {
+		const model = buildModel({
+			...remoteModelSpec,
+			remoteCompaction: { enabled: true, endpoint: "https://compact.company.invalid/responses/compact" },
+		});
 
 		const entries: SessionEntry[] = [
 			createMessageEntry(createUserMessage("Turn 1")),
@@ -730,24 +742,11 @@ describe("remote compaction setting", () => {
 		await compact(preparation, model, "test-api-key", undefined, undefined, { fetch: fetchSpy });
 
 		expect(fetchHandler).toHaveBeenCalledTimes(1);
-		expect(fetchHandler.mock.calls[0]?.[0]).toBe("https://chatgpt.com/backend-api/codex/responses/compact");
+		expect(fetchHandler.mock.calls[0]?.[0]).toBe("https://compact.company.invalid/responses/compact");
 	});
 
-	it("preserves codex assistant text signature metadata in remote compaction history", async () => {
-		const baseModel = getBundledModel("openai", "gpt-5.1");
-		if (!baseModel) throw new Error("Expected openai/gpt-5.1 model to exist");
-
-		const model: Model = {
-			...baseModel,
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			baseUrl: "https://chatgpt.com/backend-api",
-			remoteCompaction: {
-				...baseModel.remoteCompaction,
-				enabled: true,
-				endpoint: "https://chatgpt.com/backend-api/codex/responses/compact",
-			},
-		};
+	it("preserves Responses assistant text signature metadata in remote compaction history", async () => {
+		const model = buildModel(remoteModelSpec);
 		const assistant: AssistantMessage = {
 			role: "assistant",
 			content: [
@@ -798,8 +797,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("filters remote compact output and uses explicit remote instructions", async () => {
-		const model = getBundledModel("openai", "gpt-5.1");
-		if (!model) throw new Error("Expected openai/gpt-5.1 model to exist");
+		const model = buildModel(remoteModelSpec);
 
 		const entries: SessionEntry[] = [
 			createMessageEntry(createUserMessage("Turn 1")),
@@ -853,8 +851,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("clears stale OpenAI remote preserve data when local compaction runs", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Older turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Older answer"));
@@ -896,8 +893,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("summarizes snapcompact archive text locally and stops carrying frames", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Archived turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Archived answer"));
@@ -946,8 +942,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("keeps snapcompact archive text when only split-turn prefix is summarized", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Archived turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Archived answer"));
@@ -1008,8 +1003,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("strips legacy frame-only snapcompact archives during local compaction", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic/claude-sonnet-4-5 model to exist");
+		const model = buildModel(summaryModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Archived turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Archived answer"));
@@ -1048,8 +1042,7 @@ describe("remote compaction setting", () => {
 	});
 
 	it("sends snapcompact archive text to OpenAI remote compaction and strips frames", async () => {
-		const model = getBundledModel("openai", "gpt-5.1");
-		if (!model) throw new Error("Expected openai/gpt-5.1 model to exist");
+		const model = buildModel(remoteModelSpec);
 
 		const oldUser = createMessageEntry(createUserMessage("Archived turn"));
 		const oldAssistant = createMessageEntry(createAssistantMessage("Archived answer"));
@@ -1310,8 +1303,7 @@ describe("prepareCompaction retained history", () => {
 	});
 
 	it("recovers a local kept region behind an unreadable remote compaction without duplicating reusable replay", () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected anthropic test model");
+		const model = buildModel(summaryModelSpec);
 		const a = createMessageEntry(createUserMessage("Summarized A"));
 		const b = createMessageEntry(createUserMessage("Retained B"));
 		const local = createCompactionEntry("Summary A", b.id);
@@ -1647,15 +1639,15 @@ describe("Large session fixture", () => {
 // LLM integration tests (skipped without API key)
 // ============================================================================
 
-describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("LLM summarization", () => {
+describe.skipIf(!e2eApiKey("COPILOT_GITHUB_TOKEN"))("LLM summarization", () => {
 	it("should produce valid session after compaction", async () => {
 		const entries = await loadLargeSessionEntries();
 		const loaded = buildSessionContext(entries);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 
 		const preparation = prepareCompaction(entries, DEFAULT_COMPACTION_SETTINGS);
 
-		const compactionResult = await compact(preparation!, model, e2eApiKey("ANTHROPIC_API_KEY")!);
+		const compactionResult = await compact(preparation!, model, e2eApiKey("COPILOT_GITHUB_TOKEN")!);
 
 		// Simulate appending compaction to entries by creating a proper entry
 		const lastEntry = entries[entries.length - 1];

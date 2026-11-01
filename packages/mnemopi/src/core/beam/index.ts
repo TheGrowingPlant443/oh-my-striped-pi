@@ -68,7 +68,6 @@ const DEFAULT_CONFIG: BeamConfig = {
 	vecWeight: 0.5,
 	ftsWeight: 0.3,
 	importanceWeight: 0.2,
-	useCloud: false,
 	localLlmEnabled: false,
 	maxEpisodeChars: 100_000,
 	proactiveLinking: false,
@@ -76,7 +75,6 @@ const DEFAULT_CONFIG: BeamConfig = {
 
 function normalizeConfig(options: BeamMemoryOptions): BeamConfig {
 	const configured = options.config ?? {};
-	const useCloud = options.useCloud ?? configured.useCloud ?? DEFAULT_CONFIG.useCloud;
 	const proactiveLinking = options.proactiveLinking ?? configured.proactiveLinking ?? proactiveLinkingEnabled({});
 	return {
 		workingMemoryLimit: configured.workingMemoryLimit ?? DEFAULT_CONFIG.workingMemoryLimit,
@@ -85,7 +83,6 @@ function normalizeConfig(options: BeamMemoryOptions): BeamConfig {
 		vecWeight: configured.vecWeight ?? vectorWeight(),
 		ftsWeight: configured.ftsWeight ?? ftsWeight(),
 		importanceWeight: configured.importanceWeight ?? importanceWeight(),
-		useCloud,
 		localLlmEnabled: configured.localLlmEnabled ?? DEFAULT_CONFIG.localLlmEnabled,
 		maxEpisodeChars: configured.maxEpisodeChars ?? maxEpisodeChars(),
 		proactiveLinking,
@@ -119,7 +116,6 @@ export class BeamMemory implements BeamMemoryState {
 	readonly authorId: string | null;
 	readonly authorType: string | null;
 	readonly channelId: string;
-	readonly useCloud: boolean;
 	readonly eventEmitter?: (event: BeamEvent) => void;
 	readonly pluginManager: BeamMemoryState["pluginManager"];
 	readonly annotations: BeamMemoryState["annotations"];
@@ -139,7 +135,6 @@ export class BeamMemory implements BeamMemoryState {
 		authorId?: string | null,
 		authorType?: string | null,
 		channelId?: string | null,
-		useCloud?: boolean,
 		eventEmitter?: (event: BeamEvent) => void,
 	);
 	constructor(
@@ -148,7 +143,6 @@ export class BeamMemory implements BeamMemoryState {
 		authorId?: string | null,
 		authorType?: string | null,
 		channelId?: string | null,
-		useCloud?: boolean,
 		eventEmitter?: (event: BeamEvent) => void,
 	) {
 		const options: BeamMemoryOptions =
@@ -159,7 +153,6 @@ export class BeamMemory implements BeamMemoryState {
 						authorId,
 						authorType,
 						channelId,
-						useCloud,
 						eventEmitter,
 					}
 				: optionsOrSessionId;
@@ -169,7 +162,6 @@ export class BeamMemory implements BeamMemoryState {
 		this.channelId = options.channelId ?? this.sessionId;
 		this.dbPath = options.dbPath;
 		this.config = normalizeConfig(options);
-		this.useCloud = this.config.useCloud;
 		this.eventEmitter = options.eventEmitter;
 		this.pluginManager = options.pluginManager ?? null;
 		this.db = openDatabase(this.dbPath);

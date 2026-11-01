@@ -20,7 +20,7 @@ function makeModel(): Model<"openai-responses"> {
 		api: "openai-responses",
 		name: "GPT Test",
 		id: "gpt-test",
-		provider: "openai",
+		provider: "github-copilot",
 		baseUrl: "https://api.openai.com/v1",
 		contextWindow: 8192,
 		maxTokens: 2048,
@@ -35,7 +35,7 @@ function makeOutput(): AssistantMessage {
 		role: "assistant",
 		content: [],
 		timestamp: Date.now(),
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-test",
 		api: "openai-responses",
 		usage: {
@@ -57,6 +57,37 @@ async function* makeStream(events: unknown[]): AsyncIterable<ResponseStreamEvent
 type EmittedEvent = { type?: string } & Record<string, unknown>;
 
 describe("processResponsesStream: terminal events", () => {
+	test.each([
+		["MALFORMED_RESPONSE", false],
+		["MALFORMED_FUNCTION_CALL", true],
+	] as const)("rejects native failure %s instead of promoting a completed response", async (reason, withTool) => {
+		const output = makeOutput();
+		const events: unknown[] = withTool
+			? [
+					{
+						type: "response.output_item.done",
+						output_index: 0,
+						item: { type: "function_call", id: "fc_1", call_id: "call_1", name: "read", arguments: "{}" },
+					},
+				]
+			: [];
+		events.push({
+			type: "response.completed",
+			response: {
+				id: "resp_native_failure",
+				status: "completed",
+				native_finish_reason: reason,
+				usage: { input_tokens: 100, output_tokens: 604, total_tokens: 704 },
+			},
+		});
+
+		await expect(
+			processResponsesStream(makeStream(events), output, { push: () => {}, end: () => {} } as never, makeModel()),
+		).rejects.toThrow(reason);
+		expect(output.responseId).toBe("resp_native_failure");
+		expect(output.usage).toMatchObject({ input: 100, output: 604, totalTokens: 704 });
+	});
+
 	test.each(["arguments.done", "output_item.done", "terminal"])(
 		"refuses truncated final JSON via %s",
 		async finalizer => {

@@ -1,18 +1,4 @@
-/**
- * Regression test for `loadCliExtensionProviders`.
- *
- * One-shot CLIs (`omp bench`, dry-balance) build a bare `ModelRegistry` that
- * only knows built-in catalog providers. Before the helper existed they never
- * loaded extensions, so a provider contributed by an extension
- * (`pi.registerProvider(...)`, e.g. a custom OpenAI-compatible gateway under
- * `~/.omp/agent/extensions/`) was invisible to model resolution and
- * `omp bench <provider>/<model>` failed with "Model not found".
- *
- * Contract under test: after `loadCliExtensionProviders` drains the extension's
- * provider registrations into the registry, a `provider/id` selector for that
- * extension provider resolves. Discovery is disabled and the extension path is
- * passed explicitly so the test never touches the developer's real `~/.omp`.
- */
+/** One-shot CLIs resolve extension-supplied Copilot models after provider registration. */
 
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
@@ -34,7 +20,7 @@ beforeAll(async () => {
 	await fs.writeFile(
 		extPath,
 		`export default function (pi) {
-	pi.registerProvider("bench-gw", {
+	pi.registerProvider("github-copilot", {
 		baseUrl: "https://example.com/v1",
 		apiKey: "literal-test-key",
 		api: "openai-completions",
@@ -69,8 +55,8 @@ test("loadCliExtensionProviders makes extension providers resolvable by selector
 		const modelRegistry = new ModelRegistry(authStorage);
 		const preferences = getModelMatchPreferences(settings);
 
-		// Before the drain the extension provider is unknown: resolution fails.
-		const before = resolveCliModel({ cliModel: "bench-gw/bench-model", modelRegistry, preferences });
+		// Before the drain the extension model is unknown.
+		const before = resolveCliModel({ cliModel: "github-copilot/bench-model", modelRegistry, preferences });
 		expect(before.model).toBeUndefined();
 
 		await loadCliExtensionProviders(modelRegistry, settings, tmp.path(), {
@@ -79,9 +65,9 @@ test("loadCliExtensionProviders makes extension providers resolvable by selector
 		});
 
 		// After the drain the same selector resolves to the extension provider.
-		const after = resolveCliModel({ cliModel: "bench-gw/bench-model", modelRegistry, preferences });
+		const after = resolveCliModel({ cliModel: "github-copilot/bench-model", modelRegistry, preferences });
 		expect(after.error).toBeUndefined();
-		expect(after.model?.provider).toBe("bench-gw");
+		expect(after.model?.provider).toBe("github-copilot");
 		expect(after.model?.id).toBe("bench-model");
 	} finally {
 		authStorage.close();

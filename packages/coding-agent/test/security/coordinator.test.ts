@@ -2,13 +2,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
 import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { createMockModel, type MockResponseSource, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel, type MockResponseSource } from "@oh-my-pi/pi-ai/providers/mock";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { $ } from "bun";
 import { ModelRegistry } from "../../src/config/model-registry";
 import { Settings } from "../../src/config/settings";
+import * as sdk from "../../src/sdk";
 import {
 	createNativeSecurityProvenance,
 	DEFAULT_SECURITY_GIT_ADAPTER,
@@ -19,7 +19,8 @@ import {
 } from "../../src/security";
 import { SessionManager } from "../../src/session/session-manager";
 
-const MOCK_SOURCE_ID = "security-coordinator-test";
+const SECURITY_MODEL = getBundledModel("github-copilot", "gpt-4o");
+if (!SECURITY_MODEL) throw new Error("Expected bundled Copilot model");
 let temporaryRoot = "";
 let registryRoot = "";
 let repositoryRoot = "";
@@ -46,7 +47,7 @@ beforeAll(async () => {
 	registryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-security-coordinator-auth-"));
 	credentialStore = await SqliteAuthCredentialStore.open(path.join(registryRoot, "agent.db"));
 	authStorage = new AuthStorage(credentialStore);
-	await authStorage.credentials.set("openai-codex", {
+	await authStorage.credentials.set("github-copilot", {
 		type: "oauth",
 		access: "fixture-access-token",
 		refresh: "fixture-refresh-token",
@@ -56,7 +57,7 @@ beforeAll(async () => {
 		orgId: "workspace-fixture",
 		orgName: "pro",
 	});
-	const account = authStorage.oauth.accounts("openai-codex")[0];
+	const account = authStorage.oauth.accounts("github-copilot")[0];
 	if (!account) throw new Error("expected fixture OAuth account");
 	credentialId = account.credentialId;
 	modelRegistry = new ModelRegistry(authStorage, path.join(registryRoot, "models.yml"));
@@ -69,12 +70,10 @@ beforeEach(async () => {
 	await fs.mkdir(path.join(repositoryRoot, "src"), { recursive: true });
 	await Bun.write(path.join(repositoryRoot, "src", "app.ts"), "export const app = true;\n");
 	settings = Settings.isolated({ "security.enabled": true, "compaction.enabled": false });
-	registerMockApi(MOCK_SOURCE_ID);
 });
 
 afterEach(async () => {
 	vi.restoreAllMocks();
-	unregisterCustomApis(MOCK_SOURCE_ID);
 	settings.cancelPendingSaves();
 	await fs.rm(temporaryRoot, { recursive: true, force: true });
 });
@@ -92,8 +91,13 @@ function storeFactory(): Promise<SecurityStore> {
 function coordinatorWithMockSession(responses: MockResponseSource) {
 	const mock = createMockModel({
 		id: "security-mock",
-		provider: "openai-codex",
 		responses,
+	});
+	const createSession = sdk.createAgentSession;
+	vi.spyOn(sdk, "createAgentSession").mockImplementation(async options => {
+		const result = await createSession(options);
+		result.session.agent.streamFn = mock.stream;
+		return result;
 	});
 	const coordinator = new SecurityCoordinator(
 		{
@@ -101,7 +105,7 @@ function coordinatorWithMockSession(responses: MockResponseSource) {
 			settings,
 			authStorage,
 			modelRegistry,
-			activeModel: mock.model,
+			activeModel: SECURITY_MODEL,
 			sessionId: "parent-session",
 			agentId: "Main",
 		},
@@ -111,25 +115,8 @@ function coordinatorWithMockSession(responses: MockResponseSource) {
 }
 
 describe("native security coordinator", () => {
-	test("preflight accepts provider-owned Bedrock auth without an OAuth row", async () => {
-		const bedrockModel = getBundledModel("amazon-bedrock", "us.anthropic.claude-opus-4-8");
-		if (!bedrockModel) throw new Error("Expected bundled Bedrock model");
-		const coordinator = new SecurityCoordinator(
-			{
-				cwd: repositoryRoot,
-				settings,
-				authStorage,
-				modelRegistry,
-				activeModel: bedrockModel,
-			},
-			{ openStore: storeFactory, gitAdapter },
-		);
-		const plan = await coordinator.preflight();
-		expect(plan.account).toEqual({ provider: "amazon-bedrock", api: "bedrock-converse-stream" });
-	});
-
 	test("scripted mock model publishes a canonical completed scan and restartable session", async () => {
-		const { coordinator, mock } = coordinatorWithMockSession([
+		const { coordinator } = coordinatorWithMockSession([
 			{
 				content: [
 					{
@@ -158,7 +145,7 @@ describe("native security coordinator", () => {
 			},
 			{ content: ["Security publication completed."] },
 		]);
-		const createdPlan = await coordinator.preflight({ credentialId, model: mock.model });
+		const createdPlan = await coordinator.preflight({ credentialId, model: SECURITY_MODEL });
 		const started = await coordinator.start({ planId: createdPlan.id });
 		const terminal = await coordinator.wait(started.operationId);
 		expect(terminal.phase).toBe("completed");
@@ -175,7 +162,6 @@ describe("native security coordinator", () => {
 	});
 
 	test("records a terminal failure when initial scan persistence fails", async () => {
-		const mock = createMockModel({ id: "security-mock", provider: "openai-codex" });
 		const store = await storeFactory();
 		const coordinator = new SecurityCoordinator(
 			{
@@ -183,7 +169,7 @@ describe("native security coordinator", () => {
 				settings,
 				authStorage,
 				modelRegistry,
-				activeModel: mock.model,
+				activeModel: SECURITY_MODEL,
 			},
 			{
 				openStore: async () => store,
@@ -193,7 +179,7 @@ describe("native security coordinator", () => {
 				},
 			},
 		);
-		const plan = await coordinator.preflight({ credentialId, model: mock.model });
+		const plan = await coordinator.preflight({ credentialId, model: SECURITY_MODEL });
 		vi.spyOn(store, "putBundle").mockRejectedValue(new Error("security store unavailable"));
 		const started = await coordinator.start({ planId: plan.id });
 		await expect(coordinator.wait(started.operationId)).rejects.toThrow("security store unavailable");
@@ -205,14 +191,13 @@ describe("native security coordinator", () => {
 
 	test("cancellation before session launch has no inference side effects", async () => {
 		let sessionCreations = 0;
-		const mock = createMockModel({ id: "security-mock", provider: "openai-codex" });
 		const coordinator = new SecurityCoordinator(
 			{
 				cwd: repositoryRoot,
 				settings,
 				authStorage,
 				modelRegistry,
-				activeModel: mock.model,
+				activeModel: SECURITY_MODEL,
 				sessionId: "parent-session",
 			},
 			{
@@ -224,13 +209,12 @@ describe("native security coordinator", () => {
 				},
 			},
 		);
-		const createdPlan = await coordinator.preflight({ credentialId, model: mock.model });
+		const createdPlan = await coordinator.preflight({ credentialId, model: SECURITY_MODEL });
 		const started = await coordinator.start({ planId: createdPlan.id });
 		expect(await coordinator.cancel(started.operationId)).toBeTrue();
 		const terminal = await coordinator.wait(started.operationId);
 		expect(terminal.phase).toBe("cancelled");
 		expect(sessionCreations).toBe(0);
-		expect(mock.calls).toHaveLength(0);
 		const bundle = await (await storeFactory()).getBundle(terminal.scanId);
 		expect(bundle?.scan.status).toBe("cancelled");
 	});
@@ -239,14 +223,13 @@ describe("native security coordinator", () => {
 		const promptStarted = Promise.withResolvers<void>();
 		const promptFinished = Promise.withResolvers<void>();
 		let abortCalls = 0;
-		const mock = createMockModel({ id: "security-mock", provider: "openai-codex" });
 		const coordinator = new SecurityCoordinator(
 			{
 				cwd: repositoryRoot,
 				settings,
 				authStorage,
 				modelRegistry,
-				activeModel: mock.model,
+				activeModel: SECURITY_MODEL,
 				sessionId: "parent-session",
 			},
 			{
@@ -267,7 +250,7 @@ describe("native security coordinator", () => {
 				}),
 			},
 		);
-		const createdPlan = await coordinator.preflight({ credentialId, model: mock.model });
+		const createdPlan = await coordinator.preflight({ credentialId, model: SECURITY_MODEL });
 		const started = await coordinator.start({ planId: createdPlan.id });
 		await promptStarted.promise;
 		expect(await coordinator.cancel(started.operationId)).toBeTrue();
@@ -292,7 +275,6 @@ describe("native security coordinator", () => {
 		await $`git add src/app.ts`.cwd(repositoryRoot).quiet();
 		await $`git commit -m head`.cwd(repositoryRoot).quiet();
 		const headRevision = (await $`git rev-parse HEAD`.cwd(repositoryRoot).text()).trim();
-		const mock = createMockModel({ id: "security-mock", provider: "openai-codex" });
 		let executionRoot = "";
 		let request = "";
 		let reviewedContent = "";
@@ -302,7 +284,7 @@ describe("native security coordinator", () => {
 				settings,
 				authStorage,
 				modelRegistry,
-				activeModel: mock.model,
+				activeModel: SECURITY_MODEL,
 			},
 			{
 				openStore: storeFactory,
@@ -324,7 +306,7 @@ describe("native security coordinator", () => {
 		);
 		const plan = await coordinator.preflight({
 			credentialId,
-			model: mock.model,
+			model: SECURITY_MODEL,
 			target: { kind: "ref_diff", baseRevision, headRevision },
 		});
 		const started = await coordinator.start({ planId: plan.id });
@@ -338,8 +320,8 @@ describe("native security coordinator", () => {
 	});
 
 	test("restart recovery reconciles an interrupted persisted operation", async () => {
-		const { coordinator, mock } = coordinatorWithMockSession([]);
-		const plan = await coordinator.preflight({ credentialId, model: mock.model });
+		const { coordinator } = coordinatorWithMockSession([]);
+		const plan = await coordinator.preflight({ credentialId, model: SECURITY_MODEL });
 		const store = await storeFactory();
 		const operationId = "secop_restart_fixture";
 		const scanId = "secscan_restartfixture";
@@ -384,7 +366,7 @@ describe("native security coordinator", () => {
 				settings,
 				authStorage,
 				modelRegistry,
-				activeModel: mock.model,
+				activeModel: SECURITY_MODEL,
 			},
 			{ openStore: storeFactory, gitAdapter },
 		);

@@ -23,6 +23,7 @@ import type {
 	Context,
 	ImageContent,
 	Message,
+	Model,
 	TextContent,
 	ThinkingContent,
 	Tool,
@@ -271,15 +272,19 @@ function buildTools(tools: Array<OpenAIResponsesTool | { type: string }> | undef
 	return out.length > 0 ? out : undefined;
 }
 
-function ensureAssistantPlaceholder(messages: Message[], modelId: string, now: number): AssistantMessage {
+function ensureAssistantPlaceholder(
+	messages: Message[],
+	now: number,
+	target: Pick<Model, "id" | "provider">,
+): AssistantMessage {
 	const last = messages[messages.length - 1];
 	if (last && last.role === "assistant") return last;
 	const placeholder: AssistantMessage = {
 		role: "assistant",
 		content: [],
 		api: "openai-responses",
-		provider: "openai",
-		model: modelId,
+		provider: target.provider,
+		model: target.id,
 		usage: {
 			input: 0,
 			output: 0,
@@ -344,9 +349,6 @@ function functionOutputContent(output: string | readonly unknown[] | undefined):
 				};
 				if (imageUrl) {
 					content.push({ ...referenceImage, url: imageUrl });
-				} else {
-					const fileId = asString(raw.file_id) || undefined;
-					if (fileId) content.push({ ...referenceImage, providerFile: { provider: "openai", id: fileId } });
 				}
 			}
 		}
@@ -357,7 +359,7 @@ function functionOutputContent(output: string | readonly unknown[] | undefined):
 
 // ─── parseRequest ───────────────────────────────────────────────────────────
 
-export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
+export function parseRequest(body: unknown, target: Pick<Model, "id" | "provider">, headers?: Headers): ParsedRequest {
 	// Header capture is centralized in `auth-gateway/server.ts` (the
 	// allow-listed set lands on `options.headers` automatically). We also
 	// consult `headers` here to populate `options.promptCacheKey` when the
@@ -436,8 +438,8 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 							role: "assistant",
 							content: parts,
 							api: "openai-responses",
-							provider: "openai",
-							model: data.model,
+							provider: target.provider,
+							model: target.id,
 							usage: {
 								input: 0,
 								output: 0,
@@ -463,7 +465,7 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 					thinkingSignature: JSON.stringify(reasoning),
 					...(reasoning.id ? { itemId: reasoning.id } : {}),
 				};
-				ensureAssistantPlaceholder(messages, data.model, now).content.push(thinking);
+				ensureAssistantPlaceholder(messages, now, target).content.push(thinking);
 				continue;
 			}
 			if (effectiveType === "function_call") {
@@ -485,7 +487,7 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 					arguments: args,
 					...(call.id ? { thoughtSignature: call.id } : {}),
 				};
-				ensureAssistantPlaceholder(messages, data.model, now).content.push(toolCall);
+				ensureAssistantPlaceholder(messages, now, target).content.push(toolCall);
 				continue;
 			}
 			if (effectiveType === "custom_tool_call") {
@@ -501,7 +503,7 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 					customWireName: call.name,
 					...(call.id ? { thoughtSignature: call.id } : {}),
 				};
-				ensureAssistantPlaceholder(messages, data.model, now).content.push(toolCall);
+				ensureAssistantPlaceholder(messages, now, target).content.push(toolCall);
 				continue;
 			}
 			if (effectiveType === "computer_call") {
@@ -521,7 +523,7 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 						pendingSafetyChecks: call.pending_safety_checks as ComputerSafetyCheck[],
 					},
 				};
-				ensureAssistantPlaceholder(messages, data.model, now).content.push(toolCall);
+				ensureAssistantPlaceholder(messages, now, target).content.push(toolCall);
 				continue;
 			}
 			if (effectiveType === "function_call_output") {

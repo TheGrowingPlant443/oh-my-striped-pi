@@ -1,144 +1,100 @@
 import { Database } from "bun:sqlite";
-import { afterEach, describe, expect, test, vi } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { PASTE_CODE_LOGIN_PROVIDERS } from "@oh-my-pi/pi-ai/registry";
+import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
 import {
+	getOAuthApiKey,
 	getOAuthProviders,
-	refreshOAuthToken,
 	registerOAuthProvider,
+	refreshOAuthToken,
 	unregisterOAuthProviders,
 } from "@oh-my-pi/pi-ai/registry/oauth";
-import type { OAuthCredentials, OAuthProvider } from "@oh-my-pi/pi-ai/registry/oauth/types";
-import { getEnvApiKey } from "@oh-my-pi/pi-ai/env-api-key";
+import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
+import { getEnvApiKey, getEnvApiKeyName, resolveProviderApiKey } from "../src/env-api-key";
 
-const FIXTURE_SOURCE = "provider-registry-test";
-const ENV_KEYS = [
-	"COREWEAVE_API_KEY",
-	"ZENMUX_API_KEY",
-	"EXA_API_KEY",
-	"XAI_OAUTH_TOKEN",
-	"UMANS_AI_CODING_PLAN_API_KEY",
-	"LLAMA_CPP_API_KEY",
-	"WANDB_API_KEY",
-] as const;
-const originalEnv = new Map(ENV_KEYS.map(key => [key, Bun.env[key]]));
+const credentials: OAuthCredentials = { refresh: "r", access: "a", expires: Date.now() + 3_600_000 };
+afterEach(() => unregisterOAuthProviders("company-auth-test"));
 
-afterEach(() => {
-	unregisterOAuthProviders(FIXTURE_SOURCE);
-	for (const key of ENV_KEYS) {
-		const original = originalEnv.get(key);
-		if (original === undefined) {
-			delete Bun.env[key];
-		} else {
-			Bun.env[key] = original;
-		}
-	}
-	vi.restoreAllMocks();
-});
-
-describe("provider registry auth surface", () => {
-	test("env-key map merges catalog names, registry defs, and legacy keys", () => {
-		Bun.env.ZENMUX_API_KEY = "zenmux-env";
-		Bun.env.EXA_API_KEY = "exa-env";
-		// Plain name derived from the catalog table's `envVars`.
-		expect(getEnvApiKey("zenmux")).toBe("zenmux-env");
-		Bun.env.UMANS_AI_CODING_PLAN_API_KEY = "umans-env";
-		expect(getEnvApiKey("umans")).toBe("umans-env");
-		Bun.env.LLAMA_CPP_API_KEY = "llama-env";
-		expect(getEnvApiKey("llama.cpp")).toBe("llama-env");
-		// Exa is derived from the provider registry's `envKeys` definition.
-		expect(getEnvApiKey("exa")).toBe("exa-env");
+describe("configured provider authentication", () => {
+	test.each(["constructor", "toString", "hasOwnProperty", "__proto__"])(
+		"does not inherit built-in auth or env policies for %s",
+		provider => {
+			expect(getProviderDefinition(provider)).toBeUndefined();
+			expect(getEnvApiKey(provider)).toBeUndefined();
+			expect(getEnvApiKeyName(provider)).toBeUndefined();
+		},
+	);
+	test("optional-key login markers are not sent as bearer tokens", async () => {
+		const definition = getProviderDefinition("lm-studio");
+		expect(definition?.allowsMissingApiKey).toBe(true);
+		const key = await definition?.login?.({ onPrompt: async () => "" });
+		expect(typeof key).toBe("string");
+		expect(resolveProviderApiKey("lm-studio", key as string)).toBe("N/A");
+		expect(resolveProviderApiKey("lm-studio", "real-key")).toBe("real-key");
+		expect(getProviderDefinition("apple")?.allowsMissingApiKey).toBe(true);
 	});
 
-	test("multi-var catalog env fallback picks names in order", () => {
-		Bun.env.XAI_OAUTH_TOKEN = "xai-oauth-env";
-		expect(getEnvApiKey("xai-oauth")).toBe("xai-oauth-env");
-
-		Bun.env.WANDB_API_KEY = "wandb-env";
-		expect(getEnvApiKey("coreweave")).toBe("wandb-env");
-		Bun.env.COREWEAVE_API_KEY = "coreweave-env";
-		expect(getEnvApiKey("coreweave")).toBe("coreweave-env");
-	});
-
-	test("login list contains loginable providers and excludes env-only model providers", () => {
-		const ids = getOAuthProviders().map(provider => provider.id);
-		expect(ids).toContain("zenmux");
-		expect(ids).toContain("kagi");
-		expect(ids).toContain("exa");
-		expect(ids).toContain("umans");
-		expect(ids).toContain("llama.cpp");
-		// openai has no interactive login flow.
-		expect(ids).not.toContain("openai");
-	});
-
-	test("paste-code login set is derived from pasteCodeFlow", () => {
-		expect([...PASTE_CODE_LOGIN_PROVIDERS].sort()).toEqual(
-			[
-				"anthropic",
-				"devin",
-				"gitlab-duo",
-				"gitlab-duo-agent",
-				"google-antigravity",
-				"google-gemini-cli",
-				"openai-codex",
-				"openrouter",
-				"snowflake",
-				"stencil",
-				"zai-coding-plan",
-			].sort(),
-		);
-		expect(PASTE_CODE_LOGIN_PROVIDERS.has("zenmux")).toBe(false);
-	});
-
-	test("refresh dispatch returns api-key providers unchanged and routes real refreshers", async () => {
-		const creds: OAuthCredentials = { refresh: "r", access: "a", expires: Date.now() + 60_000 };
-		// zenmux has no refresher → returned as-is.
-		expect(await refreshOAuthToken("zenmux", creds)).toBe(creds);
-
-		const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-			new Response(
-				JSON.stringify({
-					access_token: "a2",
-					refresh_token: "r2",
-					expires_in: 120,
-					account: { uuid: "account", email_address: "user@example.com" },
+	test("rejects unknown interactive OAuth without invoking callbacks", async () => {
+		const storage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")));
+		let prompts = 0;
+		try {
+			await expect(
+				storage.oauth.login("unknown-company-provider", {
+					onAuth: () => {
+						prompts++;
+					},
+					onPrompt: async () => {
+						prompts++;
+						return "secret";
+					},
 				}),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			),
-		);
-		const refreshed = await refreshOAuthToken("anthropic", creds);
-		expect(refreshed.access).toBe("a2");
-		expect(refreshed.refresh).toBe("r2");
-		expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-		await expect(refreshOAuthToken("nonexistent-provider" as OAuthProvider, creds)).rejects.toThrow(
-			"Unknown OAuth provider",
-		);
+			).rejects.toThrow("Unknown OAuth provider");
+			expect(prompts).toBe(0);
+		} finally {
+			storage.close();
+		}
 	});
 
-	test("login dispatcher handles runtime-registered extension providers", async () => {
-		const store = new SqliteAuthCredentialStore(new Database(":memory:"));
-		const storage = new AuthStorage(store);
-		await storage.credentials.reload();
+	test("registers custom company OAuth through login, key projection and refresh", async () => {
 		registerOAuthProvider({
-			id: "fixture-x",
-			name: "Fixture X",
-			sourceId: FIXTURE_SOURCE,
-			login: async () => "fixture-key",
+			id: "company-oauth",
+			name: "Company OAuth",
+			sourceId: "company-auth-test",
+			login: async callbacks => ({ ...credentials, access: await callbacks.onPrompt({ message: "Token" }) }),
+			getApiKey: credential => `company:${credential.access}`,
+			refreshToken: async credential => ({ ...credential, access: "refreshed" }),
 		});
-
-		await storage.oauth.login("fixture-x", { onAuth: () => {}, onPrompt: async () => "" });
-
-		expect(store.getApiKey("fixture-x")).toBe("fixture-key");
-	});
-
-	test("llama.cpp login stores a local no-auth token when no key is entered", async () => {
 		const store = new SqliteAuthCredentialStore(new Database(":memory:"));
 		const storage = new AuthStorage(store);
-		await storage.credentials.reload();
+		try {
+			await storage.oauth.login("company-oauth", { onAuth: () => {}, onPrompt: async () => "operator-token" });
+			expect(store.listAuthCredentials("company-oauth")).toHaveLength(1);
+			expect(await storage.keys.get("company-oauth")).toBe("company:operator-token");
+			expect((await getOAuthApiKey("company-oauth", { "company-oauth": credentials }))?.apiKey).toBe("company:a");
+			expect((await refreshOAuthToken("company-oauth", credentials)).access).toBe("refreshed");
+			expect(getOAuthProviders().some(provider => provider.id === "company-oauth")).toBe(true);
+			unregisterOAuthProviders("company-auth-test");
+			expect(getOAuthProviders().some(provider => provider.id === "company-oauth")).toBe(false);
+		} finally {
+			storage.close();
+		}
+	});
 
-		await storage.oauth.login("llama.cpp", { onAuth: () => {}, onPrompt: async () => "" });
-
-		expect(store.getApiKey("llama.cpp")).toBe("llama-cpp-local");
+	test("preserves generic credential administration and config-key precedence", async () => {
+		const store = new SqliteAuthCredentialStore(new Database(":memory:"));
+		const storage = new AuthStorage(store, {
+			configValueResolver: async value => (value === "!company-key" ? "configured" : value),
+		});
+		try {
+			await storage.credentials.set("company", { type: "api_key", key: "stored" });
+			storage.keys.setConfig("company", "!company-key");
+			expect(await storage.keys.get("company")).toBe("configured");
+			expect(await storage.keys.getWithCredential("company")).toMatchObject({ apiKey: "configured" });
+			storage.keys.removeConfig("company");
+			expect(await storage.keys.get("company")).toBe("stored");
+			expect(store.listAuthCredentials("company")).toHaveLength(1);
+		} finally {
+			storage.close();
+		}
 	});
 });

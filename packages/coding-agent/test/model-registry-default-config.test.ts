@@ -14,7 +14,7 @@ const originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
 let tempDir: TempDir;
 let authStorage: AuthStorage;
 
-const BEDROCK_OPUS_MODEL = "us.anthropic.claude-opus-4-8";
+const COPILOT_CACHE_MODEL = "copilot-cache-fixture";
 
 describe("ModelRegistry default custom models config", () => {
 	beforeEach(async () => {
@@ -33,14 +33,14 @@ describe("ModelRegistry default custom models config", () => {
 
 	test("loads custom provider models from default models.yaml when models.yml is absent", () => {
 		writeModelsYaml("models.yaml", {
-			provider: "yaml-default-only",
+			provider: "github-copilot",
 			modelId: "yaml-model",
 			modelName: "YAML default model",
 			baseUrl: "https://yaml-default.example.com/v1",
 		});
 
 		const [model] = loadDefaultRegistryModels({
-			provider: "yaml-default-only",
+			provider: "github-copilot",
 			modelId: "yaml-model",
 		});
 
@@ -48,65 +48,37 @@ describe("ModelRegistry default custom models config", () => {
 		expect(model?.baseUrl).toBe("https://yaml-default.example.com/v1");
 	});
 
-	test("retains STB decoder metadata on a renamed custom provider", () => {
+	test("retains STB decoder metadata on a custom Copilot model", () => {
 		writeModelsYaml("models.yml", {
-			provider: "managed-primary",
-			modelId: "local-vision",
-			modelName: "Local vision",
+			provider: "github-copilot",
+			modelId: "copilot-vision",
+			modelName: "Copilot vision",
 			baseUrl: "http://127.0.0.1:8080/v1",
 			imageInputDecoder: "stb",
 		});
 
-		const [model] = loadDefaultRegistryModels({ provider: "managed-primary", modelId: "local-vision" });
+		const [model] = loadDefaultRegistryModels({ provider: "github-copilot", modelId: "copilot-vision" });
 
 		expect(model?.imageInputDecoder).toBe("stb");
 	});
 
-	test("loads Bedrock cache capabilities from a model override", () => {
-		writeBedrockCacheOverride();
-
-		const [model] = loadDefaultRegistryModels({
-			provider: "amazon-bedrock",
-			modelId: "us.anthropic.claude-opus-4-8",
-		});
-
-		const expectedCompat = {
-			promptCacheMode: "explicit",
-			supportsLongPromptCacheRetention: false,
-			promptCacheMinimumTokens: 1024,
-			promptCacheMaximumCheckpoints: 4,
-			supportsForcedToolChoice: true,
-			// Reasoning-tier Bedrock stream-stall watchdog widening applies to
-			// overrides too (model compat generation).
-			streamIdleTimeoutMs: 900000,
-			streamRevision: "possible",
-			// Opus 4.7+ rejects temperature/top_p on every host (class rule).
-			supportsSamplingParams: false,
-			// Bedrock Converse keeps thinking-binding controls on unless an override opts out.
-			supportsThinkingBindingControls: true,
-			// Converse on an AWS host supports native Claude server compaction (provider rule).
-			supportsServerCompaction: true,
-		} as const;
-		expect(model?.compat).toEqual(expectedCompat);
-	});
-
 	test("prefers default models.yml over models.yaml when both exist", () => {
 		writeModelsYaml("models.yml", {
-			provider: "yaml-precedence",
+			provider: "github-copilot",
 			modelId: "from-yml",
 			modelName: "YML winner",
 			baseUrl: "https://yml-winner.example.com/v1",
 		});
 		writeModelsYaml("models.yaml", {
-			provider: "yaml-precedence",
+			provider: "github-copilot",
 			modelId: "from-yaml",
 			modelName: "YAML loser",
 			baseUrl: "https://yaml-loser.example.com/v1",
 		});
 
 		const [ymlModel, yamlModel] = loadDefaultRegistryModels(
-			{ provider: "yaml-precedence", modelId: "from-yml" },
-			{ provider: "yaml-precedence", modelId: "from-yaml" },
+			{ provider: "github-copilot", modelId: "from-yml" },
+			{ provider: "github-copilot", modelId: "from-yaml" },
 		);
 
 		expect(ymlModel?.baseUrl).toBe("https://yml-winner.example.com/v1");
@@ -115,21 +87,21 @@ describe("ModelRegistry default custom models config", () => {
 
 	test("prefers default models.yaml over legacy models.json when models.yml is absent", () => {
 		writeModelsYaml("models.yaml", {
-			provider: "yaml-json-precedence",
+			provider: "github-copilot",
 			modelId: "from-yaml",
 			modelName: "YAML winner over JSON",
 			baseUrl: "https://yaml-over-json.example.com/v1",
 		});
 		writeModelsJson({
-			provider: "yaml-json-precedence",
+			provider: "github-copilot",
 			modelId: "from-json",
 			modelName: "JSON loser",
 			baseUrl: "https://json-loser.example.com/v1",
 		});
 
 		const [yamlModel, jsonModel] = loadDefaultRegistryModels(
-			{ provider: "yaml-json-precedence", modelId: "from-yaml" },
-			{ provider: "yaml-json-precedence", modelId: "from-json" },
+			{ provider: "github-copilot", modelId: "from-yaml" },
+			{ provider: "github-copilot", modelId: "from-json" },
 		);
 
 		expect(yamlModel?.baseUrl).toBe("https://yaml-over-json.example.com/v1");
@@ -150,14 +122,19 @@ describe("ModelRegistry default custom models config", () => {
 				"prompt-cache-empty.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
+					"    apiKey: TEST_KEY",
 					"    modelOverrides:",
-					`      ${JSON.stringify(BEDROCK_OPUS_MODEL)}:`,
+					`      ${JSON.stringify(COPILOT_CACHE_MODEL)}:`,
 					"        promptCache: {}",
+					"    models:",
+					copilotModelDefinition({ short: 300, long: 3600 }),
 					"",
 				].join("\n"),
 			);
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
 
 			expect(getPromptCacheTtlMs(model, options)).toBeUndefined();
@@ -176,17 +153,20 @@ describe("ModelRegistry default custom models config", () => {
 				"prompt-cache-short-only.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
+					"    apiKey: TEST_KEY",
 					"    modelOverrides:",
-					`      ${JSON.stringify(BEDROCK_OPUS_MODEL)}:`,
+					`      ${JSON.stringify(COPILOT_CACHE_MODEL)}:`,
 					"        promptCache:",
 					"          short: 90",
-					"        compat:",
-					"          supportsLongPromptCacheRetention: true",
+					"    models:",
+					copilotModelDefinition({ short: 300, long: 3600 }),
 					"",
 				].join("\n"),
 			);
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 			const shortOptions: SimpleStreamOptions = { cacheRetention: "short" };
 			const longOptions: SimpleStreamOptions = { cacheRetention: "long" };
 
@@ -205,37 +185,50 @@ describe("ModelRegistry default custom models config", () => {
 			}
 		});
 
-		test("a default Bedrock model retains its catalog short and long lifetimes", () => {
-			const registry = createPromptCacheRegistry("prompt-cache-default.yml", "providers: {}\n");
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+		test("a custom model retains its explicit short and long lifetimes", () => {
+			const registry = createPromptCacheRegistry(
+				"prompt-cache-custom.yml",
+				[
+					"providers:",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
+					"    apiKey: TEST_KEY",
+					"    models:",
+					copilotModelDefinition({ short: 300, long: 3600 }),
+					"",
+				].join("\n"),
+			);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 
 			expect(model.promptCache).toEqual({ short: 300, long: 3600 });
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "short" })).toBe(300_000);
+			expect(getPromptCacheTtlMs(model, { cacheRetention: "long" })).toBe(3_600_000);
 		});
 
-		test("custom Bedrock lifetime survives an unrelated override and provider fields", async () => {
+		test("custom Copilot lifetime survives an unrelated override and provider fields", async () => {
 			const registry = createPromptCacheRegistry(
 				"prompt-cache-provider-rebuild.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
-					"    baseUrl: https://bedrock-runtime.us-east-1.amazonaws.com",
-					"    api: bedrock-converse-stream",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
 					"    apiKey: TEST_KEY",
-					"    requestMetadata:",
-					"      regression: configured-custom-lifetime",
+					"    headers:",
+					"      X-Regression: configured-custom-lifetime",
 					"    modelOverrides:",
-					`      ${JSON.stringify(BEDROCK_OPUS_MODEL)}:`,
+					`      ${JSON.stringify(COPILOT_CACHE_MODEL)}:`,
 					"        maxTokens: 4321",
 					"    models:",
-					bedrockModelDefinition({ short: 90 }),
+					copilotModelDefinition({ short: 90 }),
 					"",
 				].join("\n"),
 			);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 
-			expect(model.requestMetadata).toEqual({ regression: "configured-custom-lifetime" });
+			expect((await registry.resolveModelHeaders(model))?.["X-Regression"]).toBe("configured-custom-lifetime");
 			expect(getPromptCacheTtlMs(model, options)).toBe(90_000);
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "long" })).toBeUndefined();
 			expect(model.maxTokens).toBe(4321);
@@ -251,8 +244,10 @@ describe("ModelRegistry default custom models config", () => {
 			}
 
 			await registry.refresh("offline");
-			const rebuiltModel = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
-			expect(rebuiltModel.requestMetadata).toEqual({ regression: "configured-custom-lifetime" });
+			const rebuiltModel = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
+			expect((await registry.resolveModelHeaders(rebuiltModel))?.["X-Regression"]).toBe(
+				"configured-custom-lifetime",
+			);
 			expect(getPromptCacheTtlMs(rebuiltModel, options)).toBe(90_000);
 
 			const rebuiltScheduledAt = Date.now();
@@ -271,22 +266,22 @@ describe("ModelRegistry default custom models config", () => {
 				"prompt-cache-runtime-precedence.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
-					"    baseUrl: https://bedrock-runtime.us-east-1.amazonaws.com",
-					"    api: bedrock-converse-stream",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
 					"    apiKey: TEST_KEY",
 					"    models:",
-					bedrockModelDefinition({ short: 90 }),
+					copilotModelDefinition({ short: 90 }),
 					"",
 				].join("\n"),
 			);
-			expect(requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL).promptCache).toEqual({
+			expect(requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL).promptCache).toEqual({
 				short: 90,
 			});
 
 			registry.registerProvider(
-				"amazon-bedrock",
-				runtimeBedrockProvider({ short: 180 }),
+				"github-copilot",
+				runtimeCopilotProvider({ short: 180 }),
 				"ext://runtime-cache-lifetime",
 			);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
@@ -305,28 +300,28 @@ describe("ModelRegistry default custom models config", () => {
 				}
 			};
 
-			expectRuntimeLifetime(requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL));
+			expectRuntimeLifetime(requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL));
 			await registry.refresh("offline");
-			expectRuntimeLifetime(requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL));
+			expectRuntimeLifetime(requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL));
 		});
 
-		test("empty runtime lifetime opts out, while absent runtime lifetime uses catalog defaults", () => {
+		test("empty or absent runtime lifetime does not inherit YAML lifetimes", () => {
 			const registry = createPromptCacheRegistry(
 				"prompt-cache-runtime-opt-out.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
-					"    baseUrl: https://bedrock-runtime.us-east-1.amazonaws.com",
-					"    api: bedrock-converse-stream",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
 					"    apiKey: TEST_KEY",
 					"    models:",
-					bedrockModelDefinition({ short: 90 }),
+					copilotModelDefinition({ short: 90 }),
 					"",
 				].join("\n"),
 			);
-			registry.registerProvider("amazon-bedrock", runtimeBedrockProvider({}), "ext://runtime-cache-opt-out");
+			registry.registerProvider("github-copilot", runtimeCopilotProvider({}), "ext://runtime-cache-opt-out");
 
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
 			expect(model.promptCache).toEqual({});
 			expect(getPromptCacheTtlMs(model, options)).toBeUndefined();
@@ -339,24 +334,36 @@ describe("ModelRegistry default custom models config", () => {
 				armed.warmer.cancel();
 			}
 			registry.clearSourceRegistrations("ext://runtime-cache-opt-out");
-			registry.registerProvider("amazon-bedrock", runtimeBedrockProvider(), "ext://runtime-cache-absent");
-			const catalogDefaultModel = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
-			expect(catalogDefaultModel.promptCache).toEqual({ short: 300, long: 3600 });
-			expect(getPromptCacheTtlMs(catalogDefaultModel, options)).toBe(300_000);
+			registry.registerProvider("github-copilot", runtimeCopilotProvider(), "ext://runtime-cache-absent");
+			const modelWithoutLifetime = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
+			expect(modelWithoutLifetime.promptCache).toBeUndefined();
+			expect(getPromptCacheTtlMs(modelWithoutLifetime, options)).toBeUndefined();
 		});
 
-		test("runtime API replacement drops a prior catalog lifetime when the new route has no cache policy", () => {
-			const registry = createPromptCacheRegistry("prompt-cache-runtime-route-replacement.yml", "providers: {}\n");
+		test("runtime API replacement drops a prior explicit lifetime when the new route has no cache policy", () => {
+			const registry = createPromptCacheRegistry(
+				"prompt-cache-runtime-route-replacement.yml",
+				[
+					"providers:",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
+					"    apiKey: TEST_KEY",
+					"    models:",
+					copilotModelDefinition({ short: 300, long: 3600 }),
+					"",
+				].join("\n"),
+			);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
-			const catalogModel = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
-			expect(getPromptCacheTtlMs(catalogModel, options)).toBe(300_000);
+			const configuredModel = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
+			expect(getPromptCacheTtlMs(configuredModel, options)).toBe(300_000);
 
 			registry.registerProvider(
-				"amazon-bedrock",
-				runtimeBedrockProvider(undefined, "openai-completions", "https://openai-compatible.example.com/v1"),
+				"github-copilot",
+				runtimeCopilotProvider(undefined, "openai-completions"),
 				"ext://runtime-cache-route-replacement",
 			);
-			const replacedModel = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const replacedModel = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 			expect(replacedModel.api).toBe("openai-completions");
 			expect(getPromptCacheTtlMs(replacedModel, options)).toBeUndefined();
 
@@ -373,25 +380,25 @@ describe("ModelRegistry default custom models config", () => {
 				"prompt-cache-override-precedence.yml",
 				[
 					"providers:",
-					"  amazon-bedrock:",
-					"    baseUrl: https://bedrock-runtime.us-east-1.amazonaws.com",
-					"    api: bedrock-converse-stream",
+					"  github-copilot:",
+					"    baseUrl: https://api.githubcopilot.com",
+					"    api: anthropic-messages",
 					"    apiKey: TEST_KEY",
 					"    modelOverrides:",
-					`      ${JSON.stringify(BEDROCK_OPUS_MODEL)}:`,
+					`      ${JSON.stringify(COPILOT_CACHE_MODEL)}:`,
 					"        promptCache:",
 					"          short: 120",
 					"    models:",
-					bedrockModelDefinition({ short: 90, long: 3600 }),
+					copilotModelDefinition({ short: 90, long: 3600 }),
 					"",
 				].join("\n"),
 			);
 			registry.registerProvider(
-				"amazon-bedrock",
-				runtimeBedrockProvider({ short: 180 }),
+				"github-copilot",
+				runtimeCopilotProvider({ short: 180 }),
 				"ext://runtime-cache-override",
 			);
-			const model = requireRegistryModel(registry, "amazon-bedrock", BEDROCK_OPUS_MODEL);
+			const model = requireRegistryModel(registry, "github-copilot", COPILOT_CACHE_MODEL);
 			const options: SimpleStreamOptions = { cacheRetention: "short" };
 
 			expect(model.promptCache).toEqual({ short: 120 });
@@ -430,17 +437,6 @@ interface ModelSnapshot {
 	name: string;
 	baseUrl: string | undefined;
 	imageInputDecoder?: "stb";
-	compat: {
-		promptCacheMode: string;
-		supportsLongPromptCacheRetention: boolean;
-		promptCacheMinimumTokens: number;
-		promptCacheMaximumCheckpoints: number;
-		supportsForcedToolChoice?: boolean;
-		streamIdleTimeoutMs?: number;
-		streamRevision?: "possible";
-		supportsSamplingParams?: boolean;
-		supportsThinkingBindingControls?: boolean;
-	};
 }
 
 function writeModelsYaml(file: "models.yml" | "models.yaml", fixture: ProviderFixture): void {
@@ -468,24 +464,6 @@ function writeModelsYaml(file: "models.yml" | "models.yaml", fixture: ProviderFi
 			"          cacheWrite: 0",
 			"        contextWindow: 100000",
 			"        maxTokens: 8000",
-			"",
-		].join("\n"),
-	);
-}
-
-function writeBedrockCacheOverride(): void {
-	fs.writeFileSync(
-		path.join(tempDir.path(), "models.yml"),
-		[
-			"providers:",
-			"  amazon-bedrock:",
-			"    modelOverrides:",
-			"      us.anthropic.claude-opus-4-8:",
-			"        compat:",
-			"          promptCacheMode: explicit",
-			"          supportsLongPromptCacheRetention: false",
-			"          promptCacheMinimumTokens: 1024",
-			"          promptCacheMaximumCheckpoints: 4",
 			"",
 		].join("\n"),
 	);
@@ -528,7 +506,6 @@ function loadDefaultRegistryModels(...lookups: ModelLookup[]): Array<ModelSnapsh
 			name: model.name,
 			baseUrl: model.baseUrl,
 			imageInputDecoder: model.imageInputDecoder,
-			compat: model.compat as ModelSnapshot["compat"],
 		};
 	});
 }
@@ -550,11 +527,11 @@ function requireRegistryModel(registry: ModelRegistry, provider: string, modelId
 	return model;
 }
 
-function bedrockModelDefinition(promptCache: { short: number; long?: number }): string {
+function copilotModelDefinition(promptCache: { short: number; long?: number }): string {
 	return [
-		`      - id: ${BEDROCK_OPUS_MODEL}`,
-		"        name: Configured Claude Opus cache fixture",
-		"        api: bedrock-converse-stream",
+		`      - id: ${COPILOT_CACHE_MODEL}`,
+		"        name: Configured Copilot cache fixture",
+		"        api: anthropic-messages",
 		"        reasoning: false",
 		"        input: [text]",
 		"        cost:",
@@ -566,17 +543,16 @@ function bedrockModelDefinition(promptCache: { short: number; long?: number }): 
 		`          short: ${promptCache.short}`,
 		...(promptCache.long === undefined ? [] : [`          long: ${promptCache.long}`]),
 		"        compat:",
-		"          promptCacheMode: explicit",
-		"          supportsLongPromptCacheRetention: true",
+		"          supportsLongCacheRetention: true",
 		"        contextWindow: 200000",
 		"        maxTokens: 8000",
 	].join("\n");
 }
 
-function runtimeBedrockProvider(
+function runtimeCopilotProvider(
 	promptCache?: Model["promptCache"],
-	api: NonNullable<ProviderConfigInput["api"]> = "bedrock-converse-stream",
-	baseUrl = "https://bedrock-runtime.us-east-1.amazonaws.com",
+	api: NonNullable<ProviderConfigInput["api"]> = "anthropic-messages",
+	baseUrl = "https://api.githubcopilot.com",
 ): ProviderConfigInput {
 	return {
 		baseUrl,
@@ -584,21 +560,18 @@ function runtimeBedrockProvider(
 		api,
 		models: [
 			{
-				id: BEDROCK_OPUS_MODEL,
-				name: "Runtime Claude Opus cache fixture",
+				id: COPILOT_CACHE_MODEL,
+				name: "Runtime Copilot cache fixture",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
 				contextWindow: 200000,
 				maxTokens: 8000,
 				...(promptCache !== undefined ? { promptCache } : {}),
-				...(api === "bedrock-converse-stream"
+				...(api === "anthropic-messages"
 					? {
 							compat: {
-								promptCacheMode: "explicit",
-								supportsLongPromptCacheRetention: true,
-								promptCacheMinimumTokens: 0,
-								promptCacheMaximumCheckpoints: 2,
+								supportsLongCacheRetention: true,
 							},
 						}
 					: {}),

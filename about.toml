@@ -3,7 +3,7 @@
 # addon.
 ignore-dev-dependencies = true
 
-# cargo-about 0.8.2 resolves OR expressions in this priority order. The
+# cargo-about 0.9.0 resolves OR expressions in this priority order. The
 # generated notice therefore chooses a permissive branch where one exists,
 # while cargo-deny's clarifications retain every AND obligation.
 accepted = [

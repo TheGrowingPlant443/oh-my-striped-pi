@@ -9,7 +9,7 @@ import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { Model } from "@oh-my-pi/pi-ai";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { toModelSpec } from "@oh-my-pi/pi-catalog/provider-models/bundled-references";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -30,8 +30,16 @@ describe("snapcompact archive sized by the compaction trigger", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-anthropic", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
+		// Auto-compaction only runs when the registry lists a usable model.
+		const registered = opus(1_000_000);
+		modelRegistry.registerProvider(registered.provider, {
+			api: registered.api,
+			apiKey: "test-key",
+			baseUrl: registered.baseUrl,
+			models: [{ ...registered, contextWindow: 1_000_000, maxTokens: 64_000 }],
+		});
 	});
 
 	afterEach(async () => {
@@ -44,9 +52,20 @@ describe("snapcompact archive sized by the compaction trigger", () => {
 	});
 
 	function opus(contextWindow: number): Model {
-		const bundled = getBundledModel("anthropic", "claude-opus-5-5");
-		if (!bundled) throw new Error("Expected bundled claude-opus-5-5");
-		return { ...bundled, contextWindow, maxTokens: 64_000 };
+		const spec: ModelSpec<"anthropic-messages"> = {
+			id: "claude-opus-5-5",
+			name: "Company Claude",
+			provider: "company-anthropic",
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid/v1",
+			reasoning: true,
+			input: ["text", "image"],
+			imageCountBudget: 100,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow,
+			maxTokens: 64_000,
+		};
+		return buildModel(spec);
 	}
 
 	/** A session whose discarded history needs `turns × ~2.6k` chars of archive. */
@@ -226,32 +245,10 @@ describe("snapcompact archive sized by the compaction trigger", () => {
 		);
 	});
 
-	it("lets a large trigger plan past 3 MB of frames on the official endpoint, but not through a proxy", async () => {
-		const official = opus(1_000_000);
-		const proxied = {
-			...buildModel({ ...toModelSpec(official), baseUrl: "https://anthropic-proxy.example" }),
-			maxTokens: 64_000,
-		};
-		const settings = { "compaction.thresholdTokens": 600_000 };
-		const officialFrames = await requestedFrames(official, settings);
-		const proxiedFrames = await requestedFrames(proxied, settings);
-
-		const shape = snapcompact.resolveShape(official);
-		expect(proxiedFrames).toBe(
-			snapcompact.maxFramesForDataBudget(shape, snapcompact.DEFAULT_FRAME_DATA_BYTES_BUDGET),
-		);
-		expect(officialFrames).toBeGreaterThan(proxiedFrames);
-		// The trigger, not the 12 MB frame share, decides the official count.
-		expect(officialFrames).toBeLessThan(
-			snapcompact.maxFramesForDataBudget(shape, snapcompact.frameDataBytesBudget(official)),
-		);
-		expect(officialFrames * framePrice(official)).toBeLessThanOrEqual(SHARE * 600_000);
-	});
-
 	it("sizes from the active model's compaction.modelThresholds entry", async () => {
 		const model = opus(1_000_000);
 		const perModel = await requestedFrames(model, {
-			"compaction.modelThresholds": { "anthropic/claude-opus-5-5": "f80000" },
+			"compaction.modelThresholds": { [`${model.provider}/${model.id}`]: "f80000" },
 		});
 		const global = await requestedFrames(model, { "compaction.thresholdTokens": 80_000 });
 		expect(perModel).toBe(global);
@@ -335,8 +332,7 @@ describe("snapcompact archive sized by the compaction trigger", () => {
 	});
 
 	it("follows the active model's trigger after a model switch", async () => {
-		const haiku = getBundledModel("anthropic", "claude-haiku-4-5");
-		if (!haiku) throw new Error("Expected bundled claude-haiku-4-5");
+		const haiku = buildModel({ ...toModelSpec(opus(200_000)), id: "claude-haiku-4-5" });
 		// 20% of each model's window: 200k on Opus 1M, 40k on Haiku 200k.
 		const { session } = createSession(opus(1_000_000), { "compaction.thresholdPercent": 20 });
 		const requested = stopAtRender();
@@ -358,9 +354,13 @@ describe("snapcompact archive sized by the compaction trigger", () => {
 
 	it("divides the room by a billing-verified frame price and keeps the ceiling for an unverified one", async () => {
 		const openai = (id: string): Model => {
-			const bundled = getBundledModel("openai", id);
-			if (!bundled) throw new Error(`Expected bundled openai/${id}`);
-			return { ...bundled, contextWindow: 1_000_000, maxTokens: 64_000 };
+			return buildModel({
+				...toModelSpec(opus(1_000_000)),
+				id,
+				provider: "company-responses",
+				api: "openai-responses",
+				baseUrl: "https://responses.company.invalid/v1",
+			});
 		};
 		// gpt-5.5's rule is billing-verified, gpt-5.4's is not; both bill a 1568px frame alike.
 		const verified = openai("gpt-5.5");

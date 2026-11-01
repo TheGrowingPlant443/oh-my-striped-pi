@@ -32,7 +32,6 @@ describe("read tool URL handling", () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
-		delete process.env.PARALLEL_API_KEY;
 		removeSyncWithRetries(testDir);
 	});
 
@@ -392,82 +391,11 @@ describe("read tool URL handling", () => {
 		expect(requestedUrls).not.toContain("https://example.com/llms.md");
 		void missingSystemPython;
 	});
-	it("prefers Parallel extract first when providers.fetch is set to parallel", async () => {
-		process.env.PARALLEL_API_KEY = "test-parallel-key";
-		const session = createSession({ "providers.fetch": "parallel" });
-		const tool = new ReadTool(session);
-		const pageUrl = "https://example.com/parallel-page";
-		session.fetch = asGlobalFetch(input => {
-			if (String(input) === "https://api.parallel.ai/v1beta/extract") {
-				return new Response(
-					JSON.stringify({
-						extract_id: "extract-fetch-1",
-						results: [
-							{
-								url: pageUrl,
-								title: "Parallel Page",
-								excerpts: [
-									"Parallel-rendered content that is comfortably longer than one hundred characters. ".repeat(
-										2,
-									),
-								],
-								full_content: null,
-							},
-						],
-						errors: [],
-						warnings: null,
-						usage: null,
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				);
-			}
-			return new Response("blocked", { status: 500, statusText: "Blocked" });
-		});
-		const pageHtml = "<html><body><main><h1>Parallel Page</h1></main></body></html>";
-		const ensureToolSpy = vi.spyOn(toolsManager, "ensureTool");
-		const htmlToMarkdownSpy = vi.spyOn(natives, "htmlToMarkdown");
-		vi.spyOn(scrapers, "loadPage").mockImplementation(async requestedUrl => {
-			if (requestedUrl === pageUrl) {
-				return {
-					ok: true,
-					status: 200,
-					contentType: "text/html",
-					finalUrl: pageUrl,
-					content: pageHtml,
-				};
-			}
-
-			if (requestedUrl === `${pageUrl}.md`) {
-				return {
-					ok: false,
-					status: 404,
-					contentType: "text/plain",
-					finalUrl: requestedUrl,
-					content: "",
-				};
-			}
-
-			return {
-				ok: false,
-				status: 404,
-				contentType: "text/plain",
-				finalUrl: requestedUrl,
-				content: "",
-			};
-		});
-
-		const result = await tool.execute("fetch-parallel-html", { path: pageUrl });
-		const textBlock = result.content.find(content => content.type === "text");
-
-		expect(result.details?.method).toBe("parallel");
-		expect(textBlock?.type).toBe("text");
-		expect(textBlock?.text).toContain("Parallel-rendered content");
-		expect(ensureToolSpy).not.toHaveBeenCalled();
-		expect(htmlToMarkdownSpy).not.toHaveBeenCalled();
-	});
 
 	it("prefers Firecrawl scrape first when providers.fetch is set to firecrawl", async () => {
 		const originalApiKey = process.env.FIRECRAWL_API_KEY;
+		const originalBaseUrl = process.env.FIRECRAWL_BASE_URL;
+		process.env.FIRECRAWL_BASE_URL = "http://firecrawl.internal";
 		process.env.FIRECRAWL_API_KEY = "test-firecrawl-key";
 		try {
 			const session = createSession({ "providers.fetch": "firecrawl" });
@@ -475,7 +403,7 @@ describe("read tool URL handling", () => {
 			const pageUrl = "https://example.com/firecrawl-page";
 			const requests: { url: string; authorization: string | null; body: unknown }[] = [];
 			session.fetch = asGlobalFetch(async (input, init) => {
-				if (String(input) === "https://api.firecrawl.dev/v2/scrape") {
+				if (String(input) === "http://firecrawl.internal/v2/scrape") {
 					requests.push({
 						url: String(input),
 						authorization: new Headers(init?.headers).get("authorization"),
@@ -532,6 +460,8 @@ describe("read tool URL handling", () => {
 			expect(ensureToolSpy).not.toHaveBeenCalled();
 			expect(htmlToMarkdownSpy).not.toHaveBeenCalled();
 		} finally {
+			if (originalBaseUrl === undefined) delete process.env.FIRECRAWL_BASE_URL;
+			else process.env.FIRECRAWL_BASE_URL = originalBaseUrl;
 			if (originalApiKey === undefined) delete process.env.FIRECRAWL_API_KEY;
 			else process.env.FIRECRAWL_API_KEY = originalApiKey;
 		}
@@ -539,6 +469,8 @@ describe("read tool URL handling", () => {
 
 	it("retries a retryable Firecrawl response before falling through", async () => {
 		const originalApiKey = process.env.FIRECRAWL_API_KEY;
+		const originalBaseUrl = process.env.FIRECRAWL_BASE_URL;
+		process.env.FIRECRAWL_BASE_URL = "http://firecrawl.internal";
 		process.env.FIRECRAWL_API_KEY = "test-firecrawl-key";
 		try {
 			const session = createSession({ "providers.fetch": "firecrawl" });
@@ -546,7 +478,7 @@ describe("read tool URL handling", () => {
 			const pageUrl = "https://example.com/firecrawl-retry";
 			let scrapeCalls = 0;
 			session.fetch = asGlobalFetch(async input => {
-				if (String(input) === "https://api.firecrawl.dev/v2/scrape") {
+				if (String(input) === "http://firecrawl.internal/v2/scrape") {
 					scrapeCalls++;
 					if (scrapeCalls === 1) {
 						return new Response(JSON.stringify({ error: "temporarily unavailable" }), { status: 503 });
@@ -593,6 +525,8 @@ describe("read tool URL handling", () => {
 			expect(result.details?.method).toBe("firecrawl");
 			expect(textBlock?.text).toContain("served on the retry attempt");
 		} finally {
+			if (originalBaseUrl === undefined) delete process.env.FIRECRAWL_BASE_URL;
+			else process.env.FIRECRAWL_BASE_URL = originalBaseUrl;
 			if (originalApiKey === undefined) delete process.env.FIRECRAWL_API_KEY;
 			else process.env.FIRECRAWL_API_KEY = originalApiKey;
 		}

@@ -84,7 +84,7 @@ This only controls the startup splash animation. It does not rerun setup or chan
 | boolean | `true`, `false`, `yes`, `no`, `on`, `off`, `1`, `0`  | Case-insensitive. Anything else is rejected.                                                         |
 | number  | Any finite JavaScript number                         | `Infinity`/`NaN` are rejected.                                                                       |
 | enum    | One of the key's allowed values, bare or JSON-quoted | Must match exactly; the error lists the valid values.                                                |
-| array   | A JSON array                                         | e.g. `'["anthropic","openai"]'`. Must parse and be an array.                                         |
+| array | A JSON array | e.g. `'["github-copilot"]'`. Must parse and be an array. |
 | record  | A JSON object                                        | e.g. `'{"bash":"prompt"}'`. Must parse and be a non-array object.                                    |
 | string  | Bare text or a JSON-quoted string                    | Bare text is trimmed; JSON string contents are decoded. Multi-word arguments are joined with spaces. |
 
@@ -151,7 +151,6 @@ Environment variables are never written back to `config.yml`. Variables declared
 | `PI_EDIT_FUZZY`                                     | `edit.fuzzyMatch`                                 | Exact lowercase `1`/`true` enables; `0`/`false` disables; other text defers to config.            |
 | `PI_EDIT_FUZZY_THRESHOLD`                           | `edit.fuzzyThreshold`                             | Parsed floating-point threshold from 0–1; invalid/out-of-range values are unset.                  |
 | `PI_INTENT_TRACING`                                 | `tools.intentTracing`                             | Uses the boolean env parser.                                                                      |
-| `PI_AUTO_QA`                                        | `dev.autoqa`                                      | Enables/disables automated tool issue reporting, subject to saved consent.                        |
 | `PI_NO_THINKING_LOOP_GUARD`                         | `model.loopGuard.enabled`                         | Only `1` disables; other values do not override the setting.                                      |
 | `SEARXNG_ENDPOINT` / `SEARXNG_TOKEN`                | `searxng.endpoint` / `searxng.token`              | Fallbacks when the setting is absent, null, or blank.                                             |
 | `SEARXNG_BASIC_USERNAME` / `SEARXNG_BASIC_PASSWORD` | `searxng.basicUsername` / `searxng.basicPassword` | Fallbacks only when absent or null; configured empty strings remain valid credentials.            |
@@ -241,16 +240,14 @@ tools:
       bash: prompt
       read: allow
 disabledProviders:
-   - anthropic
-   - openai
-   - google
+   - github-copilot
 
 # <repo>/.omp/config.yml
 tools:
    approval:
       bash: allow
 disabledProviders:
-   - groq
+   - claude
 ```
 
 Effective settings inside `<repo>`:
@@ -262,7 +259,7 @@ tools:
       bash: allow # overridden by project
       read: allow # kept from global
 disabledProviders:
-   - groq # project array REPLACES the global array
+   - claude # project array REPLACES the global array
 ```
 
 Array replacement is the most common surprise: the project's `disabledProviders` does not extend the global list — it becomes the entire list for that project. The same applies to `enabledModels`, `cycleOrder`, `extensions`, and every other array-typed setting.
@@ -274,9 +271,9 @@ Create `<repo>/.omp/config.yml` when a repository needs its own settings:
 ```yaml
 # <repo>/.omp/config.yml
 modelRoles:
-   default: anthropic/claude-sonnet-4-5
-   smol: openai/gpt-4.1-mini
-   slow: anthropic/claude-opus-4-5:high
+   default: github-copilot/gpt-4.1
+   smol: local/lfm2.5-230m
+   slow: github-copilot/gpt-4.1:high
 
 tools:
    approvalMode: write
@@ -314,19 +311,18 @@ Three array settings — `enabledModels`, `enabledProviders`, and `disabledProvi
 
 ```yaml
 enabledModels:
-   - claude-sonnet-4-5 # applies everywhere
+   - github-copilot/gpt-4.1 # applies everywhere
    - path: ~/work/high-context
      models:
-        - anthropic/claude-opus-4-5
+        - local/lfm2.5-230m
 
 disabledProviders:
-   - ollama # applies everywhere
+   - claude # discovery source; applies everywhere
    - paths:
         - ~/projects/sensitive
         - ~/clients/acme
      providers:
-        - anthropic
-        - openai
+        - github-copilot
 ```
 
 Bare string entries apply everywhere. A scoped entry applies when the current working directory **is** the configured path or is **under** it. `~` expands to your home directory and relative paths are resolved before matching.
@@ -350,22 +346,21 @@ Project roots remain enabled. Native OMP and `.agents` roots—including native 
 
 | Entry kind        | Example ids                                                                        | Effect                                                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model providers   | `anthropic`, `openai`, `google`, `groq`, `ollama`, `openrouter`                    | Removes those backends from model selection, even when credentials are available. See [Providers](./providers.md).                                             |
+| Model providers | `local`, `github-copilot` | Removes those backends from model selection. See [Providers](./providers.md). |
 | Discovery sources | `native`, `claude`, `codex`, `gemini`, `github`, `opencode`, `cursor`, `agents-md` | Stops that source from contributing context files, MCP servers, commands, skills, hooks, tools, prompts, or settings. See [Context files](./context-files.md). |
 
-Most provider-control use cases list model provider ids. Disabling the `claude` discovery source is different from disabling the `anthropic` model provider — one stops Claude-format config discovery, the other stops the Anthropic model backend.
+Model provider IDs and discovery-source IDs are distinct: disabling `claude` stops Claude-format configuration discovery, not a model transport. `/providers` exposes retained Copilot/self-hosted login integrations; on-device availability and configured company models are separate from foreign configuration discovery.
 
 Because arrays replace rather than append, a project that sets `disabledProviders` must list the complete desired set:
 
 ```yaml
 # ~/.omp/agent/config.yml
 disabledProviders:
-   - anthropic
-   - openai
+   - github-copilot
 
-# <repo>/.omp/config.yml — inside this repo ONLY groq is disabled
+# <repo>/.omp/config.yml — inside this repo ONLY claude discovery is disabled
 disabledProviders:
-   - groq
+   - claude
 ```
 
 The default is an empty array (nothing disabled). For the two subsystems' provider ids and ordering, see [Providers](./providers.md) and [Context files](./context-files.md).
@@ -391,38 +386,34 @@ The catalog below highlights common settings; it is not the complete schema. `om
 
 ```yaml
 modelRoles:
-   default: anthropic/claude-sonnet-4-5
-   smol: openai/gpt-4.1-mini
-   slow: anthropic/claude-opus-4-5:high
-   vision: google/gemini-3.1-pro-preview
-   plan: anthropic/claude-opus-4-5
-   advisor: anthropic/claude-sonnet-4-5:medium
+   default: github-copilot/gpt-4.1
+   smol: local/lfm2.5-230m
+   slow: github-copilot/gpt-4.1:high
+   vision: github-copilot/gpt-4.1
+   plan: github-copilot/gpt-4.1
+   advisor: github-copilot/gpt-4.1
 
    # Lightweight chat/tiny workloads
    tiny: local/lfm2.5-230m
    memory: local/lfm2-1.2b
 
    # Model-kind workloads
-   image: openai/gpt-image-2
-   web: web/duckduckgo
+   web: web/searxng
    speech: local/kokoro
    dictation: local/parakeet-tdt-0.6b-v3
-   judge: typesafe/jev-1.14.0
+   judge: local/lfm2.5-230m
 
 retry:
    fallbackChains:
       tiny: [] # explicit empty chain: do not fall back
       memory:
-         - openai/gpt-4.1-mini
+         - local/lfm2.5-230m
       web:
-         - web/parallel
-         - web/perplexity
-         - web/exa
+         - web/searxng
          - web/firecrawl
       speech: []
       dictation: []
       judge:
-         - typesafe/jev-preview
          - "@tiny"
          - "@smol"
          - "@default"
@@ -433,24 +424,23 @@ cycleOrder:
    - slow
 
 modelProviderOrder:
-   - anthropic
-   - openai
+   - github-copilot
+   - local
 
 enabledModels:
-   - claude-sonnet-4-5
+   - github-copilot/gpt-4.1
 ```
 
-Built-in chat roles are `default`, `smol`, `slow`, `vision`, `plan`, `commit`, `tiny`, `memory`, `task`, `advisor`, and `widget`. The `tiny` and `memory` roles accept both `tiny` catalog models and ordinary chat models. `widget` writes the spec behind each background job's live widget and resolves like `smol` until assigned. Built-in model-kind roles are `image`, `web`, `speech`, `dictation`, and `judge`; they select image, search/grounded-chat, TTS, STT, and judgment runners respectively. `judge` also accepts tiny and chat models, which is why aliases such as `@tiny` are valid fallbacks. Catalog kinds are `chat`, `tiny`, `image`, `tts`, `stt`, `search`, and `judge`; a custom model with no `kind` remains a chat model.
+Built-in chat roles include `default`, `smol`, `slow`, `vision`, `plan`, `commit`, `tiny`, `memory`, `task`, `advisor`, and `widget`. Local tiny models support auxiliary workloads; `widget` resolves like `smol` until assigned. Model-kind roles are `web`, `image`, `speech`, `dictation`, and `judge`: configured private search, image generation, local/private speech and judgments. Public SaaS model-grounded search is removed; generic company-endpoint protocols remain.
 
-Open `/model` and enter the **Roles** view to assign roles and edit their fallback rows. Chat roles and model-kind roles appear in separate capability sections, and the picker filters assignments to models accepted by the selected role. List the same catalog directly with `omp models --kind chat`, `omp models --kind tiny`, `omp models --kind image`, `omp models --kind tts`, `omp models --kind stt`, `omp models --kind search`, or `omp models --kind judge`; use `--kind all` for everything.
+Open `/model` and enter **Roles** to assign models and fallback rows. `omp models --kind all` lists the retained catalog.
 
-For a role, `modelRoles.<role>` is the primary and `retry.fallbackChains.<role>` is the fallback list. For model-kind roles, an unset chain uses that role's built-in priority list; `[]` explicitly means **no fallbacks**. The `retry.fallbackChains.default` chain is for chat-role/session fallback and never replaces a model-kind role's own chain. Explicit search entries such as `web/parallel`, `web/perplexity`, `web/exa`, and `web/firecrawl` are attempted as configured candidates, including their supported anonymous modes; missing required credentials still produce an availability error for that explicit entry.
+For a role, `modelRoles.<role>` is the primary and `retry.fallbackChains.<role>` is its fallback list. An unset model-kind chain uses that role's built-in priority list; `[]` means **no fallbacks**. Search selectors `web/searxng` and `web/firecrawl` require configured endpoints; neither falls back to a public service.
 
-For one-shot searches, `omp search`, `omp q`, and `omp web-search` accept a catalog selector through `--model`, for example `omp web-search --model web/duckduckgo "current Bun release"`. The in-session `web_search` tool has no per-call model override: it follows `modelRoles.web` and `retry.fallbackChains.web`.
+For one-shot searches, `omp search`, `omp q`, and `omp web-search` accept a selector through `--model`, for example `omp web-search --model web/searxng "current Bun release"`. The in-session `web_search` tool follows `modelRoles.web` and `retry.fallbackChains.web`, without a per-call model override.
 
-Image selection likewise uses full catalog model selectors, not provider names: set `modelRoles.image`, its fallback chain, or the `generate_image` request's optional `model`. OpenRouter image models run through OpenRouter's native images API.
 
-Existing configs are migrated automatically when loaded. Retired backend selectors under `providers` (`webSearch`, `webSearchOrder`, `webSearchExclude`, `webSearchGeminiModel`, `image`, `imageOrder`, `tts`, `judgmentProvider`, `autoThinkingModel`, `unexpectedStopModel`, `tinyModel`, and `memoryModel`) are translated where applicable into `modelRoles` and `retry.fallbackChains`, then removed. The retired `tts.localModel` key is removed (Kokoro is the canonical local TTS model), and `stt.modelName` values are migrated to a canonical `modelRoles.dictation` selector before removal. Other service controls—devices, dtypes, voices, timeouts, and `live.*` behavior—remain ordinary settings.
+Retired backend selectors are migrated where applicable into roles and fallback chains. Removed feature settings do not re-enable deleted backends. Local TTS uses Kokoro; device, dtype, voice and timeout controls remain ordinary settings.
 
 | Key                    | Type    | Default                     | Notes                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------- | ------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -499,7 +489,7 @@ thinkingBudgets:
    max: 32768
 ```
 
-`thinkingBudgets.<level>` overrides the token budget for the selected thinking level on transports that accept a reasoning token budget (including Anthropic, Google/Gemini, Bedrock Claude, GitLab Duo's Anthropic path, the Anthropic shim, the auth gateway, and budget-mode `cline-pass`). It does not control effort-based OpenAI-compatible requests: `openai-completions` providers such as local llama.cpp and Ollama use their own thinking/effort controls instead, so changing these budgets has no effect on their request bodies. Use `defaultThinkingLevel` or `--thinking` to select an available effort level for those models.
+`thinkingBudgets.<level>` controls a token budget only on retained transports that support it. Effort-based models use their own reasoning controls; choose a level with `defaultThinkingLevel` or `--thinking`.
 
 | Key                               | Type    | Default | Values                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -525,10 +515,7 @@ For the numeric sampling settings, a negative value (normally `-1`) means "use t
 | `minP`                           | number | `-1`      | Minimum-probability cutoff.                                                                                                                                                                                                                                                                                                                                                                               |
 | `presencePenalty`                | number | `-1`      | Presence penalty.                                                                                                                                                                                                                                                                                                                                                                                         |
 | `repetitionPenalty`              | number | `-1`      | Repetition penalty.                                                                                                                                                                                                                                                                                                                                                                                       |
-| `textVerbosity`                  | enum   | `medium`  | `low`, `medium`, `high`. Sent by OpenAI Responses; Codex forwards it only when explicitly configured, otherwise leaving its model/provider default.                                                                                                                                                                                                                                                       |
-| `tier.openai`                    | enum   | `none`    | `none`, `auto`, `default`, `flex`, `scale`, `priority`, `ultrafast`. Sent as `service_tier` for OpenAI / OpenAI-Codex and OpenAI-family OpenRouter models. `ultrafast` is sent only to the OpenAI API and to Codex models whose discovery advertises it (`/fast ultra`). Launch with `--service-tier <value>` for a one-session OpenAI override; the flag is not persisted (`none` omits `service_tier`). |
-| `tier.anthropic`                 | enum   | `none`    | `none`, `priority`. `priority` realizes fast mode on supported direct Claude models (ignored on Bedrock/Vertex and via OpenRouter).                                                                                                                                                                                                                                                                       |
-| `tier.google`                    | enum   | `none`    | `none`, `flex`, `priority`. Gemini API sends it in the body; Vertex sends `priority` via header (`flex` is a no-op on Vertex).                                                                                                                                                                                                                                                                            |
+| `textVerbosity` | enum | `medium` | `low`, `medium`, `high`; used only when supported by the selected model. |
 | `tier.subagent`                  | enum   | `inherit` | `inherit`, `none`, `auto`, `default`, `flex`, `scale`, `priority`, `ultrafast`. Applied to the spawned model's family; `inherit` tracks the main agent.                                                                                                                                                                                                                                                   |
 | `task.agentServiceTierOverrides` | record | `{}`      | Sparse exact-name overrides for agents spawned by task/eval dispatch (Vibe workers keep `tier.subagent`). Values: `inherit`, `none`, `auto`, `default`, `flex`, `scale`, `priority`, `ultrafast`. An entry overrides `tier.subagent`; concrete values apply only when supported by the resolved model's provider family. A non-mapping value fails settings load.                                         |
 | `tier.advisor`                   | enum   | `none`    | `inherit`, `none`, `auto`, `default`, `flex`, `scale`, `priority`, `ultrafast`. Applied to the advisor model's family.                                                                                                                                                                                                                                                                                    |
@@ -549,33 +536,16 @@ retry:
       # Chat roles without their own chain may inherit "default". Model-kind
       # roles use their own built-in defaults instead.
       default:
-         - anthropic/claude-opus-4-5
-         - openai/gpt-5.5
-         - google/gemini-3-pro
-      # Per-role chains override inherited or built-in fallbacks. An explicit
-      # [] disables fallback for that role. Chat selectors accept an optional
-      # thinking suffix, e.g. openai/gpt-5.5:low.
+         - github-copilot/gpt-4.1
+      # [] disables fallback for a role.
       smol:
-         - openai/gpt-5.5-mini
-         - anthropic/claude-haiku-4-5
+         - local/lfm2.5-230m
       web: []
       # Model-selector keys (any key containing "/") attach the chain to the
       # model itself: it applies whenever that model is active, no matter
       # which role it is assigned to, and survives role reassignment.
-      google/gemini-3-pro:
-         - google-vertex/gemini-3-pro
-      # A `provider/*` KEY covers every model of a provider — current or
-      # future. A `provider/*` ENTRY keeps the failing model's id and swaps
-      # the provider: google-antigravity/x -> google/x -> google-vertex/x.
-      # Ids missing on the target provider are skipped (near-miss ids resolve
-      # fuzzily); exact model keys override the wildcard for a specific model.
-      google-antigravity/*:
-         - google/*
-         - google-vertex/*
-
-providers:
-   anthropic:
-      serverSideFallback: false
+      github-copilot/gpt-4.1:
+         - local/lfm2.5-230m
 ```
 
 | Key                                      | Type    | Default           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -593,7 +563,6 @@ providers:
 | `retry.usageAwareFallback`               | boolean | `false`           | Before a turn, use reliable coding-plan quota reports to prefer healthy same-provider accounts and then configured fallback models. Unknown usage keeps the current model; ordinary API keys are excluded.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `retry.usageReservePct`                  | number  | `10`              | Remaining quota percentage protected by usage-aware fallback.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `retry.usageReservePolicy`               | enum    | `confirm`         | `confirm`, `auto`, `fail-closed`. At reserve, `confirm` asks when an interactive confirmer is available and otherwise auto-falls back; exhausted quota can fall back without confirmation. `fail-closed` blocks known reserve/depleted quota rather than spending it.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `providers.anthropic.serverSideFallback` | boolean | `false`           | Opt in to Anthropic's `server-side-fallback-2026-06-01` beta for eligible direct Claude Fable/Mythos requests. The catalog-owned server-side chain currently targets `claude-opus-5`, not `claude-opus-5-5`; unsupported models and hosts have no chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 When the active chat model keeps failing (429s, quota walls, provider outages) and `retry.modelFallback` is on, the session picks the chain that owns the failing model, by specificity: an exact `provider/model-id` key, then a `provider/*` wildcard, then the current role's chain, then `default` — which also owns a live model that belongs to no role (`/model` switch, ephemeral hop). The effective chain is the owning role's primary followed by its configured entries, and a live selector that appears nowhere in it is offered the whole chain. If several roles assign the same model, yaml key order does not decide: the live session role wins, and `default` wins over other matching chat roles when the session is not on those roles. It skips chat candidates whose selectors are still cooling down and switches for the rest of the turn. Model-kind runners resolve their named role chain separately and never consume `default`. Subagents get their own per-spawn chains when their agent definition lists multiple model patterns — the first resolvable pattern is primary and the rest become its fallbacks; there is no `agent:<name>` key in `fallbackChains`. A subagent spawned on a single model inherits its role's chain (`@reviewer` → `fallbackChains.reviewer`), or `default`'s when the role has none; an explicit `[]` gives it no fallbacks even when `default` is assigned the same model. Exact-model and `provider/*` keys still take precedence over that inherited chain.
 
@@ -640,7 +609,9 @@ tools:
 
 Mounting still follows the session's explicit tool allow-list. A session that permits `read` but omits `write` can receive a device-only write transport; this does not grant filesystem writes.
 
-Individual built-in tools and Eval preludes are toggled by their own keys, e.g. `bash.enabled`, `launch.enabled`, `eval.py`, `eval.js`, `glob.enabled`, `grep.enabled`, `fetch.enabled`, `browser.enabled`, `computer.enabled`, `ratchet.enabled` (default `false`; the `ratchet(flow)` eval/hillclimb prelude, which `/ratchet` turns on for the current session only), `archive.enabled` (default `true`; the read-only `archive` eval prelude over prompt history, recent projects, past sessions, and recaps), `astEdit.enabled`, `astGrep.enabled`, `find.enabled` (`auto`/`on`/`off`; `auto` enables `find` only when the `judge` role resolves to a native TypeSafe jev model), and `web_search.enabled`. Image questions use `read <image>?q=<question>` and honor `images.questionTimeoutMs`.
+Individual built-in tools and Eval preludes are toggled by their own keys, e.g. `bash.enabled`, `launch.enabled`, `eval.py`, `eval.js`, `glob.enabled`, `grep.enabled`, `fetch.enabled`, `browser.enabled`, `computer.enabled`, `ratchet.enabled` (default `false`; the `ratchet(flow)` eval/hillclimb prelude, which `/ratchet` turns on for the current session only), `archive.enabled` (default `true`; the read-only `archive` eval prelude over prompt history, recent projects, past sessions, and recaps), `astEdit.enabled`, `astGrep.enabled`, `find.enabled` (`auto`/`on`/`off`; `auto` requires the `judge` role to resolve first to a configured native judgment backend), and `web_search.enabled`. Image questions use `read <image>?q=<question>` and honor `images.questionTimeoutMs`.
+
+`generate_image.enabled` and `speechgen.enabled` expose the optional image/speech tools. Image generation needs an explicitly configured compatible endpoint; speech can use the on-device worker or a configured private service.
 
 ### Window-scoped computer use
 
@@ -889,7 +860,7 @@ tui:
 | `images.autoResize`           | boolean | `true`           | Resize large images for model compatibility.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `images.blockImages`          | boolean | `false`          | Never send images to providers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `tui.hyperlinks`              | enum    | `auto`           | `off`, `auto`, `always`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `tui.autoGraph`               | enum    | `auto`           | Chart numeric tables in the agent's answers, in the theme's colors, on terminals that show graphics: `always` uses the built-in best guess, `smart` lets the judge model refine each chart (kind, columns, row names and grouping, scales and reference row, which way each measure is better, the focus row, and the title, or no chart at all) for every table the guess would chart, `auto` is `smart` while the judge role resolves to a native TypeSafe jev model and `always` otherwise, `off` leaves tables alone. Tern receives the chart as SVG. Applies to the main session in the TUI only: subagent transcripts, print, RPC, and ACP output stay plain, and their system prompts omit the diagram and chart guidance. |
+| `tui.autoGraph`               | enum    | `auto`           | Chart numeric tables in the agent's answers, in the theme's colors, on terminals that show graphics: `always` uses the built-in best guess, `smart` lets the judge model refine each chart (kind, columns, row names and grouping, scales and reference row, which way each measure is better, the focus row, and the title, or no chart at all) for every table the guess would chart, `auto` is `smart` while the judge role resolves first to a configured native judgment backend and `always` otherwise, `off` leaves tables alone. Tern receives the chart as SVG. Applies to the main session in the TUI only: subagent transcripts, print, RPC, and ACP output stay plain, and their system prompts omit the diagram and chart guidance. |
 | `tui.mouse`                   | boolean | `false`          | Capture mouse clicks in the main session so live subagent cards and HUD rows focus on click, with a hover highlight on the target, and clicks on [extension-owned links](./extensions.md#extension-link-schemes) reach their extension (`app.links.hint` picks them without the mouse). Native text selection becomes Shift+drag and wheel scroll becomes Shift+wheel while on.                                                                                                                                                                                                                                           |
 | `display.pinnedAgents`        | enum    | `collapsed`      | Pinned live-agent jump list above the editor: `off` hides it, `collapsed` shows a few rows with an expander, `full` lists all.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `display.subagentLivePreview` | boolean | `false`          | Show each pinned subagent's current (or most recent) tool call beneath its jump-list row.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -927,7 +898,7 @@ The `cost` segment shows recorded session costs. For an active provider/model wi
 
 ### Providers and services
 
-Model/backend ordering for image generation, web search, speech, dictation, and judgments is configured through the corresponding `modelRoles` and `retry.fallbackChains` entries in [Models](#models). This section contains transport and service behavior that remains independent of model selection.
+Independent web search, local speech/dictation and judgments use the corresponding roles and fallback chains in [Models](#models). Transport and service behavior remains independent of model selection.
 
 ```yaml
 providers:
@@ -935,13 +906,9 @@ providers:
    webSearchTimeoutSeconds: 60
    tinyModelDevice: default
    tinyModelDtype: default
-   openaiWebsockets: auto
-   openaiLiveSteering: false
-   openrouterVariant: default
-   kimiApiFormat: auto
    cacheRetention: auto
    maxInFlightRequests:
-      anthropic: 2
+      github-copilot: 2
 
 provider:
    appendOnlyContext: auto # auto, on, off
@@ -979,19 +946,14 @@ searxng:
 | `tts.localVoice`                           | enum    | `af_heart` | Voice used by the local Kokoro TTS runner. Available local voices remain configurable independently of `modelRoles.speech`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `tts.localSpeed`                           | number  | `1`        | Speaking rate of the local Kokoro TTS runner (`tts` tool, `omp say`). `1` is normal; values are clamped to `0.5`–`2.5`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `speech.voice`                             | enum    | `af_heart` | Kokoro voice used when assistant-output vocalization is enabled.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `speech.speed`                             | number  | `1`        | Speaking rate for assistant-output vocalization. `1` is normal; values are clamped to `0.5`–`2.5`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `stt.enabled`                              | boolean | `false`    | Enable microphone speech-to-text; choose the recognition model with `modelRoles.dictation`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `stt.language`                             | string  | `en`       | Source language hint for speech-to-text.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `stt.submitTrigger`                        | enum    | `never`    | When completed dictation auto-submits: `never`, `release`, `release-complete`, or `say-submit`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `providers.openaiWebsockets`               | enum    | `auto`     | `auto`, `off`, `on`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `providers.streamFirstEventTimeoutSeconds` | number  | `-1`       | First stream-event watchdog: `-1` uses provider/env defaults, `0` disables, positive values set seconds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `providers.streamIdleTimeoutSeconds`       | number  | `-1`       | Maximum silence between stream events, with the same `-1`/`0` conventions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `providers.anthropic.slowMode`             | enum    | `off`      | `off`, `auto`. Anthropic subscription low-priority recovery when a 5-hour limit is reached and the lane is offered; `/slow on` enables it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `providers.openaiLiveSteering`             | boolean | `false`    | Deliver messages typed while a GPT-6 response streams into that response (`response.steer` over the Codex WebSocket) instead of waiting for the next tool boundary. Off by default; the Codex native turn lane can reject mid-response messages (`unsupported_native_inflight_message`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `providers.openrouterVariant`              | enum    | `default`  | `default`, `nitro`, `floor`, `online`, `exacto`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `providers.kimiApiFormat`                  | enum    | `auto`     | `auto`, `openai`, `anthropic`. `auto` follows live model metadata.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `providers.cacheRetention`                 | enum    | `auto`     | `auto`, `short`, `long`, `none`. Prompt-cache retention forwarded to providers that support it. `auto` keeps provider defaults (Anthropic: 1h entries on OAuth subscriber sessions, 5m entries on API keys) and honors `PI_CACHE_RETENTION`; `short` forces 5m; `long` uses 1h TTLs where supported; `none` disables prompt caching and cache-affinity routing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `providers.cacheWarming`                   | enum    | `idle`     | `off`, `streaming`, `idle`. Prompt-cache warming replays the last request shortly before its cache entry expires with a one-token output budget: Anthropic Messages stops at its first generated output; Converse completes a one-total-token request to consume terminal cache usage. Warming runs only when the expected avoided-miss cost exceeds the refresh cost by at least $0.05. A refresh that misses the cache or fails ends warming until the next real request. `off` disables warming; `streaming` protects prefixes during long tool executions and stops when the agent settles; `idle` also refreshes between runs (15% continuation probability) until 30 minutes after the last real request, so it covers only cache lifetimes shorter than that window (Anthropic and AWS Claude 5m entries, not 1h entries such as OAuth subscriber sessions). Warming follows the lifetime of the retention tier actually used; `providers.cacheRetention: none` suppresses warming. Models without a declared lifetime for the retention tier used (see [Models](./models.md)) are never warmed. |
+| `speech.speed` | number | `1` | Speaking rate, clamped to `0.5`–`2.5`. |
+| `stt.submitTrigger` | enum | `never` | `never`, `release`, `release-complete`, `say-submit`. |
+| `providers.streamFirstEventTimeoutSeconds` | number | `-1` | `-1` uses provider defaults, `0` disables, positive values set seconds. |
+| `providers.streamIdleTimeoutSeconds` | number | `-1` | Same timeout conventions, for stream silence. |
+| `providers.cacheRetention` | enum | `auto` | `auto`, `short`, `long`, `none`; applies only where the retained transport supports it. |
+| `providers.cacheWarming` | enum | `idle` | `off`, `streaming`, `idle`; applies only to models with supported cache lifetimes. |
 | `provider.appendOnlyContext`               | enum    | `auto`     | `auto`, `on`, `off`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `exa.enabled`                              | boolean | `true`     | Enable the Exa web search provider.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `exa.searchDelayMs`                        | number  | `1000`     | Minimum delay between Exa web search requests in milliseconds; set `0` to disable pacing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -999,22 +961,11 @@ searxng:
 | `searxng.token`                            | string  | _(unset)_  | SearXNG token; also `searxng.basicUsername`/`searxng.basicPassword`/`searxng.categories`/`searxng.language`/`searxng.engines` (comma-separated engine names or bang shortcuts, e.g. `ddg, br, startpage`, sent as the API's `engines=` parameter)/`searxng.safesearch`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `auth.broker.url`                          | string  | _(unset)_  | Auth-broker URL. The actual credential connection uses env then the main global config, not project/config-overlay values.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `auth.broker.token`                        | string  | _(unset)_  | Auth-broker token. `OMP_AUTH_BROKER_TOKEN` wins over the main global config; the broker token file is a fallback. Project/config-overlay values do not redirect credentials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `task.agentAccountPools`                   | record  | `{}`       | Exact-name task/eval agent → provider id → OAuth identity keys (the `identityKey` values of [client account pools](./auth-broker-gateway.md#client-account-pools-routing-not-authorization), e.g. `email:<address>\|org:<id>` for Anthropic; `omp usage accounts` lists them). The agent authenticates for each listed provider only with those accounts, never another account or an API key, and fails when none can serve; an empty list allows no account. A malformed entry fails settings load. See [Task agent discovery](./task-agent-discovery.md#model-and-structured-output-precedence).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `task.agentAccountPools` | record | `{}` | Exact-name task/eval agent → retained provider id → OAuth identity keys. `omp usage accounts` lists identities without tokens. Invalid mappings fail settings load. |
 | `secrets.enabled`                          | boolean | `false`    | Enable configured secret obfuscation and built-in credential-shaped token redaction before provider requests. See [Secret obfuscation](./secrets.md).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Provider credentials and custom model definitions are configured separately — see [Providers](./providers.md) and [Models](./models.md).
 
-#### Saved reset auto-consumption
-
-`codexResets.autoRedeem` and `claudeResets.autoRedeem` independently control saved-reset consumption: `yes` enables automatic spending, `no` disables it, and `unset` requires consent before the first spend. A session with no prompt UI to ask (such as `omp -p`) spends a reset under `unset` only when that reset expires within 5 minutes and would otherwise be lost; everything else waits for consent, with a notice pointing at `/usage reset`.
-
-When a usage refresh detects an eligible banked reset expiring within the next **5 minutes**, auto-consumption attempts it even with little or no usage, a credit reserve, or `salvageHorizonHours: 0`. Provider eligibility, covered-limit requirements, cooldowns, and duplicate-spend protections still apply.
-
-`salvageHorizonHours` controls earlier, usage-based salvage; setting it to `0` leaves the five-minute last-chance rule active. Set the provider's `autoRedeem` to `no` to disable all automatic spending.
-
-To spend one by hand, use `/usage reset` in a session or `omp usage reset` from a shell, which needs no session or TTY and works from an auth-broker client: without arguments it lists each account's saved resets by `<provider>/<credential id>`, and with one it spends a single reset on that account.
-
-`omp usage` and the active account's status-line usage segment flag banked resets expiring within **7 days** when the account's fullest window they restore is at least 25% used. Within **24 hours**, `omp usage` opens with a banner per account: whether the sweep above spends the reset or asks first (only while an interactive omp session is open), or that it will not, and the `/usage reset` target that spends it now when the provider allows. In a reset's final 6 hours, the interactive TUI shows a one-line warning about it once, across every conversation and omp window (`agent.db` records which resets were announced).
 
 ### Cost limits
 
@@ -1030,10 +981,10 @@ Both are unset by default and accept positive USD amounts; `--warn-cost` and `--
 
 Every schema path not individually tabulated in this catalog is explicitly deferred to `omp config list`. Additional groups include:
 
-- Agent behavior and safety: `ask.*`, `dev.*`, `eval.*`, `features.*`, `goal.*`, `loop.*`, `model.loopGuard.*`, `model.toolCallLoopGuard.*`, `prewalk.*`, `recap.*`, `sharpshooter.*`, `task.*`, `tools.*`, and `vault.*`.
-- Execution and content: `commit.*`, `completion.*`, `edit.*`, `error.*`, `extensionHandlers.*`, `generate_image.*`, `git.*`, `images.*`, `live.*`, `paste.*`, `power.*`, `read.*`, `shellMinimizer.*`, `speech.*`, `terminal.*`, and `title.*`.
-- Interface and startup: `composer.*`, `display.*`, `extensionRenderers.*`, `input.*`, `marketplace.*`, `spelling.*`, `statusLine.*`, `startup.*`, `stt.*`, `tui.*`, `ttsr.*`, and `update.*`. `extensionRenderers.assistantText` (default `false`) enables [assistant text renderers](./extensions.md#assistant-text-renderer) and [extension link schemes](./extensions.md#extension-link-schemes).
-- Discovery, sharing, and auth: `auth.*`, `browser.*`, `claudeResets.*`, `codexResets.*`, `collab.*`, `commands.*`, `contextFiles.*`, `gc.*`, `ida.*`, `mcp.*`, `share.*`, `skills.*`, `stream.*`, and `telemetry.*`. `contextFiles.extra` is documented in [Context files](./context-files.md#extra-filenames).
+- Agent behavior and safety: `ask.*`, `eval.*`, `features.*`, `goal.*`, `loop.*`, `model.loopGuard.*`, `model.toolCallLoopGuard.*`, `prewalk.*`, `recap.*`, `task.*`, `tools.*`, and `vault.*`.
+- Execution and content: `commit.*`, `completion.*`, `edit.*`, `error.*`, `git.*`, `images.*`, `paste.*`, `power.*`, `read.*`, `shellMinimizer.*`, `speech.*`, `terminal.*`, and `title.*`. Image viewing, questions and explicitly configured image generation remain; independent URL publication does not.
+- Interface and startup: `composer.*`, `display.*`, `extensionRenderers.*`, `input.*`, `marketplace.*`, `spelling.*`, `statusLine.*`, `startup.*`, `stt.*`, `tui.*`, `ttsr.*`, and `update.*`.
+- Discovery, telemetry, and auth: `auth.*`, `browser.*`, `commands.*`, `contextFiles.*`, `gc.*`, `ida.*`, `mcp.*`, `skills.*`, and `telemetry.*`. Local recording retains `stream.redactPatterns` and the `record` status-line ID; public stream/clip publication remains removed. Local memory/Mnemopi/Sharpshooter and self-hosted Hindsight/private Mnemopi endpoints remain. Private collaboration has no public relay/browser default and auto-host is off unless explicitly enabled. OpenTelemetry export requires a configured collector; `telemetry.otlpExportEnabled: false` disables export even when endpoints are configured. Message-content capture defaults to `none`; the operator is responsible for the collector. See [OpenTelemetry export](./environment-variables.md#11-opentelemetry-export).
 - Ungrouped keys: `setupVersion`, `proseOnlyThinking`, `omitThinking`, `externalThinking`, `includeWorkspaceTree`, `autocompleteMaxVisible`, `emojiAutocomplete`, `disabledExtensions`, `inlineToolDescriptors`, and `treeFilterMode`.
 
 These settings follow the same schema-defined type and default rules shown above.
@@ -1081,7 +1032,7 @@ Selected migrations applied whenever raw settings are loaded (global, project, o
 | `search.enabled` / `search.contextBefore` / `search.contextAfter`                                                        | corresponding `grep.*` keys                                                                                  |
 | `serviceTier` / `serviceTierSubagent` / `serviceTierAdvisor`                                                             | per-family `tier.*`; `fastModeScope` removed                                                                 |
 | `advisor.subagents`                                                                                                      | `task.agentAdvisor.task` (`on` / `off`)                                                                      |
-| `dev.autoqa.consent` / `todo.reminders.max`                                                                              | `dev.autoqaConsent` / `todo.remindersMax`                                                                    |
+| `todo.reminders.max` | `todo.remindersMax` |
 | `providers.parallelFetch`                                                                                                | removed; use `providers.fetch`                                                                               |
 | `providers` model/backend selectors, `tts.localModel`, `stt.modelName`                                                   | role/chain migrations described in [Models](#models); retired keys removed                                   |
 | `exa.enableSearch` / `exa.enableResearcher` / `exa.enableWebsets`                                                        | search enablement folded into `exa.enabled`; researcher/websets toggles removed                              |
@@ -1103,7 +1054,7 @@ Arrays replace; they do not append. If a project sets `disabledProviders`, `enab
 
 ### A provider is still available after editing config
 
-- Check whether you disabled the model provider id (e.g. `anthropic`) or a discovery source id (e.g. `claude`) — they are different ids in the shared `disabledProviders` namespace, with different effects.
+- Check whether you disabled a model provider id (`github-copilot` or `local`) or a discovery source id (e.g. `claude`): they have different effects.
 - Check for a project (or overlay) `disabledProviders` array replacing your global one.
 - Credentials can still come from environment variables, `.env`, OAuth, stored auth, or `models.yml`; disabling a provider blocks selection regardless, but verify you edited the right layer. See [Providers](./providers.md).
 - Check for a warning that a live reload retained the last good layer. Provider-source switches affect the next discovery pass; an already-open catalog/picker may need refreshing.

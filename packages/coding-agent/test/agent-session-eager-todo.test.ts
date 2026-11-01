@@ -109,8 +109,7 @@ describe("AgentSession eager todo enforcement", () => {
 		settingsOverride: Record<string, unknown> = {},
 		sessionOverride: Partial<AgentSessionConfig> = {},
 	): Promise<void> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 		const modelRegistry = sharedModelRegistry;
 		const settings = Settings.isolated({
@@ -217,7 +216,7 @@ describe("AgentSession eager todo enforcement", () => {
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-agent-session-eager-todo-shared-");
 		sharedAuthStorage = await AuthStorage.create(path.join(sharedDir.path(), "auth.db"));
-		sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+		sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 		sharedModelRegistry = new ModelRegistry(sharedAuthStorage, path.join(sharedDir.path(), "models.yml"));
 	});
 

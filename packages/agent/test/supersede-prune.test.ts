@@ -41,9 +41,9 @@ function assistantMessage(content: AssistantMessage["content"], timestamp: numbe
 		role: "assistant",
 		content,
 		timestamp,
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -143,11 +143,11 @@ const FILE_CONTENT = "export function alpha() { return 1; }\n".repeat(50);
 const BIG_TEXT = "const value = computeSomething(12345);\n".repeat(500);
 const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6ZQAAAABJRU5ErkJggg==";
 const anthropicModel = buildModel({
-	id: "claude-sonnet-4-5",
+	id: "claude-sonnet-4.5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text", "image"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -971,7 +971,7 @@ describe("warm-cache guard — prompt-cache lookback window", () => {
 		if (nextInput) messages.push(nextInput);
 		let positions = 0;
 		let later: string | undefined;
-		for (const param of convertAnthropicMessages(messages, anthropicModel, false)) {
+		for (const param of convertAnthropicMessages(messages, anthropicModel, { serverSideFallbackEnabled: false })) {
 			for (const block of typeof param.content === "string" ? [{ type: "text" }] : param.content) {
 				if ((block.type !== "tool_use" && block.type !== "tool_result") || block.type !== later) positions++;
 				later = block.type;

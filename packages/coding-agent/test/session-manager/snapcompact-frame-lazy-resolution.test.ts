@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import * as blobStore from "@oh-my-pi/pi-coding-agent/session/blob-store";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { getAgentDir, getBlobsDir, setAgentDir } from "@oh-my-pi/pi-utils";
@@ -16,8 +16,18 @@ function frameData(index: number): string {
 }
 
 function makeAssistantMessage(text: string) {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic model to exist");
+	const model = buildModel({
+		id: "claude-sonnet-4-5",
+		name: "Company Claude",
+		provider: "company-anthropic",
+		api: "anthropic-messages",
+		baseUrl: "https://models.company.invalid/anthropic",
+		reasoning: false,
+		input: ["text", "image"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 64_000,
+	});
 	return {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text }],

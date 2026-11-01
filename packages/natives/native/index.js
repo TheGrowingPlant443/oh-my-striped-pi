@@ -34,7 +34,6 @@ export const HighlightStream = nativeBindings.HighlightStream;
 export const IpcConnection = nativeBindings.IpcConnection;
 export const IpcServer = nativeBindings.IpcServer;
 export const LineMatcher = nativeBindings.LineMatcher;
-export const LiveWebRtcPeer = nativeBindings.LiveWebRtcPeer;
 export const MacAppearanceObserver = nativeBindings.MacAppearanceObserver;
 export const NativeOAuthCallback = nativeBindings.NativeOAuthCallback;
 export const PipeStreams = nativeBindings.PipeStreams;

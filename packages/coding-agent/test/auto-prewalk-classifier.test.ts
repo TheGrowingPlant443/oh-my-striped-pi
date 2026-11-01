@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { Api, Model } from "@oh-my-pi/pi-ai";
+import * as ai from "@oh-my-pi/pi-ai";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import {
 	AUTO_PREWALK_TIMEOUT_MS,
 	type AutoPrewalkInput,
@@ -10,28 +12,30 @@ import {
 } from "@oh-my-pi/pi-coding-agent/auto-prewalk/classifier";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { hasNativeJudge, resolveJudge } from "@oh-my-pi/pi-coding-agent/judgment";
+import { ChainJudge, hasNativeJudge } from "@oh-my-pi/pi-coding-agent/judgment";
 import { MAX_TINY_MESSAGE_CHARS } from "@oh-my-pi/pi-coding-agent/tiny/message-preproc";
 import { tinyModelClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
-import { asGlobalFetch } from "./helpers/fetch-mock";
 
-const JEV_PREVIEW = {
-	id: "jev-preview",
-	name: "JEV Preview",
+const ONLINE = getBundledModel("github-copilot", "claude-sonnet-4.6");
+if (!ONLINE) throw new Error("Expected bundled Copilot judge model");
+
+const LOCAL = getBundledModel("local", "qwen2.5-1.5b");
+if (!LOCAL) throw new Error("Expected bundled local judge model");
+
+const NATIVE = buildModel({
+	id: "openjev-company",
+	name: "Company judge",
+	provider: "company",
 	api: "typesafe",
-	provider: "typesafe",
-	baseUrl: "https://judge.example.test/",
+	baseUrl: "https://judge.company.example",
 	kind: "judge",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 128_000,
-	maxTokens: 4096,
-} as Model<Api>;
-
-const LOCAL = getBundledModel("local", "qwen2.5-1.5b");
-if (!LOCAL) throw new Error("Expected bundled local judge model");
+	contextWindow: 8192,
+	maxTokens: 0,
+});
 
 const REQUEST = "trace the sync engine, then fix the stale cursor";
 
@@ -40,15 +44,15 @@ interface JudgeRequest {
 	questions: Record<string, { criteria: Record<string, string> }>;
 }
 
-function nativeJudgeDeps() {
+function judgeDeps(model: Model<Api> = NATIVE) {
 	const authStorage = createInMemoryAuthStorage();
-	authStorage.keys.setRuntime("typesafe", "ts-key");
+	authStorage.keys.setRuntime(model.provider, "company-key");
 	const registry = new ModelRegistry(authStorage, "/nonexistent/auto-prewalk-models.yml");
-	vi.spyOn(registry, "getAvailable").mockReturnValue([JEV_PREVIEW]);
-	return { settings: Settings.isolated({ modelRoles: { judge: "typesafe/jev-preview" } }), registry };
+	vi.spyOn(registry, "getAvailable").mockReturnValue([model]);
+	return { settings: Settings.isolated({ modelRoles: { judge: `${model.provider}/${model.id}` } }), registry };
 }
 
-/** A System One answer; `choice` is the highest probability, as the real API reports. */
+/** Typed judge answer; the winning route must match the distribution. */
 function answer(prewalk: number, primary: number, direct: number) {
 	const probabilities: Record<PrewalkRoute, number> = { prewalk, primary, direct };
 	const choice: PrewalkRoute =
@@ -56,19 +60,17 @@ function answer(prewalk: number, primary: number, direct: number) {
 	return { type: "choice", choice, probabilities, confidence: probabilities[choice] };
 }
 
-/** Serve `route` as the System One reply and record every request body. */
+/** Exercise decision validation and context through the configured native wire. */
 function serveJudge(route: unknown): JudgeRequest[] {
 	const requests: JudgeRequest[] = [];
-	vi.spyOn(globalThis, "fetch").mockImplementation(
-		asGlobalFetch(async (_url, init) => {
+	const respond = Object.assign(
+		async (_input: string | URL | Request, init?: RequestInit) => {
 			requests.push(JSON.parse(String(init?.body)) as JudgeRequest);
-			return Response.json({
-				model: "jev-1.13.0",
-				answers: { route },
-				usage: { input_tokens: 8, output_tokens: 2 },
-			});
-		}),
+			return Response.json({ answers: { route }, usage: { input_tokens: 3, output_tokens: 1 } });
+		},
+		{ preconnect: globalThis.fetch.preconnect },
 	);
+	vi.spyOn(globalThis, "fetch").mockImplementation(respond);
 	return requests;
 }
 
@@ -80,7 +82,7 @@ const userTurn = (text: string, extra: Partial<Extract<AgentMessage, { role: "us
 });
 
 const classify = (input: Partial<AutoPrewalkInput> = {}) =>
-	classifyAutoPrewalk({ request: REQUEST, history: [], ...input }, nativeJudgeDeps());
+	classifyAutoPrewalk({ request: REQUEST, history: [], ...input }, judgeDeps());
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -104,16 +106,44 @@ describe("classifyAutoPrewalk decision", () => {
 		});
 	});
 
-	it("asks a single route question over the three outcomes and bills it as auto-prewalk", async () => {
+	it("asks one typed route question over all three outcomes", async () => {
 		const requests = serveJudge(answer(0.84, 0.1, 0.06));
-		const onUsage = vi.fn();
 
-		await classifyAutoPrewalk({ request: REQUEST, history: [] }, { ...nativeJudgeDeps(), onUsage });
+		await classify();
 
 		expect(requests).toHaveLength(1);
 		expect(Object.keys(requests[0]!.questions)).toEqual(["route"]);
 		expect(Object.keys(requests[0]!.questions.route!.criteria).sort()).toEqual(["direct", "prewalk", "primary"]);
-		expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ purpose: "auto-prewalk", role: "typesafe" }));
+	});
+
+	it("skips low-signal input without calling a configured judge", async () => {
+		const requests = serveJudge(answer(0.84, 0.1, 0.06));
+
+		expect(await classify({ request: "thanks" })).toBeUndefined();
+		expect(requests).toHaveLength(0);
+	});
+
+	it.each([LOCAL, ONLINE])("never substitutes prompted $provider judgments for native probabilities", async model => {
+		const local = vi.spyOn(tinyModelClient, "complete").mockRejectedValue(new Error("Unexpected local judgment"));
+		const chat = vi.spyOn(ai, "completeSimple").mockRejectedValue(new Error("Unexpected chat judgment"));
+		expect(await classifyAutoPrewalk({ request: REQUEST, history: [] }, judgeDeps(model))).toBeUndefined();
+		expect(local).not.toHaveBeenCalled();
+		expect(chat).not.toHaveBeenCalled();
+	});
+
+	it("attributes native classification usage without a prompted chat request", async () => {
+		serveJudge(answer(0.84, 0.1, 0.06));
+		const onUsage = vi.fn();
+		const decision = await classifyAutoPrewalk({ request: REQUEST, history: [] }, { ...judgeDeps(), onUsage });
+		expect(decision?.arm).toBe(true);
+		expect(onUsage).toHaveBeenCalledWith(
+			expect.objectContaining({
+				purpose: "auto-prewalk",
+				role: "judge",
+				provider: "company",
+				model: "openjev-company",
+			}),
+		);
 	});
 
 	it("rejects an answer without probabilities instead of guessing an arm", async () => {
@@ -137,41 +167,30 @@ describe("classifyAutoPrewalk decision", () => {
 		await expect(classify()).rejects.toThrow("auto-prewalk");
 	});
 
-	it("never executes a prompted model when the cached chain predates a native login", async () => {
+	it("refuses a stale prompted execution chain after the fresh gate discovers a native judge", async () => {
 		vi.spyOn(Date, "now").mockReturnValue(Date.now());
-		const { registry } = nativeJudgeDeps();
-		const stale = Settings.isolated({
-			modelRoles: { judge: "typesafe/jev-preview" },
+		const { registry } = judgeDeps();
+		const settings = Settings.isolated({
+			modelRoles: { judge: "company/openjev-company" },
 			"retry.fallbackChains": { judge: [`${LOCAL.provider}/${LOCAL.id}`] },
 		});
+		const deps = { registry, settings };
 		const available = vi.spyOn(registry, "getAvailable").mockReturnValue([LOCAL]);
-		resolveJudge({ settings: stale, registry, purpose: "seed" }).primaryModel();
-		available.mockReturnValue([JEV_PREVIEW, LOCAL]);
-		const complete = vi.spyOn(tinyModelClient, "complete").mockResolvedValue("prewalk");
-		const fetchSpy = vi.spyOn(globalThis, "fetch");
-
-		expect(hasNativeJudge(stale, registry)).toBe(true);
-		await expect(
-			classifyAutoPrewalk({ request: REQUEST, history: [] }, { settings: stale, registry }),
-		).rejects.toThrow("native");
-
+		expect(new ChainJudge({ ...deps, purpose: "warm-cache" }).primaryModel()).toBe(LOCAL);
+		available.mockReturnValue([NATIVE, LOCAL]);
+		expect(hasNativeJudge(settings, registry)).toBe(true);
+		const complete = vi.spyOn(tinyModelClient, "complete").mockRejectedValue(new Error("Unexpected local judgment"));
+		await expect(classifyAutoPrewalk({ request: REQUEST, history: [] }, deps)).rejects.toThrow("no native backend");
 		expect(complete).not.toHaveBeenCalled();
-		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 
-	it("never falls back to a prompted model when the judge role has no native backend", async () => {
-		const registry = new ModelRegistry(createInMemoryAuthStorage(), "/nonexistent/auto-prewalk-models.yml");
-		vi.spyOn(registry, "getAvailable").mockReturnValue([LOCAL]);
-		const settings = Settings.isolated({ modelRoles: { judge: `${LOCAL.provider}/${LOCAL.id}` } });
-		const complete = vi.spyOn(tinyModelClient, "complete").mockResolvedValue("prewalk");
-		const fetchSpy = vi.spyOn(globalThis, "fetch");
+	it("does not run judgment when no candidate is available", async () => {
+		const deps = judgeDeps();
+		vi.spyOn(deps.registry, "getAvailable").mockReturnValue([]);
+		const judge = vi.spyOn(ChainJudge.prototype, "withCandidate");
 
-		await expect(classifyAutoPrewalk({ request: REQUEST, history: [] }, { settings, registry })).resolves.toBe(
-			undefined,
-		);
-
-		expect(complete).not.toHaveBeenCalled();
-		expect(fetchSpy).not.toHaveBeenCalled();
+		expect(await classifyAutoPrewalk({ request: REQUEST, history: [] }, deps)).toBeUndefined();
+		expect(judge).not.toHaveBeenCalled();
 	});
 });
 
@@ -183,26 +202,28 @@ describe("classifyAutoPrewalk bounds", () => {
 				? AbortSignal.abort(new DOMException("timed out", "TimeoutError"))
 				: realTimeout(ms),
 		);
-		vi.spyOn(globalThis, "fetch").mockImplementation(asGlobalFetch(() => new Promise<Response>(() => {})));
+		const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected network request"));
 
 		await expect(classify()).rejects.toThrow();
+		expect(fetch).not.toHaveBeenCalled();
 	});
 
 	it("stops waiting when the caller aborts", async () => {
 		const requested = Promise.withResolvers<void>();
-		vi.spyOn(globalThis, "fetch").mockImplementation(
-			asGlobalFetch(
-				(_url, init) =>
-					new Promise<Response>((_resolve, reject) => {
-						requested.resolve();
-						init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
-					}),
-			),
+		const respond = Object.assign(
+			(_input: string | URL | Request, init?: RequestInit) => {
+				const response = Promise.withResolvers<Response>();
+				requested.resolve();
+				init?.signal?.addEventListener("abort", () => response.reject(init.signal?.reason), { once: true });
+				return response.promise;
+			},
+			{ preconnect: globalThis.fetch.preconnect },
 		);
+		vi.spyOn(globalThis, "fetch").mockImplementation(respond);
 		const controller = new AbortController();
 		const pending = classifyAutoPrewalk(
 			{ request: REQUEST, history: [] },
-			{ ...nativeJudgeDeps(), signal: controller.signal },
+			{ ...judgeDeps(), signal: controller.signal },
 		);
 
 		await requested.promise;

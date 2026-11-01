@@ -37,12 +37,12 @@ describe("AgentSession per-turn prune persistence", () => {
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-prune-persistence-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!bundled) throw new Error("Expected retained Copilot test model");
 		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
 
 		const now = Date.now();
@@ -294,7 +294,7 @@ describe("AgentSession per-turn prune persistence", () => {
 		}
 
 		function enableAdvisor(): void {
-			session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+			session.settings.setModelRole("advisor", "github-copilot/claude-sonnet-4.5");
 			expect(session.setAdvisorEnabled(true)).toBe(true);
 		}
 

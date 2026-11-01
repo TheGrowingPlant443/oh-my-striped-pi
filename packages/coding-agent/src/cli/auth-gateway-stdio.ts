@@ -12,6 +12,7 @@
  */
 import type { Api, Model } from "@oh-my-pi/pi-ai";
 import { createAuthGatewayRouter, serveAuthGatewayStdio } from "@oh-my-pi/pi-ai/auth-gateway";
+import { modelKind } from "@oh-my-pi/pi-catalog/types";
 import { getProjectDir, isRecord, logger, postmortem, VERSION } from "@oh-my-pi/pi-utils";
 import { ModelRegistry } from "../config/model-registry";
 import { formatModelStringWithRouting, normalizeModelPatternList, resolveCliModel } from "../config/model-resolver";
@@ -34,9 +35,14 @@ export function selectorCandidates(
 	settings: Settings,
 	registry: Pick<ModelRegistry, "getAll" | "getAvailable">,
 ): Model<Api>[] {
-	const available = registry.getAvailable();
+	const routable = (model: Model<Api>) => {
+		const kind = modelKind(model);
+		return kind !== "tiny" && kind !== "search" && kind !== "video";
+	};
+	const available = registry.getAvailable("all").filter(routable);
+	const scopedRegistry = { getAll: () => registry.getAll("all").filter(routable), getAvailable: () => available };
 	for (const pattern of normalizeModelPatternList(selector)) {
-		const { model, configuredRole } = resolveCliModel({ cliModel: pattern, modelRegistry: registry, settings });
+		const { model, configuredRole } = resolveCliModel({ cliModel: pattern, modelRegistry: scopedRegistry, settings });
 		if (!model) continue;
 		const chain = configuredRole
 			? collectOnlineTinyCandidates([configuredRole], settings, available).map(candidate => candidate.model)
@@ -59,7 +65,7 @@ export async function runAuthGatewayStdio(): Promise<void> {
 	const cwd = getProjectDir();
 	const settings = await Settings.init({ cwd });
 	const storage = await discoverAuthStorage(undefined, { settings });
-	const registry = new ModelRegistry(storage);
+	const registry = new ModelRegistry(storage, undefined, { settings });
 	await registry.refresh();
 	await loadCliExtensionProviders(registry, settings, cwd);
 
@@ -69,7 +75,13 @@ export async function runAuthGatewayStdio(): Promise<void> {
 	const router = createAuthGatewayRouter({
 		storage,
 		resolveModel: id => routed.get(id),
-		listModels: () => registry.getAvailable(),
+		getApiKeyWithCredential: (provider, sessionId, options) =>
+			registry.getApiKeyWithCredentialForProvider(provider, sessionId, options),
+		listModels: () =>
+			registry.getAvailable("all").filter(model => {
+				const kind = modelKind(model);
+				return kind !== "tiny" && kind !== "search" && kind !== "video";
+			}),
 	});
 	const route = async (req: Request): Promise<Response> => {
 		// Unparseable bodies pass through for the route to reject in its own wire format.

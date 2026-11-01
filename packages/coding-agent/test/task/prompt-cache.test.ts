@@ -1,10 +1,9 @@
-import { afterEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import type { Model, ProviderSessionState, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { buildRequest as buildGeminiRequest } from "@oh-my-pi/pi-ai/providers/google-gemini-cli";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildTransformedCodexRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import { buildParams as buildResponsesParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
+import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -22,6 +21,14 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 describe("task sibling prompt-cache routing", () => {
 	const sessions: AgentSession[] = [];
 
+	beforeEach(() => {
+		const resolve = catalogPolicy.resolveCatalogPolicy;
+		vi.spyOn(catalogPolicy, "resolveCatalogPolicy").mockImplementation(model => ({
+			...resolve(model),
+			sharedPromptCache: model.provider === "github-copilot" && model.id === "gpt-5.4",
+		}));
+	});
+
 	afterEach(async () => {
 		await Promise.all(sessions.splice(0).map(session => session.dispose()));
 		vi.restoreAllMocks();
@@ -29,156 +36,53 @@ describe("task sibling prompt-cache routing", () => {
 		AgentRegistry.resetGlobalForTests();
 	});
 
-	// Rows whose parent runs on a different lane than its children: the parent
-	// stays on the bundled, non-caching openai/gpt-5.4 lane while the mocked
-	// agent definition overrides the siblings onto the row's child lane.
+	// Exercise the session-level opt-in contract independently of catalog lane policy.
 	const unoptedParentLanes: Record<string, readonly [provider: string, modelId: string]> = {
-		"unopted parent seeds the Go Luna family key for eligible siblings": ["openai", "gpt-5.4"],
-		"unopted parent passes explicit cache lineage to eligible Go Luna siblings": ["openai", "gpt-5.4"],
-		"unopted parent keeps an ineligible child on its own wire identity": ["openai", "gpt-5.4"],
+		"unopted parent seeds the family key for eligible siblings": ["github-copilot", "gpt-5.5"],
+		"unopted parent passes explicit cache lineage to eligible siblings": ["github-copilot", "gpt-5.5"],
 	};
 
 	it.each([
 		[
-			"Muse standard provider-session fallback",
-			"muse-code",
-			"muse-spark-1.3",
+			"eligible provider-session fallback",
+			"github-copilot",
+			"gpt-5.4",
 			undefined,
 			undefined,
 			"parent-provider-lineage:task",
 		],
 		[
-			"Muse provider-session fallback",
-			"muse-code",
-			"muse-spark-1.3-contributor",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Wonder provider-session fallback",
-			"muse-code",
-			"muse-wonder-1.0",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Wonder Contributor provider-session fallback",
-			"muse-code",
-			"muse-wonder-1.0-contributor",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Wonder Full provider-session fallback",
-			"muse-code",
-			"muse-wonder-full-1.0",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Wonder Full Contributor provider-session fallback",
-			"muse-code",
-			"muse-wonder-full-1.0-contributor",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Wonder explicit parent key",
-			"muse-code",
-			"muse-wonder-full-1.0-contributor",
+			"eligible explicit parent key",
+			"github-copilot",
+			"gpt-5.4",
 			"explicit-parent",
 			"automatic-parent",
 			"explicit-parent:task",
 		],
+		["eligible nested lineage", "github-copilot", "gpt-5.4", undefined, "root:task", "root:task:task"],
 		[
-			"Muse explicit parent key",
-			"muse-code",
-			"muse-spark-1.3-contributor",
+			"ineligible model keeps child keys",
+			"github-copilot",
+			"gpt-5.5",
 			"explicit-parent",
 			"automatic-parent",
-			"explicit-parent:task",
+			undefined,
 		],
-		["Muse nested lineage", "muse-code", "muse-spark-1.3-contributor", undefined, "root:task", "root:task:task"],
 		[
-			"Go Muse contributor sibling key",
-			"opencode-go",
-			"muse-spark-1.3-contributor",
+			"unopted parent seeds the family key for eligible siblings",
+			"github-copilot",
+			"gpt-5.4",
 			undefined,
 			undefined,
 			"parent-provider-lineage:task",
 		],
 		[
-			// The standard Go Muse 1.3 id was never exactly lane-verified;
-			// the opt-in covers Contributor 1.3 only, so a standard-id child
-			// keeps its own native session identity on the wire.
-			"Go Muse standard keeps child keys",
-			"opencode-go",
-			"muse-spark-1.3",
-			undefined,
-			undefined,
-			undefined,
-		],
-		[
-			"Go Muse 1.2 contributor sibling key",
-			"opencode-go",
-			"muse-spark-1.2-contributor",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"Go DeepSeek Pro Completions sibling key",
-			"opencode-go",
-			"deepseek-v4-pro",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			// Verified on the Go Responses lane, so the child now shares the
-			// family key while its own conversation id stays per-child.
-			"Go Luna sibling key",
-			"opencode-go",
-			"gpt-6-luna",
-			"explicit-parent",
-			"automatic-parent",
-			"explicit-parent:task",
-		],
-		["Luna keeps child keys", "openai-codex", "gpt-6-luna", "explicit-parent", "automatic-parent", undefined],
-		["OpenAI keeps child keys", "openai", "gpt-5.4", undefined, undefined, undefined],
-		["Gemini omits cache keys", "google-antigravity", "gemini-3.8-flash", "explicit-parent", undefined, undefined],
-		[
-			// Unopted-parent rows: the parent never opts into task caching, yet an
-			// agent override onto an eligible lane must still mint one family key
-			// both siblings stream on (never on the parent's lane), while an
-			// ineligible overridden child keeps its own wire identity.
-			"unopted parent seeds the Go Luna family key for eligible siblings",
-			"opencode-go",
-			"gpt-6-luna",
-			undefined,
-			undefined,
-			"parent-provider-lineage:task",
-		],
-		[
-			"unopted parent passes explicit cache lineage to eligible Go Luna siblings",
-			"opencode-go",
-			"gpt-6-luna",
+			"unopted parent passes explicit cache lineage to eligible siblings",
+			"github-copilot",
+			"gpt-5.4",
 			"explicit-parent",
 			undefined,
 			"explicit-parent:task",
-		],
-		[
-			"unopted parent keeps an ineligible child on its own wire identity",
-			"openai-codex",
-			"gpt-6-luna",
-			"explicit-parent",
-			undefined,
-			undefined,
 		],
 	] as const)(
 		"%s without sharing child conversation or response state",
@@ -188,19 +92,8 @@ describe("task sibling prompt-cache routing", () => {
 			const authStorage = await AuthStorage.create(directory.join("auth.db"));
 			const parentOverride = unoptedParentLanes[_name];
 			const [parentProvider, parentModelId] = parentOverride ?? [provider, modelId];
-			authStorage.keys.setRuntime(
-				provider,
-				provider === "muse-code"
-					? JSON.stringify({ oauthAccessToken: "test-oauth", apiKey: "test-key" })
-					: "test-key",
-			);
-			if (parentOverride && parentProvider !== provider) authStorage.keys.setRuntime(parentProvider, "test-key");
-			const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
-				fetch: async () =>
-					Response.json({ data: [{ id: modelId, object: "model", created: 0, owned_by: "meta" }] }),
-			});
-			if (provider === "muse-code" || provider === "opencode-go")
-				await modelRegistry.refreshProvider(provider, "online");
+			authStorage.keys.setRuntime(provider, "test-key");
+			const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"));
 			const model = modelRegistry.find(provider, modelId);
 			if (!model) throw new Error(`Model missing from offline catalog fixture: ${provider}/${modelId}`);
 			const parentModel = parentOverride ? modelRegistry.find(parentProvider, parentModelId) : model;
@@ -237,54 +130,30 @@ describe("task sibling prompt-cache routing", () => {
 			});
 			const followup = createMockModel({ handler: { content: [{ type: "text", text: "Review complete." }] } });
 			const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
-			vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slowMode) =>
-				realSettingsStream(
-					settings,
-					async (requestModel, context, streamOptions) => {
-						const cacheOptions = {
-							sessionId: streamOptions?.sessionId,
-							promptCacheKey: streamOptions?.promptCacheKey,
-							providerSessionState: streamOptions?.providerSessionState,
-						};
-						let wireKey: unknown;
-						if (requestModel.api === "openai-codex-responses") {
-							wireKey = (
-								await buildTransformedCodexRequestBody(
-									requestModel as Model<"openai-codex-responses">,
-									context,
-									cacheOptions,
-								)
-							).prompt_cache_key;
-						} else if (requestModel.api === "openai-responses") {
-							wireKey = buildResponsesParams(
-								requestModel as Model<"openai-responses">,
-								context,
-								cacheOptions,
-								undefined,
-							).params.prompt_cache_key;
-						} else if (requestModel.api === "google-gemini-cli") {
-							const request = buildGeminiRequest(
-								requestModel as Model<"google-gemini-cli">,
-								context,
-								"test-project",
-								cacheOptions,
-								true,
-							);
-							wireKey = JSON.stringify(request).includes('"prompt_cache_key"');
-						}
-						requests.push({
-							modelId: requestModel.id,
-							sessionId: streamOptions?.sessionId,
-							cacheKey: streamOptions?.promptCacheKey,
-							state: streamOptions?.providerSessionState,
-							hasSiblingResponseState: streamOptions?.providerSessionState?.has("test-response-state"),
-							wireKey,
-						});
-						streamOptions?.providerSessionState?.set("test-response-state", { close() {} });
-						return (requests.length <= 2 ? mock : followup).stream(requestModel, context, streamOptions);
-					},
-					slowMode,
-				),
+			vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+				realSettingsStream(settings, async (requestModel, context, streamOptions) => {
+					const cacheOptions = {
+						sessionId: streamOptions?.sessionId,
+						promptCacheKey: streamOptions?.promptCacheKey,
+						providerSessionState: streamOptions?.providerSessionState,
+					};
+					const wireKey = buildResponsesParams(
+						requestModel as Model<"openai-responses">,
+						context,
+						cacheOptions,
+						undefined,
+					).params.prompt_cache_key;
+					requests.push({
+						modelId: requestModel.id,
+						sessionId: streamOptions?.sessionId,
+						cacheKey: streamOptions?.promptCacheKey,
+						state: streamOptions?.providerSessionState,
+						hasSiblingResponseState: streamOptions?.providerSessionState?.has("test-response-state"),
+						wireKey,
+					});
+					streamOptions?.providerSessionState?.set("test-response-state", { close() {} });
+					return (requests.length <= 2 ? mock : followup).stream(requestModel, context, streamOptions);
+				}),
 			);
 			try {
 				const { session: parent } = await sdk.createAgentSession({
@@ -331,14 +200,10 @@ describe("task sibling prompt-cache routing", () => {
 				expect(requests[0]?.state).toBeInstanceOf(Map);
 				expect(requests[1]?.state).toBeInstanceOf(Map);
 				expect(requests[0]?.state).not.toBe(requests[1]?.state);
-				if (model.api !== "openai-completions" && model.api !== "anthropic-messages") {
-					expect(requests.map(request => request.wireKey)).toEqual(
-						provider === "google-antigravity"
-							? [false, false]
-							: requests.map(request => expected ?? request.sessionId),
-					);
-				}
-				if (provider === "openai" || provider === "openai-codex") {
+				expect(requests.map(request => request.wireKey)).toEqual(
+					requests.map(request => expected ?? request.sessionId),
+				);
+				if (model.id === "gpt-5.5") {
 					const child = AgentRegistry.global()
 						.list()
 						.find(candidate => candidate.session && candidate.session !== parent)?.session;
@@ -377,7 +242,7 @@ describe("task sibling prompt-cache routing", () => {
 						expect(sessionManager.getHeader()?.taskPromptCacheKey).toBeUndefined();
 					}
 				}
-				if (_name === "Muse provider-session fallback") {
+				if (_name === "eligible provider-session fallback") {
 					const ref = AgentRegistry.global()
 						.list()
 						.find(candidate => candidate.session && candidate.session !== parent);
@@ -421,14 +286,9 @@ describe("task sibling prompt-cache routing", () => {
 		using directory = TempDir.createSync("@omp-task-cache-empty-");
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const authStorage = await AuthStorage.create(directory.join("auth.db"));
-		authStorage.keys.setRuntime("opencode-go", "test-key");
-		const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
-			fetch: async () =>
-				Response.json({ data: [{ id: "gpt-6-luna", object: "model", created: 0, owned_by: "meta" }] }),
-		});
-		await modelRegistry.refreshProvider("opencode-go", "online");
-		const model = modelRegistry.find("opencode-go", "gpt-6-luna");
-		if (!model) throw new Error("Model missing from offline catalog fixture: opencode-go/gpt-6-luna");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"));
+		const model = getBundledModel("github-copilot", "gpt-5.4");
 		const requests: Array<{
 			sessionId: string | undefined;
 			cacheKey: string | undefined;
@@ -455,30 +315,26 @@ describe("task sibling prompt-cache routing", () => {
 			handler: { content: [{ type: "toolCall", name: "yield", arguments: { data: { findings: [] } } }] },
 		});
 		const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
-		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slowMode) =>
-			realSettingsStream(
-				settings,
-				async (requestModel, context, streamOptions) => {
-					const cacheOptions = {
-						sessionId: streamOptions?.sessionId,
-						promptCacheKey: streamOptions?.promptCacheKey,
-						providerSessionState: streamOptions?.providerSessionState,
-					};
-					const wireKey = buildResponsesParams(
-						requestModel as Model<"openai-responses">,
-						context,
-						cacheOptions,
-						undefined,
-					).params.prompt_cache_key;
-					requests.push({
-						sessionId: streamOptions?.sessionId,
-						cacheKey: streamOptions?.promptCacheKey,
-						wireKey,
-					});
-					return mock.stream(requestModel, context, streamOptions);
-				},
-				slowMode,
-			),
+		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+			realSettingsStream(settings, async (requestModel, context, streamOptions) => {
+				const cacheOptions = {
+					sessionId: streamOptions?.sessionId,
+					promptCacheKey: streamOptions?.promptCacheKey,
+					providerSessionState: streamOptions?.providerSessionState,
+				};
+				const wireKey = buildResponsesParams(
+					requestModel as Model<"openai-responses">,
+					context,
+					cacheOptions,
+					undefined,
+				).params.prompt_cache_key;
+				requests.push({
+					sessionId: streamOptions?.sessionId,
+					cacheKey: streamOptions?.promptCacheKey,
+					wireKey,
+				});
+				return mock.stream(requestModel, context, streamOptions);
+			}),
 		);
 		try {
 			for (const suffix of ["a", "b"]) {
@@ -535,26 +391,14 @@ describe("task sibling prompt-cache routing", () => {
 		}
 	});
 
-	// Shared fixture for the stash-lifecycle regressions: a real Task child
-	// spawns on the parent's unopted openai lane (the executor stashes the
-	// parent-derived family candidate without seeding the persisted header copy
-	// for an ineligible initial model), the opted opencode-go Luna lane is
-	// available for runtime switches, and the stream wrapper records the real
-	// Responses wire `prompt_cache_key` of every request.
+	// A real Task child starts ineligible and later opts in; retain its family candidate across lifecycle changes.
 	async function createUnoptedTaskFixture(directory: TempDir) {
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const authStorage = await AuthStorage.create(directory.join("auth.db"));
-		authStorage.keys.setRuntime("openai", "test-key");
-		authStorage.keys.setRuntime("opencode-go", "test-key");
-		const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
-			fetch: async () =>
-				Response.json({ data: [{ id: "gpt-6-luna", object: "model", created: 0, owned_by: "meta" }] }),
-		});
-		await modelRegistry.refreshProvider("opencode-go", "online");
-		const initialModel = modelRegistry.find("openai", "gpt-5.4");
-		const optedModel = modelRegistry.find("opencode-go", "gpt-6-luna");
-		if (!initialModel) throw new Error("Model missing from offline catalog fixture: openai/gpt-5.4");
-		if (!optedModel) throw new Error("Model missing from offline catalog fixture: opencode-go/gpt-6-luna");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"));
+		const initialModel = getBundledModel("github-copilot", "gpt-5.5");
+		const optedModel = getBundledModel("github-copilot", "gpt-5.4");
 		const sessionSettings = Settings.isolated({
 			"async.enabled": false,
 			"task.structured": true,
@@ -590,26 +434,22 @@ describe("task sibling prompt-cache routing", () => {
 		const chatMock = createMockModel({ handler: { content: [{ type: "text", text: "Review complete." }] } });
 		let inTaskExecute = false;
 		const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
-		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slowMode) =>
-			realSettingsStream(
-				settings,
-				async (model, context, options) => {
-					const cacheOptions = {
-						sessionId: options?.sessionId,
-						promptCacheKey: options?.promptCacheKey,
-						providerSessionState: options?.providerSessionState,
-					};
-					requests.push({
-						sessionId: options?.sessionId,
-						cacheKey: options?.promptCacheKey,
-						wireKey: buildResponsesParams(model as Model<"openai-responses">, context, cacheOptions, undefined)
-							.params.prompt_cache_key,
-						state: options?.providerSessionState,
-					});
-					return (inTaskExecute ? taskMock : chatMock).stream(model, context, options);
-				},
-				slowMode,
-			),
+		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+			realSettingsStream(settings, async (model, context, options) => {
+				const cacheOptions = {
+					sessionId: options?.sessionId,
+					promptCacheKey: options?.promptCacheKey,
+					providerSessionState: options?.providerSessionState,
+				};
+				requests.push({
+					sessionId: options?.sessionId,
+					cacheKey: options?.promptCacheKey,
+					wireKey: buildResponsesParams(model as Model<"openai-responses">, context, cacheOptions, undefined)
+						.params.prompt_cache_key,
+					state: options?.providerSessionState,
+				});
+				return (inTaskExecute ? taskMock : chatMock).stream(model, context, options);
+			}),
 		);
 		async function createParent(lineage: string, model: Model, explicitKey?: string) {
 			const { session } = await sdk.createAgentSession({
@@ -665,7 +505,7 @@ describe("task sibling prompt-cache routing", () => {
 	// The executor seeds the sibling family candidate from the nonempty parent
 	// lineage once the child session exists; the per-request policy gate then
 	// decides whether a given request uses it. A child that starts on an
-	// unopted lane and later switches to an opted Go lane (the runtime retry
+	// unopted lane and later switches to an opted lane (the runtime retry
 	// fallback's model change after creation) must find the candidate at the
 	// first opted-in consumer request, while: ineligible initial requests stay
 	// child-scoped, siblings keep isolated conversation and response state, an
@@ -694,7 +534,7 @@ describe("task sibling prompt-cache routing", () => {
 			expect(requests[0]?.state).not.toBe(requests[1]?.state);
 
 			// Runtime model change after creation: the retry-fallback walk would
-			// re-request on the opted Go lane here. The consumer request must find
+			// re-request on the opted lane here. The consumer request must find
 			// the parent-derived candidate even though the initial model was
 			// unopted, and both siblings must land on the same family key.
 			const childA = childFor(requests[0]?.sessionId);
@@ -749,116 +589,108 @@ describe("task sibling prompt-cache routing", () => {
 		}
 	});
 
-	it.each([
-		["muse-code/muse-spark-1.3-contributor", "openai-codex", "gpt-6-luna", undefined],
-		["openai-codex/gpt-6-luna", "muse-code", "muse-spark-1.3-contributor", "parent:task"],
-	] as const)(
-		"gates the authenticated fallback after deferred %s selection",
-		async (requested, provider, modelId, expected) => {
-			using directory = TempDir.createSync("@omp-task-cache-fallback-");
-			vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
-			const requests: Array<{ model: Model; cacheKey: string | undefined }> = [];
-			const mock = createMockModel({ handler: { content: [{ type: "text", text: "Done." }] } });
-			const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
-			vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slowMode) =>
-				realSettingsStream(
-					settings,
-					(model, context, options) => {
-						requests.push({ model, cacheKey: options?.promptCacheKey });
-						return mock.stream(model, context, options);
-					},
-					slowMode,
-				),
-			);
-			const authStorage = await AuthStorage.create(directory.join("auth.db"));
-			authStorage.keys.setRuntime(provider, "test-key");
-			try {
-				const { session } = await sdk.createAgentSession({
-					cwd: directory.path(),
-					agentDir: directory.path(),
-					authStorage,
-					modelPattern: requested,
-					modelPatternAuthFallback: `${provider}/${modelId}`,
-					taskPromptCacheKey: "parent:task",
-					sessionManager: SessionManager.inMemory(directory.path()),
-					settings: Settings.isolated({
-						"async.enabled": false,
-						"marketplace.autoUpdate": "off",
-						"compaction.enabled": false,
-					}),
-					toolNames: [],
-					disableExtensionDiscovery: true,
-					skills: [],
-					contextFiles: [],
-					promptTemplates: [],
-					rules: [],
-					enableMCP: false,
-					enableLsp: false,
-				});
-				sessions.push(session);
-				await session.agent.prompt("Review the change.");
-				expect(requests).toHaveLength(1);
-				expect(requests[0]?.model.provider).toBe(provider);
-				expect(requests[0]?.model.id).toBe(modelId);
-				expect(requests[0]?.cacheKey).toBe(expected);
-			} finally {
-				await Promise.all(sessions.splice(0).map(session => session.dispose()));
-				authStorage.close();
-			}
-		},
-	);
+	it("gates the authenticated fallback after deferred Copilot selection", async () => {
+		using directory = TempDir.createSync("@omp-task-cache-fallback-");
+		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
+		const requests: Array<{ model: Model; cacheKey: string | undefined }> = [];
+		const mock = createMockModel({ handler: { content: [{ type: "text", text: "Done." }] } });
+		const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
+		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+			realSettingsStream(settings, (model, context, options) => {
+				requests.push({ model, cacheKey: options?.promptCacheKey });
+				return mock.stream(model, context, options);
+			}),
+		);
+		const authStorage = await AuthStorage.create(directory.join("auth.db"));
+		authStorage.keys.setRuntime(mock.provider, "test-key");
+		const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
+			ignoreLocalModelConfig: true,
+		});
+		modelRegistry.registerProvider("local", {
+			baseUrl: mock.baseUrl,
+			api: "local-inference",
+			models: [
+				{
+					id: mock.id,
+					name: mock.name,
+					kind: "chat",
+					reasoning: mock.reasoning,
+					input: mock.input,
+					cost: mock.cost,
+					contextWindow: mock.contextWindow,
+					maxTokens: mock.maxTokens,
+				},
+			],
+		});
+		try {
+			const { session } = await sdk.createAgentSession({
+				cwd: directory.path(),
+				agentDir: directory.path(),
+				authStorage,
+				modelRegistry,
+				modelPattern: "github-copilot/gpt-5.4",
+				modelPatternAuthFallback: `local/${mock.id}`,
+				taskPromptCacheKey: "parent:task",
+				sessionManager: SessionManager.inMemory(directory.path()),
+				settings: Settings.isolated({
+					"async.enabled": false,
+					"marketplace.autoUpdate": "off",
+					"compaction.enabled": false,
+				}),
+				toolNames: [],
+				disableExtensionDiscovery: true,
+				skills: [],
+				contextFiles: [],
+				promptTemplates: [],
+				rules: [],
+				enableMCP: false,
+				enableLsp: false,
+			});
+			sessions.push(session);
+			await session.agent.prompt("Review the change.");
+			expect(requests).toHaveLength(1);
+			expect(requests[0]?.model.provider).toBe("local");
+			expect(requests[0]?.model.api).toBe("local-inference");
+			expect(requests[0]?.model.id).toBe(mock.id);
+			expect(requests[0]?.cacheKey).toBeUndefined();
+		} finally {
+			await Promise.all(sessions.splice(0).map(session => session.dispose()));
+			authStorage.close();
+		}
+	});
 
-	const cacheModels = ["muse-spark-1.3-contributor", "muse-wonder-full-1.0-contributor"];
+	const cacheModels = ["gpt-5.4"];
 	it.each(cacheModels)("rechecks %s while explicit session and request keys win", async modelId => {
 		using directory = TempDir.createSync("@omp-task-cache-model-");
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const requests: Array<{ provider: string; options: SimpleStreamOptions | undefined; wireKey: unknown }> = [];
 		const mock = createMockModel({ handler: { content: [{ type: "text", text: "Done." }] } });
 		const realSettingsStream = settingsStream.createSettingsAwareStreamFn;
-		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slowMode) =>
-			realSettingsStream(
-				settings,
-				async (model, context, options) => {
-					const cacheOptions = {
-						sessionId: options?.sessionId,
-						promptCacheKey: options?.promptCacheKey,
-						providerSessionState: options?.providerSessionState,
-					};
-					const wireKey =
-						model.api === "openai-codex-responses"
-							? (
-									await buildTransformedCodexRequestBody(
-										model as Model<"openai-codex-responses">,
-										context,
-										cacheOptions,
-									)
-								).prompt_cache_key
-							: buildResponsesParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params
-									.prompt_cache_key;
-					requests.push({ provider: model.provider, options, wireKey });
-					return mock.stream(model, context, options);
-				},
-				slowMode,
-			),
+		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+			realSettingsStream(settings, async (model, context, options) => {
+				const cacheOptions = {
+					sessionId: options?.sessionId,
+					promptCacheKey: options?.promptCacheKey,
+					providerSessionState: options?.providerSessionState,
+				};
+				const wireKey = buildResponsesParams(model as Model<"openai-responses">, context, cacheOptions, undefined)
+					.params.prompt_cache_key;
+				requests.push({ provider: model.provider, options, wireKey });
+				return mock.stream(model, context, options);
+			}),
 		);
 		const authStorage = await AuthStorage.create(directory.join("auth.db"));
-		authStorage.keys.setRuntime("muse-code", JSON.stringify({ oauthAccessToken: "test-oauth", apiKey: "test-key" }));
-		authStorage.keys.setRuntime("openai-codex", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		try {
-			const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"), {
-				fetch: async () =>
-					Response.json({ data: [{ id: modelId, object: "model", created: 0, owned_by: "meta" }] }),
-			});
-			await modelRegistry.refreshProvider("muse-code", "online");
-			const muse = modelRegistry.find("muse-code", modelId);
-			if (!muse) throw new Error(`Model missing from offline catalog fixture: muse-code/${modelId}`);
-			const luna = getBundledModel("openai-codex", "gpt-6-luna");
+			const modelRegistry = new ModelRegistry(authStorage, directory.join("models.yml"));
+			const eligibleModel = getBundledModel("github-copilot", modelId);
+			const ineligibleModel = getBundledModel("github-copilot", "gpt-5.5");
 			const { session } = await sdk.createAgentSession({
 				cwd: directory.path(),
 				agentDir: directory.path(),
 				authStorage,
 				modelRegistry,
-				modelPattern: `muse-code/${modelId}`,
+				modelPattern: `github-copilot/${modelId}`,
 				providerSessionId: "child-conversation",
 				providerPromptCacheKey: "configured-child",
 				taskPromptCacheKey: "parent:task",
@@ -879,19 +711,23 @@ describe("task sibling prompt-cache routing", () => {
 			});
 			sessions.push(session);
 			await session.agent.prompt("Review first.");
-			session.agent.setModel(luna);
+			session.agent.setModel(ineligibleModel);
 			await session.agent.prompt("Review second.");
 			session.agent.promptCacheKey = undefined;
 			await session.agent.prompt("Review third.");
-			session.agent.setModel(muse);
+			session.agent.setModel(eligibleModel);
 			await session.agent.prompt("Review fourth.");
-			const fallback = await session.agent.streamFn(luna, { messages: [] }, { sessionId: "fallback-conversation" });
+			const fallback = await session.agent.streamFn(
+				ineligibleModel,
+				{ messages: [] },
+				{ sessionId: "fallback-conversation" },
+			);
 			await fallback.result();
 			session.agent.promptCacheKey = "explicit-child";
-			session.agent.setModel(luna);
+			session.agent.setModel(ineligibleModel);
 			await session.agent.prompt("Review fifth.");
 			const explicit = await session.agent.streamFn(
-				luna,
+				ineligibleModel,
 				{ messages: [] },
 				{
 					sessionId: "request-conversation",
@@ -899,15 +735,7 @@ describe("task sibling prompt-cache routing", () => {
 				},
 			);
 			await explicit.result();
-			expect(requests.map(request => request.provider)).toEqual([
-				"muse-code",
-				"openai-codex",
-				"openai-codex",
-				"muse-code",
-				"openai-codex",
-				"openai-codex",
-				"openai-codex",
-			]);
+			expect(requests.map(request => request.provider)).toEqual(Array(7).fill("github-copilot"));
 			expect(requests.map(request => request.options?.promptCacheKey)).toEqual([
 				"configured-child",
 				"configured-child",
@@ -1097,7 +925,7 @@ describe("task sibling prompt-cache routing", () => {
 			expect(await child.switchSession(altFile, { onCwdChange: async () => true })).toBe(true);
 			expect(child.sessionManager.getSessionFile()).toBe(altFile);
 			child.agent.setModel(optedModel);
-			expect(child.agent.state.model?.id).toBe("gpt-6-luna");
+			expect(child.agent.state.model?.id).toBe("gpt-5.4");
 			await child.prompt("Review the alternate session.");
 			expect(requests.at(-1)?.cacheKey).toBeUndefined();
 			expect(requests.at(-1)?.wireKey).toBe(requests.at(-1)?.sessionId);
@@ -1239,7 +1067,7 @@ describe("task sibling prompt-cache routing", () => {
 	// first eligible request, which never happened before this park. The warm
 	// reviver reopens a fresh SessionManager from the spawn-time spec, so the
 	// pending candidate must be captured at park and restored on revive:
-	// otherwise a runtime/auth fallback to an opted Go model after revival
+	// otherwise a runtime/auth fallback to an opted model after revival
 	// finds neither header nor stash and falls back to the child's own wire
 	// identity instead of the family key.
 	it("carries the pending family key across park and revive before the first eligible request", async () => {
@@ -1271,7 +1099,7 @@ describe("task sibling prompt-cache routing", () => {
 			// so only a captured-and-restored candidate can carry the family.
 			expect(revived.sessionManager.getHeader()?.taskPromptCacheKey).toBeUndefined();
 
-			// The runtime fallback walk onto the opted Go lane after revival:
+			// The runtime fallback walk onto the opted lane after revival:
 			// this first eligible request must find the pending candidate and
 			// promote it into the persisted header.
 			revived.agent.setModel(optedModel);

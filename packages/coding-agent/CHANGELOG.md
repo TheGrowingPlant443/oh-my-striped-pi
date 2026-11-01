@@ -4,41 +4,39 @@
 
 ### Breaking Changes
 
+- Removed built-in public SaaS model-provider integrations other than Copilot; on-device, self-hosted and explicitly configured company providers remain.
 - Custom tool loaders now resolve the injected host SDK themselves; constructors take cwd as their first argument instead of a pi namespace.
 - WebMCP now uses Chrome's native WebMCP support through WebMcpController, which accepts a Puppeteer Page. The former page-hook installation helpers, bridge constant, and page-hook types have been removed; Tern tabs no longer support WebMCP.
-- Provider-qualified model selectors in --model, settings, roles, and task agents must identify an exact model ID or alias. Near matches now fail with a helpful error and suggestions instead of silently selecting a sibling model. Bare selectors such as opus retain fuzzy matching, and the Google Vertex Claude alias remains supported. Older migrated web fallback chains replace the retired Codex entry with openai-codex/gpt-5.6-sol.
+- Provider-qualified model selectors in --model, settings, roles, and task agents must identify an exact model ID or alias. Near matches fail with a helpful error instead of silently selecting a sibling model; bare selectors such as opus retain fuzzy matching.
 
 ### Added
 
+- Added /update to show company-managed application update guidance without sending an update request to the agent.
 - Agents can send an interim response without ending the current task by writing Markdown to out:// (or using > out:// in bash), with streaming output up to 64 KiB. This is enabled by default in the interactive TUI and can be configured with out.enabled; it is disabled by default in print, RPC, and ACP sessions.
 - Added computer-tool approval modes: tools.approval["computer.control"] can allow unattended foreground control on dedicated machines or deny the request without prompting. The approval mode does not itself grant access.
 - Added optional task-file input (task.file=true), allowing subagent instructions to be loaded from an absolute UTF-8 file path or local:// URL with the submitted path and SHA-256 recorded.
 - Sessions can be pinned or unpinned from the resume picker with Alt+K and Alt+Shift+K, or the remappable app.session.pin and app.session.unpin actions. Pinned sessions move to the top and take priority in search results.
 - Added PI_LINK_SCHEME and optional PI_LINK_HOST, allowing file links from SSH or tmux sessions to open through a desktop protocol handler.
-- Extensions and RPC clients can start live voice sessions using their own WebRTC peer, including phone-browser clients, through ctx.startLive({ sdpOffer }) or live_connect.
 - Extensions can customize assistant-text rendering and rerender individual replies through the opt-in extensionRenderers.assistantText setting, and can register interactive link schemes with extension callbacks and renderer fallbacks.
 - /debug reports now include session-logs.txt containing all log records written by the reporting session and its subagents for the current day.
 
 ### Changed
 
 - Improved startup responsiveness by deferring nonessential UI, accessibility, browser, provider, slash-command, and interactive-composer loading until needed, and by overlapping independent session preparation work.
-- OpenAI live steering is now disabled by default for GPT models. Typed messages wait for the next tool boundary unless providers.openaiLiveSteering is enabled, avoiding unsupported in-flight message errors.
-- HTML exports now match the /stats visual design with a higher-contrast light theme, timeline and full-trace views, and navigation for nested subagents and advisors. Packaged viewers use integrity-pinned shared assets and require network access; source checkouts continue to embed the viewer.
-- tui.autoGraph now defaults to auto: charts are refined by the judge for supported native TypeSafe judge models and otherwise use the built-in estimate.
+- HTML exports now embed their complete viewer, Markdown parser and syntax highlighter for offline viewing, including nested transcripts and trace navigation.
 - Filesystem changes are detected automatically, so manual scan-cache invalidation after edits is no longer needed.
 - Model refreshes use substantially less CPU by reusing unchanged models and avoiding repeated model-cache database opens.
 - Overlapping sloppy-edit operations are now applied sequentially, with each operation matched against the result of the preceding operation.
 - PI_INTENT_PROMPT and PI_INTENT_DESC can now customize the system guidance and tool-schema description for the i intent field.
 - Printed JSON values in eval, including large Python dictionaries and lists, are displayed as collapsible JSON trees.
-- Codex and Claude rate-limit reset warnings now appear once per reset across conversations and windows, only during the final six hours; the status line continues to show the countdown.
 - The . and c continue shortcuts now simply answer an unanswered last message instead of adding a hidden continue directive.
 - With bash.gitGuard enabled, checkout, switch, restore, reset, and stash operations run safely in linked worktrees, while discarded uncommitted changes are preserved for recovery.
 - Sessions with computer use enabled receive the desktop guide before the first computer call.
 - The Tern interface now presents warnings, errors, update notices, file reads, and completed background work consistently with chat messages.
-- Muted live voice sessions remain visibly muted while the voice model starts work.
 
 ### Fixed
 
+- Fixed session creation replacing an extension- or host-registered `local-inference` stream handler with the bundled on-device transport.
 - Fixed live configuration reloads missing edits immediately after a symlink switches to another file in the same directory.
 - Fixed auth-gateway model routing after catalog refreshes so bare model IDs select the highest-priority credentialed provider, with wire-format compatibility used as a tie-breaker.
 - Fixed chart recommendations that incorrectly inferred whether higher or lower values were better from row or column names; smart charting now uses the judge and avoids charting unsuitable numeric text such as page or step numbers.
@@ -54,10 +52,8 @@
 - Fixed cached approval directory grants that did not cover every target in a request.
 - Fixed text typed during startup being delayed until startup completed, including resumed drafts.
 - Fixed pull-request metadata and diffs remaining stale after a successful git push.
-- Fixed live voice playback clicks when audio stalls mid-word.
 - Fixed read rejecting artifact URLs from truncation hints under cached approvals or restricted folders.
 - Fixed peer task acknowledgements being mistaken for final answers, so wait continues until the peer replies.
-- Failed Hindsight memory recalls and retention operations now produce visible warnings instead of silently continuing without memory.
 - Fixed long conflict-path handling, conflict-content selectors, and stale conflict IDs after aborted merges or external file changes.
 - Fixed cancelled MCP OAuth flows and authentication lookups from crashing the session.
 - Fixed progress HUD entries for idle local-model workers that were no longer used.
@@ -68,10 +64,22 @@
 - Fixed failed large-value JSON queries from displaying the rejected value instead of a useful error.
 - Fixed F5 retry reporting no retry when a background result arrived after cancellation or interruption.
 - Fixed WebMCP invocation errors being empty and timed-out page invocations continuing to run.
-- Fixed HTTP 413 errors for Factory Droid GPT and Grok after computer-use sessions by removing obsolete screenshots from requests.
 - Fixed unavailable configured default or dictation models being silently replaced; omp now warns and identifies the fallback model.
 - Fixed LSP references for files in sibling Git worktrees by adding those checkouts to the active workspace.
 - Improved macOS computer-use behavior for applications without windows by opening the app and inspecting its returned window in one operation.
+
+### Removed
+
+- Removed application self-updates, upstream release checks and release-channel settings; company-managed deployment and plugin upgrades remain.
+- Removed automated QA/grievance reporting, consent prompts and upload commands.
+- Removed hosted snapshot sharing, custom publication scripts, public streaming, clip uploads and skill publication; private/local collaboration remains.
+- Removed independent image URL publication and hosted-only image, speech, transcription, video and judgment service clients; compatible private-endpoint protocols remain.
+- Removed public memory-service defaults and borrowed public-provider credentials; local memory, Sharpshooter, private Hindsight and configured Mnemopi endpoints remain.
+- Removed public/model-backed search and public reader fallbacks; configured SearXNG and private Firecrawl remain.
+- Removed hosted Codex Security scans while preserving local workflows and report imports.
+- Removed Codex Live voice and retired provider-specific saved-reset commands.
+- Removed Smithery cloud marketplace/login and Exa-specific MCP filtering/key extraction; ordinary configured MCP remains.
+
 
 ## [18.13.3] - 2026-10-28
 

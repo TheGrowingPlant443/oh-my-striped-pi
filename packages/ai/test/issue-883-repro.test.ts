@@ -22,7 +22,7 @@ function findOpenAICompletionAssistantWireMessage(
 }
 
 function deepseekModel(overrides: Partial<ModelSpec<"openai-completions">>): Model<"openai-completions"> {
-	const base = getBundledModel("openai", "gpt-4o-mini");
+	const base = getBundledModel("github-copilot", "gpt-4o");
 	return buildModel({
 		...base,
 		api: "openai-completions",
@@ -63,7 +63,7 @@ function assistantWithToolCall(model: Model<"openai-completions">): AssistantMes
 describe("issue #883 / #810 — DeepSeek V4 reasoning_content tool-call replay", () => {
 	it("sets reasoning_content to empty string for deepseek-v4-pro tool-call turn with no thinking blocks", () => {
 		const model = deepseekModel({
-			provider: "deepseek",
+			provider: "github-copilot",
 			baseUrl: "https://api.deepseek.com/v1",
 			id: "deepseek-v4-pro",
 		});
@@ -79,7 +79,7 @@ describe("issue #883 / #810 — DeepSeek V4 reasoning_content tool-call replay",
 
 	it("normalizes assistant content to '' when reasoning_content placeholder is injected (DeepSeek invariant)", () => {
 		const model = deepseekModel({
-			provider: "deepinfra",
+			provider: "github-copilot",
 			baseUrl: "https://api.deepinfra.com/v1/openai",
 			id: "deepseek-ai/DeepSeek-V4-Pro",
 		});

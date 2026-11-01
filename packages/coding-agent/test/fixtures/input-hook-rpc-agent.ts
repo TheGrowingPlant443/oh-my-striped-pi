@@ -1,7 +1,6 @@
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
@@ -11,6 +10,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
+import { getTestModel } from "../helpers/model-fixtures";
 
 // Real RPC dispatch, session queues and extension input handlers; only the model response is scripted.
 // Input handler contract, keyed by message prefix:
@@ -22,7 +22,8 @@ async function ioDetour(): Promise<void> {
 	for (let index = 0; index < 50; index++) await Bun.file(import.meta.path).text();
 }
 const authStorage = await AuthStorage.create(path.join(process.cwd(), "auth.db"));
-authStorage.keys.setRuntime("anthropic", "test-key");
+const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
+authStorage.keys.setRuntime(model.provider, "test-key");
 const modelRegistry = new ModelRegistry(authStorage, path.join(process.cwd(), "models.yml"));
 const sessionManager = SessionManager.inMemory(process.cwd());
 const runtime = new ExtensionRuntime();
@@ -49,7 +50,7 @@ const extensionRunner = new ExtensionRunner([extension], runtime, process.cwd(),
 const mock = createMockModel({ handler: { content: ["ok"] } });
 const agent = new Agent({
 	getApiKey: () => "test-key",
-	initialState: { model: getBundledModel("anthropic", "claude-sonnet-4-5")!, systemPrompt: ["Test"], tools: [] },
+	initialState: { model, systemPrompt: ["Test"], tools: [] },
 	streamFn: mock.stream,
 });
 const session = new AgentSession({

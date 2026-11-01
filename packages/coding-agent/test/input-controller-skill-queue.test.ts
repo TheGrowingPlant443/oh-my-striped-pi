@@ -567,10 +567,10 @@ interface SessionFixture {
 async function createRealSession(): Promise<SessionFixture> {
 	const tempDir = TempDir.createSync("@pi-skill-queue-real-");
 	const authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-	authStorage.keys.setRuntime("anthropic", "test-key");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
 	const modelRegistry = new ModelRegistry(authStorage);
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic model to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected built-in Copilot model to exist");
 
 	const agent = new Agent({
 		initialState: {

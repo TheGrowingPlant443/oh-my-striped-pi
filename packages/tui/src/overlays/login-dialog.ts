@@ -22,9 +22,6 @@ const PRESS_KEY_SUFFIX = /,?\s*then press\s+\S+\s*:?\s*$/i;
 /** Progress that reports a problem rather than a finished stage. */
 const PROGRESS_PROBLEM = /\b(?:fail(?:ed|ure)?|error|unavailable|in use|could ?n[o']t|unable)\b/i;
 
-/** Shown on the field when the flow asks for the manual code again: the last paste had no usable code. */
-const RETRY_MESSAGE = "Couldn't read a code from that. Paste the authorization code or the full redirect URL.";
-
 /** Shown while the browser half of the flow runs and the provider reports nothing. */
 const BROWSER_WAIT = "Waiting for you to finish in the browser…";
 
@@ -72,7 +69,6 @@ export class LoginDialogComponent extends OverlayPanel {
 	#abortController = new AbortController();
 	#inputResolver?: (value: string) => void;
 	#inputRejecter?: (error: Error) => void;
-	#inputAbortCleanup?: () => void;
 	readonly #providerName: string;
 	#nativeAuth: LoginAuth | undefined;
 	/** Native steps after the link, in arrival order; the live input field is embedded by identity. */
@@ -214,50 +210,6 @@ export class LoginDialogComponent extends OverlayPanel {
 	}
 
 	/**
-	 * Show input for manual code/URL entry (for callback server providers)
-	 */
-	showManualInput(prompt: string, signal?: AbortSignal): Promise<string> {
-		// Keep retry chrome in place, but discard prior prompt undo/kill history.
-		const mounted = this.#contentContainer.children.indexOf(this.#input);
-		const previousInput = this.#input;
-		this.#replaceInput();
-		const nativeMounted = this.#nativeSteps.find(step => step.kind === "input" && step.field === previousInput);
-		if (mounted !== -1) {
-			// The flow asks again only when the last paste carried no usable code.
-			this.#input.setError(RETRY_MESSAGE);
-			this.#contentContainer.children.splice(mounted, 1, this.#input);
-			if (nativeMounted?.kind === "input") nativeMounted.field = this.#input;
-		} else {
-			this.#nativeSteps.push({ kind: "input", message: plainText(prompt), field: this.#input });
-			this.#contentContainer.addChild(new Spacer(1));
-			this.#contentContainer.addChild(new Text(theme.fg("dim", prompt), 0, 0));
-			this.#contentContainer.addChild(this.#input);
-			this.#contentContainer.addChild(
-				new Text(theme.fg("dim", `(${editorKey("tui.select.cancel")} to cancel)`), 0, 0),
-			);
-		}
-		this.#nativeRoot = undefined;
-		this.#tui.requestRender();
-
-		if (signal?.aborted) {
-			return Promise.reject(signal.reason instanceof Error ? signal.reason : new Error("Login input cancelled"));
-		}
-		const { promise, resolve, reject } = Promise.withResolvers<string>();
-		this.#inputResolver = resolve;
-		this.#inputRejecter = reject;
-		if (signal) {
-			const onAbort = () => {
-				if (this.#inputRejecter !== reject) return;
-				this.#clearInputHandlers();
-				reject(signal.reason instanceof Error ? signal.reason : new Error("Login input cancelled"));
-			};
-			signal.addEventListener("abort", onAbort, { once: true });
-			this.#inputAbortCleanup = () => signal.removeEventListener("abort", onAbort);
-		}
-		return promise;
-	}
-
-	/**
 	 * Called by onPrompt callback - show prompt and wait for input
 	 * Note: Does NOT clear content, appends to existing (preserves URL from showAuth)
 	 */
@@ -296,8 +248,6 @@ export class LoginDialogComponent extends OverlayPanel {
 
 		this.#tui.requestRender();
 
-		this.#inputAbortCleanup?.();
-		this.#inputAbortCleanup = undefined;
 		const { promise, resolve, reject } = Promise.withResolvers<string>();
 		this.#inputResolver = resolve;
 		this.#inputRejecter = reject;
@@ -305,8 +255,6 @@ export class LoginDialogComponent extends OverlayPanel {
 	}
 
 	#clearInputHandlers(): void {
-		this.#inputAbortCleanup?.();
-		this.#inputAbortCleanup = undefined;
 		this.#inputResolver = undefined;
 		this.#inputRejecter = undefined;
 	}

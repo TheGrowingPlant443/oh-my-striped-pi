@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 /**
  * Usage history contracts:
  *
@@ -13,11 +17,10 @@
  *      fetched credential, whenever a fresh usage report lands.
  */
 import { Database } from "bun:sqlite";
-import { afterEach, beforeEach, describe, expect, it, setSystemTime, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import type { UsageHistoryEntry, UsageReport } from "@oh-my-pi/pi-ai/usage";
-import * as claudeUsage from "@oh-my-pi/pi-ai/usage/claude";
-import * as opencodeGoUsage from "@oh-my-pi/pi-ai/usage/opencode-go";
+import { fixtureUsageProvider } from "./usage-test-utils";
 
 const HOUR = 3_600_000;
 // Hour-aligned base so bucket boundaries in the tests are explicit.
@@ -26,11 +29,11 @@ const T0 = Math.floor(Date.parse("2026-06-12T10:00:00Z") / HOUR) * HOUR;
 function entry(overrides: Partial<UsageHistoryEntry>): UsageHistoryEntry {
 	return {
 		recordedAt: T0,
-		provider: "anthropic",
+		provider: "github-copilot",
 		accountKey: "oauth|account:account-1|email:a@example.com",
 		email: "a@example.com",
 		accountId: "account-1",
-		limitId: "anthropic:5h",
+		limitId: "github-copilot:5h",
 		label: "5 Hour",
 		windowLabel: "5 Hour",
 		usedFraction: 0.1,
@@ -70,7 +73,7 @@ describe("SqliteAuthCredentialStore usage history", () => {
 	it("keeps independent series per account and per limit window", () => {
 		store.recordUsageSnapshots([
 			entry({ usedFraction: 0.2 }),
-			entry({ limitId: "anthropic:7d", label: "7 Day", windowLabel: "7 Day", usedFraction: 0.4 }),
+			entry({ limitId: "github-copilot:7d", label: "7 Day", windowLabel: "7 Day", usedFraction: 0.4 }),
 			entry({
 				accountKey: "oauth|account:account-2|email:b@example.com",
 				email: "b@example.com",
@@ -86,13 +89,13 @@ describe("SqliteAuthCredentialStore usage history", () => {
 	it("filters by provider and sinceMs, oldest first", () => {
 		store.recordUsageSnapshots([
 			entry({ recordedAt: T0 + 2 * HOUR, usedFraction: 0.6 }),
-			entry({ provider: "openai-codex", limitId: "codex:5h", recordedAt: T0 }),
+			entry({ provider: "local", limitId: "codex:5h", recordedAt: T0 }),
 			entry({ recordedAt: T0, usedFraction: 0.2 }),
 		]);
 
-		expect(store.listUsageHistory({ provider: "openai-codex" })).toHaveLength(1);
+		expect(store.listUsageHistory({ provider: "local" })).toHaveLength(1);
 
-		const anthropic = store.listUsageHistory({ provider: "anthropic" });
+		const anthropic = store.listUsageHistory({ provider: "github-copilot" });
 		expect(anthropic.map(row => row.recordedAt)).toEqual([T0, T0 + 2 * HOUR]);
 
 		const recent = store.listUsageHistory({ sinceMs: T0 + HOUR });
@@ -118,7 +121,7 @@ describe("AuthStorage usage history recording", () => {
 
 	beforeEach(async () => {
 		store = new SqliteAuthCredentialStore(new Database(":memory:"));
-		await store.upsertAuthCredential("anthropic", {
+		await store.upsertAuthCredential("github-copilot", {
 			type: "oauth",
 			access: "oat-1",
 			refresh: "refresh-1",
@@ -129,7 +132,7 @@ describe("AuthStorage usage history recording", () => {
 		// Restrict the resolver to anthropic so AuthStorage doesn't fan out real
 		// network fetches for providers with *_API_KEY env vars on the test host.
 		storage = new AuthStorage(store, {
-			usageProviderResolver: provider => (provider === "anthropic" ? claudeUsage.claudeUsageProvider : undefined),
+			usageProviderResolver: provider => (provider === "github-copilot" ? fixtureUsageProvider : undefined),
 		});
 		await storage.credentials.reload();
 	});
@@ -142,21 +145,21 @@ describe("AuthStorage usage history recording", () => {
 	it("appends one row per limit on a fresh fetch, attributed to the credential", async () => {
 		const fetchedAt = Date.now();
 		const report: UsageReport = {
-			provider: "anthropic",
+			provider: "github-copilot",
 			fetchedAt,
 			limits: [
 				{
-					id: "anthropic:5h",
+					id: "github-copilot:5h",
 					label: "5 Hour",
-					scope: { provider: "anthropic", windowId: "5h" },
+					scope: { provider: "github-copilot", windowId: "5h" },
 					window: { id: "5h", label: "5 Hour", resetsAt: fetchedAt + 5 * HOUR },
 					amount: { usedFraction: 0.42, unit: "percent" },
 					status: "ok",
 				},
 				{
-					id: "anthropic:7d",
+					id: "github-copilot:7d",
 					label: "7 Day",
-					scope: { provider: "anthropic", windowId: "7d" },
+					scope: { provider: "github-copilot", windowId: "7d" },
 					window: { id: "7d", label: "7 Day" },
 					amount: { used: 84, limit: 100, unit: "percent" },
 					status: "warning",
@@ -164,15 +167,15 @@ describe("AuthStorage usage history recording", () => {
 			],
 			metadata: { email: "a@example.com" },
 		};
-		vi.spyOn(claudeUsage.claudeUsageProvider, "fetchUsage").mockImplementation(async () => report);
+		vi.spyOn(fixtureUsageProvider, "fetchUsage").mockImplementation(async () => report);
 
 		await storage.usage.reports();
 
 		const rows = storage.usage.history();
 		expect(rows).toHaveLength(2);
 
-		const fiveHour = rows.find(row => row.limitId === "anthropic:5h");
-		expect(fiveHour?.provider).toBe("anthropic");
+		const fiveHour = rows.find(row => row.limitId === "github-copilot:5h");
+		expect(fiveHour?.provider).toBe("github-copilot");
 		expect(fiveHour?.usedFraction).toBe(0.42);
 		expect(fiveHour?.email).toBe("a@example.com");
 		expect(fiveHour?.windowLabel).toBe("5 Hour");
@@ -182,247 +185,8 @@ describe("AuthStorage usage history recording", () => {
 		expect(fiveHour?.accountKey).toContain("email:a@example.com");
 
 		// used/limit fallback resolves a fraction even without usedFraction.
-		const sevenDay = rows.find(row => row.limitId === "anthropic:7d");
+		const sevenDay = rows.find(row => row.limitId === "github-copilot:7d");
 		expect(sevenDay?.usedFraction).toBeCloseTo(0.84);
 		expect(sevenDay?.status).toBe("warning");
-	});
-});
-
-describe("OpenCode Go usage via the upstream endpoint", () => {
-	let store: SqliteAuthCredentialStore;
-	let storage: AuthStorage;
-	let fetchCalls: Array<{ url: string; headers: Record<string, string> }>;
-
-	beforeEach(async () => {
-		fetchCalls = [];
-		store = new SqliteAuthCredentialStore(new Database(":memory:"));
-		storage = new AuthStorage(store, {
-			usageProviderResolver: provider =>
-				provider === "opencode-go" ? opencodeGoUsage.opencodeGoUsageProvider : undefined,
-			usageFetch: (async (input: string | URL | Request, init?: RequestInit) => {
-				fetchCalls.push({
-					url: String(input),
-					headers: (init?.headers as Record<string, string>) ?? {},
-				});
-				return new Response(
-					JSON.stringify({
-						usage: {
-							rolling: { status: "ok", percent: 12, resetsAt: "2026-08-12T15:09:04.847Z" },
-							weekly: { status: "ok", percent: 8, resetsAt: "2026-08-17T00:00:00.847Z" },
-							monthly: { status: "rate-limited", percent: 100, resetsAt: "2026-08-19T00:31:53.847Z" },
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				);
-			}) as unknown as typeof fetch,
-		});
-		await storage.credentials.reload();
-		await storage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-key" });
-	});
-
-	afterEach(() => {
-		setSystemTime();
-		storage.close();
-		vi.restoreAllMocks();
-	});
-
-	it("fetches percent-based limits for a stored API key and records history rows", async () => {
-		const reports = await storage.usage.reports();
-
-		expect(fetchCalls).toHaveLength(1);
-		expect(fetchCalls[0]?.url).toBe("https://opencode.ai/zen/go/v1/usage");
-		expect(fetchCalls[0]?.headers.authorization).toBe("Bearer opencode-go-key");
-
-		const report = reports?.find(candidate => candidate.provider === "opencode-go");
-		expect(report?.limits.map(limit => [limit.id, limit.amount.used, limit.status])).toEqual([
-			["rolling-5h", 12, "ok"],
-			["weekly", 8, "ok"],
-			["monthly", 100, "exhausted"],
-		]);
-		expect(report?.limits.map(limit => limit.scope.windowId)).toEqual(["5h", "7d", "monthly"]);
-		expect(report?.limits.find(limit => limit.id === "monthly")?.window?.resetsAt).toBe(
-			Date.parse("2026-08-19T00:31:53.847Z"),
-		);
-
-		// Fresh reports append durable usage-history rows per limit window.
-		const rows = store.listUsageHistory({ provider: "opencode-go" });
-		expect(rows.map(row => [row.limitId, row.usedFraction])).toEqual([
-			["rolling-5h", 0.12],
-			["weekly", 0.08],
-			["monthly", 1],
-		]);
-	});
-
-	it("resolves reference-stored API keys before the Authorization header", async () => {
-		// Keys stored as references (env var name, "!command") must reach the
-		// endpoint as the resolved secret, not the reference string (#8337 review).
-		const referenceStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
-			usageProviderResolver: provider =>
-				provider === "opencode-go" ? opencodeGoUsage.opencodeGoUsageProvider : undefined,
-			configValueResolver: async config => (config === "ref:opencode" ? "sk-resolved-secret" : config),
-			usageFetch: (async (input: string | URL | Request, init?: RequestInit) => {
-				fetchCalls.push({
-					url: String(input),
-					headers: (init?.headers as Record<string, string>) ?? {},
-				});
-				return new Response(
-					JSON.stringify({
-						usage: {
-							rolling: { status: "ok", percent: 5, resetsAt: "2026-08-12T15:09:04.847Z" },
-							weekly: { status: "ok", percent: 8, resetsAt: "2026-08-17T00:00:00.847Z" },
-							monthly: { status: "ok", percent: 10, resetsAt: "2026-08-19T00:31:53.847Z" },
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				);
-			}) as unknown as typeof fetch,
-		});
-		try {
-			await referenceStorage.credentials.reload();
-			await referenceStorage.credentials.set("opencode-go", { type: "api_key", key: "ref:opencode" });
-
-			const reports = await referenceStorage.usage.reports();
-
-			expect(fetchCalls).toHaveLength(1);
-			expect(fetchCalls[0]?.headers.authorization).toBe("Bearer sk-resolved-secret");
-			expect(reports?.some(candidate => candidate.provider === "opencode-go")).toBe(true);
-		} finally {
-			referenceStorage.close();
-		}
-	});
-
-	it("drops the last-good report when the key turns definitively unauthorized", async () => {
-		// Transient failures serve the cached report; a 401/403 must not — a
-		// revoked key or lapsed subscription would otherwise keep rendering and
-		// ranking from stale quota until the process restarts.
-		let respondWith: "success" | "unauthorized" = "success";
-		const transitionStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
-			usageProviderResolver: provider =>
-				provider === "opencode-go" ? opencodeGoUsage.opencodeGoUsageProvider : undefined,
-			usageFetch: (async () =>
-				respondWith === "success"
-					? new Response(
-							JSON.stringify({
-								usage: {
-									rolling: { status: "ok", percent: 12, resetsAt: "2026-08-12T15:09:04.847Z" },
-									weekly: { status: "ok", percent: 8, resetsAt: "2026-08-17T00:00:00.847Z" },
-									monthly: { status: "ok", percent: 10, resetsAt: "2026-08-19T00:31:53.847Z" },
-								},
-							}),
-							{ status: 200, headers: { "content-type": "application/json" } },
-						)
-					: new Response(
-							JSON.stringify({ type: "error", error: { type: "AuthError", message: "Unauthorized" } }),
-							{
-								status: 401,
-								headers: { "content-type": "application/json" },
-							},
-						)) as unknown as typeof fetch,
-		});
-		try {
-			await transitionStorage.credentials.reload();
-			await transitionStorage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-key" });
-
-			const nowMs = Date.now();
-			setSystemTime(new Date(nowMs));
-			const fresh = await transitionStorage.usage.reports();
-			expect(fresh?.some(candidate => candidate.provider === "opencode-go")).toBe(true);
-
-			// Past the report TTL the next poll re-hits the endpoint and gets 401.
-			respondWith = "unauthorized";
-			setSystemTime(new Date(nowMs + 10 * 60_000));
-			const afterRevocation = await transitionStorage.usage.reports();
-			expect(afterRevocation?.some(candidate => candidate.provider === "opencode-go")).toBe(false);
-		} finally {
-			transitionStorage.close();
-		}
-	});
-
-	it("retains the last-good report through a partial payload", async () => {
-		// One malformed window fails the whole decode, which must fall back to
-		// the cached complete report instead of replacing it with fewer windows.
-		let respondWith: "success" | "partial" = "success";
-		const partialStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
-			usageProviderResolver: provider =>
-				provider === "opencode-go" ? opencodeGoUsage.opencodeGoUsageProvider : undefined,
-			usageFetch: (async () =>
-				new Response(
-					JSON.stringify({
-						usage: {
-							rolling:
-								respondWith === "success"
-									? { status: "ok", percent: 12, resetsAt: "2026-08-12T15:09:04.847Z" }
-									: { status: "ok", percent: "abc" },
-							weekly: { status: "ok", percent: 8, resetsAt: "2026-08-17T00:00:00.847Z" },
-							monthly: { status: "ok", percent: 10, resetsAt: "2026-08-19T00:31:53.847Z" },
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				)) as unknown as typeof fetch,
-		});
-		try {
-			await partialStorage.credentials.reload();
-			await partialStorage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-key" });
-
-			const nowMs = Date.now();
-			setSystemTime(new Date(nowMs));
-			const fresh = await partialStorage.usage.reports();
-			expect(fresh?.find(candidate => candidate.provider === "opencode-go")?.limits).toHaveLength(3);
-
-			respondWith = "partial";
-			setSystemTime(new Date(nowMs + 10 * 60_000));
-			const afterPartial = await partialStorage.usage.reports();
-			const retained = afterPartial?.find(candidate => candidate.provider === "opencode-go");
-			expect(retained?.limits.map(limit => limit.id)).toEqual(["rolling-5h", "weekly", "monthly"]);
-		} finally {
-			partialStorage.close();
-		}
-	});
-
-	it("stops serving the last-good report 24h after its last successful fetch, however often it fails", async () => {
-		// Each failed probe re-stores the fallback; that must not extend retention,
-		// or a persistently failing account shows its old quota as live forever.
-		let respondWith: "success" | "unavailable" = "success";
-		const failingStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
-			usageProviderResolver: provider =>
-				provider === "opencode-go"
-					? { ...opencodeGoUsage.opencodeGoUsageProvider, failureBackoffMs: 5 * 60_000 }
-					: undefined,
-			usageFetch: (async () =>
-				respondWith === "success"
-					? new Response(
-							JSON.stringify({
-								usage: {
-									rolling: { status: "ok", percent: 12, resetsAt: "2026-08-12T15:09:04.847Z" },
-									weekly: { status: "ok", percent: 8, resetsAt: "2026-08-17T00:00:00.847Z" },
-									monthly: { status: "ok", percent: 10, resetsAt: "2026-08-19T00:31:53.847Z" },
-								},
-							}),
-							{ status: 200, headers: { "content-type": "application/json" } },
-						)
-					: new Response("unavailable", { status: 503 })) as unknown as typeof fetch,
-		});
-		try {
-			await failingStorage.credentials.reload();
-			await failingStorage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-key" });
-
-			const nowMs = Date.now();
-			setSystemTime(new Date(nowMs));
-			const fresh = await failingStorage.usage.reports();
-			expect(fresh?.some(candidate => candidate.provider === "opencode-go")).toBe(true);
-
-			respondWith = "unavailable";
-			for (const elapsed of [10 * 60_000, 12 * HOUR, 23 * HOUR, 24 * HOUR - 60_000]) {
-				setSystemTime(new Date(nowMs + elapsed));
-				const served = await failingStorage.usage.reports();
-				expect(served?.some(candidate => candidate.provider === "opencode-go")).toBe(true);
-			}
-
-			setSystemTime(new Date(nowMs + 24 * HOUR + 1_000));
-			const expired = await failingStorage.usage.reports();
-			expect(expired?.some(candidate => candidate.provider === "opencode-go")).toBe(false);
-		} finally {
-			failingStorage.close();
-		}
 	});
 });

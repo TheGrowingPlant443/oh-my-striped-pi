@@ -523,7 +523,7 @@ class TreeList implements Component {
 
 			switch (filterMode) {
 				case "user-only":
-					// Just user requests (plain prompts and user-invoked skill/collab prompts)
+					// Just user requests (plain prompts and user-invoked skill prompts)
 					passesFilter = isUserRequestEntry(entry);
 					break;
 				case "no-tools":

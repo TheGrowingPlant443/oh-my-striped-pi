@@ -3,7 +3,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AuthStorage } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -11,6 +10,7 @@ import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-sessi
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { removeSyncWithRetries, Snowflake, prompt } from "@oh-my-pi/pi-utils";
 import subagentSystemPromptTemplate from "../src/prompts/system/subagent-system-prompt.md" with { type: "text" };
+import { getTestModel } from "./helpers/model-fixtures";
 
 async function expectProviderYieldContract(
 	session: AgentSession,
@@ -63,7 +63,7 @@ describe("SDK workpool yield schema", () => {
 		registryDir = path.join(os.tmpdir(), `pi-workpool-yield-${Snowflake.next()}`);
 		fs.mkdirSync(registryDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(registryDir, "auth.db"));
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -84,7 +84,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],
@@ -139,7 +139,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],
@@ -179,7 +179,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],
@@ -223,7 +223,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],
@@ -269,7 +269,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],
@@ -324,7 +324,7 @@ describe("SDK workpool yield schema", () => {
 				modelRegistry,
 				sessionManager: SessionManager.inMemory(),
 				settings: Settings.isolated({ ...toolSettings, inlineToolDescriptors: "on" }),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],

@@ -66,7 +66,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 	test("loads account policy config with the configured or default global reserve", async () => {
 		const accountPolicies = [
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				account: { email: "policy@example.com" },
 				reservePct: 25,
 				reclaimAbovePct: 60,
@@ -108,7 +108,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 		await Bun.write(path.join(agentDir, "config.yml"), ["auth:", "  accountPolicies: null", ""].join("\n"));
 		const invalidPolicies = [
 			{
-				provider: "openai-codex",
+				provider: "local",
 				account: { email: "policy@example.com" },
 				reservePercent: 25,
 			},
@@ -142,12 +142,12 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 	test("applies selector-list account priority from config.yml during credential selection", async () => {
 		const accountPolicies = [
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				account: { email: "preferred@example.com", accountId: "preferred" },
 				priority: 100,
 			},
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				account: { accountId: "fallback" },
 				priority: 10,
 			},
@@ -157,14 +157,14 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 			["auth:", `  accountPolicies: ${JSON.stringify(accountPolicies)}`, ""].join("\n"),
 		);
 		vi.spyOn(oauthUtils, "getOAuthApiKey").mockImplementation(async (_provider, credentials) => {
-			const credential = credentials["openai-codex"];
+			const credential = credentials["github-copilot"];
 			return credential ? { apiKey: credential.access, newCredentials: credential } : null;
 		});
 
 		await withEnv(SUPPRESS_AUTH_BROKER_ENV, async () => {
 			const storage = await discoverAuthStorage({ agentDir });
 			try {
-				await storage.credentials.set("openai-codex", [
+				await storage.credentials.set("github-copilot", [
 					{
 						type: "oauth",
 						access: "preferred-access",
@@ -183,7 +183,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 					},
 				]);
 
-				const selected = await storage.oauth.access("openai-codex", "fresh-session");
+				const selected = await storage.oauth.access("github-copilot", "fresh-session");
 
 				expect(selected?.email).toBe("preferred@example.com");
 			} finally {
@@ -207,14 +207,14 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 				error: "auth.accountPolicies must be an array",
 			},
 			{
-				yaml: ["auth:", "  accountPolicies:", "    openai-codex: {}", ""].join("\n"),
+				yaml: ["auth:", "  accountPolicies:", "    github-copilot: {}", ""].join("\n"),
 				error: "auth.accountPolicies must be an array",
 			},
 			{
 				yaml: [
 					"auth:",
 					"  accountPolicies:",
-					"    - provider: openai-codex",
+					"    - provider: github-copilot",
 					"      account:",
 					"        orgId: org-only",
 					"",
@@ -225,7 +225,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 				yaml: [
 					"auth:",
 					"  accountPolicies:",
-					"    - provider: openai-codex",
+					"    - provider: github-copilot",
 					"      account:",
 					"        email: preferred@example.com",
 					"        tenantId: unknown",
@@ -237,7 +237,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 				yaml: [
 					"auth:",
 					"  accountPolicies:",
-					"    - provider: openai-codex",
+					"    - provider: github-copilot",
 					"      account:",
 					"        email: preferred@example.com",
 					"      reservePct: 101",
@@ -249,7 +249,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 				yaml: [
 					"auth:",
 					"  accountPolicies:",
-					"    - provider: openai-codex",
+					"    - provider: github-copilot",
 					"      account:",
 					"        email: preferred@example.com",
 					"      reclaimAbovePct: high",
@@ -261,7 +261,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 				yaml: [
 					"auth:",
 					"  accountPolicies:",
-					'    - provider: " openai-codex"',
+					'    - provider: " github-copilot"',
 					"      account:",
 					"        email: preferred@example.com",
 					"",
@@ -300,7 +300,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 			credentials: [
 				{
 					id: 1,
-					provider: "anthropic",
+					provider: "github-copilot",
 					credential: { type: "api_key", key: "cached-key" },
 					identityKey: null,
 					rotatesInMs: null,
@@ -318,7 +318,7 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 			async () => {
 				const storage = await discoverAuthStorage({ agentDir, cachePath });
 				try {
-					expect(storage.keys.source("anthropic") !== undefined).toBeTrue();
+					expect(storage.keys.source("github-copilot") !== undefined).toBeTrue();
 				} finally {
 					storage.close();
 				}
@@ -342,10 +342,10 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 
 			const invalidFiles = [
 				["[]", "must contain a JSON object"],
-				['{"anthropic":"email:a@example.com"}', "must be an array of identity keys"],
-				['{"anthropic":[42]}', "contains an invalid identity key"],
-				['{" anthropic":["email:a@example.com"]}', "provider id with surrounding whitespace"],
-				['{"anthropic":[" email:a@example.com"]}', "identity key with surrounding whitespace"],
+				['{"github-copilot":"email:a@example.com"}', "must be an array of identity keys"],
+				['{"github-copilot":[42]}', "contains an invalid identity key"],
+				['{" github-copilot":["email:a@example.com"]}', "provider id with surrounding whitespace"],
+				['{"github-copilot":[" email:a@example.com"]}', "identity key with surrounding whitespace"],
 			] as const;
 			for (const [content, expectedError] of invalidFiles) {
 				await Bun.write(poolPath, content);

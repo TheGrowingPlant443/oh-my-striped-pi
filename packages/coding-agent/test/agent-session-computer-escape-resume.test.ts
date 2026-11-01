@@ -11,7 +11,6 @@ import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { registerComputerController } from "@oh-my-pi/pi-coding-agent/tools/computer/supervisor";
 import { TempDir } from "@oh-my-pi/pi-utils";
-import { COLLAB_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-wire";
 
 describe("AgentSession computer use after the user's Escape", () => {
 	let tempDir: TempDir;
@@ -22,7 +21,7 @@ describe("AgentSession computer use after the user's Escape", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-computer-escape-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -36,10 +35,10 @@ describe("AgentSession computer use after the user's Escape", () => {
 		tempDir.removeSync();
 	});
 
-	it("resumes on the user's prompt, steer, follow-up and collab prompt, never on agent-sent or synthetic ones", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+	it("resumes on the user's prompt, steer and follow-up, never on agent-sent or synthetic ones", async () => {
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({
-			responses: ["stopped", "budget", "steered", "followed", "collab", "continued"].map(text => ({
+			responses: ["stopped", "budget", "steered", "followed", "continued"].map(text => ({
 				content: [text],
 			})),
 		});
@@ -81,20 +80,10 @@ describe("AgentSession computer use after the user's Escape", () => {
 			await current.waitForIdle();
 			expect(atYield).toEqual([1, 1, 2, 3]);
 
-			await current.promptCustomMessage({
-				customType: COLLAB_PROMPT_MESSAGE_TYPE,
-				content: "guest asks",
-				display: true,
-				details: { from: "guest" },
-				attribution: "user",
-			});
-			await current.waitForIdle();
-			expect(resumes).toBe(4);
-
 			await current.prompt("Continue.", { synthetic: true });
 			await current.waitForIdle();
-			expect(mock.calls.length).toBe(6);
-			expect(resumes).toBe(4);
+			expect(mock.calls.length).toBe(5);
+			expect(resumes).toBe(3);
 		} finally {
 			unregister();
 		}

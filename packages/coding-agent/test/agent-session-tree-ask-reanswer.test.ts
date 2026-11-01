@@ -23,7 +23,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import type { AskToolDetails } from "@oh-my-pi/pi-tui/tools/ask";
 
-const TEST_MODEL = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+const TEST_MODEL = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 
 async function createTestSession(
 	options: { inMemory?: boolean; extensionRunner?: ExtensionRunner; obfuscator?: SecretObfuscator } = {},
@@ -62,7 +62,7 @@ function assistantMsg(text: string) {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text }],
 		api: "anthropic-messages" as const,
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "test",
 		usage: {
 			input: 1,

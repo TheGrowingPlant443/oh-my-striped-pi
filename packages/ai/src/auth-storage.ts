@@ -27,7 +27,6 @@ import { OAuthAccounts } from "./auth/oauth";
 import { AccountPolicies } from "./auth/policy";
 import { CredentialPool } from "./auth/pool";
 import { OAuthRefresher } from "./auth/refresh";
-import { ResetCredits } from "./auth/resets";
 import { RateLimits } from "./auth/rotation";
 import { CredentialSelector } from "./auth/select";
 import { SqliteAuthCredentialStore } from "./auth/sqlite-credential-store";
@@ -43,7 +42,6 @@ import type {
 	KeysApi,
 	LimitsApi,
 	OAuthApi,
-	ResetsApi,
 	SessionsApi,
 	UsageApi,
 } from "./auth/types";
@@ -72,7 +70,6 @@ interface AuthStorageModules {
 	usage: UsageService;
 	health: CredentialHealth;
 	limits: RateLimits;
-	resets: ResetCredits;
 	blocks: CredentialBlocks;
 }
 
@@ -126,10 +123,6 @@ export class AuthStorage {
 	/** Usage-limit marking and credential rotation. */
 	get limits(): LimitsApi {
 		return this.#modules.limits;
-	}
-	/** Saved rate-limit resets. */
-	get resets(): ResetsApi {
-		return this.#modules.resets;
 	}
 	/** Persisted rate-limit blocks (auth-broker server seam). */
 	get blocks(): BlocksApi {
@@ -259,7 +252,6 @@ export class AuthStorage {
 				strategies,
 			}),
 			limits,
-			resets: new ResetCredits({ store, pool, oauth, usage, usageCache, blocks }),
 			blocks,
 		};
 	}

@@ -47,8 +47,8 @@ export default class Models extends Command {
 	static examples = [
 		`# List available chat models, grouped by provider\n  ${APP_NAME} models`,
 		`# List models of every catalog kind\n  ${APP_NAME} models --kind all`,
-		`# List one provider's models (any provider name works)\n  ${APP_NAME} models openai-codex`,
-		`# Find models by substring\n  ${APP_NAME} models find minimax`,
+		`# List Copilot's models\n  ${APP_NAME} models github-copilot`,
+		`# Find models by substring\n  ${APP_NAME} models find gpt`,
 		`# Force a fresh catalog fetch (replaces rm -rf ~/.omp/models.db)\n  ${APP_NAME} models refresh`,
 		`# Machine-readable output\n  ${APP_NAME} models --json`,
 	];

@@ -54,7 +54,6 @@
  */
 
 import type { Api, ImageContent, Message, Model, TextContent } from "@oh-my-pi/pi-ai";
-import { reachesBudgetedHost } from "@oh-my-pi/pi-ai/providers/anthropic-state";
 import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import {
 	type ImageSize,
@@ -268,6 +267,13 @@ export function frameBilling(target: ShapeTarget | undefined): FrameBilling {
 export function frameBillingKey(billing: FrameBilling): string {
 	return `${billing.imageDetail ?? "auto"}:${billing.rule ? JSON.stringify(billing.rule) : "ceiling"}`;
 }
+
+/** Conservative per-frame token estimate for sizing archives whose frame price
+ *  is not billing-verified, and for frames of unknown size — the upper bound
+ *  across shapes: high-res Claude frames hit the 4,784 visual-token cap, billed
+ *  at +5% margin (ceil(4784 * 1.05)). Keeps the overflow guard from
+ *  undercounting a high-res archive at the raised {@link MAX_FRAMES_DEFAULT}. */
+export const FRAME_TOKEN_ESTIMATE = 5024;
 
 /** Billed-token estimate for one rendered frame of `size` under `billing`. */
 export function frameTokens(billing: FrameBilling, size: ImageSize): number {
@@ -514,13 +520,6 @@ export const MAX_FRAMES_DEFAULT = 80;
  *  text region (newest) — with the denser low-quality tier filling the middle. */
 export const HQ_EDGE_FRAMES = 3;
 
-/** Conservative per-frame token estimate for sizing archives whose frame price
- *  is not billing-verified, and for frames of unknown size — the upper bound
- *  across shapes: high-res Claude frames hit the 4,784 visual-token cap, billed
- *  at +5% margin (ceil(4784 * 1.05)). Keeps the overflow guard from
- *  undercounting a high-res archive at the raised {@link MAX_FRAMES_DEFAULT}. */
-export const FRAME_TOKEN_ESTIMATE = 5024;
-
 /** Conservative upper bound for one persisted frame's base64 payload. The
  *  measured high-res Anthropic `8x13`/`11on16` PNG frames sit around 159 KB;
  *  170 KB leaves margin for denser glyph pages without permitting multi-MB
@@ -540,7 +539,7 @@ export const DEFAULT_FRAME_DATA_BYTES_BUDGET = 3_000_000;
  *  request, so the send-time byte clamp evicts them first; the other half stays
  *  free for live screenshots. */
 export function frameDataBytesBudget(model: Model | undefined): number {
-	const inlineBudget = model ? resolveInlineImageByteBudget(model, reachesBudgetedHost(model)) : undefined;
+	const inlineBudget = model ? resolveInlineImageByteBudget(model) : undefined;
 	return inlineBudget === undefined ? DEFAULT_FRAME_DATA_BYTES_BUDGET : Math.floor(inlineBudget / 2);
 }
 
@@ -581,9 +580,7 @@ export const DEFAULT_PROVIDER_IMAGE_BUDGET = 5;
 /** Most images one request to `model`'s deployment may carry, archive,
  *  system-prompt and tool-result imaging combined. */
 export function providerImageBudget(model: Model | undefined): number {
-	return (
-		(model ? resolveImageCountBudget(model, reachesBudgetedHost(model)) : undefined) ?? DEFAULT_PROVIDER_IMAGE_BUDGET
-	);
+	return (model ? resolveImageCountBudget(model) : undefined) ?? DEFAULT_PROVIDER_IMAGE_BUDGET;
 }
 
 /** Archive frame cap for `model`: its image budget, never above {@link MAX_FRAMES_DEFAULT}. */

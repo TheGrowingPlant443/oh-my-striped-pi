@@ -16,7 +16,7 @@ Wrapper -> host:
   {"type": "stderr",      "id": ..., "data": str}
   {"type": "view",        "id": ..., "text": str, "view": {"kind": "table"|"json"|"markdown", ...}}
   {"type": "image",       "id": ..., "image": {"mimeType": str, "data": base64,
-                              "detail"?: str, "url"?: str, "providerFile"?: dict}}
+                              "detail"?: str, "url"?: str}}
   {"type": "status",      "id": ..., "event": {"op": str, ...}}
   {"type": "reply",       "id": ..., "value": <tool envelope>}
   {"type": "error",       "id": ..., "ename": str, "evalue": str, "traceback": [str]}
@@ -1781,7 +1781,7 @@ def _emit_view(text: str, view: dict) -> None:
 
 
 def _emit_image(image: dict) -> None:
-    """Emit an image payload ``{mimeType, data(base64), detail?, url?, providerFile?}``."""
+    """Emit an image payload ``{mimeType, data(base64), detail?, url?}``."""
     rid = _CURRENT_RID.get()
     if rid is None:
         return
@@ -1798,14 +1798,14 @@ def _image_base64(data: Any) -> str | None:
 
 
 def _image_payload(value: Any) -> dict | None:
-    """Image payload of a ``{mimeType, data, detail?, url?, providerFile?}`` dict."""
+    """Image payload of a ``{mimeType, data, detail?, url?}`` dict."""
     if not isinstance(value, dict) or not isinstance(value.get("mimeType"), str):
         return None
     data = _image_base64(value.get("data"))
     if data is None:
         return None
     image = {"mimeType": value["mimeType"], "data": data}
-    for key in ("detail", "url", "providerFile"):
+    for key in ("detail", "url"):
         if key in value:
             image[key] = value[key]
     return image

@@ -19,12 +19,7 @@ import {
 } from "../index";
 import { colorLuma, formatDuration, hexToRgb, rgbToHex, sanitizeText } from "@oh-my-pi/pi-utils";
 import { formatProviderName } from "../chrome/format";
-import {
-	collapseSharedUsageReports,
-	formatLimitTitle,
-	summarizeUsageResetCredits,
-	type UsageResetSummary,
-} from "./usage-display";
+import { collapseSharedUsageReports, formatLimitTitle } from "./usage-display";
 import { colorToAnsi } from "../theme/color";
 import { ensureThemeSync, theme } from "../theme/theme";
 import { formatAbsoluteOnlyAmount } from "../prompt/usage-amounts";
@@ -92,14 +87,6 @@ export interface ProviderCard {
 	notes: string[];
 	/** True when nothing is used anywhere (or there are no limits): collapses to a tick. */
 	idle: boolean;
-	resetCredits?: {
-		bankedCount: number;
-		redeemableCount: number;
-		soonestExpiryMs?: number;
-		unavailableReasons: string[];
-	};
-	/** Labels of accounts with verified Daybreak access. */
-	daybreakAccounts?: string[];
 }
 
 /**
@@ -178,12 +165,8 @@ export function buildProviderCards(
 		for (const report of providerReports) {
 			for (const limit of report.limits) {
 				const label = formatLimitTitle(limit);
-				// Distinct buckets can share a label and window (Antigravity's Gemini
-				// vs Gemini (Argon) weekly) and must not average into one row, so the
-				// id joins the key. The label and window stay in it too: some
-				// providers build ids positionally or per plan (kimi's `${index}`,
-				// copilot's allowance), where ids differ across accounts for the
-				// same quota, so an id-only key would split those accounts apart.
+				// Include the id to distinguish separate buckets sharing a label and window.
+				// Keep the label and window because allowance ids can differ across accounts.
 				// `sharedGroup` already names the routing copies of one shared bucket.
 				const key =
 					limit.scope.sharedGroup ??
@@ -227,45 +210,6 @@ export function buildProviderCards(
 			if (!duplicated) window.windowTag = undefined;
 		}
 
-		const resetRows = providerReports
-			.map(report => summarizeUsageResetCredits(report.resetCredits, nowMs))
-			.filter((summary): summary is UsageResetSummary => summary !== undefined && summary.bankedCount > 0);
-		const bankedCount = resetRows.reduce((total, summary) => total + summary.bankedCount, 0);
-		const redeemableCount = resetRows.reduce((total, summary) => total + summary.redeemableCount, 0);
-		const resetExpiries = resetRows
-			.map(summary => summary.soonestExpiry)
-			.filter((expiry): expiry is string => expiry !== undefined)
-			.map(expiry => Date.parse(expiry))
-			.filter(Number.isFinite)
-			.sort((left, right) => left - right);
-		const soonestResetExpiry = resetExpiries.find(expiry => expiry > nowMs) ?? resetExpiries.at(-1);
-		const unavailableReasons = [
-			...new Set(
-				resetRows
-					.map(summary => summary.unavailableReason)
-					.filter((reason): reason is string => reason !== undefined),
-			),
-		];
-		const resetCredits =
-			bankedCount > 0
-				? {
-						bankedCount,
-						redeemableCount,
-						soonestExpiryMs: soonestResetExpiry === undefined ? undefined : soonestResetExpiry - nowMs,
-						unavailableReasons,
-					}
-				: undefined;
-		const daybreakAccounts = providerReports.flatMap((report, index) =>
-			report.metadata?.daybreak === true
-				? [
-						typeof report.metadata.email === "string" && report.metadata.email
-							? report.metadata.email
-							: typeof report.metadata.accountId === "string" && report.metadata.accountId
-								? report.metadata.accountId
-								: `account ${index + 1}`,
-					]
-				: [],
-		);
 		cards.push({
 			provider,
 			name: formatProviderName(provider),
@@ -276,11 +220,7 @@ export function buildProviderCards(
 			notes: [...new Set(providerReports.flatMap(report => report.notes ?? []))],
 			idle:
 				unavailable.length === 0 &&
-				!resetCredits &&
-				daybreakAccounts.length === 0 &&
 				windows.every(window => window.fraction !== undefined && window.fraction < IDLE_FRACTION),
-			resetCredits,
-			...(daybreakAccounts.length > 0 ? { daybreakAccounts } : {}),
 		});
 	}
 
@@ -785,30 +725,6 @@ export class UsageDashboardComponent implements Component {
 		const titlePad = Math.max(0, width - 2 - visibleWidth(title) - visibleWidth(accountsText));
 		lines.push(`${this.#statusIcon(cardStatus)} ${title}${" ".repeat(titlePad)}${accountsText}`);
 
-		for (const account of card.daybreakAccounts ?? []) {
-			const label = sanitizeText(account.replace(/[\r\n\t]+/g, " "));
-			lines.push(`  ${theme.fg("success", truncateToWidth(`daybreak · ${label}`, width - 2))}`);
-		}
-
-		if (card.resetCredits) {
-			const resets = card.resetCredits;
-			let resetText = `✦ ${resets.bankedCount} reset${resets.bankedCount === 1 ? "" : "s"}`;
-			if (resets.redeemableCount !== resets.bankedCount) {
-				resetText += ` · ${resets.redeemableCount} usable`;
-			}
-			if (resets.soonestExpiryMs !== undefined) {
-				resetText +=
-					resets.soonestExpiryMs > 0 ? ` · expires ${formatDuration(resets.soonestExpiryMs)}` : " · expired";
-			}
-			lines.push(
-				`  ${theme.fg(resets.redeemableCount > 0 ? "success" : "warning", truncateToWidth(resetText, width - 2))}`,
-			);
-			if (resets.redeemableCount === 0 && resets.unavailableReasons.length > 0) {
-				const reason = sanitizeText(resets.unavailableReasons.join(" • ").replace(/[\r\n\t]+/g, " "));
-				lines.push(`  ${theme.fg("dim", truncateToWidth(`unavailable: ${reason}`, width - 2))}`);
-			}
-		}
-
 		for (const account of card.unavailableAccounts) {
 			const text = sanitizeDisplayLine(`${account} — usage unavailable`);
 			for (const line of wrapTextWithAnsi(text, Math.max(1, width - 2))) {
@@ -1167,8 +1083,7 @@ export class UsageDashboardComponent implements Component {
 		const unreported: ProviderCard[] = [];
 		const unmetered: ProviderCard[] = [];
 		for (const entry of this.#cards) {
-			const shown =
-				entry.windows.length > 0 || entry.resetCredits !== undefined || entry.daybreakAccounts !== undefined;
+			const shown = entry.windows.length > 0;
 			if (!shown) (entry.unavailableAccounts.length > 0 ? unreported : unmetered).push(entry);
 			else if (entry.idle) untouched.push(entry);
 			else framed.push(entry);
@@ -1383,36 +1298,6 @@ export class UsageDashboardComponent implements Component {
 		];
 		if (entry.accounts > 1) {
 			who.push(text([span(`${entry.accounts} accounts`, "dim")], { role: "omp.usage.provider.meta" }));
-		}
-		if (entry.resetCredits) {
-			const resets = entry.resetCredits;
-			const details: string[] = [];
-			if (resets.redeemableCount !== resets.bankedCount) details.push(`${resets.redeemableCount} usable now`);
-			if (resets.soonestExpiryMs !== undefined) {
-				details.push(
-					resets.soonestExpiryMs > 0 ? `expires in ${formatDuration(resets.soonestExpiryMs)}` : "expired",
-				);
-			}
-			if (resets.redeemableCount === 0 && resets.unavailableReasons.length > 0) {
-				details.push(`unavailable: ${sanitizeDisplayLine(resets.unavailableReasons.join(" • "))}`);
-			}
-			const label = `${resets.bankedCount} reset${resets.bankedCount === 1 ? "" : "s"} banked`;
-			who.push(
-				text([span(label, resets.redeemableCount > 0 ? "success" : "warning")], {
-					role: "omp.usage.provider.meta",
-					title: details.length > 0 ? `${label} · ${details.join(" · ")}` : label,
-				}),
-			);
-		}
-		for (const account of entry.daybreakAccounts ?? []) {
-			const name = sanitizeDisplayLine(account);
-			who.push(
-				text([span(`Daybreak · ${name}`, "success")], {
-					role: "omp.usage.provider.meta",
-					truncate: "middle",
-					title: `Daybreak access · ${name}`,
-				}),
-			);
 		}
 		for (const account of entry.unavailableAccounts) {
 			const name = sanitizeDisplayLine(account);
@@ -1641,36 +1526,6 @@ export class UsageDashboardComponent implements Component {
 			const facts: { k: TspText; v: TspText }[] = [];
 			const notes = [...new Set(reports.flatMap(report => report.notes ?? []))];
 			if (notes.length > 0) facts.push({ k: [span("Notes", "muted")], v: sanitizeDisplayLine(notes.join(" • ")) });
-			for (const [index, report] of reports.entries()) {
-				const resets = summarizeUsageResetCredits(report.resetCredits, nowMs);
-				if (!resets || resets.bankedCount <= 0) continue;
-				const value: TspSpan[] = [
-					span(
-						`${resets.bankedCount} saved reset${resets.bankedCount === 1 ? "" : "s"}`,
-						resets.redeemableCount > 0 ? "success" : "warning",
-					),
-				];
-				if (resets.redeemableCount !== resets.bankedCount) {
-					value.push(span(` · ${resets.redeemableCount} usable now`, "muted"));
-				}
-				if (resets.soonestExpiry) {
-					const remaining = Date.parse(resets.soonestExpiry) - nowMs;
-					const date = resets.soonestExpiry.slice(0, 10);
-					value.push(
-						span(
-							remaining > 0 ? ` · expires in ${formatDuration(remaining)} (${date})` : ` · expired (${date})`,
-							"muted",
-						),
-					);
-				}
-				if (resets.redeemableCount === 0 && resets.unavailableReason) {
-					value.push(span(` · unavailable: ${sanitizeDisplayLine(resets.unavailableReason)}`, "muted"));
-				}
-				facts.push({
-					k: [span(`Resets · ${reportAccountLabel(report, report.limits[0], index)}`, "muted")],
-					v: value,
-				});
-			}
 			if (facts.length > 0) {
 				children.push(node("kv", { items: facts, layout: "grid", role: "omp.usage.facts" }, undefined, "facts"));
 			}

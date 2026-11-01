@@ -1,13 +1,12 @@
 /**
  * Per-task prewalk-suitability classifier for `prewalk.auto`.
  *
- * Asks the native System One judge one choice question about where a request's
+ * Asks the configured native judge one choice question about where a request's
  * expensive reasoning belongs: up front (`prewalk`: the active model
  * investigates and plans, the cheap target finishes), throughout (`primary`:
  * stay on the active model), or nowhere (`direct`: nothing worth handing off
- * from). This is not a difficulty classifier (see `auto-thinking/classifier.ts`)
- * and it trusts only the calibrated native probabilities, so a prompted chat or
- * on-device model never stands in for the native judge.
+ * from). This is not a difficulty classifier (see `auto-thinking/classifier.ts`);
+ * it relies on calibrated native probabilities, never prompted chat or on-device answers.
  *
  * Resolves `undefined` when there is nothing to judge: no native backend, or a
  * low-signal request ("ok", "thanks"). Throws on every other failure (no key,
@@ -118,8 +117,7 @@ function toDecision({ choice, probabilities, confidence }: ChoiceAnswer<PrewalkR
 
 /**
  * Classify where `input.request`'s reasoning belongs.
- * @returns `undefined` when the request is low-signal or the `judge` role does not resolve first to a native
- * System One backend.
+ * @returns `undefined` when the request is low-signal or no native judge resolves first.
  * @throws when the judge cannot produce a usable answer within {@link AUTO_PREWALK_TIMEOUT_MS}.
  */
 export async function classifyAutoPrewalk(

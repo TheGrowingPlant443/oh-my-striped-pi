@@ -5,7 +5,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
@@ -16,6 +15,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { createTools, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { Snowflake } from "@oh-my-pi/pi-utils";
 import { e2eApiKey } from "../../ai/test/oauth";
+import { getTestModel } from "./helpers/model-fixtures";
 
 export { e2eApiKey };
 
@@ -92,9 +92,9 @@ export async function createTestSession(options: TestSessionOptions = {}): Promi
 	};
 	const tools = await createTools(toolSession);
 
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+	const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 	const agent = new Agent({
-		getApiKey: () => e2eApiKey("ANTHROPIC_API_KEY"),
+		getApiKey: () => e2eApiKey("COPILOT_GITHUB_TOKEN"),
 		initialState: {
 			model,
 			systemPrompt: Array.isArray(options.systemPrompt)

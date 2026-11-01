@@ -58,11 +58,8 @@ export const OUTPUT_FIT_HEADWAY_TOKENS = 64;
  *
  * Returns `maxTokens` unchanged when the requested cap already fits, the
  * model declares no window, the host ends generation at the window itself
- * instead of rejecting the request (`stops-output-at-context-window`, e.g.
- * Claude 4.5+ on the Claude API), or nothing would be requested (including an
- * OpenRouter-hosted model with no caller cap: the transport omits the catalog
- * default there so each upstream self-caps, and a fitted value would turn into
- * an explicit cap that filters upstreams). Otherwise returns
+ * instead of rejecting the request (`stops-output-at-context-window`), or
+ * nothing would be requested. Otherwise returns
  * the remaining room minus {@link OUTPUT_FIT_HEADWAY_TOKENS} (never below
  * {@link MIN_FITTED_OUTPUT_TOKENS}); a
  * prompt that fills the whole window still overflows and is left to the
@@ -72,11 +69,6 @@ export const OUTPUT_FIT_HEADWAY_TOKENS = 64;
  * Lives here, not next to the default in pi-ai's `mapOptionsForApi`, because
  * pi-ai has no tokenizer; callers apply it in their `streamFn` (coding-agent
  * does so in its shared settings-aware wrapper).
- *
- * Not fixed: Anthropic budget-thinking transports raise `max_tokens` back to
- * at least the thinking budget plus a fallback buffer downstream
- * (`ensureMaxTokensForThinking`), so a fitted cap below that is overridden
- * and the request can still exceed the window as before.
  */
 export function fitOutputTokensToContextWindow(
 	model: Model,
@@ -84,7 +76,6 @@ export function fitOutputTokensToContextWindow(
 	maxTokens: number | undefined,
 	tokenizer: Tokenizer,
 ): number | undefined {
-	if (maxTokens === undefined && omitsDefaultOutputCap(model.compat)) return undefined;
 	const requested = maxTokens ?? model.maxTokens;
 	const contextWindow = model.contextWindow;
 	if (!requested || !contextWindow || contextWindow <= 0) return maxTokens;
@@ -93,13 +84,6 @@ export function fitOutputTokensToContextWindow(
 	const room = contextWindow - countPromptTokens(context, tokenizer) - OUTPUT_FIT_HEADWAY_TOKENS;
 	if (room >= requested) return maxTokens;
 	return Math.max(MIN_FITTED_OUTPUT_TOKENS, room);
-}
-
-/** OpenRouter hosts drop the catalog default cap unless the endpoint always needs one. */
-function omitsDefaultOutputCap(compat: Model["compat"] | undefined): boolean {
-	return (
-		compat !== undefined && "isOpenRouterHost" in compat && compat.isOpenRouterHost && !compat.alwaysSendMaxTokens
-	);
 }
 
 /**
@@ -148,7 +132,6 @@ function countContextTokens(context: Context, tokenizer: Tokenizer): number {
 	return (
 		countFraming(systemPrompt, tokenizer, () => [...(systemPrompt ?? [])]) +
 		countFraming(tools, tokenizer, () => toolFragments(tools ?? [])) +
-		// Anthropic replays retired tool definitions, so they are prompt too.
 		countFraming(inactiveTools, tokenizer, () => toolFragments(inactiveTools ?? [])) +
 		tokenizer.countMessages(context.messages)
 	);

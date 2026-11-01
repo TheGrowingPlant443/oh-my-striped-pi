@@ -9,6 +9,7 @@ import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { BlockAccumulator, SpeechEnhancer } from "@oh-my-pi/pi-coding-agent/tts/speech-enhancer";
+import { getTestModel } from "../helpers/model-fixtures";
 
 const authStorages: AuthStorage[] = [];
 const modelConfigDirs: string[] = [];
@@ -34,8 +35,7 @@ afterEach(() => {
 
 describe("SpeechEnhancer rewriting", () => {
 	it("uses a reasoning-safe rewrite budget when the catalog disables reasoning", async () => {
-		const baseModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!baseModel) throw new Error("Expected bundled Claude Sonnet 4.5 model");
+		const baseModel = getTestModel("github-copilot");
 		const model = { ...baseModel, reasoning: false };
 		const settings = Settings.isolated({ modelRoles: { tiny: `${model.provider}/${model.id}` } });
 		const registry = await createRegistry(settings, [model]);
@@ -58,8 +58,7 @@ describe("SpeechEnhancer rewriting", () => {
 	it("selects an available local-inference tiny model", async () => {
 		const localModel = getBundledModel("local", "lfm2.5-230m");
 		if (!localModel) throw new Error("Expected bundled local tiny model");
-		const paidModel = getBundledModel("anthropic", "claude-haiku-4-5");
-		if (!paidModel) throw new Error("Expected bundled Claude Haiku 4.5 model");
+		const paidModel = getTestModel("github-copilot");
 		const settings = Settings.isolated({ modelRoles: { tiny: `${localModel.provider}/${localModel.id}` } });
 		const registry = await createRegistry(settings, [localModel, paidModel]);
 		const completeSimpleMock = vi.spyOn(ai, "completeSimple").mockResolvedValue({

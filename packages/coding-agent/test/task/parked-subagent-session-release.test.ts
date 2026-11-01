@@ -10,8 +10,8 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -57,7 +57,6 @@ beforeEach(async () => {
 	setAgentDir(path.join(home, ".omp", "agent"));
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
-	registerMockApi(MOCK_API_SOURCE);
 });
 
 afterEach(async () => {
@@ -113,15 +112,18 @@ async function runKeptAliveSubagent(): Promise<{ release(): void; close(): void 
 	authStorage.keys.setRuntime("mock", "test-key");
 	const modelRegistry = new ModelRegistry(authStorage);
 	const mock = createMockModel({
+		provider: "mock",
 		handler: context =>
 			(context.tools ?? []).some(tool => tool.name === "yield")
 				? { content: [{ type: "toolCall", name: "yield", arguments: { type: "result", data: "done" } }] }
 				: { content: ["label"] },
 	});
-	const catalogAvailable = modelRegistry.getAvailable.bind(modelRegistry);
-	const availableSpy = vi
-		.spyOn(modelRegistry, "getAvailable")
-		.mockImplementation(kind => [mock, ...catalogAvailable(kind)]);
+	modelRegistry.registerProvider(mock.provider, {
+		api: mock.api,
+		baseUrl: mock.baseUrl,
+		models: [mock],
+	});
+	registerCustomApi(mock.api, mock.stream, MOCK_API_SOURCE);
 	try {
 		const result = await runSubprocess({
 			cwd,
@@ -157,7 +159,6 @@ async function runKeptAliveSubagent(): Promise<{ release(): void; close(): void 
 		// Recorded mock calls carry stream options with closures bound to the session.
 		release: () => {
 			mock.reset();
-			availableSpy.mockRestore();
 		},
 		close: () => authStorage.close(),
 	};

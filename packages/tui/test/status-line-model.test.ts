@@ -31,7 +31,6 @@ function createModelContext(advisorActive: boolean): SegmentContext {
 		vibeMode: null,
 		vim: null,
 		collab: null,
-		stream: null,
 		recording: false,
 		usageStats: {
 			input: 0,
@@ -62,16 +61,16 @@ function createModelContext(advisorActive: boolean): SegmentContext {
 	};
 }
 
-describe("status line stream segment", () => {
-	it("renders the live viewer badge only while attached", () => {
+describe("status line record segment", () => {
+	it("renders the local recording badge only while recording", () => {
 		const ctx = createModelContext(false);
-		ctx.stream = { viewers: 7 };
-		expect(renderSegment("stream", ctx)).toEqual({
-			content: theme.fg("thinkingHigh", "● LIVE 7"),
+		ctx.recording = true;
+		expect(renderSegment("record", ctx)).toEqual({
+			content: theme.fg("thinkingHigh", "● REC"),
 			visible: true,
 		});
-		ctx.stream = null;
-		expect(renderSegment("stream", ctx)).toEqual({ content: "", visible: false });
+		ctx.recording = false;
+		expect(renderSegment("record", ctx)).toEqual({ content: "", visible: false });
 	});
 });
 

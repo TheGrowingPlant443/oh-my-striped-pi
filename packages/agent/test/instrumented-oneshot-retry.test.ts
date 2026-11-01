@@ -29,10 +29,10 @@ const emptyUsage = (): Usage =>
 	}) as unknown as Usage;
 
 const model = {
-	id: "claude-sonnet-4-6",
-	provider: "anthropic",
+	id: "claude-sonnet-4.6",
+	provider: "github-copilot",
 	api: "anthropic-messages",
-	baseUrl: "https://api.anthropic.com",
+	baseUrl: "https://api.githubcopilot.com",
 } as unknown as Model<Api>;
 
 const ctx = { systemPrompt: "s", messages: [] } as unknown as Context;
@@ -42,8 +42,8 @@ function reply(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
 		role: "assistant",
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-6",
+		provider: "github-copilot",
+		model: "claude-sonnet-4.6",
 		usage: emptyUsage(),
 		stopReason: "stop",
 		timestamp: 0,

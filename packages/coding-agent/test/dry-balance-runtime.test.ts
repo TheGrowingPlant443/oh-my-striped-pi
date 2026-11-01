@@ -5,6 +5,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
 import { getModelDbPath, TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 const cliEntry = path.join(import.meta.dir, "..", "src", "cli.ts");
 
@@ -12,35 +13,31 @@ test("omp dry-balance resolves credential-scoped models from the model cache", a
 	const tempDir = TempDir.createSync("@omp-dry-balance-runtime-");
 	const apiKey = "dry-balance-cache-test-key";
 	const modelId = "cached-dry-balance-model";
+	const bundled = getTestModel("github-copilot");
 	const cacheDbPath = getModelDbPath(tempDir.path());
 	await fs.mkdir(path.dirname(cacheDbPath), { recursive: true });
 	try {
 		writeModelCache(
-			resolveModelCacheProviderId("opencode-go", { apiKey }),
+			resolveModelCacheProviderId("github-copilot", { apiKey }),
 			Date.now(),
 			[
 				buildModel({
+					...bundled,
 					id: modelId,
 					name: "Cached Dry Balance Model",
-					provider: "opencode-go",
-					api: "openai-completions",
-					baseUrl: "https://opencode.ai/zen/go/v1",
-					reasoning: false,
-					input: ["text"],
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-					contextWindow: 128_000,
-					maxTokens: 4096,
 				}),
 			],
 			true,
 			"",
 			cacheDbPath,
+			[bundled],
+			bundled.headers,
 		);
 		const child = Bun.spawn(
-			[process.execPath, cliEntry, "dry-balance", `opencode-go/${modelId}`, "--count", "1", "--json"],
+			[process.execPath, cliEntry, "dry-balance", `github-copilot/${modelId}`, "--count", "1", "--json"],
 			{
 				cwd: tempDir.path(),
-				env: { ...process.env, NO_COLOR: "1", OPENCODE_API_KEY: apiKey, PI_CODING_AGENT_DIR: tempDir.path() },
+				env: { ...process.env, NO_COLOR: "1", COPILOT_GITHUB_TOKEN: apiKey, PI_CODING_AGENT_DIR: tempDir.path() },
 				stdout: "pipe",
 				stderr: "pipe",
 			},
@@ -53,7 +50,7 @@ test("omp dry-balance resolves credential-scoped models from the model cache", a
 
 		// No OAuth account is stored, so the sample itself fails; resolving the model is the contract here.
 		expect(stderr).toBe("");
-		expect(JSON.parse(stdout).model).toBe(`opencode-go/${modelId}`);
+		expect(JSON.parse(stdout).model).toBe(`github-copilot/${modelId}`);
 	} finally {
 		await tempDir.remove();
 	}

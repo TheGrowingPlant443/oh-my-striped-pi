@@ -27,6 +27,7 @@ import {
 	startAuthBroker,
 } from "@oh-my-pi/pi-ai/auth-broker";
 import { createBrokerAuthStorage, refreshBrokerOAuthCredential } from "@oh-my-pi/pi-coding-agent/cli/auth-broker-cli";
+import { registerOAuthProvider, unregisterOAuthProvider } from "@oh-my-pi/pi-ai/oauth";
 import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
 import { mcpOAuthCredentialId } from "@oh-my-pi/pi-coding-agent/mcp/oauth-flow";
 import type { MCPServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
@@ -161,11 +162,26 @@ describe("broker provider refresh", () => {
 			),
 		);
 		const controller = new AbortController();
-		await refreshBrokerOAuthCredential(
-			"cursor",
-			{ type: "oauth", access: "a", refresh: "r", expires: 0, email: "dev@example.test" },
-			controller.signal,
-		).catch(() => {});
+		registerOAuthProvider({
+			id: "company-oauth",
+			name: "Company OAuth",
+			login: async () => {
+				throw new Error("Login is not part of refresh");
+			},
+			refreshToken: async (credentials, signal) => {
+				await fetch("https://auth.company.test/token", { method: "POST", signal });
+				return credentials;
+			},
+		});
+		try {
+			await refreshBrokerOAuthCredential(
+				"company-oauth",
+				{ type: "oauth", access: "a", refresh: "r", expires: 0, email: "dev@example.test" },
+				controller.signal,
+			);
+		} finally {
+			unregisterOAuthProvider("company-oauth");
+		}
 		expect(tokenSignal).toBe(controller.signal);
 	});
 });

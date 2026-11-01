@@ -13,7 +13,6 @@ import { fetchWithRetry } from "@oh-my-pi/pi-utils";
 import type { AgentStorage } from "../session/agent-storage";
 import { findCredential, withHardTimeout } from "./search/providers/utils";
 
-const FIRECRAWL_DEFAULT_BASE_URL = "https://api.firecrawl.dev/v2";
 /** Cap on honoured `Retry-After` hints; longer hints fail fast to the next backend. */
 const RETRY_MAX_DELAY_MS = 2_000;
 
@@ -23,8 +22,8 @@ const RETRY_MAX_DELAY_MS = 2_000;
  * keeps an explicit `/v1` or `/v2` suffix and is otherwise defaulted to `/v2`.
  */
 export function resolveFirecrawlUrl(endpoint: "/search" | "/scrape"): string {
-	const configured = process.env.FIRECRAWL_BASE_URL ?? process.env.FIRECRAWL_API_URL;
-	if (!configured?.trim()) return `${FIRECRAWL_DEFAULT_BASE_URL}${endpoint}`;
+	const configured = process.env.FIRECRAWL_BASE_URL?.trim() || process.env.FIRECRAWL_API_URL?.trim();
+	if (!configured) throw new Error("Firecrawl requires FIRECRAWL_BASE_URL or FIRECRAWL_API_URL.");
 	let url: URL;
 	try {
 		url = new URL(configured.trim());
@@ -45,6 +44,16 @@ export function resolveFirecrawlUrl(endpoint: "/search" | "/scrape"): string {
 	if (!/\/v[12]$/i.test(basePath)) basePath += "/v2";
 	url.pathname = basePath + endpoint;
 	return url.toString();
+}
+
+/** No hosted default: only explicitly configured deployments are available. */
+export function isFirecrawlConfigured(): boolean {
+	try {
+		resolveFirecrawlUrl("/scrape");
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export class FirecrawlApiError extends Error {
@@ -101,19 +110,17 @@ export async function scrapeWithFirecrawl(
 	options: FirecrawlScrapeOptions,
 	storage: AgentStorage | null | undefined,
 ): Promise<string | null> {
+	const endpoint = resolveFirecrawlUrl("/scrape");
 	const apiKey = findFirecrawlApiKey(storage);
-	if (!apiKey) {
-		throw new FirecrawlApiError("Firecrawl credentials not found. Set FIRECRAWL_API_KEY.");
-	}
 
 	const body = { url, formats: ["markdown"] };
 
-	const response = await fetchWithRetry(resolveFirecrawlUrl("/scrape"), {
+	const response = await fetchWithRetry(endpoint, {
 		method: "POST",
 		headers: {
 			Accept: "application/json",
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${apiKey}`,
+			...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
 		},
 		body: JSON.stringify(body),
 		signal: withHardTimeout(options.signal, options.timeoutMs),

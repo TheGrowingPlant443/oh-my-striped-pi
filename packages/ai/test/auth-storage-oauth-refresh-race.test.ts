@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, setSystemTime, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -38,7 +42,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	afterEach(async () => {
 		vi.restoreAllMocks();
 		setSystemTime();
-		oauthUtils.unregisterOAuthProviders("auth-storage-oauth-refresh-race-test");
+		resetOAuthMocks("auth-storage-oauth-refresh-race-test");
 		store?.close();
 		store = null;
 		authStorage = null;
@@ -53,7 +57,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		// Seed the shared DB with one expired OAuth credential; this simulates the
 		// state two cooperating omp processes both load from the persisted row.
-		await authStorage.credentials.set("anthropic", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "stale-access",
@@ -61,7 +65,7 @@ describe("AuthStorage OAuth refresh race", () => {
 				expires: Date.now() - 60_000,
 			},
 		]);
-		const storedBefore = store.listAuthCredentials("anthropic");
+		const storedBefore = store.listAuthCredentials("github-copilot");
 		expect(storedBefore).toHaveLength(1);
 		const credentialId = storedBefore[0]!.id;
 
@@ -88,17 +92,17 @@ describe("AuthStorage OAuth refresh race", () => {
 		});
 
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
-			const apiKey = await authStorage!.keys.get("anthropic", "session-race");
+			const apiKey = await authStorage!.keys.get("github-copilot", "session-race");
 
 			// We should have picked up the rotated credential instead of disabling
 			// the row that the peer just updated.
 			expect(apiKey).toBe("fresh-access-from-peer");
 			expect(events).toHaveLength(0);
-			expect(authStorage!.credentials.has("anthropic")).toBe(true);
+			expect(authStorage!.credentials.has("github-copilot")).toBe(true);
 
 			// The row must still be active in storage; before the fix it would be
 			// soft-deleted with disabled_cause set to the invalid_grant error.
-			const stored = store!.listAuthCredentials("anthropic");
+			const stored = store!.listAuthCredentials("github-copilot");
 			expect(stored).toHaveLength(1);
 			expect(stored[0]?.id).toBe(credentialId);
 			expect(stored[0]?.credential.type).toBe("oauth");
@@ -111,7 +115,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	test("does not disable when peer rotates between pre-check and CAS disable", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
-		await authStorage.credentials.set("anthropic", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "stale-access",
@@ -119,7 +123,7 @@ describe("AuthStorage OAuth refresh race", () => {
 				expires: Date.now() - 60_000,
 			},
 		]);
-		const storedBefore = store.listAuthCredentials("anthropic");
+		const storedBefore = store.listAuthCredentials("github-copilot");
 		expect(storedBefore).toHaveLength(1);
 		const credentialId = storedBefore[0]!.id;
 
@@ -155,7 +159,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			});
 
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
-			const apiKey = await authStorage!.keys.get("anthropic", "session-cas-race");
+			const apiKey = await authStorage!.keys.get("github-copilot", "session-cas-race");
 
 			// CAS lost → reload → pick up the peer-rotated credential.
 			expect(apiKey).toBe("fresh-access-from-peer");
@@ -163,7 +167,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			expect(tryDisableSpy).toHaveBeenCalled();
 
 			// Row must still be active, with the peer's rotated tokens.
-			const stored = sharedStore.listAuthCredentials("anthropic");
+			const stored = sharedStore.listAuthCredentials("github-copilot");
 			expect(stored).toHaveLength(1);
 			expect(stored[0]?.id).toBe(credentialId);
 			expect(stored[0]?.credential.type).toBe("oauth");
@@ -179,7 +183,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		// Single-process scenario: refresh genuinely fails and no peer updated the
 		// row. The credential should still be soft-deleted.
-		await authStorage.credentials.set("anthropic", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "expired-access",
@@ -193,7 +197,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		});
 
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
-			const apiKey = await authStorage!.keys.get("anthropic", "session-real-failure");
+			const apiKey = await authStorage!.keys.get("github-copilot", "session-real-failure");
 
 			expect(apiKey).toBeUndefined();
 			expect(events).toHaveLength(1);
@@ -205,8 +209,8 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		const expires = Date.now() - 60_000;
 		const refreshedExpires = Date.now() + 60 * 60_000;
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-preflight",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Preflight",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -225,15 +229,15 @@ describe("AuthStorage OAuth refresh race", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-preflight", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "access-a", refresh: "refresh-a", expires },
 			{ type: "oauth", access: "access-b", refresh: "refresh-b", expires },
 		]);
 
-		const apiKey = await authStorage.keys.get("unit-oauth-preflight");
+		const apiKey = await authStorage.keys.get("github-copilot");
 		expect(apiKey).toBe("access-a-rotated");
 
-		const stored = store.listAuthCredentials("unit-oauth-preflight");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(2);
 		const oauth = stored.map(entry => entry.credential).filter(credential => credential.type === "oauth");
 		expect(oauth.map(credential => credential.refresh).sort()).toEqual(["refresh-a-rotated", "refresh-b-rotated"]);
@@ -251,7 +255,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		const rows: StoredAuthCredential[] = [
 			{
 				id: 1,
-				provider: "unit-oauth-preflight-rotate",
+				provider: "github-copilot",
 				credential: { type: "oauth", access: "stale-access", refresh: "stale-refresh", expires: staleExpires },
 				disabledCause: null,
 			},
@@ -292,8 +296,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		};
 
 		let refreshCalls = 0;
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-preflight-rotate",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Preflight Rotate",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -328,7 +332,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		});
 		await storage.credentials.reload();
 
-		const apiKey = await storage.keys.get("unit-oauth-preflight-rotate", "session-preflight-rotate");
+		const apiKey = await storage.keys.get("github-copilot", "session-preflight-rotate");
 
 		// The single stored credential was peer-rotated during preflight refresh. The
 		// resolve pass must pick up the reloaded fresh credential instead of adding the
@@ -338,7 +342,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		// Preflight refreshed once and threw; the final pass reuses the fresh token
 		// synced from the reloaded row rather than replaying a second refresh.
 		expect(refreshCalls).toBe(1);
-		const stored = noLeaseStore.listAuthCredentials("unit-oauth-preflight-rotate");
+		const stored = noLeaseStore.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(1);
 		expect(stored[0]?.credential.type).toBe("oauth");
 		if (stored[0]?.credential.type === "oauth") {
@@ -355,8 +359,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		const allowRefresh = Promise.withResolvers<void>();
 		let refreshCalls = 0;
 
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-mutex",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Mutex",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -378,12 +382,12 @@ describe("AuthStorage OAuth refresh race", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-mutex", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "access-old", refresh: "refresh-old", expires },
 		]);
 
-		const first = authStorage.keys.get("unit-oauth-mutex", "same-session");
-		const second = authStorage.keys.get("unit-oauth-mutex", "same-session");
+		const first = authStorage.keys.get("github-copilot", "same-session");
+		const second = authStorage.keys.get("github-copilot", "same-session");
 
 		await refreshStarted.promise;
 		allowRefresh.resolve();
@@ -400,8 +404,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		const expires = Date.now() - 60_000;
 		const refreshedExpires = Date.now() + 60 * 60_000;
 
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-post-lease-race",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Post-Lease Race",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -427,15 +431,15 @@ describe("AuthStorage OAuth refresh race", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-post-lease-race", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "access-old", refresh: "refresh-old", expires },
 		]);
-		const credentialId = store.listAuthCredentials("unit-oauth-post-lease-race")[0]?.id;
+		const credentialId = store.listAuthCredentials("github-copilot")[0]?.id;
 		expect(credentialId).toBeDefined();
 
-		const apiKey = await authStorage.keys.get("unit-oauth-post-lease-race", "session-post-lease");
+		const apiKey = await authStorage.keys.get("github-copilot", "session-post-lease");
 		expect(apiKey).toBe("access-from-this-process");
-		const persisted = store.listAuthCredentials("unit-oauth-post-lease-race")[0]?.credential;
+		const persisted = store.listAuthCredentials("github-copilot")[0]?.credential;
 		expect(persisted?.type).toBe("oauth");
 		if (persisted?.type === "oauth") {
 			expect(persisted.refresh).toBe("refresh-from-peer");
@@ -447,15 +451,15 @@ describe("AuthStorage OAuth refresh race", () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
 		const expires = Date.now() - 60_000;
-		await authStorage.credentials.set("unit-oauth-cas-loss", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "access-first", refresh: "refresh-first", expires },
 			{ type: "oauth", access: "access-target", refresh: "refresh-target", expires },
 		]);
-		const credentialId = store.listAuthCredentials("unit-oauth-cas-loss")[1]?.id;
+		const credentialId = store.listAuthCredentials("github-copilot")[1]?.id;
 		expect(credentialId).toBeDefined();
 		if (credentialId === undefined) return;
 
-		const result = await authStorage.oauth.refreshStored("unit-oauth-cas-loss", {
+		const result = await authStorage.oauth.refreshStored("github-copilot", {
 			credentialId,
 			forceRefresh: true,
 			credentialFromRow: credential => credential,
@@ -471,7 +475,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		expect(result.refreshed).toBe(false);
 		expect(result.credential).toMatchObject({ access: "access-from-peer", refresh: "refresh-from-peer" });
-		const rows = store.listAuthCredentials("unit-oauth-cas-loss");
+		const rows = store.listAuthCredentials("github-copilot");
 		expect(rows[0]?.credential).toMatchObject({ type: "oauth", access: "access-first" });
 		expect(rows[1]?.credential).toMatchObject({ type: "oauth", access: "access-from-peer" });
 	});
@@ -481,8 +485,8 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		const expires = Date.now() + 60 * 60_000;
 		let refreshCalls = 0;
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-peer-sync",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Peer Sync",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -502,10 +506,10 @@ describe("AuthStorage OAuth refresh race", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-peer-sync", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "access-old", refresh: "refresh-old", expires },
 		]);
-		const storedBefore = store.listAuthCredentials("unit-oauth-peer-sync");
+		const storedBefore = store.listAuthCredentials("github-copilot");
 		expect(storedBefore).toHaveLength(1);
 		const credentialId = storedBefore[0]!.id;
 
@@ -515,7 +519,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			refresh: "refresh-peer",
 			expires,
 		});
-		const apiKey = await authStorage.keys.get("unit-oauth-peer-sync", "session-peer-sync");
+		const apiKey = await authStorage.keys.get("github-copilot", "session-peer-sync");
 		expect(apiKey).toBe("access-peer");
 		expect(refreshCalls).toBe(0);
 
@@ -525,7 +529,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			refresh: "refresh-peer-force",
 			expires,
 		});
-		const forcedKey = await authStorage.keys.get("unit-oauth-peer-sync", "session-peer-sync", {
+		const forcedKey = await authStorage.keys.get("github-copilot", "session-peer-sync", {
 			forceRefresh: true,
 		});
 		expect(forcedKey).toBe("access-peer-force");
@@ -545,7 +549,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		}
 		if (!sessionId) throw new Error("could not find test session id");
 
-		await authStorage.credentials.set("unit-oauth-rotation", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-a",
@@ -566,15 +570,15 @@ describe("AuthStorage OAuth refresh race", () => {
 			return { newCredentials: credential, apiKey: credential.access };
 		});
 
-		const firstKey = await authStorage.keys.get("unit-oauth-rotation", sessionId);
+		const firstKey = await authStorage.keys.get("github-copilot", sessionId);
 		expect(firstKey).toBe("access-a");
 
-		const invalidated = await authStorage.limits.invalidateMatching("unit-oauth-rotation", "access-a", {
+		const invalidated = await authStorage.limits.invalidateMatching("github-copilot", "access-a", {
 			sessionId,
 		});
 		expect(invalidated).toBe(true);
 
-		const retryKey = await authStorage.keys.get("unit-oauth-rotation", sessionId);
+		const retryKey = await authStorage.keys.get("github-copilot", sessionId);
 		expect(retryKey).toBe("access-b");
 	});
 
@@ -582,12 +586,12 @@ describe("AuthStorage OAuth refresh race", () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 		const now = Date.now();
 		// Three distinct expired accounts → index order A, B, C by id ascending.
-		await authStorage.credentials.set("anthropic", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "a-acc", refresh: "a-ref", expires: now - 60_000, accountId: "acc-a", email: "a@x" },
 			{ type: "oauth", access: "b-acc", refresh: "b-ref", expires: now - 60_000, accountId: "acc-b", email: "b@x" },
 			{ type: "oauth", access: "c-acc", refresh: "c-ref", expires: now - 60_000, accountId: "acc-c", email: "c@x" },
 		]);
-		const seeded = store.listAuthCredentials("anthropic");
+		const seeded = store.listAuthCredentials("github-copilot");
 		expect(seeded).toHaveLength(3);
 		const idA = seeded[0]!.id;
 		const idB = seeded[1]!.id;
@@ -616,7 +620,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			expect(refreshed.id).toBe(idB);
 		});
 
-		const after = store.listAuthCredentials("anthropic");
+		const after = store.listAuthCredentials("github-copilot");
 		const bRow = after.find(row => row.id === idB);
 		const cRow = after.find(row => row.id === idC);
 		expect(bRow?.credential.type).toBe("oauth");
@@ -628,7 +632,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	test("propagates CAS update storage errors instead of treating them as peer refresh wins", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
-		await authStorage.credentials.set("unit-oauth-cas-update-error", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-old",
@@ -643,7 +647,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		});
 
 		await expect(
-			authStorage.oauth.refreshStored("unit-oauth-cas-update-error", {
+			authStorage.oauth.refreshStored("github-copilot", {
 				credentialFromRow: row => row,
 				forceRefresh: true,
 				refresh: async credential => ({
@@ -655,7 +659,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			}),
 		).rejects.toThrow("sqlite update failed");
 
-		const stored = store.listAuthCredentials("unit-oauth-cas-update-error");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(1);
 		expect(stored[0]?.credential).toMatchObject({
 			type: "oauth",
@@ -667,7 +671,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	test("propagates CAS disable storage errors instead of treating them as peer rotations", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
-		await authStorage.credentials.set("unit-oauth-cas-disable-error", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-old",
@@ -682,7 +686,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		});
 
 		await expect(
-			authStorage.oauth.refreshStored("unit-oauth-cas-disable-error", {
+			authStorage.oauth.refreshStored("github-copilot", {
 				credentialFromRow: row => row,
 				forceRefresh: true,
 				refresh: async () => {
@@ -694,7 +698,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		).rejects.toThrow("sqlite disable failed");
 
 		expect(events).toHaveLength(0);
-		const stored = store.listAuthCredentials("unit-oauth-cas-disable-error");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(1);
 		expect(stored[0]?.credential).toMatchObject({
 			type: "oauth",
@@ -708,7 +712,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		const now = Date.parse("2026-07-10T12:30:00.000Z");
 		setSystemTime(new Date(now));
-		await authStorage.credentials.set("unit-oauth-lease-disable", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-old",
@@ -716,14 +720,14 @@ describe("AuthStorage OAuth refresh race", () => {
 				expires: now - 60_000,
 			},
 		]);
-		const storedBefore = store.listAuthCredentials("unit-oauth-lease-disable");
+		const storedBefore = store.listAuthCredentials("github-copilot");
 		expect(storedBefore).toHaveLength(1);
 		const credentialId = storedBefore[0]!.id;
 		const stealLease = store.tryAcquireCredentialRefreshLease?.bind(store);
 		if (!stealLease) throw new Error("test store does not support refresh leases");
 		const disableSpy = vi.spyOn(store, "tryDisableAuthCredentialIfMatches");
 
-		const result = await authStorage.oauth.refreshStored("unit-oauth-lease-disable", {
+		const result = await authStorage.oauth.refreshStored("github-copilot", {
 			credentialFromRow: row => row,
 			forceRefresh: true,
 			refresh: async () => {
@@ -745,7 +749,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			refresh: "refresh-old",
 		});
 		expect(events).toHaveLength(0);
-		const stored = store.listAuthCredentials("unit-oauth-lease-disable");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(1);
 		expect(stored[0]?.id).toBe(credentialId);
 		expect(stored[0]?.credential).toMatchObject({
@@ -760,7 +764,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		const now = Date.parse("2026-07-10T13:00:00.000Z");
 		setSystemTime(new Date(now));
-		await authStorage.credentials.set("unit-oauth-observed-mismatch-expired", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "stored-access-expired",
@@ -783,7 +787,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		};
 
 		let refreshCalled = false;
-		const result = await authStorage.oauth.refreshStored("unit-oauth-observed-mismatch-expired", {
+		const result = await authStorage.oauth.refreshStored("github-copilot", {
 			observedCredential: observed,
 			credentialFromRow: row => row,
 			forceRefresh: false,
@@ -802,7 +806,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		expect(refreshCalled).toBe(true);
 		expect(result).toMatchObject({ refreshed: true, removed: false });
 		expect(result.credential).toMatchObject({ type: "oauth", access: "refreshed-access" });
-		const stored = store.listAuthCredentials("unit-oauth-observed-mismatch-expired");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored[0]?.credential).toMatchObject({ type: "oauth", access: "refreshed-access" });
 	});
 
@@ -811,7 +815,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 		const now = Date.parse("2026-07-10T13:30:00.000Z");
 		setSystemTime(new Date(now));
-		await authStorage.credentials.set("unit-oauth-observed-mismatch-fresh", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "peer-rotated-access",
@@ -832,7 +836,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		};
 
 		let refreshCalled = false;
-		const result = await authStorage.oauth.refreshStored("unit-oauth-observed-mismatch-fresh", {
+		const result = await authStorage.oauth.refreshStored("github-copilot", {
 			observedCredential: observed,
 			credentialFromRow: row => row,
 			forceRefresh: false,
@@ -850,7 +854,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	test("stops after a definitive refresh failure loses its disable CAS", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 
-		await authStorage.credentials.set("unit-oauth-definitive-cas-loss", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-old",
@@ -860,8 +864,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		]);
 		const controller = new AbortController();
 		let refreshCalls = 0;
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-definitive-cas-loss",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Definitive CAS Loss",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -879,7 +883,7 @@ describe("AuthStorage OAuth refresh race", () => {
 		vi.spyOn(store, "tryDisableAuthCredentialIfMatches").mockReturnValue(false);
 
 		await expect(
-			authStorage.keys.get("unit-oauth-definitive-cas-loss", "session-cas-loss", {
+			authStorage.keys.get("github-copilot", "session-cas-loss", {
 				signal: controller.signal,
 			}),
 		).resolves.toBeUndefined();
@@ -889,8 +893,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
 		const started = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
-		oauthUtils.registerOAuthProvider({
-			id: "unit-oauth-caller-abort",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Caller Abort",
 			sourceId: "auth-storage-oauth-refresh-race-test",
 			async login() {
@@ -905,10 +909,10 @@ describe("AuthStorage OAuth refresh race", () => {
 				return current.access;
 			},
 		});
-		await authStorage.credentials.set("unit-oauth-caller-abort", [
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "oauth", access: "old-access", refresh: "old-refresh", expires: 0 },
 		]);
-		const credentialId = store.listAuthCredentials("unit-oauth-caller-abort")[0]?.id;
+		const credentialId = store.listAuthCredentials("github-copilot")[0]?.id;
 		if (credentialId === undefined) throw new Error("missing stored credential");
 		const controller = new AbortController();
 		const request = authStorage.oauth.refresh(credentialId, controller.signal);
@@ -917,8 +921,8 @@ describe("AuthStorage OAuth refresh race", () => {
 		await expect(request).rejects.toThrow();
 		release.resolve();
 		// A second consumer must see the rotated token rather than replaying the consumed grant.
-		expect(await authStorage.keys.get("unit-oauth-caller-abort", "next-session")).toBe("new-access");
-		expect(store.listAuthCredentials("unit-oauth-caller-abort")[0]?.credential).toMatchObject({
+		expect(await authStorage.keys.get("github-copilot", "next-session")).toBe("new-access");
+		expect(store.listAuthCredentials("github-copilot")[0]?.credential).toMatchObject({
 			type: "oauth",
 			refresh: "new-refresh",
 		});
@@ -926,7 +930,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a key request cancelled while taking the refresh lease settles without an unhandled rejection", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-abort-during-lease";
+		const provider = "github-copilot";
 		const exchanges = registerSingleUseProvider(provider);
 		await authStorage.credentials.set(provider, [
 			{ type: "oauth", access: "access-0", refresh: "refresh-0", expires: 0 },
@@ -960,7 +964,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a caller cancelled before refreshing does not hand its cancellation to a joining caller", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-cancelled-owner";
+		const provider = "github-copilot";
 		const exchanges = registerSingleUseProvider(provider);
 		await authStorage.credentials.set(provider, [
 			{ type: "oauth", access: "access-0", refresh: "refresh-0", expires: 0 },
@@ -978,7 +982,7 @@ describe("AuthStorage OAuth refresh race", () => {
 	function registerSingleUseProvider(id: string): { exchanges: () => number } {
 		let generation = 0;
 		let liveRefresh = "refresh-0";
-		oauthUtils.registerOAuthProvider({
+		mockOAuthProvider({
 			id,
 			name: id,
 			sourceId: "auth-storage-oauth-refresh-race-test",
@@ -1018,7 +1022,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a provider-401 refresh adopts the token another process rotated to, instead of exchanging again", async () => {
 		if (!authStorage || !tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-401-peer-rotated";
+		const provider = "github-copilot";
 		const peerRotation = registerSingleUseProvider(provider);
 		await seedLogin(provider);
 
@@ -1053,7 +1057,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a provider-401 refresh still exchanges when the stored token is the rejected one", async () => {
 		if (!authStorage) throw new Error("test setup failed");
-		const provider = "unit-oauth-401-no-peer";
+		const provider = "github-copilot";
 		const noPeer = registerSingleUseProvider(provider);
 		await seedLogin(provider);
 
@@ -1069,7 +1073,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a forced refresh adopts the row a peer rotated after this process loaded it", async () => {
 		if (!authStorage || !tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-forced-peer-rotated";
+		const provider = "github-copilot";
 		const forced = registerSingleUseProvider(provider);
 		const credentialId = await seedLogin(provider);
 
@@ -1090,7 +1094,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("keeps an exchanged token when the store is busy at save time", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-busy-save";
+		const provider = "github-copilot";
 		const busy = registerSingleUseProvider(provider);
 		await authStorage.credentials.set(provider, [
 			{ type: "oauth", access: "access-0", refresh: "refresh-0", expires: Date.now() - 60_000 },
@@ -1139,7 +1143,7 @@ describe("AuthStorage OAuth refresh race", () => {
 			child.kill("SIGTERM");
 			await Bun.write(release, "complete");
 			expect(await child.exited).toBe(143);
-			expect(store.listAuthCredentials("anthropic")[0]?.credential).toMatchObject({
+			expect(store.listAuthCredentials("github-copilot")[0]?.credential).toMatchObject({
 				type: "oauth",
 				access: "new",
 				refresh: "new-refresh",
@@ -1157,7 +1161,7 @@ describe("AuthStorage OAuth refresh race", () => {
 				if (!store || !tempDir) throw new Error("test setup failed");
 				const dbPath = path.join(tempDir, "agent.db");
 				const marker = path.join(tempDir, "exchanged");
-				await authStorage!.credentials.set("anthropic", [
+				await authStorage!.credentials.set("github-copilot", [
 					{ type: "oauth", access: "old", refresh: "old-refresh", expires: 0 },
 				]);
 				// `during-pass`: the refresh starts in another owner's cleanup; `after-pass`: just before the real exit.
@@ -1178,7 +1182,7 @@ describe("AuthStorage OAuth refresh race", () => {
 					expect(await Bun.file(`${marker}.started`).exists()).toBe(true);
 					// Either no exchange started, or the token it got was saved before exit.
 					const exchanged = await Bun.file(marker).exists();
-					expect(store.listAuthCredentials("anthropic")[0]?.credential).toMatchObject(
+					expect(store.listAuthCredentials("github-copilot")[0]?.credential).toMatchObject(
 						exchanged ? { access: "new", refresh: "new-refresh" } : { access: "old", refresh: "old-refresh" },
 					);
 				} finally {
@@ -1192,7 +1196,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a 401 names the token of the request that failed, not of the last request started", async () => {
 		if (!authStorage) throw new Error("test setup failed");
-		const provider = "unit-oauth-interleaved-401";
+		const provider = "github-copilot";
 		const interleaved = registerSingleUseProvider(provider);
 		await seedLogin(provider);
 		const resolver = authStorage.keys.resolver(provider, { sessionId: "shared" });
@@ -1223,10 +1227,10 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a 401 recovery that joins a row refresh landing on the rejected token refreshes again", async () => {
 		if (!authStorage) throw new Error("test setup failed");
-		const provider = "unit-oauth-joined-row-refresh";
+		const provider = "github-copilot";
 		const firstAnswer = Promise.withResolvers<void>();
 		let exchanges = 0;
-		oauthUtils.registerOAuthProvider({
+		mockOAuthProvider({
 			id: provider,
 			name: provider,
 			sourceId: "auth-storage-oauth-refresh-race-test",
@@ -1266,7 +1270,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a 401 recovery does not adopt a peer row that still carries the rejected access token", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-peer-same-access";
+		const provider = "github-copilot";
 		const singleUse = registerSingleUseProvider(provider);
 		const credentialId = await seedLogin(provider);
 		const resolver = authStorage.keys.resolver(provider, { sessionId: "peer-same-access" });
@@ -1287,7 +1291,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("does not disable a login when its refresh token is rejected after taking over a stalled refresher", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-stalled-owner";
+		const provider = "github-copilot";
 		await seedLogin(provider);
 		const credentialId = store.listAuthCredentials(provider)[0]?.id;
 		if (credentialId === undefined) throw new Error("missing stored credential");
@@ -1324,7 +1328,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a caller that keeps its credential on refresh failure gets it back after a takeover rejection", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-stalled-owner-keep";
+		const provider = "github-copilot";
 		await seedLogin(provider);
 		const credentialId = store.listAuthCredentials(provider)[0]?.id;
 		if (credentialId === undefined) throw new Error("missing stored credential");
@@ -1360,7 +1364,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a store error during the hand-back after a takeover rejection still goes through the failure policy", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const provider = "unit-oauth-stalled-owner-handback-error";
+		const provider = "github-copilot";
 		await seedLogin(provider);
 		const credentialId = store.listAuthCredentials(provider)[0]?.id;
 		if (credentialId === undefined) throw new Error("missing stored credential");
@@ -1411,7 +1415,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("keeps a stalled refresher's lease when the store is busy at hand-back", async () => {
 		if (!store || !tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-handback-busy";
+		const provider = "github-copilot";
 		const credentialId = await seedLogin(provider);
 		const peerStore = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 		const peer = new AuthStorage(peerStore);
@@ -1489,9 +1493,9 @@ describe("AuthStorage OAuth refresh race", () => {
 	}
 
 	test("hands a taken-over lease back when it leaves before the exchange", async () => {
-		await expectTakeoverLeftForStalledOwner("unit-oauth-takeover-cannot", async (peer, _peerStore, credentialId) => {
+		await expectTakeoverLeftForStalledOwner("github-copilot", async (peer, _peerStore, credentialId) => {
 			let checks = 0;
-			const result = await peer.oauth.refreshStored("unit-oauth-takeover-cannot", {
+			const result = await peer.oauth.refreshStored("github-copilot", {
 				...refreshSpentToken(credentialId, () => {}),
 				// Refreshable when the lease is taken, no longer once the row is re-read under it.
 				canRefresh: () => {
@@ -1505,24 +1509,21 @@ describe("AuthStorage OAuth refresh race", () => {
 	});
 
 	test("hands a taken-over lease back when the exchange fails transiently", async () => {
-		await expectTakeoverLeftForStalledOwner(
-			"unit-oauth-takeover-transient",
-			async (peer, _peerStore, credentialId) => {
-				await expect(
-					peer.oauth.refreshStored("unit-oauth-takeover-transient", {
-						...refreshSpentToken(credentialId, () => {}),
-						refresh: async () => {
-							throw new Error("HTTP 503 overloaded");
-						},
-					}),
-				).rejects.toThrow("503");
-			},
-		);
+		await expectTakeoverLeftForStalledOwner("github-copilot", async (peer, _peerStore, credentialId) => {
+			await expect(
+				peer.oauth.refreshStored("github-copilot", {
+					...refreshSpentToken(credentialId, () => {}),
+					refresh: async () => {
+						throw new Error("HTTP 503 overloaded");
+					},
+				}),
+			).rejects.toThrow("503");
+		});
 	});
 
 	test("saves an exchanged token when a peer holds the lease handed back to the stalled refresher", async () => {
 		if (!authStorage || !store || !tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-handback-save";
+		const provider = "github-copilot";
 		const credentialId = await seedLogin(provider);
 		const peerStore = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 		const peer = new AuthStorage(peerStore);
@@ -1585,7 +1586,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("waits for a stalled refresher's save instead of replaying the refresh token it spent", async () => {
 		if (!tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-stalled-replay";
+		const provider = "github-copilot";
 		const credentialId = await seedLogin(provider);
 		const stores = await Promise.all(
 			[0, 1].map(() => SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"))),
@@ -1649,7 +1650,7 @@ describe("AuthStorage OAuth refresh race", () => {
 
 	test("a 401 recovery that joins another request's refresh does not get back the token it was refused", async () => {
 		if (!authStorage || !tempDir) throw new Error("test setup failed");
-		const provider = "unit-oauth-join-rejected";
+		const provider = "github-copilot";
 		const joined = registerSingleUseProvider(provider);
 		await seedLogin(provider);
 		const resolver = authStorage.keys.resolver(provider, { sessionId: "shared" });

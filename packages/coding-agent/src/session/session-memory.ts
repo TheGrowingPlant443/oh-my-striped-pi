@@ -187,15 +187,11 @@ export class SessionMemory {
 	}
 	/** Rekeys every active memory backend to the current provider session. */
 	rekeyForCurrentSessionId(): void {
-		this.#rekeyHindsightMemoryForCurrentSessionId();
+		if (cfgMemoryBackend.get(this.#host.settings) === "hindsight") {
+			const sid = this.#host.agent.sessionId;
+			if (sid) this.#host.getHindsightSessionState()?.setSessionId(sid);
+		}
 		this.#rekeyMnemopiMemoryForCurrentSessionId();
-	}
-
-	#rekeyHindsightMemoryForCurrentSessionId(): void {
-		if (cfgMemoryBackend.get(this.#host.settings) !== "hindsight") return;
-		const sid = this.#host.agent.sessionId;
-		if (!sid) return;
-		this.#host.getHindsightSessionState()?.setSessionId(sid);
 	}
 
 	#rekeyMnemopiMemoryForCurrentSessionId(): void {
@@ -203,19 +199,6 @@ export class SessionMemory {
 		const sid = this.#host.agent.sessionId;
 		if (!sid) return;
 		this.#host.getMnemopiSessionState()?.setSessionId(sid);
-	}
-
-	/** New transcript: reset Hindsight counters and reload its frozen mental-model snapshot. */
-	#resetHindsightConversationTrackingIfHindsight(): boolean {
-		if (cfgMemoryBackend.get(this.#host.settings) !== "hindsight") return false;
-		const state = this.#host.getHindsightSessionState();
-		if (!state || state.aliasOf) return false;
-		state.resetConversationTracking();
-		// Start a bounded first-turn reload without delaying /new, fork, clear, or
-		// session switches. A slow result is discarded so the previous snapshot
-		// remains byte-stable for this transcript (#11961).
-		state.beginMentalModelsTranscriptReload();
-		return true;
 	}
 
 	#resetMnemopiConversationTrackingIfMnemopi(): boolean {
@@ -229,7 +212,13 @@ export class SessionMemory {
 	/** Resets transcript-scoped memory counters and removes a promoted prompt. */
 	async resetContextForNewTranscript(): Promise<void> {
 		const hadPromotedMemoryPrompt = this.#baseSystemPromptBeforeMemoryPromotion !== undefined;
-		const resetHindsight = this.#resetHindsightConversationTrackingIfHindsight();
+		const hindsight =
+			cfgMemoryBackend.get(this.#host.settings) === "hindsight" ? this.#host.getHindsightSessionState() : undefined;
+		const resetHindsight = hindsight !== undefined && !hindsight.aliasOf;
+		if (resetHindsight) {
+			hindsight.resetConversationTracking();
+			hindsight.beginMentalModelsTranscriptReload();
+		}
 		const resetMnemopi = this.#resetMnemopiConversationTrackingIfMnemopi();
 		if (hadPromotedMemoryPrompt) {
 			this.#host.setBaseSystemPrompt(this.#baseSystemPromptBeforeMemoryPromotion!);
@@ -271,12 +260,12 @@ export class SessionMemory {
 			try {
 				await hindsight.flushRetainQueue();
 			} catch (error) {
-				logger.warn("Memory lifecycle: Hindsight flush failed", { error: String(error) });
+				logger.warn("Memory lifecycle: Hindsight retain flush failed", { error: String(error) });
+			} finally {
+				this.#host.setHindsightSessionState(undefined);
+				hindsight.dispose();
 			}
-			this.#host.setHindsightSessionState(undefined);
-			hindsight.dispose();
 		}
-
 		const mnemopi = this.#host.takeMnemopiSessionState();
 		if (mnemopi) {
 			try {

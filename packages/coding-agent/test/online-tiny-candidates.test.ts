@@ -1,17 +1,32 @@
 import { describe, expect, it } from "bun:test";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { getRoleInfo } from "@oh-my-pi/pi-coding-agent/config/model-roles";
-import { formatModelStringWithRouting } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import {
 	collectOnlineTinyCandidates,
 	expandOnlineTinyModelFallbacks,
 } from "@oh-my-pi/pi-coding-agent/tiny/online-candidates";
 
+function companyModel(provider: string, id: string) {
+	return buildModel({
+		id,
+		name: id,
+		provider,
+		api: "openai-completions",
+		baseUrl: "https://models.company.test/v1",
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 16_384,
+	});
+}
+
 const localTiny = getBundledModel("local", "lfm2.5-230m")!;
-const primary = getBundledModel("google", "gemini-3.5-flash")!;
-const secondary = getBundledModel("openai", "gpt-4o-mini")!;
-const fallback = getBundledModel("google-vertex", "gemini-3.5-flash")!;
+const primary = companyModel("company-google", "gemini-3.5-flash")!;
+const secondary = companyModel("company-openai", "gpt-4o-mini")!;
+const fallback = companyModel("company-vertex", "gemini-3.5-flash")!;
 const models = [primary, secondary, fallback];
 const primarySelector = `${primary.provider}/${primary.id}`;
 const localTinySelector = `${localTiny.provider}/${localTiny.id}`;
@@ -76,21 +91,21 @@ describe("online tiny fallback candidates", () => {
 	});
 
 	it("uses the most specific wildcard key", () => {
-		const routed = getBundledModel("openrouter", "google/gemini-3.5-flash")!;
+		const routed = companyModel("company-gateway", "google/gemini-3.5-flash")!;
 		const settings = Settings.isolated({
 			"retry.fallbackChains": {
-				"openrouter/*": [secondarySelector],
-				"openrouter/google/*": ["google-vertex/*"],
+				"company-gateway/*": [secondarySelector],
+				"company-gateway/google/*": ["company-vertex/*"],
 			},
 		});
-		settings.setModelRole("tiny", "openrouter/google/gemini-3.5-flash");
+		settings.setModelRole("tiny", "company-gateway/google/gemini-3.5-flash");
 		expect(
 			collectOnlineTinyCandidates(["tiny"], settings, [...models, routed]).map(candidate => candidate.model),
 		).toEqual([routed, fallback]);
 	});
 
 	it("expands wildcard entries using the current model id", () => {
-		expect(candidates({ tiny: ["google-vertex/*"] })).toEqual(models);
+		expect(candidates({ tiny: ["company-vertex/*"] })).toEqual(models);
 	});
 
 	it("does not append default when every requested role has its own chain", () => {
@@ -127,49 +142,6 @@ describe("online tiny fallback candidates", () => {
 		expect(collectOnlineTinyCandidates(["smol"], settings, models).map(candidate => candidate.model)).toEqual([
 			secondary,
 			fallback,
-		]);
-	});
-
-	it("strips upstream routing before expanding wildcard fallbacks", () => {
-		const routed = getBundledModel("openrouter", "google/gemini-3.5-flash")!;
-		const settings = Settings.isolated({
-			"retry.fallbackChains": {
-				"openrouter/*": ["google-vertex/*"],
-			},
-		});
-		settings.setModelRole("tiny", "openrouter/google/gemini-3.5-flash@cerebras");
-		expect(
-			collectOnlineTinyCandidates(["tiny"], settings, [...models, routed]).map(
-				candidate => `${candidate.model.provider}/${candidate.model.id}`,
-			),
-		).toEqual([`${routed.provider}/${routed.id}`, `${fallback.provider}/${fallback.id}`]);
-	});
-
-	it("keeps distinct @upstream routes for the same aggregator model", () => {
-		const routed = getBundledModel("openrouter", "google/gemini-3.5-flash")!;
-		const settings = Settings.isolated({ "retry.modelFallback": true });
-		settings.setModelRole("tiny", "openrouter/google/gemini-3.5-flash@cerebras");
-		settings.setModelRole("smol", "openrouter/google/gemini-3.5-flash@openai");
-		const result = collectOnlineTinyCandidates(["tiny", "smol"], settings, [...models, routed]);
-		expect(result.map(candidate => formatModelStringWithRouting(candidate.model))).toEqual([
-			"openrouter/google/gemini-3.5-flash@cerebras",
-			"openrouter/google/gemini-3.5-flash@openai",
-		]);
-		expect(result.map(candidate => candidate.role)).toEqual(["tiny", "smol"]);
-	});
-
-	it("resolves routed @upstream fallback selectors before lookup", () => {
-		const routed = getBundledModel("openrouter", "google/gemini-3.5-flash")!;
-		const settings = Settings.isolated({
-			"retry.fallbackChains": {
-				tiny: ["openrouter/google/gemini-3.5-flash@cerebras"],
-			},
-		});
-		settings.setModelRole("tiny", primarySelector);
-		const result = collectOnlineTinyCandidates(["tiny"], settings, [...models, routed]);
-		expect(result.map(candidate => formatModelStringWithRouting(candidate.model))).toEqual([
-			primarySelector,
-			"openrouter/google/gemini-3.5-flash@cerebras",
 		]);
 	});
 

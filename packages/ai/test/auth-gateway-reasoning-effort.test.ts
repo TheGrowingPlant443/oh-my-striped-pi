@@ -11,10 +11,42 @@ import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
 import type { Api, Context, Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { ThinkingBudgets } from "@oh-my-pi/pi-catalog/types";
 import { withOfficialAnthropicEndpoint } from "./helpers";
-import { anthropicChunks, type CapturedRequest, captureFetch, completionsChunks } from "./helpers/factory-droid";
+import type { FetchImpl } from "@oh-my-pi/pi-ai/types";
+
+interface CapturedRequest {
+	body: Record<string, any>;
+}
+
+function anthropicChunks(text: string): string[] {
+	const events = [
+		{
+			type: "message_start",
+			message: {
+				id: "msg_test",
+				type: "message",
+				role: "assistant",
+				model: "claude-haiku-5-5",
+				content: [],
+				usage: { input_tokens: 1, output_tokens: 0 },
+			},
+		},
+		{ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+		{ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+		{ type: "content_block_stop", index: 0 },
+		{ type: "message_delta", delta: { stop_reason: "end_turn" }, usage: { output_tokens: 1 } },
+		{ type: "message_stop" },
+	];
+	return events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+}
+
+function captureFetch(captured: CapturedRequest[], chunks: string[]): FetchImpl {
+	return async (_input, init) => {
+		captured.push({ body: JSON.parse(String(init?.body)) });
+		return new Response(chunks.join(""), { headers: { "Content-Type": "text/event-stream" } });
+	};
+}
 
 withOfficialAnthropicEndpoint();
 
@@ -24,7 +56,7 @@ const CLAUDE = buildModel({
 	id: "claude-haiku-5-5",
 	name: "claude-haiku-5-5",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text"],
@@ -103,7 +135,7 @@ describe("auth-gateway reasoning effort", () => {
 			id: "budget-test-model",
 			name: "Budget test model",
 			api: "anthropic-messages",
-			provider: "budget-test-provider",
+			provider: "github-copilot",
 			baseUrl: "https://api.anthropic.com",
 			reasoning: true,
 			thinking: { mode: "budget", efforts: [Effort.Low, Effort.High] },
@@ -123,20 +155,5 @@ describe("auth-gateway reasoning effort", () => {
 		expect(upstream[0].body.thinking).toMatchObject(
 			expected === 0 ? { type: "disabled" } : { type: "enabled", budget_tokens: expected },
 		);
-	});
-
-	it("keeps the catalog's effort mapping for an effort outside the ladder", async () => {
-		// Kimi K3's ladder is low/high/max; the catalog maps `medium` up to `high`.
-		// Clamping first would downgrade it to `low`.
-		const kimi = getBundledModel("fireworks", "kimi-k3");
-		const { status, upstream } = await requestUpstream(
-			kimi,
-			completionsChunks("ok", kimi.id),
-			"/v1/chat/completions",
-			"medium",
-		);
-
-		expect(status).toBe(200);
-		expect(upstream[0].body.reasoning_effort).toBe("high");
 	});
 });

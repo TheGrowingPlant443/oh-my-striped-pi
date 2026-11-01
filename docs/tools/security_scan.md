@@ -1,14 +1,13 @@
 # security_scan
 
-> Plan and run OMP-native security reviews, validate stored findings, and explicitly interact with Codex Security cloud scans.
+> Plan and run OMP-native security reviews and validate stored findings.
 
 ## Availability and prerequisites
 
 - `security.enabled` defaults to `false`. When disabled, `security_scan` is omitted from the available tool set and `security://` reads fail with an enablement message. Enable it in **Settings → Tools → Security** or set `security.enabled = true`.
 - The tool is discoverable, strict-schema, and classified as `exec`.
-- Native `preflight` requires a Git repository, an active model, and the session model/authentication registries. It selects a stored OAuth credential when available. Without one, only provider-owned authentication APIs explicitly declared in provider metadata are accepted: currently Amazon Bedrock (`bedrock-converse-stream`) and Bedrock Mantle (`openai-responses`). Ordinary API-key-only providers are not accepted.
+- Native `preflight` requires a Git repository, an active retained model, and a stored Copilot OAuth credential. The scan runs through OMP's local tool workflow; model context is still sent to Copilot.
 - If several OAuth accounts exist and none is active, pass `credential_id`; a lone account is selected automatically. The immutable plan pins the credential row and recorded account/workspace identity. Execution and token refresh stay on that row rather than rotating to another account.
-- Cloud actions require an `openai-codex` ChatGPT OAuth credential. They call ChatGPT's Codex Security cloud control plane, not the public OpenAI API, and are never a fallback from a native scan.
 
 ## Source
 
@@ -19,14 +18,13 @@
 - Background execution: `packages/coding-agent/src/security/coordinator.ts`
 - Scan-only publication tool: `packages/coding-agent/src/security/publication.ts`
 - Canonical store and output files: `packages/coding-agent/src/security/store.ts`
-- Cloud client/import: `packages/coding-agent/src/security/cloud.ts`
 - Read-only resources: `packages/coding-agent/src/internal-urls/security-protocol.ts`
 
 ## Inputs
 
 | Field                    | Type                                                                                                                               | Used by                                | Description                                                                                                                                                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `action`                 | `"preflight" \| "start" \| "status" \| "cancel" \| "validate" \| "cloud_scans" \| "cloud_start" \| "cloud_status" \| "cloud_pull"` | All                                    | Required dispatch selector.                                                                                                                                                                                 |
+| `action`                 | `"preflight" \| "start" \| "status" \| "cancel" \| "validate"` | All                                    | Required dispatch selector. |
 | `plan_id`                | `string`                                                                                                                           | `start`                                | Plan ID returned by `preflight`.                                                                                                                                                                            |
 | `operation_id`           | `string`                                                                                                                           | `status`, `cancel`                     | Operation ID returned by `start`.                                                                                                                                                                           |
 | `target_kind`            | `"repository" \| "scoped_path" \| "ref_diff" \| "working_tree"`                                                                    | `preflight`                            | Defaults to `repository`.                                                                                                                                                                                   |
@@ -37,17 +35,12 @@
 | `knowledge_base_paths`   | `string[]`                                                                                                                         | `preflight`                            | Files resolved relative to the repository root, canonicalized, and pinned by SHA-256 and size.                                                                                                              |
 | `output_root`            | `string`                                                                                                                           | `preflight`                            | Optional external result directory. It must be outside the repository, canonical, non-symlinked, and empty unless `archive_existing=true`.                                                                  |
 | `archive_existing`       | `boolean`                                                                                                                          | `preflight`                            | Defaults to `false`. Allows a nonempty output directory to be renamed to `<output_root>.archive-<scan-id>` when execution begins.                                                                           |
-| `credential_id`          | positive integer                                                                                                                   | Native `preflight`; every cloud action | Pins one stored OAuth credential. Native scans select it for the active model provider; cloud actions select it for `openai-codex`. An explicit unavailable id fails rather than using provider-owned auth. |
+| `credential_id`          | positive integer | Native `preflight` | Pins one stored Copilot OAuth credential. An unavailable explicit ID fails instead of selecting another account. |
 | `scan_id`                | `string`                                                                                                                           | `validate`                             | Stored scan containing the finding.                                                                                                                                                                         |
 | `finding_id`             | `string`                                                                                                                           | `validate`                             | Stored finding to update.                                                                                                                                                                                   |
 | `validation_status`      | `"unvalidated" \| "validated" \| "rejected" \| "partial" \| "error"`                                                               | `validate`                             | New validation state.                                                                                                                                                                                       |
 | `validation_summary`     | `string`                                                                                                                           | `validate`                             | Required, nonblank validation explanation.                                                                                                                                                                  |
 | `validation_evidence`    | `{label: string, explanation: string}[]`                                                                                           | `validate`                             | Optional evidence appended as validation evidence; labels must be nonempty.                                                                                                                                 |
-| `cloud_configuration_id` | `string`                                                                                                                           | `cloud_status`, `cloud_pull`           | Codex Security cloud configuration ID.                                                                                                                                                                      |
-| `repository_id`          | `string`                                                                                                                           | `cloud_start`                          | Required cloud repository identifier.                                                                                                                                                                       |
-| `repository_url`         | `string`                                                                                                                           | `cloud_start`                          | Required cloud repository URL.                                                                                                                                                                              |
-| `environment_id`         | `string`                                                                                                                           | `cloud_start`                          | Required cloud environment identifier.                                                                                                                                                                      |
-| `lookback_days`          | positive integer or `"all"`                                                                                                        | `cloud_start`                          | Defaults to `30`; `"all"` sends an unlimited lookback.                                                                                                                                                      |
 
 Unused optional fields are ignored by actions that do not read them.
 
@@ -139,26 +132,6 @@ Finding <finding-id> validation is now <status>.
 
 `details.finding` contains the finding ID and validation status. Missing scans/findings or required fields fail rather than creating a new finding.
 
-### `cloud_scans`
-
-Lists every paginated configuration visible to the selected ChatGPT account. Each line contains configuration ID, current step, repository ID, environment ID, and repository URL. If none exist, the tool says so. Structured configurations are returned in `details.cloudConfigurations`.
-
-### `cloud_start`
-
-Requires `repository_id`, `repository_url`, and `environment_id`. It creates an enabled Codex Security cloud scan configuration and consumes the account's separate cloud scan allowance. `lookback_days` defaults to `30`.
-
-The text identifies the configuration and repository. `details.cloudScan` contains `{ id, repositoryUrl }`.
-
-### `cloud_status`
-
-Requires `cloud_configuration_id`. It reports the current step and finished/pending commit counts. `details.cloudStats` also contains failed commits, per-severity finding counts, and any last scanned commit/timestamps exposed by the service.
-
-### `cloud_pull`
-
-Requires `cloud_configuration_id`. It fetches the configuration, status, and all attributed finding details, converts them to OMP's canonical schema, generates a report and SARIF, and persists a completed imported scan.
-
-Import fails closed unless the current project has an `origin` remote whose normalized repository identity matches the cloud configuration URL. Cloud coverage is recorded as `unknown` because the findings API does not expose coverage receipts. `details.importedScan` contains the new scan ID and finding count.
-
 ## Native publication and persistence
 
 `security_publish` is an internal, strict, write-tier tool available only inside the restricted native scan session; it is not a normal caller action. The coordinator requires the scan agent to call it once with:
@@ -235,28 +208,9 @@ Validate a finding:
 }
 ```
 
-Explicitly start and later import a cloud scan:
-
-```json
-{
-	"action": "cloud_start",
-	"repository_id": "repo_<id>",
-	"repository_url": "https://github.com/owner/repo",
-	"environment_id": "env_<id>",
-	"lookback_days": 30,
-	"credential_id": 7
-}
-```
-
-```json
-{ "action": "cloud_pull", "cloud_configuration_id": "scan_<id>", "credential_id": 7 }
-```
-
 ## Errors and constraints
 
 - Every action first rechecks `security.enabled`; direct execution while disabled throws `Security is disabled. Enable security.enabled before using security_scan.`
-- Action-specific required IDs, cloud repository fields, and validation summaries are trimmed and reject blank values. Ref revisions and path arrays are instead handled by planning validation. ArkType rejects invalid enum values, nonpositive credential/lookback IDs, and malformed validation evidence.
+- Action-specific required IDs and validation summaries are trimmed and reject blank values. Ref revisions and path arrays are handled by planning validation. ArkType rejects invalid enum values, nonpositive credential IDs, and malformed validation evidence.
 - Native scans reject missing Git context, unknown refs, escaping/nonexistent scope paths, invalid knowledge-base files, unsafe output directories, unknown/stale plans, unavailable pinned models, OAuth identity changes, and unavailable pinned credentials.
-- Cloud requests retry once on HTTP 401 with a forced refresh, then fail. Other non-success responses report the status and endpoint.
-- `cloud_pull` verifies repository identity and configuration attribution before importing.
 - Cancellation is cooperative. An unpublished operation reaches terminal `cancelled` after the background run handles the abort and persists its terminal bundle; an already-published result stays `completed`.

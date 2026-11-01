@@ -1,12 +1,11 @@
 # Natives media + system utilities
 
-This document covers the media/system/conversion exports in `@oh-my-pi/pi-natives`: audio capture/playback and live WebRTC media, terminal SIXEL conversion, SVG rasterization, snapcompact PNG rendering, HTML/PDF conversion, clipboard access, token counting, DeviceCheck, macOS appearance/power helpers, and work profiling.
+This document covers the media/system/conversion exports in `@oh-my-pi/pi-natives`: audio capture/playback, terminal SIXEL conversion, SVG rasterization, snapcompact PNG rendering, HTML/PDF conversion, clipboard access, token counting, DeviceCheck, macOS appearance/power helpers, and work profiling.
 
 ## Implementation files
 
 - `crates/pi-natives/src/audio.rs`
-- `crates/pi-natives/src/live.rs`
-- `crates/pi-voice/src/audio.rs` and `crates/pi-voice/src/live.rs` (media engines behind the N-API adapters)
+- `crates/pi-voice/src/audio.rs` (media engine behind the N-API adapters)
 - `crates/pi-natives/src/snapcompact.rs`
 - `crates/pi-natives/src/sixel.rs`
 - `crates/pi-natives/src/svg.rs`
@@ -30,7 +29,6 @@ There is no native `PhotonImage` class or `image.rs` in the addon. General-purpo
 | ------------------------------------------------------- | ------------------------------ | ---------------- |
 | `new AudioCapture(sampleRate, cb)`                      | `AudioCapture`                 | `audio.rs`       |
 | `new AudioPlayback(sampleRate)`                         | `AudioPlayback`                | `audio.rs`       |
-| `new LiveWebRtcPeer(...)`                               | `LiveWebRtcPeer`               | `live.rs`        |
 | `encodeSixel(bytes, width, height, backgroundRgb)`      | `encode_sixel`                 | `sixel.rs`       |
 | `encodeSixelAsync(bytes, width, height, backgroundRgb)` | `encode_sixel_async`           | `sixel.rs`       |
 | `decodeSixelToPng(bytes)`                               | `decode_sixel_to_png`          | `sixel.rs`       |
@@ -50,12 +48,11 @@ There is no native `PhotonImage` class or `image.rs` in the addon. General-purpo
 
 ## Data format boundaries and conversions
 
-### Audio and live WebRTC
+### Audio
 
 - `AudioCapture(sampleRate, callback)` opens the default microphone and delivers low-latency mono `Float32Array` PCM chunks at the requested logical rate. `stop()` immediately releases capture.
 - `AudioPlayback(sampleRate)` opens the default speaker. `write(samples)` queues mono `Float32Array` PCM in order; `setGain(gain)` changes render-time gain even for queued samples; `end()` drains and closes, while `stop()` discards queued audio immediately.
-- `LiveWebRtcPeer(onEvent, onLevel, onFailure)` owns a WebRTC peer for Codex live media. `createOffer()` returns SDP, `acceptAnswer(sdp)` applies the remote answer, and `waitForOpen(timeoutMs?)` waits for the `oai-events` data channel (default 20 seconds). `pushAudio(samples)` accepts 16 kHz mono PCM with a bounded queue; muted input and input that would overflow the queue are dropped. `setMuted()` controls transmission and discards partial muted frames; `close()` asynchronously tears down media, data channel, peer, and playback.
-- The N-API modules adapt callbacks/buffers; device discovery, conversion, playback, WebRTC, and Opus media live in `pi-voice`. The TypeScript host owns authenticated signaling and sideband protocol handling.
+- The N-API module adapts callbacks/buffers; device discovery, conversion, and playback live in `pi-voice`.
 
 ### SIXEL image encoding (`sixel`)
 

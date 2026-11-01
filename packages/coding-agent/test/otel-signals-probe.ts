@@ -160,7 +160,7 @@ logger.error("probe error", { code: "probe" });
 // charge, but the ChatUsageEvent only gets a cost when the resolver installed
 // by createTelemetryExportConfig() runs.
 const mock = createMockModel({
-	provider: "anthropic",
+	provider: "local",
 	id: "probe-model",
 	responses: [
 		{

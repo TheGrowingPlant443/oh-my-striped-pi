@@ -13,6 +13,7 @@ import type {
 	Context,
 	ImageContent,
 	Message,
+	Model,
 	ServiceTier,
 	StopReason,
 	TextContent,
@@ -84,7 +85,7 @@ function rejectUnsupportedExplicitPromptCacheFields(body: unknown): void {
 // parseRequest
 // ---------------------------------------------------------------------------
 
-export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
+export function parseRequest(body: unknown, target: Pick<Model, "id" | "provider">, headers?: Headers): ParsedRequest {
 	// Header capture is centralized in `auth-gateway/server.ts` (allow-listed
 	// headers like openai-organization/openai-project/openai-beta/x-stainless-*
 	// land on `options.headers` automatically). We consult `headers` here too
@@ -136,8 +137,8 @@ export function parseRequest(body: unknown, headers?: Headers): ParsedRequest {
 						(m.content ?? undefined) as string | OpenAIChatContentPart[] | undefined,
 						m.tool_calls,
 						(m as { reasoning_content?: string | null }).reasoning_content ?? undefined,
-						data.model,
 						now,
+						target,
 					),
 				);
 				break;
@@ -263,8 +264,8 @@ function buildAssistantMessage(
 	content: string | OpenAIChatContentPart[] | undefined,
 	toolCalls: OpenAIChatToolCall[] | undefined,
 	reasoningContent: string | undefined,
-	modelId: string,
 	now: number,
+	target: Pick<Model, "id" | "provider">,
 ): AssistantMessage {
 	const parts: AssistantMessage["content"] = [];
 	if (reasoningContent !== undefined && reasoningContent.length > 0) {
@@ -300,8 +301,8 @@ function buildAssistantMessage(
 		role: "assistant",
 		content: parts,
 		api: "openai-completions",
-		provider: "openai",
-		model: modelId,
+		provider: target.provider,
+		model: target.id,
 		usage: {
 			input: 0,
 			output: 0,

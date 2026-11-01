@@ -7,7 +7,6 @@ import { OAuthSelectorComponent, type OAuthSelectorAuthSource } from "../src/ove
 import { ThemeSelectorComponent } from "../src/overlays/theme-selector";
 import { ThinkingSelectorComponent } from "../src/overlays/thinking-selector";
 import { SessionAccountSelectorComponent } from "../src/overlays/session-account-selector";
-import { type ResetUsageAccount, ResetUsageSelectorComponent } from "../src/overlays/reset-usage-selector";
 import { initTheme } from "../src/theme/theme";
 
 beforeAll(async () => {
@@ -131,58 +130,6 @@ describe("session account picker", () => {
 	});
 });
 
-describe("reset usage picker", () => {
-	const usable: ResetUsageAccount = {
-		label: "a@x.so",
-		provider: "anthropic",
-		providerLabel: "Claude Max",
-		availableCount: 2,
-		redeemableCount: 2,
-		target: { credentialId: 4, provider: "anthropic", creditId: "c1" },
-		active: true,
-		credit: { id: "c1", clears: ["anthropic:5h"] } as never,
-	};
-	const blocked: ResetUsageAccount = {
-		label: "b@x.so",
-		provider: "openai-codex",
-		providerLabel: "ChatGPT Pro",
-		availableCount: 1,
-		redeemableCount: 0,
-		target: { credentialId: 7, provider: "openai-codex" },
-		active: false,
-		unavailableReason: "limit not reached",
-	};
-
-	it("disables unusable accounts with their reason and spends only after the confirm strip", () => {
-		const spent: string[] = [];
-		const selector = new ResetUsageSelectorComponent(
-			[usable, blocked],
-			account => spent.push(account.label),
-			() => spent.push("cancel"),
-		);
-		const first = sheet(selector.describe(pickerCx)).props;
-		expect(first.current).toEqual(["anthropic:4:c1"]);
-		expect(first.items?.find(item => item.id === "openai-codex:7:")?.disabled).toBe("limit not reached");
-		expect(first.confirm).toBeNull();
-
-		selector.handleNativeEvent(act("confirm"));
-		const pending = sheet(selector.describe(pickerCx)).props;
-		expect(pending.confirm?.label).toBe("Spend");
-		expect(pending.subtitle).toBe("Covers Claude 5h.");
-		expect(spent).toEqual([]);
-
-		selector.handleNativeEvent(act("cancel"));
-		expect(sheet(selector.describe(pickerCx)).props.confirm).toBeNull();
-		expect(spent).toEqual([]);
-
-		selector.handleNativeEvent(act("confirm"));
-		selector.handleNativeEvent(act("confirm"));
-		expect(spent).toEqual(["a@x.so"]);
-		selector.handleNativeEvent(act("close"));
-		expect(spent).toEqual(["a@x.so", "cancel"]);
-	});
-});
-
 describe("hook selector picker", () => {
 	it("pointer select moves the selection without confirming; confirm picks it", () => {
 		const picked: string[] = [];
@@ -223,7 +170,7 @@ describe("oauth selector picker", () => {
 		keys: { source: (id: string) => (id === signedIn ? { kind: "oauth" } : undefined) } as never,
 	};
 
-	it("cards with auth-state dots and origin detail; typing keeps the catalogue", () => {
+	it("shows Copilot and self-hosted backends with the auth-state dot and origin detail", () => {
 		const selector = new OAuthSelectorComponent(
 			"login",
 			auth,
@@ -235,12 +182,14 @@ describe("oauth selector picker", () => {
 		const row = first.items?.find(item => item.id === signedIn);
 		expect(row?.dot).toBe("success");
 		expect(row?.detail).toBe("Signed in · login");
-		expect(first.items?.find(item => item.id !== signedIn)?.dot).toBe("muted");
-		expect(first.query).toBe("");
-		selector.handleInput(providers[1]!.name.slice(0, 3));
-		const typed = sheet(selector.describe(pickerCx)).props;
-		expect(typed.items).toBe(first.items);
-		expect(typed.order?.length).toBeLessThan(providers.length);
+		expect(first.items?.map(item => item.id)).toEqual([
+			"github-copilot",
+			"ollama",
+			"llama.cpp",
+			"lm-studio",
+			"vllm",
+			"litellm",
+		]);
 	});
 
 	it("activate signs in with the clicked provider; close cancels", () => {

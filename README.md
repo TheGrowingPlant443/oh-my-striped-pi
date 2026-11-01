@@ -24,7 +24,17 @@
 
 The most capable agent surface that ships. Continuously tuned by real-world use — complete out of the box, open all the way down.
 
-**60+** providers · **31** built-in tools · **14** lsp ops · **28** dap ops · **~80k** lines of Rust core.
+**Local and self-hosted models + GitHub Copilot** · native tools, LSP and DAP support.
+
+This fork retains on-device inference, Apple Foundation Models, self-hosted Ollama/llama.cpp/LM Studio/vLLM/LiteLLM, and explicitly configured company endpoints. Built-in public model-provider integrations other than Copilot are removed. Copilot transmits the prompts, code and tool results included in its context to GitHub. GitHub development workflows, shell/eval, extensions, plugins, MCP, LSP and direct URL reads remain network-capable: this is **not an egress sandbox**.
+
+QA reporting, hosted sharing/publication, public search providers and public reader fallbacks are removed. Local/private collaboration, local memory and Sharpshooter, self-hosted Hindsight, local/private-endpoint Mnemopi, configured image/speech/embedding/judgment protocols, recording/playback and self-contained HTML export remain. Configurable OpenTelemetry (OTLP) export supports an operator-provided in-house collector: no export occurs without an endpoint and message-content capture defaults to `none`. Operators must review configured endpoints and their upstream behavior. See [OpenTelemetry export](docs/environment-variables.md#11-opentelemetry-export).
+
+Credential administration remains available: token access, auth export/import, and auth broker/gateway can expose or redistribute credentials to their configured destinations. Automatic dependency, model and runtime downloads also remain; this fork is not offline-only.
+
+Smithery cloud marketplace/login and Exa-specific MCP credential overrides are removed. Manual/local MCP configuration and plugins remain; existing remote MCP entries and credential files are not deleted, so review their destinations before use.
+
+`/update` and `omp update` explain that application updates are company-managed; they do not check upstream releases, obtain GitHub credentials or replace the application. Deploy this fork through Git, Nix or your company's release process. Plugin updates remain available through `omp update --plugins`, with `--check` for a dry run.
 
 > [!NOTE]
 > Pull requests are **temporarily open to everyone** as a trial. We previously
@@ -32,45 +42,24 @@ The most capable agent surface that ships. Continuously tuned by real-world use 
 > while we evaluate how open contributions go. Depending on the results, the
 > vouch system may return.
 
-## Install
+## Install this company fork
 
-**macOS · Linux**
+Build or deploy this checkout through your company's release process. Upstream installers and public package-manager releases install the upstream product, not this fork.
 
-```sh
-curl -fsSL https://omp.sh/install | sh
-```
-
-Without a usable bun (or with `--binary`), the install scripts fetch the prebuilt binary from `build.stencil.so` and check its SHA-256 before installing it. Pin a release with `curl -fsSL https://omp.sh/install | sh -s -- --binary --ref v<version>` (PowerShell: `-Binary -Ref v<version>`).
-
-> **Alpine / musl:** the prebuilt musl binary links `libstdc++`/`libgcc` dynamically, which stock Alpine does not ship. Install them first: `apk add libstdc++ libgcc`.
-
-**Homebrew**
+**Nix, from this checkout**
 
 ```sh
-brew install can1357/tap/omp
+nix build .#omp
+./result/bin/omp
+
+# Or install this checkout into the active profile
+nix profile add .
 ```
 
-**Bun (recommended)**
-
-```sh
-bun install -g @oh-my-pi/pi-coding-agent
-```
-
-**Nix**
-
-```sh
-# Run without installing
-nix run github:can1357/oh-my-pi
-
-# Or install into the active profile (Nix < 2.30: `nix profile install`)
-nix profile add github:can1357/oh-my-pi
-```
-
-Flake consumers can use `packages.<system>.omp`, `overlays.default`, `nixosModules.default`, or `homeManagerModules.default`. A Home Manager configuration can install OMP and own its settings declaratively:
+Flake consumers can use `packages.<system>.omp`, `overlays.default`, `nixosModules.default`, or `homeManagerModules.default`. Pin the `omp` input to your company-controlled fork. A Home Manager module can install OMP and own its settings declaratively:
 
 ```nix
-{
-  inputs.omp.url = "github:can1357/oh-my-pi";
+{ inputs, ... }: {
 
   # In your Home Manager module:
   imports = [ inputs.omp.homeManagerModules.default ];
@@ -81,17 +70,6 @@ Flake consumers can use `packages.<system>.omp`, `overlays.default`, `nixosModul
 }
 ```
 
-**Windows (PowerShell)**
-
-```powershell
-irm https://omp.sh/install.ps1 | iex
-```
-
-**Pinned versions (mise)**
-
-```sh
-mise use -g github:can1357/oh-my-pi
-```
 
 macOS · Linux · Windows · bun ≥ 1.4.4
 
@@ -112,7 +90,7 @@ omp completions fish > ~/.config/fish/completions/omp.fish
 
 ## Every tool, _benchmaxxed_.
 
-Edits that land on the first attempt. Reads that summarize files instead of dumping their content. Searches that return instantly. Pick any model — omp will get it right.
+Edits that land on the first attempt. Reads that summarize files instead of dumping their content. Searches that return instantly. Historical upstream edit-format benchmarks:
 
 | model            | metric       | what                                                                  |
 | ---------------- | ------------ | --------------------------------------------------------------------- |
@@ -176,27 +154,14 @@ Watch the fan-out while it runs: `Alt+A` opens [Agent Hub](docs/agent-hub.md), w
 
 Pair a reviewer model to the 'advisor' role and it reads every turn the main agent takes, injecting notes inline — a quiet aside, a concern, or a hard blocker. It runs on its own context and its own model, so it catches what the doer rushed past. The main agent sees the note and course-corrects, or tells you why it won't.
 
-![omp TUI: /advisor status shows the advisor running on openai-codex/gpt-5.5; after the main agent scopes a catch to ENOENT instead of swallowing every error, an amber 'Advisor 1 note (concern)' card warns the fix no longer matches the user's literal acceptance criterion.](https://omp.sh/clips/advisor-poster.webp)
 
-_[Watch the capture ↗](https://omp.sh/clips/advisor.mp4)_
 
-### 07 · Hand someone the link, they're in.
+### 07 · Read a pdf on arxiv, why not?
 
-/collab puts your live session on a relay and hands back a link — and a QR. A teammate joins from another terminal with omp join, or just opens it in a browser. Share read-write to pair on the same agent, or /collab view for a read-only link anyone can watch but no one can steer. Frames are sealed client-side; the relay never sees your keys.
+`web_search` uses your configured SearXNG or private Firecrawl server and hands result URLs to `read`. Direct reads use native/local conversion; private Firecrawl is an explicit optional backend, not a public fallback. Arxiv PDFs, GitHub pages and Stack Overflow threads can return as structured Markdown with anchors intact.
 
-![omp TUI: /collab view prints 'Collab session started!' with an omp join command, a my.omp.sh browser link, the note 'Anyone with this link can watch the session but cannot prompt the agent', and a large scannable QR code.](https://omp.sh/clips/collab-poster.webp)
 
-_[Watch the capture ↗](https://omp.sh/clips/collab.mp4)_
-
-### 08 · Read a pdf on arxiv, why not?
-
-web_search chains twenty-three ranked providers and hands whatever URLs it finds straight to read. Arxiv PDFs, GitHub pages, Stack Overflow threads come back as structured markdown with anchors intact — the same tool surface you use on local files. Cite, follow, quote, never lose where you came from.
-
-![omp TUI: web_search returns 10 ranked Perplexity sources for inference-time compute scaling, the agent picks an arxiv paper, calls read https://arxiv.org/pdf/2604.10739v1, and summarizes the paper's headline result with real numbers.](https://omp.sh/clips/web-poster.webp)
-
-_[Watch the capture ↗](https://omp.sh/clips/web.mp4)_
-
-### 09 · Unapologetically native. Even on Windows.
+### 08 · Unapologetically native. Even on Windows.
 
 Other agents shell out to rg, grep, find, and bash. On many machines those binaries don't exist, and on the ones where they do, every call costs a fork-exec round-trip. omp links the real implementations into the process. ripgrep, glob, find: in-process. brush is the bash — with sessions that survive across calls, and 58 command-line utilities (ls, sed, sort, xargs, even jq) ported into the builtins crate and run in-process, zero fork/exec. The same omp binary runs on macOS, Linux, and Windows — no WSL bridge.
 
@@ -281,7 +246,7 @@ Core tools live in the same namespace as `read` and `bash`. Pin the active set w
 
 - `lsp` — diagnostics, navigation, symbols, renames, code actions, raw requests.
 - `debug` — drive a DAP session — breakpoints, stepping, threads, stack, variables.
-- `security_scan` — plan and run native security reviews; drives Codex Security cloud scans.
+- `security_scan` — plan and run native code security reviews using the selected retained model, including Copilot; hosted Codex Security cloud scans are removed.
 
 **Coordination**
 
@@ -296,7 +261,6 @@ Core tools live in the same namespace as `read` and `bash`. Pin the active set w
 - `computer` — persistent JS against the host desktop: windows, screenshots, native input, AX tree, clipboard.
 - `web_search` — one query across configured providers, returning answer plus citations.
 - `github` — GitHub CLI ops — repo, PR, issues, code search, Actions run-watch.
-- `generate_image` — generate or edit raster images via Gemini, GPT, or xAI Grok image models.
 - `tts` — text-to-speech via xAI Grok Voice — five built-in voices, WAV or MP3.
 
 **Memory & skills**
@@ -310,7 +274,7 @@ Core tools live in the same namespace as `read` and `bash`. Pin the active set w
 - `learn` — capture a reusable lesson; optionally promote it into a managed skill.
 - `manage_skill` — create, update, or delete an isolated managed skill.
 
-Setting-gated, off by default: `github`, `security_scan`, `generate_image`, `tts`, `checkpoint`, `rewind`, and the memory tools (`retain`/`recall`/`reflect`/`memory_edit`, per `memory.backend`).
+Setting-gated, off by default: `github`, `security_scan`, `tts`, `checkpoint`, `rewind`, and the memory tools (`retain`/`recall`/`reflect`/`memory_edit`, per `memory.backend`).
 
 [Full reference →](https://omp.sh/docs/tools)
 
@@ -331,29 +295,18 @@ Slash commands shift how a whole session runs:
 - `/vibe` — enter [Vibe mode](docs/vibe-mode.md): act as a director driving persistent `fast`/`good` worker sessions with a `read`-only toolset.
 - `/fresh` — reset the provider stream state (stale prompt cache, wedged stream) without changing the local transcript. See [Session operations](docs/session-operations-export-share-fork-resume.md#fresh).
 
-## Sixty-plus providers, a thousand models, _one /model away_.
+## Local, self-hosted and Copilot models, _one /model away_.
 
-Nine roles route work by intent. `default` for normal turns. `smol` for cheap subagent fan-out. `slow` for deep reasoning. `plan` for plan mode. `commit` for changelogs. Plus `vision`, `task`, `advisor`, and `tiny` for their namesakes. Override at launch with `--smol`, `--slow`, or `--plan`; cycle through the configured models for the active role with `Ctrl+P`. Swap the active model mid-session with the `/model` slash command.
+Roles route work by intent: `default` for normal turns, `smol` for lightweight work, `slow` for deep reasoning, plus `plan`, `commit`, `vision`, `task`, `advisor`, `tiny` and `memory`. Override at launch with `--smol`, `--slow`, or `--plan`; cycle with `Ctrl+P` or switch using `/model`.
 
-Auth tags below: `oauth` signs in with your provider account, `plan` routes through a coding-plan subscription, `local` runs against a local server with the key optional.
+### Built-in integrations
 
-### Frontier APIs
+- **GitHub Copilot** — the retained hosted coding-model service; existing login and compatibility behavior remain.
+- **Ollama, llama.cpp, LM Studio, vLLM and LiteLLM** — local or company-operated inference servers, with optional keys where supported.
+- **Apple Foundation Models** — on-device inference on supported Apple Silicon/macOS systems.
+- **Local workers** — bundled tiny text, TTS and STT runtimes for auxiliary workloads.
 
-Direct APIs and gateways. Mix providers per role.
-
-Anthropic `oauth` · OpenAI · OpenAI Codex `oauth` · Google Gemini · Google Vertex · Google Antigravity `oauth` · xAI · SuperGrok `oauth` · DeepSeek · Mistral · Groq · Cerebras · SambaNova · Fireworks · Together · Baseten · DeepInfra · Hugging Face · NVIDIA · Meta · Inception · Amazon Bedrock · Azure OpenAI · SiliconFlow · GMI Cloud · CoreWeave · Sakana AI · Command Code · Charm Hyper · StepFun · Helmcode · OpenRouter · Synthetic · Vercel AI Gateway · Cloudflare AI Gateway · Wafer Serverless
-
-### Coding plans
-
-Subscription-routed. `/login` attaches the session.
-
-Cursor `oauth` · GitHub Copilot `oauth` · GitLab Duo · Devin `oauth` · Kimi Code `plan` · Moonshot · MiniMax Coding Plan `plan` · MiniMax Coding Plan CN `plan` · Alibaba Coding Plan `plan` · Qwen Portal `oauth` · Z.AI / GLM Coding Plan `plan` · Zhipu Coding Plan `plan` · Xiaomi MiMo · Qianfan · Umans `plan` · NanoGPT · Novita · Venice · Kilo · ZenMux · OpenCode Go · OpenCode Zen
-
-### Run it yourself
-
-OpenAI-compatible `/v1/models`. Local instances skip the key.
-
-Ollama `local` · Ollama Cloud · LM Studio `local` · llama.cpp `local` · vLLM `local` · LiteLLM
+Model families served through Copilot or a company server do not enable separate public vendor integrations. The bundled catalog is generated offline.
 
 ### Custom OpenAI-compatible providers
 
@@ -364,7 +317,7 @@ providers:
    spark:
       baseUrl: http://192.168.10.223:8000/v1
       api: openai-completions
-      apiKey: dummy
+      auth: none
       models:
          - id: minimax-m3
            name: MiniMax M3
@@ -383,49 +336,25 @@ modelRoles:
 
 ### Four knobs that make routing useful
 
-- **Custom providers** — Declare anything that speaks `openai-completions`, `openai-responses`, `openai-codex-responses`, `azure-openai-responses`, `anthropic-messages`, `bedrock-converse-stream`, `google-generative-ai`, `google-gemini-cli`, `google-vertex`, `typesafe`, `openrouter-decisions`, `openai-decisions`, or `workers-ai-systemone` (the judge APIs) in `~/.omp/agent/models.yml`.
+- **Custom providers** — Configure explicit company endpoints using the supported chat/native or modality protocols in `~/.omp/agent/models.yml`; use `auth: none` for a keyless service. Trusted extensions may register custom providers, transports and OAuth flows. See [Model configuration](docs/models.md).
 - **Fallback chains** — Per-role or per-model chains under `retry.fallbackChains`. When the primary throws 429s or hits a quota wall, the next entry takes the rest of the turn — restored on cooldown.
 - **Path-scoped models** — Scope `enabledModels` and `disabledProviders` entries to a `path:` prefix to pin a different model set on one repo without touching the global config. Scoped entries cover the path and everything under it.
 - **Round-robin credentials** — Stack API keys per provider and the runtime rotates with session affinity and per-credential backoff. Useful when one key would burn its quota by lunch.
 
-Full provider & routing reference at [omp.sh/docs/providers](https://omp.sh/docs/providers).
+Full provider and routing reference: [Providers](docs/providers.md).
 
-## Twenty-three backends. _One tool the agent already knows_.
+## Self-hosted search. _One tool the agent already knows_.
 
-`web_search` is built in, not bolted on. `auto` walks a twenty-three-provider chain; pin one by name if you already pay for it. Behind every hit, site-aware extraction turns GitHub, registries, arXiv, Stack Overflow, and docs into structured markdown — anchors and link targets survive.
+`web_search` uses configured company services. `auto` tries SearXNG, then explicitly configured Firecrawl, subject to availability. There is no built-in public search or reader fallback.
 
 ### Search providers
 
-Twenty-three backends. Pin one, or let `auto` walk the chain in order.
+| Provider | Configuration |
+| --- | --- |
+| `web/searxng` | Your SearXNG endpoint; optional bearer or Basic authentication |
+| `web/firecrawl` | Explicit private `FIRECRAWL_BASE_URL` / `FIRECRAWL_API_URL`; optional dedicated key |
 
-| provider     | auth                                      |
-| ------------ | ----------------------------------------- |
-| `auto`       | chain                                     |
-| `perplexity` | `PERPLEXITY_API_KEY` (anonymous fallback) |
-| `gemini`     | oauth                                     |
-| `anthropic`  | oauth                                     |
-| `codex`      | oauth                                     |
-| `xai`        | oauth or `XAI_API_KEY`                    |
-| `zai`        | `ZAI_API_KEY`                             |
-| `exa`        | `EXA_API_KEY` (or mcp)                    |
-| `tinyfish`   | `TINYFISH_API_KEY`                        |
-| `jina`       | `JINA_API_KEY`                            |
-| `kagi`       | `KAGI_API_KEY`                            |
-| `tavily`     | `TAVILY_API_KEY`                          |
-| `firecrawl`  | `FIRECRAWL_API_KEY` (keyless fallback)    |
-| `brave`      | `BRAVE_API_KEY`                           |
-| `kimi`       | `/login kimi-code` or search key          |
-| `parallel`   | `PARALLEL_API_KEY`                        |
-| `synthetic`  | `SYNTHETIC_API_KEY`                       |
-| `searxng`    | self-hosted                               |
-| `duckduckgo` | no key                                    |
-| `startpage`  | no key                                    |
-| `google`     | no key (browser)                          |
-| `ecosia`     | no key (browser)                          |
-| `mojeek`     | no key (browser)                          |
-| `public`     | no key (all of the above, consolidated)   |
-
-Exa also accepts a stored API key through `/login exa`; explicit keyless selection uses the public MCP fallback.
+These servers control their own upstream services. Running a proxy locally does not by itself guarantee that it never forwards queries externally.
 
 ### Specialised handlers
 

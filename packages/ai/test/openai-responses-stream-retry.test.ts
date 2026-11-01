@@ -11,7 +11,7 @@ import type {
 } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
-const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+const model = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 const firstUser = { role: "user" as const, content: "Read the file", timestamp: 1_000 };
 const context: Context = { messages: [firstUser] };
 
@@ -557,7 +557,7 @@ describe("OpenAI Responses transient stream retry", () => {
 		expect(result.content).toEqual([]);
 		expect(result.responseId).toBeUndefined();
 		expect(result.providerPayload).toBeUndefined();
-		expect(result.usage).toEqual({
+		expect(result.usage).toMatchObject({
 			input: 0,
 			output: 0,
 			cacheRead: 0,

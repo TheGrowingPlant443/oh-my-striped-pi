@@ -19,7 +19,7 @@ const ENV_KEYS = [
 	"OMP_AUTH_BROKER_SNAPSHOT_CACHE",
 	"OMP_AUTH_BROKER_SNAPSHOT_TTL_MS",
 ] as const;
-const PROVIDER = "unit-auth-broker-cache";
+const PROVIDER = "github-copilot";
 const TOKEN = "coding-agent-cache-token";
 
 const savedEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};

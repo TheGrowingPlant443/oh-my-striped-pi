@@ -28,7 +28,7 @@ afterEach(async () => {
 it("keeps the compacted eval context in the fork's provider prefix", async () => {
 	auth = await AuthStorage.create(":memory:");
 	const registry = new ModelRegistry(auth);
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 	if (!model) throw new Error("Expected bundled model");
 	const settings = Settings.isolated({ "compaction.keepRecentTokens": 1 });
 	const manager = SessionManager.create(temp.path(), path.join(temp.path(), "sessions"));
@@ -66,7 +66,7 @@ it("keeps the compacted eval context in the fork's provider prefix", async () =>
 		role: "assistant",
 		content: [{ type: "toolCall", id: "eval-1", name: "eval", arguments: { code: "1+1" } }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		stopReason: "toolUse",
 		usage: {

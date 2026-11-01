@@ -43,4 +43,22 @@ describe("legacy grep file and directory globs", () => {
 			await fs.rm(cwd, { recursive: true, force: true });
 		}
 	});
+
+	it("preserves literal regex characters and an absolute glob independently of the base path", async () => {
+		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-legacy-grep-"));
+		try {
+			const file = path.join(cwd, "sample.txt");
+			await Bun.write(file, "a+b[0]\naab0\n");
+			const result = await createGrepTool(cwd).execute("grep-literal", {
+				pattern: "a+b[0]",
+				literal: true,
+				path: "unrelated",
+				glob: file,
+			});
+			expect(result.details.files).toEqual(["sample.txt"]);
+			expect(result.details.matchCount).toBe(1);
+		} finally {
+			await fs.rm(cwd, { recursive: true, force: true });
+		}
+	});
 });

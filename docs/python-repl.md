@@ -72,7 +72,7 @@ Runner → host:
 {"type": "stdout",   "id": "<reqId>", "data": "..."}
 {"type": "stderr",   "id": "<reqId>", "data": "..."}
 {"type": "view",     "id": "<reqId>", "text": "...", "view": {"kind": "table"|"json"|"markdown", ...}}
-{"type": "image",    "id": "<reqId>", "image": {"mimeType": "...", "data": "<base64>", "detail"?: "...", "url"?: "...", "providerFile"?: {...}}}
+{"type": "image",    "id": "<reqId>", "image": {"mimeType": "...", "data": "<base64>", "detail"?: "...", "url"?: "..."}}
 {"type": "status",   "id": "<reqId>", "event": {"op": "...", ...}}
 {"type": "reply",    "id": "<reqId>", "value": {"ok": true, ...}}
 {"type": "error",    "id": "<reqId>", "ename": "...", "evalue": "...", "traceback": ["..."]}
@@ -212,7 +212,7 @@ The runner replaces `builtins.print`. When it prints to the cell's stdout, each 
 
 | Value                                                                                                          | Text in the output  | Extra frame     |
 | -------------------------------------------------------------------------------------------------------------- | ------------------- | --------------- |
-| `{"type": "image", "mimeType", "data": str\|bytes, "detail"?, "url"?, "providerFile"?}`                        | `<image MIME>`      | `image`         |
+| `{"type": "image", "mimeType", "data": str\|bytes, "detail"?, "url"?}`                                         | `<image MIME>`      | `image`         |
 | matplotlib `Figure` (PNG, `bbox_inches="tight"`), `PIL.Image.Image`, objects with `_repr_png_` / `_repr_jpeg_` | `str` / `repr`      | `image`         |
 | objects (not classes) with `_repr_markdown_`                                                                   | the Markdown source | `markdown` view |
 | pandas `DataFrame` / `Series`, polars `DataFrame` / `Series`                                                   | `str` / `repr`      | `table` view    |

@@ -9,14 +9,12 @@ import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { presentNarrationAsAnswer } from "@oh-my-pi/pi-ai/utils/narration";
 import { $flag, logger, postmortem, sanitizeText } from "@oh-my-pi/pi-utils";
-import { HINDSIGHT_NOTICE_SOURCE } from "../hindsight/state";
 import type { MCPManager } from "../mcp/manager";
 import { resolveMCPTimeoutMs } from "../mcp/timeout";
 import { type AgentSession, type AgentSessionEvent, SHUTDOWN_CONSOLIDATE_BUDGET_MS } from "../session/agent-session";
 import { COST_GATE_NOTICE_SOURCE } from "../session/cost-gate";
 import { CREDENTIAL_DISABLED_NOTICE_SOURCE } from "../session/credential-disabled-notice";
 import { isSilentAbort } from "../session/messages";
-import { flushTelemetryExport } from "../telemetry-export";
 import { parseSlashCommand, parseSubcommand } from "../slash-commands/helpers/parse";
 import type { SlashCommandRuntime } from "../slash-commands/types";
 import { reconnectMcpManagerServer } from "../mcp/oauth-reauth";
@@ -362,14 +360,11 @@ async function runPrintModeCore(
 			writeStdoutLine(`${JSON.stringify(printableEvent(event))}\n`);
 		} else if (
 			event.type === "notice" &&
-			(event.source === CREDENTIAL_DISABLED_NOTICE_SOURCE ||
-				event.source === COST_GATE_NOTICE_SOURCE ||
-				event.source === HINDSIGHT_NOTICE_SOURCE)
+			(event.source === CREDENTIAL_DISABLED_NOTICE_SOURCE || event.source === COST_GATE_NOTICE_SOURCE)
 		) {
 			// Text mode renders no session notices, but an automatic sign-out must not stay
-			// hidden behind a sibling account that quietly answers the prompt, a run must
-			// say when it crossed its cost thresholds, and a memory failure must not pass
-			// as an answer that used memories.
+			// hidden behind a sibling account that quietly answers the prompt, and a run must
+			// say when it crossed its cost thresholds.
 			writeStderrLine(event.source === COST_GATE_NOTICE_SOURCE ? event.message : `Warning: ${event.message}`);
 		}
 	});
@@ -601,9 +596,6 @@ async function runPrintModeCore(
 			{ waitThroughRecovery: true, strictWithoutDeadline: true },
 		);
 	}
-	// Error spans must reach the exporter; the postmortem `exit` handler can't await.
-	if (terminalFailure) await flushTelemetryExport();
-
 	// Block shutdown until every serialized stdout write (including the final
 	// agent_end and late JSON advisor events) has drained; process.exit would
 	// otherwise discard the buffered tail and truncate the last record.

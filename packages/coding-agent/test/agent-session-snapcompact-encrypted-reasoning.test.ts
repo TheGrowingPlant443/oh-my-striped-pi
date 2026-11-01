@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { Message } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -34,13 +34,22 @@ describe("AgentSession snapcompact no-reduction guard: opaque reasoning", () => 
 
 	beforeEach(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-anthropic", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 		sessionManager = SessionManager.inMemory();
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected bundled claude-sonnet-4-5 model");
-		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
+		const model = buildModel({
+			id: "claude-sonnet-4-5",
+			name: "Company Claude",
+			provider: "company-anthropic",
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid/anthropic",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
 
 		// A tiny real conversation whose archived region carries an opaque
 		// reasoning-replay signature far larger than its text.
@@ -53,9 +62,9 @@ describe("AgentSession snapcompact no-reduction guard: opaque reasoning", () => 
 					{ type: "thinking", thinking: "short", thinkingSignature: bigSignature },
 					{ type: "text", text: "first answer" },
 				],
-				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				api: model.api,
+				provider: model.provider,
+				model: model.id,
 				stopReason: "stop",
 				usage: {
 					input: 20,

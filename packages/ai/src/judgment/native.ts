@@ -1,37 +1,16 @@
-/**
- * Native judgment client: the {@link Judge} backend for catalog models whose
- * API answers typed questions directly ({@link isJudgmentApi}).
- *
- * Each judgment API is one wire dialect: TypeSafe's System One route
- * (`POST /v1/systemone`), OpenRouter Decisions (`POST /api/alpha/decisions`,
- * same body), Cloudflare Workers AI (`POST /ai/run/{model}`, same body plus
- * top-level data URL images; `systemone.ts`), and OpenAI Decisions
- * (`POST /v1/decisions`, translated both ways; `openai-decisions.ts`).
- * Credentials flow through {@link withAuth}, so a stored key rotates on
- * 401/403 exactly like chat providers; transient 429/5xx responses retry with
- * bounded, `retry-after`-aware backoff. Endpoints that cap the questions per
- * request (the catalog's `judgment-questions-max`, e.g. OpenJEV at 16) get
- * oversized requests split into chunks under `maxQuestions`, at most
- * {@link CHUNK_PARALLEL} in flight at once.
- *
- * Environment (mirrors the official TypeSafe SDK, for judges built without an
- * explicit model): `TYPESAFE_API_KEY` is resolved by the auth registry
- * (`rules/auth/typesafe.kdl`), `TYPESAFE_BASE_URL` overrides the API root,
- * `TYPESAFE_DEFAULT_MODEL` the model.
- */
+/** Native configured-endpoint judgments, with validated images, batching and credential rotation. */
 import { resolveJudgmentImageInput, type JudgmentImageInput } from "@oh-my-pi/pi-catalog/compat/judgment-images";
 import { resolveJudgmentQuestionsMax } from "@oh-my-pi/pi-catalog/compat/judgment-questions";
-import { TYPESAFE_DEFAULT_BASE_URL } from "@oh-my-pi/pi-catalog/discovery";
 import type { Api, FetchImpl } from "@oh-my-pi/pi-catalog/types";
-import { $env, isRecord, parseImageMetadata } from "@oh-my-pi/pi-utils";
-import { type ApiKey, withAuth } from "../auth-retry";
+import { isRecord, parseImageMetadata } from "@oh-my-pi/pi-utils";
+import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import { validateImageInput } from "../images/shared";
 import { withInferenceUserAgent } from "../providers/inference-headers";
 import type { ImageContent, Model, Usage } from "../types";
 import { getRetryAfterMsFromHeaders } from "../utils/retry-after";
 import { openaiDecisionsWire } from "./openai-decisions";
-import { openrouterDecisionsWire, referencedImageAssets, typesafeWire, workersAiWire } from "./systemone";
+import { referencedImageAssets, typesafeWire } from "./systemone";
 import {
 	type Answer,
 	type Judge,
@@ -45,12 +24,9 @@ import type { JudgmentImageAssets, JudgmentWire } from "./wire";
 export type { JudgmentImageAssets } from "./wire";
 
 export const TYPESAFE_PROVIDER = "typesafe";
-export const TYPESAFE_DEFAULT_MODEL = "jev-latest";
 
 const JUDGMENT_WIRES = {
 	typesafe: typesafeWire,
-	"openrouter-decisions": openrouterDecisionsWire,
-	"workers-ai-systemone": workersAiWire,
 	"openai-decisions": openaiDecisionsWire,
 } as const satisfies Partial<Record<Api, JudgmentWire>>;
 
@@ -153,21 +129,12 @@ export function checkBoxQuestions(request: JudgmentRequest): void {
 	}
 }
 
-/** `TYPESAFE_BASE_URL` when set, else the public API root; trailing slashes stripped. */
-export function typesafeBaseUrl(): string {
-	return ($env.TYPESAFE_BASE_URL?.trim() || TYPESAFE_DEFAULT_BASE_URL).replace(/\/+$/, "");
-}
-
-/** `TYPESAFE_DEFAULT_MODEL` when set, else {@link TYPESAFE_DEFAULT_MODEL}. */
-export function typesafeModel(): string {
-	return $env.TYPESAFE_DEFAULT_MODEL?.trim() || TYPESAFE_DEFAULT_MODEL;
-}
-
 /** Credential and transport overrides for a judge; see {@link createNativeJudge}. */
 export interface NativeJudgeConnection {
 	apiKey: ApiKey;
 	/** Static headers attached to judgment requests (e.g. proxy routing, gateway auth). */
 	headers?: Record<string, string>;
+	resolveHeaders?: Model["resolveHeaders"];
 	fetch?: FetchImpl;
 }
 
@@ -176,10 +143,10 @@ export interface NativeJudgeOptions extends NativeJudgeConnection {
 	api?: JudgmentApi;
 	/** Catalog provider reported on results; defaults to {@link TYPESAFE_PROVIDER}. */
 	provider?: string;
-	/** Defaults to {@link typesafeBaseUrl}. */
-	baseUrl?: string;
-	/** Wire model id; defaults to {@link typesafeModel}. */
-	model?: string;
+	/** Explicit company endpoint; no public default. */
+	baseUrl: string;
+	/** Wire model id. */
+	model: string;
 	/** Per-attempt timeout; defaults to {@link DEFAULT_TIMEOUT_MS}. */
 	timeoutMs?: number;
 	/**
@@ -328,6 +295,7 @@ export class NativeJudge implements Judge {
 	readonly #wire: JudgmentWire;
 	readonly #apiKey: ApiKey;
 	readonly #headers: Record<string, string> | undefined;
+	readonly #resolveHeaders: Model["resolveHeaders"];
 	readonly #fetch: FetchImpl;
 	readonly #timeoutMs: number;
 	readonly #maxQuestions: number | undefined;
@@ -338,9 +306,12 @@ export class NativeJudge implements Judge {
 		this.api = options.api ?? TYPESAFE_PROVIDER;
 		this.#wire = JUDGMENT_WIRES[this.api];
 		this.provider = options.provider ?? TYPESAFE_PROVIDER;
-		this.baseUrl = (options.baseUrl ?? typesafeBaseUrl()).replace(/\/+$/, "");
-		this.model = options.model ?? typesafeModel();
+		if (!options.baseUrl?.trim())
+			throw new AIError.ConfigurationError("Native judgment requires an explicit base URL");
+		this.baseUrl = options.baseUrl.replace(/\/+$/, "");
+		this.model = options.model;
 		this.#headers = options.headers;
+		this.#resolveHeaders = options.resolveHeaders;
 		this.#fetch = options.fetch ?? fetch;
 		this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 		if (options.maxQuestions !== undefined && !(Number.isInteger(options.maxQuestions) && options.maxQuestions > 0)) {
@@ -502,8 +473,9 @@ export class NativeJudge implements Judge {
 		const target = this.#wire.target(this.baseUrl, this.model, key);
 		const headers: Record<string, string> = {
 			...this.#headers,
+			...(await this.#resolveHeaders?.(signal)),
 			...requestHeaders,
-			Authorization: `Bearer ${target.token}`,
+			...(target.token && target.token !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${target.token}` } : {}),
 			Accept: "application/json",
 			"Content-Type": "application/json",
 		};
@@ -552,6 +524,8 @@ export function createNativeJudge(model: Model, connection: NativeJudgeConnectio
 	}
 	return new NativeJudge({
 		...connection,
+		headers: { ...model.headers, ...connection.headers },
+		resolveHeaders: connection.resolveHeaders ?? model.resolveHeaders,
 		api: model.api,
 		provider: model.provider,
 		model: model.requestModelId ?? model.id,

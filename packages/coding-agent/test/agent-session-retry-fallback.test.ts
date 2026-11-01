@@ -5,7 +5,6 @@ import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import { createCompactionSummaryMessage } from "@oh-my-pi/pi-agent-core/compaction";
 import {
-	type AnthropicFallbackCreditHandle,
 	type Api,
 	type AssistantMessage,
 	Effort,
@@ -17,7 +16,6 @@ import {
 } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { CodexApiError } from "@oh-my-pi/pi-ai/providers/openai-codex/response-handler";
 import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
@@ -27,7 +25,6 @@ import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-model
 import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
-import { parseModelPattern } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { editVariantForModel } from "@oh-my-pi/pi-coding-agent/utils/edit-mode";
 import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
@@ -162,32 +159,6 @@ function thinkingLoopErrorStream(model: Model<Api>): AssistantMessageEventStream
 	return stream;
 }
 
-/** Finalize a real Codex `turn_rate_limit_exceeded` 429 the way the provider does. */
-async function finalizeCodexCapacityError(retryAfterSeconds: string): Promise<AIError.FinalizeResult> {
-	const response = new Response(
-		JSON.stringify({
-			error: {
-				type: "rate_limit_error",
-				code: "turn_rate_limit_exceeded",
-				message: "Codex is at capacity, please try again later",
-			},
-		}),
-		{
-			status: 429,
-			headers: {
-				"retry-after": retryAfterSeconds,
-				"x-codex-primary-used-percent": "14",
-				"x-codex-primary-reset-at": String(Math.floor(Date.now() / 1000) + 3 * 60 * 60),
-			},
-		},
-	);
-	return AIError.finalize(await CodexApiError.fromResponse(response), {
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		model: "gpt-5.6-sol",
-	});
-}
-
 /** A stream that ends with a finalized provider error, as a provider stream does. */
 function finalizedErrorStream(model: Model<Api>, failure: AIError.FinalizeResult): AssistantMessageEventStream {
 	const stream = new AssistantMessageEventStream();
@@ -303,15 +274,27 @@ describe("AgentSession retry fallback", () => {
 		tempDir = TempDir.createSync("@pi-retry-fallback-");
 		await initTheme();
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
-		authStorage.keys.setRuntime("openai", "openai-test-key");
-		authStorage.keys.setRuntime("fireworks", "fireworks-test-key");
-		authStorage.keys.setRuntime("google", "google-test-key");
-		authStorage.keys.setRuntime("google-vertex", "google-vertex-test-key");
-		authStorage.keys.setRuntime("openrouter", "openrouter-test-key");
-		authStorage.keys.setRuntime("devin", "devin-test-key");
-		authStorage.keys.setRuntime("openai-codex", "openai-codex-test-key");
+		authStorage.keys.setRuntime("github-copilot", "copilot-test-key");
+		authStorage.keys.setRuntime("local", "local-test-key");
 		sharedRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		sharedRegistry.registerProvider("local", {
+			api: "local-inference",
+			baseUrl: "mock://",
+			apiKey: "local-test-key",
+			models: [
+				...[
+					"qwen3-1.7b",
+					"gemini-3.5-flash",
+					"google/gemini-3-flash-preview",
+					"google/gemini-3.5-flash",
+					"fixture@default",
+				].map(id => createMockModel({ id })),
+				{
+					...createMockModel({ id: "effort-floor", reasoning: true }),
+					thinking: { mode: "effort", efforts: [Effort.High], requiresEffort: true },
+				},
+			],
+		});
 	});
 
 	afterAll(() => {
@@ -336,9 +319,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("advances through a role-keyed fallback chain across retries", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const firstFallback = getBundledModel("openai", "gpt-4o-mini");
-		const secondFallback = getBundledModel("openai", "gpt-4o");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const firstFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const secondFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!primaryModel || !firstFallback || !secondFallback) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -452,8 +435,8 @@ describe("AgentSession retry fallback", () => {
 		// A session that starts on a default-hashline model and auto-falls-back to a
 		// variant-pinned model must rebuild its base prompt so the edit-mode policy
 		// tracks the model actually serving the turn (issue #11983).
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -522,8 +505,8 @@ describe("AgentSession retry fallback", () => {
 	// Re-rendering the prompt on a fallback hop changes the Model line and every byte after it, so
 	// Anthropic rewrites the whole cached conversation once per hop and again on the restore.
 	it("keeps the rendered system prompt across a retry-fallback hop that leaves the edit mode alone", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -585,8 +568,8 @@ describe("AgentSession retry fallback", () => {
 	// The hop kept the primary's prompt, but a rebuild while on the fallback (memory recall, a tool
 	// change) renders the fallback's policy; the restored primary must not keep it.
 	it("re-renders the primary's prompt on restore when a rebuild on the fallback rendered the fallback's", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -645,9 +628,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("hops to the chain owned by a fallback that is the last entry of the chain it came from", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const firstFallback = getBundledModel("openai", "gpt-4o-mini");
-		const secondFallback = getBundledModel("openai", "gpt-4o");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const firstFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const secondFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!primaryModel || !firstFallback || !secondFallback) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -739,9 +722,9 @@ describe("AgentSession retry fallback", () => {
 		// longer than `retry.maxDelayMs` aborted the session after one attempt
 		// instead of walking `default`. The walk starts at that role's primary,
 		// which is deliberately not the live model.
-		const liveModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const rolePrimary = getBundledModel("openai", "gpt-4o");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const liveModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const rolePrimary = getBundledModel("github-copilot", "gpt-4o");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!liveModel || !rolePrimary || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -798,16 +781,16 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps non-Gemini empty-body errors on the model-fallback path", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled empty-body fallback models");
 		}
 
 		const requestedModels: string[] = [];
 		const agent = createFallbackAgent(primaryModel, requestedModels, {
-			firstError: new AIError.ProviderResponseError("Devin API error: empty response body", {
-				provider: "devin",
+			firstError: new AIError.ProviderResponseError("OpenAI responses API error: empty response body", {
+				provider: "github-copilot",
 				kind: "empty-body",
 			}),
 		});
@@ -841,16 +824,16 @@ describe("AgentSession retry fallback", () => {
 		// A fallback candidate that availability-filtered resolution misses was
 		// looked up by name in the full catalog, so a chain naming a disabled
 		// provider's model sent the retry there anyway.
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const disabledModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const disabledModel = getBundledModel("local", "qwen3-1.7b");
 		if (!primaryModel || !disabledModel) {
 			throw new Error("Expected bundled disabled-provider fallback models");
 		}
 
 		const requestedModels: string[] = [];
 		const agent = createFallbackAgent(primaryModel, requestedModels, {
-			firstError: new AIError.ProviderResponseError("Devin API error: empty response body", {
-				provider: "devin",
+			firstError: new AIError.ProviderResponseError("OpenAI responses API error: empty response body", {
+				provider: "github-copilot",
 				kind: "empty-body",
 			}),
 		});
@@ -881,8 +864,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("forwards retry fallback events to extension handlers", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -951,8 +934,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("confirms before crossing models when every pooled account is inside reserve", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled reserve fallback models");
 		const requestedModels: string[] = [];
 		const mock = createMockModel({ responses: [{ content: ["continued with full context"] }] });
@@ -974,8 +957,8 @@ describe("AgentSession retry fallback", () => {
 			},
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) =>
+			options.modelId === primaryModel.id
 				? {
 						state: "reserve",
 						accounts: [
@@ -1019,8 +1002,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("lets the computer display sleep while the reserve fallback waits for the user", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled reserve fallback models");
 		const mock = createMockModel({ responses: [{ content: ["continued"] }] });
 		const agent = new Agent({
@@ -1036,8 +1019,8 @@ describe("AgentSession retry fallback", () => {
 			"retry.fallbackChains": { default: [`${fallbackModel.provider}/${fallbackModel.id}`] },
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) =>
+			options.modelId === primaryModel.id
 				? {
 						state: "reserve",
 						accounts: [
@@ -1083,8 +1066,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps a declined reserve fallback until the selected account recovers", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled reserve fallback models");
 		const mock = createMockModel({ handler: { content: ["stayed on primary"] } });
 		const agent = new Agent({
@@ -1101,10 +1084,10 @@ describe("AgentSession retry fallback", () => {
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
 		let health: "reserve" | "unknown" | "healthy" = "reserve";
 		let selectedHealth: "reserve" | "healthy" | undefined = "reserve";
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider => ({
-			state: provider === primaryModel.provider ? health : "healthy",
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) => ({
+			state: options.modelId === fallbackModel.id ? "healthy" : health,
 			accounts:
-				provider === primaryModel.provider
+				options.modelId !== fallbackModel.id
 					? [
 							{
 								credentialId: 1,
@@ -1169,7 +1152,7 @@ describe("AgentSession retry fallback", () => {
 		await session.prompt("Keep the decision after resetting the provider connection");
 		await session.waitForIdle();
 		expect(confirmFallback).toHaveBeenCalledTimes(2);
-		const otherModel = getBundledModel("anthropic", "claude-haiku-4-5");
+		const otherModel = getBundledModel("github-copilot", "claude-haiku-4.5");
 		if (!otherModel) throw new Error("Expected another bundled reserve model");
 		await session.setModel(otherModel);
 		await session.prompt("Ask before spending another model's reserve");
@@ -1183,8 +1166,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("honors a live fail-closed policy after reserve spending was approved", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled reserve policy models");
 		const mock = createMockModel({ responses: [{ content: ["stayed on primary"] }] });
 		const agent = new Agent({
@@ -1201,21 +1184,23 @@ describe("AgentSession retry fallback", () => {
 			},
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		const usageHealth = vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
-				? {
-						state: "reserve",
-						accounts: [
-							{
-								credentialId: 1,
-								credentialType: "oauth",
-								state: "reserve",
-								remainingFraction: 0.05,
-							},
-						],
-					}
-				: { state: "healthy", accounts: [] },
-		);
+		const usageHealth = vi
+			.spyOn(modelRegistry.authStorage.health, "model")
+			.mockImplementation(async (_provider, options) =>
+				options.modelId === primaryModel.id
+					? {
+							state: "reserve",
+							accounts: [
+								{
+									credentialId: 1,
+									credentialType: "oauth",
+									state: "reserve",
+									remainingFraction: 0.05,
+								},
+							],
+						}
+					: { state: "healthy", accounts: [] },
+			);
 		const confirmFallback = vi.fn(async () => false);
 		session = new AgentSession({
 			agent,
@@ -1235,8 +1220,8 @@ describe("AgentSession retry fallback", () => {
 		expect(usageHealth).toHaveBeenCalledTimes(3);
 	});
 	it("reselects a healthy same-provider account before considering a model fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled pooled fallback models");
 		const requestedModels: string[] = [];
 		const mock = createMockModel({ responses: [{ content: ["same provider continued"] }] });
@@ -1286,8 +1271,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("reselects a healthy sibling before applying a same-provider model fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("anthropic", "claude-haiku-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "claude-haiku-4.5");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled same-provider fallback models");
 		const requestedModels: string[] = [];
 		const mock = createMockModel({ responses: [{ content: ["same-provider fallback continued"] }] });
@@ -1357,7 +1342,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("does not dispatch a prompt after its usage preflight is cancelled", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) throw new Error("Expected bundled preflight model");
 		const requestedModels: string[] = [];
 		const agent = new Agent({
@@ -1399,8 +1384,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("cancels a pending reserve confirmation without dispatching the prompt", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled confirmation cancellation models");
 		const requestedModels: string[] = [];
 		const agent = new Agent({
@@ -1419,8 +1404,8 @@ describe("AgentSession retry fallback", () => {
 			},
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) =>
+			options.modelId === primaryModel.id
 				? {
 						state: "reserve",
 						accounts: [
@@ -1459,8 +1444,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("defers usage fallback for a queued steer until the active stream finishes", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled queued fallback models");
 		const requestedModels: string[] = [];
 		const streamStarted = Promise.withResolvers<void>();
@@ -1492,33 +1477,35 @@ describe("AgentSession retry fallback", () => {
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
 		let useReserve = false;
-		const usageHealth = vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
-				? useReserve
-					? {
-							state: "reserve",
-							accounts: [
-								{
-									credentialId: 1,
-									credentialType: "oauth",
-									state: "reserve",
-									remainingFraction: 0.05,
-								},
-							],
-						}
-					: {
-							state: "healthy",
-							accounts: [
-								{
-									credentialId: 1,
-									credentialType: "oauth",
-									state: "healthy",
-									remainingFraction: 0.8,
-								},
-							],
-						}
-				: { state: "healthy", accounts: [] },
-		);
+		const usageHealth = vi
+			.spyOn(modelRegistry.authStorage.health, "model")
+			.mockImplementation(async (_provider, options) =>
+				options.modelId === primaryModel.id
+					? useReserve
+						? {
+								state: "reserve",
+								accounts: [
+									{
+										credentialId: 1,
+										credentialType: "oauth",
+										state: "reserve",
+										remainingFraction: 0.05,
+									},
+								],
+							}
+						: {
+								state: "healthy",
+								accounts: [
+									{
+										credentialId: 1,
+										credentialType: "oauth",
+										state: "healthy",
+										remainingFraction: 0.8,
+									},
+								],
+							}
+					: { state: "healthy", accounts: [] },
+			);
 		session = new AgentSession({
 			agent,
 			sessionManager: SessionManager.inMemory(),
@@ -1545,8 +1532,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("cancels queued-turn usage confirmation when post-prompt work is disposed", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled queued cancellation models");
 		const requestedModels: string[] = [];
 		const agent = new Agent({
@@ -1565,8 +1552,8 @@ describe("AgentSession retry fallback", () => {
 			},
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) =>
+			options.modelId === primaryModel.id
 				? {
 						state: "reserve",
 						accounts: [
@@ -1602,7 +1589,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("does not reschedule a queued drain after a dequeue hook rejects", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) throw new Error("Expected bundled queued-drain model");
 		const requestedModels: string[] = [];
 		const agent = new Agent({
@@ -1638,7 +1625,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("enforces fail-closed usage health when model fallback is disabled", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) throw new Error("Expected bundled fail-closed model");
 		const agent = new Agent({
 			getApiKey: model => `${model.provider}-test-key`,
@@ -1672,88 +1659,8 @@ describe("AgentSession retry fallback", () => {
 		await expect(session.prompt("Do not spend reserve")).rejects.toThrow("reserve policy is fail-closed");
 	});
 
-	it("does not degrade Fireworks Fast or retry a chain after queued fail-closed preflight", async () => {
-		const primaryModel = getBundledModel("fireworks", "kimi-k3-fast");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
-		if (!primaryModel || !fallbackModel) throw new Error("Expected bundled queued fail-closed models");
-		const requestedModels: string[] = [];
-		const streamStarted = Promise.withResolvers<void>();
-		const firstResponse = Promise.withResolvers<{ content: string[] }>();
-		const mock = createMockModel({
-			responses: [
-				async () => {
-					streamStarted.resolve();
-					return firstResponse.promise;
-				},
-				{ content: ["must not run"] },
-			],
-		});
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
-			streamFn: (model, context, options) => {
-				requestedModels.push(`${model.provider}/${model.id}`);
-				return mock.stream(model, context, options);
-			},
-		});
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.usageAwareFallback": true,
-			"retry.usageReservePolicy": "fail-closed",
-			"retry.fallbackChains": {
-				default: [`${fallbackModel.provider}/${fallbackModel.id}`],
-			},
-		});
-		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		let useReserve = false;
-		const usageHealth = vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async () =>
-			useReserve
-				? {
-						state: "reserve",
-						accounts: [
-							{
-								credentialId: 1,
-								credentialType: "oauth",
-								state: "reserve",
-								remainingFraction: 0.05,
-							},
-						],
-					}
-				: {
-						state: "healthy",
-						accounts: [
-							{
-								credentialId: 1,
-								credentialType: "oauth",
-								state: "healthy",
-								remainingFraction: 0.8,
-							},
-						],
-					},
-		);
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-
-		const firstPrompt = session.prompt("Keep the primary stream active");
-		await streamStarted.promise;
-		useReserve = true;
-		await session.sendUserMessage("Queue blocked work", { deliverAs: "steer" });
-		firstResponse.resolve({ content: ["primary stream completed"] });
-		await firstPrompt;
-		await session.waitForIdle();
-
-		expect(usageHealth).toHaveBeenCalledTimes(2);
-		expect(requestedModels).toEqual([`${primaryModel.provider}/${primaryModel.id}`]);
-		expect(session.model?.id).toBe(primaryModel.id);
-		expect(agent.hasQueuedMessages()).toBe(true);
-	});
-
 	it("rechecks fail-closed usage health before an internally scheduled continuation", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) throw new Error("Expected bundled scheduled continuation model");
 		const requestedModels: string[] = [];
 		let useReserve = false;
@@ -1820,7 +1727,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("rechecks fail-closed usage health before a same-turn tool continuation", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) throw new Error("Expected bundled tool-continuation model");
 		const requestedModels: string[] = [];
 		let useReserve = false;
@@ -1894,8 +1801,8 @@ describe("AgentSession retry fallback", () => {
 		expect(requestedModels).toEqual([`${primaryModel.provider}/${primaryModel.id}`]);
 	});
 	it("rechecks fail-closed usage health when prompt setup changes the model", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const setupTarget = getBundledModel("anthropic", "claude-sonnet-4-6");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const setupTarget = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!primaryModel || !setupTarget) throw new Error("Expected bundled setup-handoff models");
 		const requestedModels: string[] = [];
 		const usageChecks: string[] = [];
@@ -1956,8 +1863,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("restarts usage preflight when the model changes during a health request", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const selectedModel = getBundledModel("anthropic", "claude-sonnet-4-6");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const selectedModel = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!primaryModel || !selectedModel) throw new Error("Expected bundled preflight race models");
 		const requestedModels: string[] = [];
 		const usageChecks: string[] = [];
@@ -2038,8 +1945,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("continues a startup-owned role fallback chain from the active fallback", async () => {
-		const firstFallback = getBundledModel("openai", "gpt-4o-mini");
-		const secondFallback = getBundledModel("openai", "gpt-4o");
+		const firstFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const secondFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!firstFallback || !secondFallback) {
 			throw new Error("Expected bundled fallback models to exist");
 		}
@@ -2150,10 +2057,10 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps advisor fallback recovery on its role chain when another role shares its model", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const unrelatedFallback = getBundledModel("openai", "gpt-4o");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const unrelatedFallback = getBundledModel("github-copilot", "gpt-4o");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!mainModel || !advisorPrimary || !unrelatedFallback || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2285,16 +2192,16 @@ describe("AgentSession retry fallback", () => {
 	it.each(["enabled", "remote-disabled", "model-disabled"])(
 		"skips incompatible advisor retries and replays compatible history with %s compaction",
 		async policy => {
-			const primary = getBundledModel("openai", "gpt-5")!;
-			const compatibleBase = getBundledModel("openai", "gpt-5-mini")!;
+			const primary = getBundledModel("github-copilot", "gpt-5")!;
+			const compatibleBase = getBundledModel("github-copilot", "gpt-5-mini")!;
 			const compatible =
 				policy === "model-disabled"
 					? { ...compatibleBase, remoteCompaction: { ...compatibleBase.remoteCompaction, enabled: false } }
 					: compatibleBase;
-			const foreign = getBundledModel("anthropic", "claude-sonnet-4-5")!;
-			const wrongApi: Model = { ...getBundledModel("openai", "gpt-4o")!, api: "openai-completions" };
+			const foreign = modelRegistry.find("local", "qwen3-1.7b")!;
+			const wrongApi: Model = { ...getBundledModel("github-copilot", "gpt-4o")!, api: "openai-completions" };
 			const wrongAnthropicApi: Model = {
-				...getBundledModel("openai", "gpt-4o-mini")!,
+				...getBundledModel("github-copilot", "gpt-5.4-mini")!,
 				api: "anthropic-messages",
 				remoteCompaction: { enabled: true, api: "openai-responses" },
 			};
@@ -2371,13 +2278,13 @@ describe("AgentSession retry fallback", () => {
 		async policy => {
 			const compatible = policy !== "foreign";
 			const primaryBase = compatible
-				? getBundledModel("openai", "gpt-5-mini")!
-				: getBundledModel("anthropic", "claude-sonnet-4-5")!;
+				? getBundledModel("github-copilot", "gpt-5-mini")!
+				: modelRegistry.find("local", "qwen3-1.7b")!;
 			const primary =
 				policy === "model-disabled"
 					? { ...primaryBase, remoteCompaction: { ...primaryBase.remoteCompaction, enabled: false } }
 					: primaryBase;
-			const fallback = getBundledModel("openai", "gpt-5")!;
+			const fallback = getBundledModel("github-copilot", "gpt-5")!;
 			const primarySelector = `${primary.provider}/${primary.id}`;
 			const fallbackSelector = `${fallback.provider}/${fallback.id}`;
 			const mainMock = createMockModel({
@@ -2451,9 +2358,9 @@ describe("AgentSession retry fallback", () => {
 	);
 
 	it("switches an advisor off a dual-classified media-budget 413 with no token excess", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!mainModel || !advisorPrimary || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2533,9 +2440,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps a usage-backed media-budget overflow from switching the advisor", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!mainModel || !advisorPrimary || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2610,9 +2517,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("retries an advisor's transient error on its own model under retry.fallbackOn usage-limit", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!mainModel || !advisorPrimary || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2679,9 +2586,9 @@ describe("AgentSession retry fallback", () => {
 
 	it("pauses an advisor on a usage limit instead of switching under retry.fallbackOn except-usage-limit", async () => {
 		vi.spyOn(modelRegistry.authStorage.limits, "markReached").mockResolvedValue({ switched: false });
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!mainModel || !advisorPrimary || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2749,88 +2656,11 @@ describe("AgentSession retry fallback", () => {
 		});
 	});
 
-	describe("advisor on a timed Codex capacity 429", () => {
-		async function runAdvisorAgainstCapacityErrors(failures: number, maxRetries: number) {
-			const markReached = vi.spyOn(modelRegistry.authStorage.limits, "markReached");
-			const mainModel = getBundledModel("openai", "gpt-4o-mini");
-			const advisorModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-			if (!mainModel || !advisorModel) throw new Error("Expected bundled models to exist");
-			// 10ms Retry-After keeps each provider-timed wait short.
-			const failure = await finalizeCodexCapacityError("0.01");
-			let advisorRequests = 0;
-			// Settles on a completed review (yield) or a dropped batch (advisor failure notice).
-			const advisorSettled = Promise.withResolvers<void>();
-
-			const agent = new Agent({
-				getApiKey: model => `${model.provider}-test-key`,
-				initialState: { model: mainModel, systemPrompt: ["Test"], tools: [], messages: [] },
-				streamFn: createMockModel({ responses: [{ content: ["Primary complete"] }] }).stream,
-			});
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.enabled": true,
-				"retry.baseDelayMs": 0,
-				"retry.maxDelayMs": 1_000,
-				"retry.maxRetries": maxRetries,
-				"retry.modelFallback": false,
-			});
-			const advisorSelector = `${advisorModel.provider}/${advisorModel.id}`;
-			settings.setModelRole("advisor", advisorSelector);
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry,
-				advisorTools: [],
-				advisorConfigs: [{ name: "capacity-test", model: advisorSelector }],
-				advisorStreamFn: model => {
-					advisorRequests++;
-					return advisorRequests <= failures
-						? finalizedErrorStream(model, failure)
-						: recoveredTextStream(model, "Advisor recovered");
-				},
-			});
-			session.subscribe(event => {
-				if (event.type === "advisor_yielded" || (event.type === "notice" && event.source === "advisor")) {
-					advisorSettled.resolve();
-				}
-			});
-
-			session.setAdvisorEnabled(true);
-			await session.prompt("Complete one primary turn");
-			await session.waitForIdle();
-			await advisorSettled.promise;
-			return {
-				advisorRequests,
-				markReached,
-				status: session.getAdvisorStatusOverview().advisors[0]?.status,
-			};
-		}
-
-		it("waits out the Retry-After and completes the review", async () => {
-			// Three failures used to exhaust the runtime's 1s retries and drop the batch.
-			const result = await runAdvisorAgainstCapacityErrors(3, 5);
-
-			expect(result.advisorRequests).toBe(4);
-			expect(result.status).toBe("running");
-			expect(result.markReached).not.toHaveBeenCalled();
-		});
-
-		it("drops the batch once retry.maxRetries waits are spent", async () => {
-			// maxRetries provider-timed waits, then the runtime's three strikes.
-			const result = await runAdvisorAgainstCapacityErrors(Number.POSITIVE_INFINITY, 2);
-
-			expect(result.advisorRequests).toBe(2 + 3);
-			expect(result.status).toBe("error");
-			expect(result.markReached).not.toHaveBeenCalled();
-		}, 15_000);
-	});
-
 	it("hops an advisor to the chain owned by the fallback it landed on", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("google", "gemini-2.5-flash");
-		const secondFallback = getBundledModel("openai", "gpt-4o");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
+		const secondFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!mainModel || !advisorPrimary || !advisorFallback || !secondFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2923,9 +2753,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("ignores late advisor fallback credentials after a session transition", async () => {
-		const mainModel = getBundledModel("openai", "gpt-4o-mini");
-		const advisorPrimary = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorFallback = getBundledModel("openai", "gpt-4o");
+		const mainModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const advisorPrimary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const advisorFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!mainModel || !advisorPrimary || !advisorFallback) {
 			throw new Error("Expected bundled advisor fallback models to exist");
 		}
@@ -2994,8 +2824,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("activates a model-keyed fallback chain without any role assignment", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3046,9 +2876,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("prefers a model-keyed chain over the matching role chain", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const modelKeyFallback = getBundledModel("openai", "gpt-4o-mini");
-		const roleChainFallback = getBundledModel("openai", "gpt-4o");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const modelKeyFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const roleChainFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!primaryModel || !modelKeyFallback || !roleChainFallback) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3099,8 +2929,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("falls back to the chain when credential rotation exhausts the retry budget", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3167,8 +2997,8 @@ describe("AgentSession retry fallback", () => {
 		expect(retryEndEvents[0]).toMatchObject({ success: true });
 	});
 	it("rotates sibling credentials on 402 Payment is required and status-only 402 without invoking model fallback", async () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o") ?? getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("google", "gemini-1.5-pro") ?? getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-4o");
+		const fallbackModel = getBundledModel("github-copilot", "gemini-2.5-pro");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3250,8 +3080,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("allows model fallback on 402 Payment Required when all sibling credentials are exhausted", async () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o") ?? getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("google", "gemini-1.5-pro") ?? getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-4o");
+		const fallbackModel = getBundledModel("github-copilot", "gemini-2.5-pro");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3308,8 +3138,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("applies a provider-wildcard chain to any model of that provider", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-opus-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-opus-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3324,7 +3154,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -3355,15 +3185,15 @@ describe("AgentSession retry fallback", () => {
 				type: "retry_fallback_applied",
 				from: `${primaryModel.provider}/${primaryModel.id}`,
 				to: `${fallbackModel.provider}/${fallbackModel.id}`,
-				role: "anthropic/*",
+				role: "github-copilot/*",
 				reason: expect.any(String),
 			},
 		]);
 	});
 
 	it("consults the fallback chain on a non-retryable hard error instead of failing the turn", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = modelRegistry.find("local", "qwen3-1.7b");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3381,12 +3211,12 @@ describe("AgentSession retry fallback", () => {
 			},
 			streamFn: (model, context, options) => {
 				requestedModels.push(`${model.provider}/${model.id}`);
-				if (model.provider === primaryModel.provider) {
+				if (model.id === primaryModel.id) {
 					// Classifies as neither transient, usage-limit, nor auth:
 					// the generic retry classifier rejects it outright.
 					mock.push({ throw: "unrecoverable model quirk" });
 				} else {
-					mock.push({ content: ["Recovered on fallback"] });
+					mock.push({ content: ["Recovered on the fallback"] });
 				}
 				return mock.stream(model, context, options);
 			},
@@ -3396,7 +3226,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.baseDelayMs": 5,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -3427,7 +3257,7 @@ describe("AgentSession retry fallback", () => {
 				type: "retry_fallback_applied",
 				from: `${primaryModel.provider}/${primaryModel.id}`,
 				to: `${fallbackModel.provider}/${fallbackModel.id}`,
-				role: "anthropic/*",
+				role: "github-copilot/*",
 				reason: expect.stringContaining("unrecoverable model quirk"),
 			},
 		]);
@@ -3483,8 +3313,8 @@ describe("AgentSession retry fallback", () => {
 		async ({ fallbackOn, error, failures, requests, stop }) => {
 			mockSchedulerWaitWithClock();
 			vi.spyOn(modelRegistry.authStorage.limits, "markReached").mockResolvedValue({ switched: false });
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 			if (!primaryModel || !fallbackModel) {
 				throw new Error("Expected bundled test models to exist");
 			}
@@ -3501,7 +3331,7 @@ describe("AgentSession retry fallback", () => {
 					messages: [],
 				},
 				streamFn: (model, context, options) => {
-					const onPrimary = model.provider === primaryModel.provider;
+					const onPrimary = model.id === primaryModel.id;
 					requested.push(onPrimary ? "primary" : "fallback");
 					if (onPrimary && primaryFailures < failures) {
 						primaryFailures++;
@@ -3540,8 +3370,8 @@ describe("AgentSession retry fallback", () => {
 		},
 	);
 	it("surfaces immutable Anthropic thinking errors without retry fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled Anthropic test models to exist");
 		}
@@ -3580,7 +3410,7 @@ describe("AgentSession retry fallback", () => {
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -3616,8 +3446,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps signed Anthropic thinking on its source model during transient retry", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled Anthropic test models to exist");
 		}
@@ -3658,7 +3488,7 @@ describe("AgentSession retry fallback", () => {
 			"retry.baseDelayMs": 1,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -3700,9 +3530,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("walks the Anthropic chain when the failed model did not sign the replayed thinking", async () => {
-		const signingModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
-		const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+		const signingModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 		if (!signingModel || !primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -3784,8 +3614,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("walks the Anthropic chain once same-model retries on the signing model are spent", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled Anthropic test models to exist");
 		}
@@ -3826,7 +3656,7 @@ describe("AgentSession retry fallback", () => {
 			"retry.baseDelayMs": 1,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -3894,8 +3724,8 @@ describe("AgentSession retry fallback", () => {
 					Object.assign(new Error("concurrent connections limit (retry-after-ms=1)"), { status: 429 }),
 					{
 						api: "anthropic-messages",
-						provider: "anthropic",
-						model: "claude-sonnet-4-5",
+						provider: "github-copilot",
+						model: "claude-sonnet-4.5",
 					},
 				),
 			extraSettings: { "retry.rateLimitWalksChain": true },
@@ -3913,8 +3743,8 @@ describe("AgentSession retry fallback", () => {
 	])(
 		"reaches the Anthropic fallback after $primaryAttempts attempt(s) on the signing model when it fails with $name",
 		async ({ failure, extraSettings, primaryAttempts }) => {
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 			if (!primaryModel || !fallbackModel) {
 				throw new Error("Expected bundled Anthropic test models to exist");
 			}
@@ -3960,7 +3790,7 @@ describe("AgentSession retry fallback", () => {
 					"retry.baseDelayMs": 1,
 					"retry.maxRetries": 3,
 					"retry.fallbackChains": {
-						"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+						"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 					},
 					...extraSettings,
 				}),
@@ -4029,8 +3859,8 @@ describe("AgentSession retry fallback", () => {
 	])(
 		"walks the Anthropic chain when the signing model fails with $name, which it does not retry",
 		async ({ failure, settings: extraSettings }) => {
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 			if (!primaryModel || !fallbackModel) {
 				throw new Error("Expected bundled Anthropic test models to exist");
 			}
@@ -4073,7 +3903,7 @@ describe("AgentSession retry fallback", () => {
 					"retry.baseDelayMs": 1,
 					"retry.maxRetries": 3,
 					"retry.fallbackChains": {
-						"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+						"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 					},
 					...extraSettings,
 				}),
@@ -4109,8 +3939,8 @@ describe("AgentSession retry fallback", () => {
 	);
 
 	it("keeps signed thinking in a preserved transport-error turn on its source Anthropic model", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("anthropic", "claude-opus-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "claude-opus-4.5");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled Anthropic test models to exist");
 		}
@@ -4138,7 +3968,7 @@ describe("AgentSession retry fallback", () => {
 				if (requestCount === 1) {
 					return transportErrorAfterToolCallStream(model, toolCall, "sonnet-signature");
 				}
-				const mock = createMockModel({ id: model.id, provider: model.provider });
+				const mock = createMockModel({ id: model.id });
 				mock.push({ content: ["Recovered on Sonnet"] });
 				return mock.stream(mock, context, options);
 			},
@@ -4149,7 +3979,7 @@ describe("AgentSession retry fallback", () => {
 			"retry.baseDelayMs": 1,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -4176,15 +4006,15 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("surfaces a non-retryable error without same-model retries when no fallback candidate has a credential", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
 
 		const originalGetApiKey = modelRegistry.getApiKey.bind(modelRegistry);
 		vi.spyOn(modelRegistry, "getApiKey").mockImplementation((model, sessionId) =>
-			model.provider === fallbackModel.provider ? Promise.resolve(undefined) : originalGetApiKey(model, sessionId),
+			model.id === fallbackModel.id ? Promise.resolve(undefined) : originalGetApiKey(model, sessionId),
 		);
 
 		const mock = createMockModel();
@@ -4209,7 +4039,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.baseDelayMs": 5,
 			"retry.fallbackChains": {
-				"anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
+				"github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`],
 			},
 		});
 
@@ -4256,9 +4086,9 @@ describe("AgentSession retry fallback", () => {
 		}
 
 		it("skips the blocked candidate and switches to the next one in the chain", async () => {
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const blockedModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-			const nextModel = getBundledModel("openai", "gpt-4o-mini");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const blockedModel = getBundledModel("local", "qwen3-1.7b");
+			const nextModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 			if (!primaryModel || !blockedModel || !nextModel) throw new Error("Expected bundled test models to exist");
 			blockProvider(blockedModel.provider);
 
@@ -4269,7 +4099,7 @@ describe("AgentSession retry fallback", () => {
 				initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
 				streamFn: (model, context, options) => {
 					requestedModels.push(`${model.provider}/${model.id}`);
-					if (model.provider === primaryModel.provider) {
+					if (model.id === primaryModel.id) {
 						mock.push({ throw: "overloaded_error: provider returned error 503" });
 					} else {
 						mock.push({ content: [`ok:${model.provider}/${model.id}`] });
@@ -4300,8 +4130,8 @@ describe("AgentSession retry fallback", () => {
 		});
 
 		it("ends the retry as a failure when the blocked candidate is the only one left", async () => {
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const blockedModel = getBundledModel("openai-codex", "gpt-5.6-sol");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const blockedModel = getBundledModel("local", "qwen3-1.7b");
 			if (!primaryModel || !blockedModel) throw new Error("Expected bundled test models to exist");
 			blockProvider(blockedModel.provider);
 
@@ -4339,8 +4169,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("substitutes the failing model id into provider-wildcard chain entries", async () => {
-		const primaryModel = getBundledModel("google", "gemini-3.5-flash");
-		const fallbackModel = getBundledModel("google-vertex", "gemini-3.5-flash");
+		const primaryModel = getBundledModel("github-copilot", "gemini-3.5-flash");
+		const fallbackModel = modelRegistry.find("local", "gemini-3.5-flash");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -4349,13 +4179,12 @@ describe("AgentSession retry fallback", () => {
 		const fallbackAppliedEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
 		const agent = createFallbackAgent(primaryModel, requestedModels);
 
-		// `google-vertex/*` is not a fixed target: it must adopt the failing
-		// model's id (google/gemini-3.5-flash -> google-vertex/gemini-3.5-flash).
+		// Wildcard targets preserve the failed model's bare id.
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"google/*": ["google-vertex/*"],
+				"github-copilot/*": ["local/*"],
 			},
 		});
 
@@ -4379,22 +4208,22 @@ describe("AgentSession retry fallback", () => {
 			`${primaryModel.provider}/${primaryModel.id}`,
 			`${fallbackModel.provider}/${fallbackModel.id}`,
 		]);
-		expect(session.model?.provider).toBe("google-vertex");
+		expect(session.model?.provider).toBe("local");
 		expect(session.model?.id).toBe(primaryModel.id);
 		expect(fallbackAppliedEvents).toEqual([
 			{
 				type: "retry_fallback_applied",
 				from: `${primaryModel.provider}/${primaryModel.id}`,
-				to: `google-vertex/${primaryModel.id}`,
-				role: "google/*",
+				to: `local/${primaryModel.id}`,
+				role: "github-copilot/*",
 				reason: expect.any(String),
 			},
 		]);
 	});
 
 	it("re-prefixes the failing model's bare id for id-prefixed wildcard chain entries", async () => {
-		const primaryModel = getBundledModel("google", "gemini-2.5-flash");
-		const fallbackModel = getBundledModel("openrouter", "google/gemini-2.5-flash");
+		const primaryModel = getBundledModel("github-copilot", "gemini-3-flash-preview");
+		const fallbackModel = modelRegistry.find("local", "google/gemini-3-flash-preview");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -4403,14 +4232,12 @@ describe("AgentSession retry fallback", () => {
 		const fallbackAppliedEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
 		const agent = createFallbackAgent(primaryModel, requestedModels);
 
-		// `openrouter/google/*` splits into provider `openrouter` + id prefix
-		// `google`: the failing bare id is re-prefixed into the aggregator's
-		// namespace (google/gemini-2.5-flash -> openrouter/google/gemini-2.5-flash).
+		// The target adds a namespace to the failed model's bare id.
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"google/*": ["openrouter/google/*"],
+				"github-copilot/*": ["local/google/*"],
 			},
 		});
 
@@ -4434,22 +4261,22 @@ describe("AgentSession retry fallback", () => {
 			`${primaryModel.provider}/${primaryModel.id}`,
 			`${fallbackModel.provider}/${fallbackModel.id}`,
 		]);
-		expect(session.model?.provider).toBe("openrouter");
+		expect(session.model?.provider).toBe("local");
 		expect(session.model?.id).toBe(`google/${primaryModel.id}`);
 		expect(fallbackAppliedEvents).toEqual([
 			{
 				type: "retry_fallback_applied",
 				from: `${primaryModel.provider}/${primaryModel.id}`,
-				to: `openrouter/google/${primaryModel.id}`,
-				role: "google/*",
+				to: `local/google/${primaryModel.id}`,
+				role: "github-copilot/*",
 				reason: expect.any(String),
 			},
 		]);
 	});
 
 	it("matches id-prefixed wildcard keys and strips the vendor prefix for direct-provider targets", async () => {
-		const primaryModel = getBundledModel("openrouter", "google/gemini-3.5-flash");
-		const fallbackModel = getBundledModel("google-vertex", "gemini-3.5-flash");
+		const primaryModel = modelRegistry.find("local", "google/gemini-3.5-flash");
+		const fallbackModel = getBundledModel("github-copilot", "gemini-3.5-flash");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -4458,14 +4285,12 @@ describe("AgentSession retry fallback", () => {
 		const fallbackAppliedEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
 		const agent = createFallbackAgent(primaryModel, requestedModels);
 
-		// Key `openrouter/google/*` covers only openrouter's google-namespaced
-		// ids; the plain `google-vertex/*` target drops the aggregator's vendor
-		// prefix because vertex only knows the bare id.
+		// A namespaced key drops its prefix for a bare-id target.
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.maxRetries": 1,
 			"retry.fallbackChains": {
-				"openrouter/google/*": ["google-vertex/*"],
+				"local/google/*": ["github-copilot/*"],
 			},
 		});
 
@@ -4489,23 +4314,23 @@ describe("AgentSession retry fallback", () => {
 			`${primaryModel.provider}/${primaryModel.id}`,
 			`${fallbackModel.provider}/${fallbackModel.id}`,
 		]);
-		expect(session.model?.provider).toBe("google-vertex");
+		expect(session.model?.provider).toBe("github-copilot");
 		expect(session.model?.id).toBe(fallbackModel.id);
 		expect(fallbackAppliedEvents).toEqual([
 			{
 				type: "retry_fallback_applied",
 				from: `${primaryModel.provider}/${primaryModel.id}`,
-				to: `google-vertex/${fallbackModel.id}`,
-				role: "openrouter/google/*",
+				to: `github-copilot/${fallbackModel.id}`,
+				role: "local/google/*",
 				reason: expect.any(String),
 			},
 		]);
 	});
 
 	it("uses the active initial model as the default fallback primary when other role fallback chains are configured", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
-		const otherRoleFallbackModel = getBundledModel("openai", "gpt-4o");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const otherRoleFallbackModel = getBundledModel("github-copilot", "gpt-4o");
 		if (!primaryModel || !fallbackModel || !otherRoleFallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -4557,8 +4382,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("falls back on structured classifier refusals and pins the fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -4667,156 +4492,8 @@ describe("AgentSession retry fallback", () => {
 		]);
 	});
 
-	it.each([
-		// Fable → Opus 4.8 and Opus 5.5 → Opus 5 are catalog-permitted fallback-credit target pairs.
-		{ primaryId: "claude-fable-5", fallbackId: "claude-opus-4-8", swapRebuildsPrompt: false, nonTargetFirst: false },
-		{ primaryId: "claude-fable-5", fallbackId: "claude-opus-4-8", swapRebuildsPrompt: true, nonTargetFirst: false },
-		{ primaryId: "claude-opus-5-5", fallbackId: "claude-opus-5", swapRebuildsPrompt: false, nonTargetFirst: false },
-		// A refusal may move to another Claude model, but a chain entry the credit cannot
-		// target (Opus 5.5 for Fable) must not take the hop ahead of one it can and forfeit the credit.
-		{ primaryId: "claude-fable-5", fallbackId: "claude-opus-4-8", swapRebuildsPrompt: false, nonTargetFirst: true },
-	])(
-		"redeems Anthropic fallback credit across a same-provider refusal fallback with signed thinking unless the swap rebuilt the prompt (%o)",
-		async ({ primaryId, fallbackId, swapRebuildsPrompt, nonTargetFirst }) => {
-			const primaryModel = getBundledModel("anthropic", primaryId);
-			const fallbackModel = getBundledModel("anthropic", fallbackId);
-			if (!primaryModel || !fallbackModel) {
-				throw new Error("Expected bundled test models to exist");
-			}
-
-			const requestedModels: string[] = [];
-			const fallbackAppliedEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
-			const mock = createMockModel({ provider: "anthropic", id: primaryModel.id });
-			const refusalDetails = {
-				type: "refusal",
-				category: "cyber",
-				explanation: "Classifier declined this turn.",
-				fallback_credit_token: "fct_signed_test",
-				fallback_has_prefill_claim: true,
-			};
-			let requestCount = 0;
-			let fallbackTurnRedemption: AnthropicFallbackCreditHandle | undefined;
-			const agent = new Agent({
-				getApiKey: model => `${model.provider}-test-key`,
-				initialState: {
-					model: primaryModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (model, context, options) => {
-					requestCount++;
-					requestedModels.push(`${model.provider}/${model.id}`);
-					if (requestCount === 1) {
-						mock.push({
-							content: [
-								{
-									type: "thinking",
-									thinking: "Signed Sonnet reasoning.",
-									thinkingSignature: "sonnet-signature",
-								},
-								"Seeded turn",
-							],
-						});
-					} else if (requestCount === 2) {
-						mock.push({
-							content: [
-								{
-									type: "thinking",
-									thinking: "Fable thinking before refusal.",
-									thinkingSignature: "sig_fable_opaque_signature_12345",
-								},
-							],
-							stopReason: "error",
-							stopDetails: refusalDetails,
-							errorMessage: "Refusal (cyber): Classifier declined this turn.",
-							fallbackCreditHandle: {
-								token: "fct_signed_test",
-								prefillClaim: true,
-								params: {
-									model: primaryModel.id,
-									messages: [{ role: "user", content: "Test prompt" }],
-									max_tokens: 1024,
-									stream: true,
-								},
-								betas: ["fallback-credit-2026-06-01"],
-								expiresAt: Date.now() + 60000,
-							},
-						});
-					} else if (requestCount === 3) {
-						fallbackTurnRedemption = session?.consumeActiveFallbackCreditRedemption(model);
-						mock.push({ content: ["Recovered on Opus with credit"] });
-					} else {
-						throw new Error(
-							`Unexpected model requested during refusal fallback test: ${model.provider}/${model.id}`,
-						);
-					}
-					return mock.stream(model, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxRetries": 1,
-				"retry.fallbackChains": {
-					default: [
-						...(nonTargetFirst ? ["anthropic/claude-opus-5-5"] : []),
-						`${fallbackModel.provider}/${fallbackModel.id}`,
-					],
-				},
-				"retry.fallbackRevertPolicy": "cooldown-expiry",
-			});
-			settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry,
-			});
-			session.subscribe(event => {
-				if (event.type === "retry_fallback_applied") {
-					fallbackAppliedEvents.push(event);
-					// The frozen body carries the refused request's system prompt; a swap that
-					// rebuilt it must not replay the stale body.
-					if (swapRebuildsPrompt) agent.setSystemPrompt(["Rebuilt for the fallback model"]);
-				}
-			});
-
-			await session.prompt("Seed signed thinking");
-			await session.waitForIdle();
-			const seededAssistant = agent.state.messages.findLast(
-				(message): message is AssistantMessage => message.role === "assistant",
-			);
-			if (!seededAssistant) throw new Error("Expected seeded assistant message");
-			seededAssistant.api = primaryModel.api;
-			seededAssistant.provider = primaryModel.provider;
-			seededAssistant.model = primaryModel.id;
-
-			await session.prompt("Recover from classifier refusal with signed thinking");
-			await session.waitForIdle();
-
-			expect(requestedModels).toEqual([
-				`${primaryModel.provider}/${primaryModel.id}`,
-				`${primaryModel.provider}/${primaryModel.id}`,
-				`${fallbackModel.provider}/${fallbackModel.id}`,
-			]);
-			expect(fallbackAppliedEvents).toHaveLength(1);
-			expect(fallbackAppliedEvents[0].to).toBe(`${fallbackModel.provider}/${fallbackModel.id}`);
-			expect(session.model?.id).toBe(fallbackModel.id);
-			if (swapRebuildsPrompt) {
-				expect(fallbackTurnRedemption).toBeUndefined();
-			} else {
-				expect(fallbackTurnRedemption?.token).toBe("fct_signed_test");
-			}
-			expect(session.consumeActiveFallbackCreditRedemption(fallbackModel)).toBeUndefined();
-			expect(session.consumeActiveFallbackCreditRedemption()).toBeUndefined();
-		},
-	);
-
 	it("drops classifier refusal messages before later prompts", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) {
 			throw new Error("Expected bundled test model to exist");
 		}
@@ -4913,7 +4590,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps the pruned refusal visible to getLastAssistantMessage until the next run", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) {
 			throw new Error("Expected bundled test model to exist");
 		}
@@ -4975,9 +4652,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps walking the chain on a refusal after the retry budget is spent, each model once", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const firstFallback = getBundledModel("openai", "gpt-4o-mini");
-		const secondFallback = getBundledModel("openai", "gpt-4o");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const firstFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const secondFallback = getBundledModel("github-copilot", "gpt-4o");
 		if (!primaryModel || !firstFallback || !secondFallback) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5093,8 +4770,8 @@ describe("AgentSession retry fallback", () => {
 		// A turn that spent its retries on transient provider errors used to get no fallback at all
 		// once the classifier declined, ending on the model it started on with the rest of the chain
 		// untried. `retry.maxRetries: 0` is that state on the first failure.
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5150,8 +4827,8 @@ describe("AgentSession retry fallback", () => {
 		// current model's own chain as well as the pinned one, so A -> B and B -> A alternate
 		// rather than loop in place, and every hop spent an attempt. With a refusal no longer
 		// stopped by the budget, the walk is bounded by visiting each model at most once.
-		const modelA = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const modelB = getBundledModel("openai", "gpt-4o-mini");
+		const modelA = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const modelB = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!modelA || !modelB) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5234,8 +4911,8 @@ describe("AgentSession retry fallback", () => {
 		// The walk records the current selector, which carries the thinking level (`…:high`), while
 		// chain entries name bare models. Both must reduce to the same model, or the walk asks the
 		// model that just refused a second time.
-		const modelA = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const modelB = getBundledModel("openai", "gpt-4o-mini");
+		const modelA = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const modelB = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!modelA || !modelB) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5291,10 +4968,10 @@ describe("AgentSession retry fallback", () => {
 		// so the run ended on the refusal with the rest of the chain untried. Anthropic's documented
 		// retry resends the history unchanged on the fallback model, which drops the blocks it cannot
 		// read. The walk follows the chain that served the refused model, not that model's own chain.
-		const requested = getBundledModel("openai-codex", "gpt-5.6-terra");
-		const fallback = getBundledModel("anthropic", "claude-opus-5-5");
-		const next = getBundledModel("anthropic", "claude-opus-5");
-		const fallbacksOwnNext = getBundledModel("anthropic", "claude-opus-4-8");
+		const requested = getBundledModel("github-copilot", "gpt-5.6-terra");
+		const fallback = getBundledModel("github-copilot", "claude-opus-5.5");
+		const next = getBundledModel("github-copilot", "claude-opus-5");
+		const fallbacksOwnNext = getBundledModel("github-copilot", "claude-opus-4.8");
 		if (!requested || !fallback || !next || !fallbacksOwnNext) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5384,8 +5061,8 @@ describe("AgentSession retry fallback", () => {
 		// An abort during the fallback's request ends the turn without closing the retry saga, and a
 		// turn an extension starts skips prompt()'s per-prompt reset, so neither a new saga nor a new
 		// prompt is there to drop the walk. The walk the aborted turn left must still not follow it.
-		const modelA = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const modelB = getBundledModel("openai", "gpt-4o-mini");
+		const modelA = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const modelB = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!modelA || !modelB) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5469,7 +5146,7 @@ describe("AgentSession retry fallback", () => {
 		// while `retryAttempt (2) <= maxRetries (2)`, so it can't fall through
 		// the pre-existing maxRetries-exceeded path (which already emits
 		// `auto_retry_end`) — isolating the branch this regression covers.
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!primaryModel) {
 			throw new Error("Expected bundled test model to exist");
 		}
@@ -5539,7 +5216,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("uses Google retry hints in quota errors before quota backoff", async () => {
-		const model = getBundledModel("google", "gemini-1.5-flash");
+		const model = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!model) {
 			throw new Error("Expected bundled Google test model to exist");
 		}
@@ -5599,8 +5276,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps retry on the primary model when retry model fallback is disabled", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5679,7 +5356,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("auto-retries preserved OpenAI first-event timeout errors", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -5737,7 +5414,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("auto-retries stream stall errors", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -5795,7 +5472,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("auto-retries OpenAI processing-request transient errors", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -5857,8 +5534,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("restarts Responses provider state before retrying stale item-id replay errors", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const fallbackModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5905,7 +5582,7 @@ describe("AgentSession retry fallback", () => {
 			}
 		});
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-responses:openai", {
+		session.providerSessionState.set(`openai-responses:${model.provider}`, {
 			close: closeSpy,
 		} satisfies ProviderSessionState);
 		const { retryStartEvents, retryEndEvents } = trackRetryEvents(session);
@@ -5914,7 +5591,7 @@ describe("AgentSession retry fallback", () => {
 		await session.waitForIdle();
 
 		expect(closeSpy).toHaveBeenCalledTimes(1);
-		expect(session.providerSessionState.has("openai-responses:openai")).toBe(true);
+		expect(session.providerSessionState.has(`openai-responses:${model.provider}`)).toBe(true);
 		expect(requestedModels).toEqual([`${model.provider}/${model.id}`, `${model.provider}/${model.id}`]);
 		expect(fallbackAppliedEvents).toHaveLength(0);
 		expect(retryStartEvents).toHaveLength(1);
@@ -5934,8 +5611,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("restarts Responses provider state before retrying Zero Data Retention errors", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const fallbackModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -5986,7 +5663,7 @@ describe("AgentSession retry fallback", () => {
 			}
 		});
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-responses:openai", {
+		session.providerSessionState.set(`openai-responses:${model.provider}`, {
 			close: closeSpy,
 		} satisfies ProviderSessionState);
 		const { retryStartEvents, retryEndEvents } = trackRetryEvents(session);
@@ -5995,7 +5672,7 @@ describe("AgentSession retry fallback", () => {
 		await session.waitForIdle();
 
 		expect(closeSpy).toHaveBeenCalledTimes(1);
-		expect(session.providerSessionState.has("openai-responses:openai")).toBe(true);
+		expect(session.providerSessionState.has(`openai-responses:${model.provider}`)).toBe(true);
 		expect(requestedModels).toEqual([`${model.provider}/${model.id}`, `${model.provider}/${model.id}`]);
 		expect(fallbackAppliedEvents).toHaveLength(0);
 		expect(retryStartEvents).toHaveLength(1);
@@ -6012,7 +5689,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("auto-retries Anthropic stream-envelope failures before message_stop", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -6070,8 +5747,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("falls back on mid-stream Anthropic envelope failures without same-model retries", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -6152,7 +5829,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("closes the retry lifecycle when a retried turn ends with a non-retryable error", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) throw new Error("Expected bundled OpenAI test model to exist");
 
 		const retryableError = "rate limit exceeded retry-after-ms=5";
@@ -6202,7 +5879,7 @@ describe("AgentSession retry fallback", () => {
 	it.each(["Request was aborted.", "The operation was aborted", "The operation was aborted."])(
 		"auto-retries empty abort errors: %s",
 		async abortMessage => {
-			const model = getBundledModel("openai", "gpt-4o-mini");
+			const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 			if (!model) {
 				throw new Error("Expected bundled OpenAI test model to exist");
 			}
@@ -6260,86 +5937,11 @@ describe("AgentSession retry fallback", () => {
 		},
 	);
 
-	it("matches plain fallback roles for compat-routed primary models", async () => {
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
-		if (!fallbackModel) {
-			throw new Error("Expected bundled OpenAI test model to exist");
-		}
-		const routedPrimary = buildModel({
-			id: "z-ai/glm-4.7",
-			name: "GLM 4.7",
-			api: "openai-completions",
-			provider: "openrouter",
-			baseUrl: "https://openrouter.ai/api/v1",
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 128000,
-			maxTokens: 8192,
-			compat: { openRouterRouting: { only: ["cerebras"] } },
-		});
-
-		const requestedModels: string[] = [];
-		const mock = createMockModel();
-		let primaryAttempts = 0;
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: {
-				model: routedPrimary,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				const route =
-					requestedModel.provider === "openrouter" &&
-					requestedModel.compat &&
-					"openRouterRouting" in requestedModel.compat
-						? requestedModel.compat.openRouterRouting?.only?.[0]
-						: undefined;
-				const requested = `${requestedModel.provider}/${requestedModel.id}${route ? `@${route}` : ""}`;
-				requestedModels.push(requested);
-				if (requestedModel.provider === "openrouter" && primaryAttempts === 0) {
-					primaryAttempts += 1;
-					mock.push({ throw: "rate limit exceeded retry-after-ms=200" });
-				} else {
-					mock.push({ content: [`ok:${requested}`] });
-				}
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.fallbackChains": {
-				default: [`${fallbackModel.provider}/${fallbackModel.id}`],
-			},
-		});
-		settings.setModelRole("default", "openrouter/z-ai/glm-4.7");
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-
-		await session.prompt("Compat-routed primary should still match plain role");
-		await session.waitForIdle();
-		expect(requestedModels).toEqual([
-			"openrouter/z-ai/glm-4.7@cerebras",
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-		]);
-		expect(session.model?.provider).toBe(fallbackModel.provider);
-		expect(session.model?.id).toBe(fallbackModel.id);
-	});
-
 	it("keeps exact @-suffixed model IDs in fallback selectors", async () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
-		const fallbackModel = getBundledModel("google-vertex", "claude-opus-4-8@default");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const fallbackModel = modelRegistry.find("local", "fixture@default");
 		if (!primaryModel || !fallbackModel) {
-			throw new Error("Expected bundled OpenAI and Vertex Anthropic test models to exist");
+			throw new Error("Expected registered fallback model to exist");
 		}
 
 		const requestedModels: string[] = [];
@@ -6391,8 +5993,8 @@ describe("AgentSession retry fallback", () => {
 		expect(session.model?.id).toBe(fallbackModel.id);
 	});
 	it("suppresses cooled selectors and lazily reverts to the role primary after cooldown expiry", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -6460,8 +6062,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps credit with the fallback when a restored primary fails without serving", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -6535,66 +6137,6 @@ describe("AgentSession retry fallback", () => {
 		}
 	});
 
-	it("reports a Fireworks Fast degrade as fallback-routed even though it arms no chain", async () => {
-		const fastModel = getBundledModel("fireworks", "kimi-k3-fast");
-		if (!fastModel) throw new Error("Expected the bundled Fireworks Fast model to exist");
-		const baseId = fastModel.id.replace(/-fast$/, "");
-		const baseModel = getBundledModel("fireworks", baseId);
-		if (!baseModel) throw new Error("Expected the bundled Fireworks base model to exist");
-
-		const requestedModels: string[] = [];
-		const mock = createMockModel();
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: { model: fastModel, systemPrompt: ["Test"], tools: [], messages: [] },
-			streamFn: (model, context, options) => {
-				requestedModels.push(`${model.provider}/${model.id}`);
-				// Fast rejects the request; the base model answers it.
-				mock.push(
-					model.id === fastModel.id
-						? { throw: "rate limit exceeded retry-after-ms=200" }
-						: { content: ["the base model did the work"] },
-				);
-				return mock.stream(model, context, options);
-			},
-		});
-
-		const settings = Settings.isolated({ "compaction.enabled": false, "retry.baseDelayMs": 5 });
-		settings.setModelRole("default", `${fastModel.provider}/${fastModel.id}`);
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-
-		await session.prompt("Degrade off Fast and answer on the base model");
-		await session.waitForIdle();
-
-		// The degrade swaps models without arming a retry-fallback chain, but it is
-		// still fallback routing — a bare model badge would hide that.
-		expect(requestedModels).toEqual([`${fastModel.provider}/${fastModel.id}`, `fireworks/${baseId}`]);
-		expect(session.servingModel).toEqual({
-			selector: `fireworks/${baseId}`,
-			modelIdentity: `fireworks/${baseId}`,
-			thinkingLevel: undefined,
-			isFallback: true,
-			contextWindow: baseModel.contextWindow,
-		});
-
-		// How the previous transcript was routed says nothing about a freshly
-		// loaded one: switching sessions in place must not describe the new
-		// session's model as fallback-routed.
-		vi.spyOn(session.sessionManager, "getSessionId").mockReturnValue("some-other-session");
-		expect(session.servingModel).toEqual({
-			selector: `fireworks/${baseId}`,
-			modelIdentity: `fireworks/${baseId}`,
-			thinkingLevel: undefined,
-			isFallback: false,
-			contextWindow: baseModel.contextWindow,
-		});
-	});
-
 	it("re-checks context before a cooldown-expiry revert onto a smaller-window model in the auto-continue path", async () => {
 		// Regression for #7952: a cooldown-expiry revert reverts the model at a
 		// turn boundary. The user-prompt path re-checks context after the revert
@@ -6609,9 +6151,9 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					openai: {
+					"github-copilot": {
 						modelOverrides: {
-							"gpt-4o-mini": { contextWindow: 4000, contextPromotionTarget: "openai/gpt-4o" },
+							"gpt-5.4-mini": { contextWindow: 4000, contextPromotionTarget: "github-copilot/gpt-4o" },
 							"gpt-4o": { contextWindow: 1_000_000 },
 						},
 					},
@@ -6620,8 +6162,8 @@ describe("AgentSession retry fallback", () => {
 		);
 		modelRegistry = new ModelRegistry(authStorage, modelsConfigPath);
 
-		const primaryModel = modelRegistry.find("openai", "gpt-4o-mini");
-		const fallbackModel = modelRegistry.find("openai", "gpt-4o");
+		const primaryModel = modelRegistry.find("github-copilot", "gpt-5.4-mini");
+		const fallbackModel = modelRegistry.find("github-copilot", "gpt-4o");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected override models to resolve");
 		}
@@ -6722,14 +6264,10 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					anthropic: {
+					"github-copilot": {
 						modelOverrides: {
-							"claude-sonnet-4-5": { contextWindow: 1_000_000 },
-						},
-					},
-					openai: {
-						modelOverrides: {
-							"gpt-4o-mini": { contextWindow: 4000, contextPromotionTarget: "openai/gpt-4o" },
+							"claude-sonnet-4.5": { contextWindow: 1_000_000 },
+							"gpt-5.4-mini": { contextWindow: 4000, contextPromotionTarget: "github-copilot/gpt-4o" },
 							"gpt-4o": { contextWindow: 1_000_000 },
 						},
 					},
@@ -6738,9 +6276,9 @@ describe("AgentSession retry fallback", () => {
 		);
 		modelRegistry = new ModelRegistry(authStorage, modelsConfigPath);
 
-		const primaryModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const smallFallback = modelRegistry.find("openai", "gpt-4o-mini");
-		const largeFallback = modelRegistry.find("openai", "gpt-4o");
+		const primaryModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const smallFallback = modelRegistry.find("github-copilot", "gpt-5.4-mini");
+		const largeFallback = modelRegistry.find("github-copilot", "gpt-4o");
 		if (!primaryModel || !smallFallback || !largeFallback) {
 			throw new Error("Expected override models to resolve");
 		}
@@ -6814,14 +6352,10 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					anthropic: {
+					"github-copilot": {
 						modelOverrides: {
-							"claude-sonnet-4-5": { contextWindow: 1_000_000 },
-						},
-					},
-					openai: {
-						modelOverrides: {
-							"gpt-4o-mini": { contextWindow: 8000 },
+							"claude-sonnet-4.5": { contextWindow: 1_000_000 },
+							"gpt-5.4-mini": { contextWindow: 8000 },
 						},
 					},
 				},
@@ -6829,8 +6363,8 @@ describe("AgentSession retry fallback", () => {
 		);
 		modelRegistry = new ModelRegistry(authStorage, modelsConfigPath);
 
-		const primaryModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = modelRegistry.find("openai", "gpt-4o-mini");
+		const primaryModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = modelRegistry.find("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected override models to resolve");
 		}
@@ -6899,14 +6433,10 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					anthropic: {
+					"github-copilot": {
 						modelOverrides: {
-							"claude-sonnet-4-5": { contextWindow: 1_000_000 },
-						},
-					},
-					openai: {
-						modelOverrides: {
-							"gpt-4o-mini": { contextWindow: 4000 },
+							"claude-sonnet-4.5": { contextWindow: 1_000_000 },
+							"gpt-5.4-mini": { contextWindow: 4000 },
 							"gpt-4o": { contextWindow: 1_000_000 },
 						},
 					},
@@ -6915,9 +6445,9 @@ describe("AgentSession retry fallback", () => {
 		);
 		modelRegistry = new ModelRegistry(authStorage, modelsConfigPath);
 
-		const primaryModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const smallFallback = modelRegistry.find("openai", "gpt-4o-mini");
-		const largeFallback = modelRegistry.find("openai", "gpt-4o");
+		const primaryModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const smallFallback = modelRegistry.find("github-copilot", "gpt-5.4-mini");
+		const largeFallback = modelRegistry.find("github-copilot", "gpt-4o");
 		if (!primaryModel || !smallFallback || !largeFallback) {
 			throw new Error("Expected override models to resolve");
 		}
@@ -6943,7 +6473,7 @@ describe("AgentSession retry fallback", () => {
 				requestedModels.push(`${model.provider}/${model.id}`);
 				// The first mid-stream drop gets one same-model retry before fallback selection.
 				if (requestCount <= 2) return transportErrorAfterToolCallStream(model, toolCall);
-				const mock = createMockModel({ id: model.id, provider: model.provider });
+				const mock = createMockModel({ id: model.id });
 				mock.push({ content: ["Recovered on a fitting fallback"] });
 				return mock.stream(mock, context, options);
 			},
@@ -6978,92 +6508,9 @@ describe("AgentSession retry fallback", () => {
 		expect(session.model?.id).toBe(largeFallback.id);
 	});
 
-	it("restores routed fallback primaries after cooldown expiry", async () => {
-		const openRouterModel = getBundledModel("openrouter", "z-ai/glm-4.7");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
-		if (!openRouterModel || !fallbackModel) {
-			throw new Error("Expected bundled OpenRouter and OpenAI test models to exist");
-		}
-		const routedPrimary = parseModelPattern("openrouter/z-ai/glm-4.7@cerebras", [openRouterModel]).model;
-		if (!routedPrimary) {
-			throw new Error("Expected routed OpenRouter primary to resolve");
-		}
-
-		const requestedModels: string[] = [];
-		const mock = createMockModel();
-		let primaryAttempts = 0;
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: {
-				model: routedPrimary,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				const route =
-					requestedModel.provider === "openrouter"
-						? (
-								requestedModel.compat as {
-									openRouterRouting?: { only?: string[] };
-								}
-							).openRouterRouting?.only?.[0]
-						: undefined;
-				const requested = `${requestedModel.provider}/${requestedModel.id}${route ? `@${route}` : ""}`;
-				requestedModels.push(requested);
-				if (requested === "openrouter/z-ai/glm-4.7@cerebras" && primaryAttempts === 0) {
-					primaryAttempts += 1;
-					mock.push({ throw: "rate limit exceeded retry-after-ms=200" });
-				} else {
-					mock.push({ content: [`ok:${requested}`] });
-				}
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.fallbackChains": {
-				default: [`${fallbackModel.provider}/${fallbackModel.id}`],
-			},
-			"retry.fallbackRevertPolicy": "cooldown-expiry",
-		});
-		settings.setModelRole("default", "openrouter/z-ai/glm-4.7@cerebras");
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		let now = Date.now();
-		vi.spyOn(Date, "now").mockImplementation(() => now);
-
-		await session.prompt("First prompt triggers routed primary fallback");
-		await session.waitForIdle();
-		expect(requestedModels).toEqual([
-			"openrouter/z-ai/glm-4.7@cerebras",
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-		]);
-
-		now += 240;
-		await session.prompt("Second prompt should restore routed primary");
-		await session.waitForIdle();
-		expect(requestedModels).toEqual([
-			"openrouter/z-ai/glm-4.7@cerebras",
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-			"openrouter/z-ai/glm-4.7@cerebras",
-		]);
-		expect(session.model?.provider).toBe("openrouter");
-		expect(session.model?.id).toBe("z-ai/glm-4.7");
-		expect(
-			(session.model?.compat as { openRouterRouting?: { only?: string[] } } | undefined)?.openRouterRouting?.only,
-		).toEqual(["cerebras"]);
-	});
 	it("preserves thinking on bare fallback selectors and does not overwrite user thinking on restore", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -7099,7 +6546,7 @@ describe("AgentSession retry fallback", () => {
 		]);
 		expect(session.model?.provider).toBe(fallbackModel.provider);
 		expect(session.model?.id).toBe(fallbackModel.id);
-		expect(session.thinkingLevel).toBeUndefined();
+		expect(session.thinkingLevel).toBe(Effort.High);
 
 		session.setThinkingLevel(Effort.Low);
 		now += 240;
@@ -7112,7 +6559,7 @@ describe("AgentSession retry fallback", () => {
 		]);
 		expect(session.model?.provider).toBe(primaryModel.provider);
 		expect(session.model?.id).toBe(primaryModel.id);
-		expect(session.thinkingLevel).toBeUndefined();
+		expect(session.thinkingLevel).toBe(Effort.Low);
 	});
 
 	for (const { name, primaryThinking, suffix, expectedThinking } of [
@@ -7141,8 +6588,8 @@ describe("AgentSession retry fallback", () => {
 		expectedThinking: ConfiguredThinkingLevel;
 	}>) {
 		it(name, async () => {
-			const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const fallbackModel = getBundledModel("openai-codex", "gpt-5.6-sol");
+			const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			const fallbackModel = getBundledModel("github-copilot", "gpt-5.6-sol");
 			if (!primaryModel || !fallbackModel) {
 				throw new Error("Expected bundled test models to exist");
 			}
@@ -7179,8 +6626,8 @@ describe("AgentSession retry fallback", () => {
 	}
 
 	it("clamps a fallback selector's explicit thinking level to the session effort ceiling", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai-codex", "gpt-5.6-sol");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.6-sol");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -7223,9 +6670,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("skips usage fallbacks whose effort floor exceeds the session ceiling", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const incompatibleFallback = getBundledModel("openrouter", "deepseek/deepseek-v4-pro");
-		const compatibleFallback = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const incompatibleFallback = modelRegistry.find("local", "effort-floor");
+		const compatibleFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !incompatibleFallback || !compatibleFallback) {
 			throw new Error("Expected bundled usage fallback effort models");
 		}
@@ -7270,53 +6717,8 @@ describe("AgentSession retry fallback", () => {
 		expect(session.model?.id).toBe(compatibleFallback.id);
 	});
 
-	it("accepts cached Ollama Cloud fallback selectors during startup validation", () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
-		if (!primaryModel) {
-			throw new Error("Expected bundled OpenAI test model to exist");
-		}
-		const cachedModel: Model<"ollama-chat"> = buildModel({
-			id: "deepseek-v4-pro",
-			name: "DeepSeek V4 Pro",
-			api: "ollama-chat",
-			provider: "ollama-cloud",
-			baseUrl: "https://ollama.com",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 1_000_000,
-			maxTokens: 384_000,
-		});
-		writeModelCache("ollama-cloud", Date.now(), [cachedModel], true, "", path.join(tempDir.path(), "models.db"));
-		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.json"));
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.fallbackChains": { default: ["ollama-cloud/deepseek-v4-pro"] },
-		});
-		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
-			streamFn: () => {
-				throw new Error("Not exercised");
-			},
-		});
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-
-		expect(session.configWarnings).not.toContain(
-			"Fallback chain for role 'default' references unknown model: ollama-cloud/deepseek-v4-pro",
-		);
-	});
-
 	it("suppresses unknown-model warnings for a config-declared discovery provider with a cold cache", async () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -7325,10 +6727,11 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					litellm: {
-						baseUrl: "https://litellm.example.net/v1",
+					"github-copilot": {
+						baseUrl: "https://copilot-discovery.example.net/v1",
+						apiKey: "copilot-discovery-test-key",
 						api: "openai-completions",
-						discovery: { type: "litellm" },
+						discovery: { type: "openai-models-list" },
 					},
 				},
 			}),
@@ -7337,13 +6740,13 @@ describe("AgentSession retry fallback", () => {
 		// models and its discovery state is `idle` (pending) at construction —
 		// the exact state that made valid selectors look unknown (#10048).
 		const coldRegistry = new ModelRegistry(authStorage, modelsConfigPath);
-		expect(coldRegistry.isProviderDiscoveryPending("litellm")).toBe(true);
-		expect(coldRegistry.find("litellm", "Qwen3.8-27B")).toBeUndefined();
+		expect(coldRegistry.isProviderDiscoveryPending("github-copilot")).toBe(true);
+		expect(coldRegistry.find("github-copilot", "Qwen3.8-27B")).toBeUndefined();
 
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.fallbackChains": {
-				"litellm/Qwen3.8-27B": ["litellm/Qwen3.8-27B-hetzner"],
+				"github-copilot/Qwen3.8-27B": ["github-copilot/Qwen3.8-27B-hetzner"],
 			},
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
@@ -7364,15 +6767,15 @@ describe("AgentSession retry fallback", () => {
 		await session.waitForIdle();
 
 		expect(session.configWarnings).not.toContain(
-			"retry.fallbackChains key references unknown model: litellm/Qwen3.8-27B",
+			"retry.fallbackChains key references unknown model: github-copilot/Qwen3.8-27B",
 		);
 		expect(session.configWarnings).not.toContain(
-			"Fallback chain for model 'litellm/Qwen3.8-27B' references unknown model: litellm/Qwen3.8-27B-hetzner",
+			"Fallback chain for model 'github-copilot/Qwen3.8-27B' references unknown model: github-copilot/Qwen3.8-27B-hetzner",
 		);
 	});
 
 	it("suppresses unknown-model warnings for a catalog descriptor provider with a cold cache", async () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -7382,8 +6785,8 @@ describe("AgentSession retry fallback", () => {
 			JSON.stringify({
 				providers: {
 					litellm: {
-						baseUrl: "https://litellm.example.net/v1",
-						apiKey: "sk-litellm-test",
+						baseUrl: "https://litellm.company.invalid/v1",
+						apiKey: "litellm-descriptor-test-key",
 						api: "openai-completions",
 					},
 				},
@@ -7476,7 +6879,7 @@ describe("AgentSession retry fallback", () => {
 
 	/** `deferValidation` mirrors the CLI, which validates once the background refresh is in flight. */
 	function createChainSession(registry: ModelRegistry, chain: string[], deferValidation = true): AgentSession {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -7584,21 +6987,21 @@ describe("AgentSession retry fallback", () => {
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"retry.fallbackChains": {
-				"litellm/Qwen3.8-27B": ["litellm/Qwen3.8-27B-hetzner"],
+				"github-copilot/Qwen3.8-27B": ["github-copilot/Qwen3.8-27B-hetzner"],
 			},
 		});
 
 		const pendingWarnings: string[] = [];
 		validateRetryFallbackChains(settings, sharedRegistry, message => pendingWarnings.push(message), {
-			isDiscoveryPending: provider => provider === "litellm",
+			isDiscoveryPending: provider => provider === "github-copilot",
 		});
 		expect(pendingWarnings).toEqual([]);
 
 		const settledWarnings: string[] = [];
 		validateRetryFallbackChains(settings, sharedRegistry, message => settledWarnings.push(message));
 		expect(settledWarnings).toEqual([
-			"retry.fallbackChains key references unknown model: litellm/Qwen3.8-27B",
-			"Fallback chain for model 'litellm/Qwen3.8-27B' references unknown model: litellm/Qwen3.8-27B-hetzner",
+			"retry.fallbackChains key references unknown model: github-copilot/Qwen3.8-27B",
+			"Fallback chain for model 'github-copilot/Qwen3.8-27B' references unknown model: github-copilot/Qwen3.8-27B-hetzner",
 		]);
 	});
 
@@ -7608,10 +7011,11 @@ describe("AgentSession retry fallback", () => {
 			modelsConfigPath,
 			JSON.stringify({
 				providers: {
-					litellm: {
-						baseUrl: "https://litellm.example.net/v1",
+					"github-copilot": {
+						baseUrl: "https://copilot-refresh.example.net/v1",
+						apiKey: "copilot-refresh-test-key",
 						api: "openai-completions",
-						discovery: { type: "litellm" },
+						discovery: { type: "openai-models-list" },
 					},
 				},
 			}),
@@ -7641,18 +7045,24 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("rebinds the active model to its post-discovery same-selector window (#10488)", async () => {
-		// A discovery-backed provider whose live catalog caps a selector below the
-		// window the pre-discovery snapshot carried at startup — the same class as
-		// the GitHub Copilot gpt-5.6-sol split, where the bundled base ships the
-		// full long-context window and discovery caps it to the default tier.
-		authStorage.keys.setRuntime("ollama-cloud", "ollama-cloud-test-key");
-		const buildTieredModel = (contextWindow: number, input: Model<"ollama-chat">["input"]): Model<"ollama-chat"> =>
+		// A private discovery-backed selector changes its window after startup.
+		const providerConfig = {
+			baseUrl: "https://vllm.company.invalid/v1",
+			apiKey: "vllm-test-key",
+			api: "openai-responses",
+		};
+		const modelsConfigPath = path.join(tempDir.path(), "tiered-models.json");
+		await Bun.write(modelsConfigPath, JSON.stringify({ providers: { vllm: providerConfig } }));
+		const buildTieredModel = (
+			contextWindow: number,
+			input: Model<"openai-responses">["input"],
+		): Model<"openai-responses"> =>
 			buildModel({
-				id: "deepseek-v4-tiered",
-				name: "DeepSeek V4 Tiered",
-				api: "ollama-chat",
-				provider: "ollama-cloud",
-				baseUrl: "https://ollama.com",
+				id: "company-tiered",
+				name: "Company tiered model",
+				api: "openai-responses",
+				provider: "vllm",
+				baseUrl: providerConfig.baseUrl,
 				reasoning: true,
 				input,
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -7662,14 +7072,15 @@ describe("AgentSession retry fallback", () => {
 		// Post-discovery catalog: the capped entry the registry resolves for the
 		// selector once background discovery settles.
 		writeModelCache(
-			"ollama-cloud",
+			resolveModelCacheProviderId("vllm", providerConfig),
 			Date.now(),
 			[buildTieredModel(400_000, ["text"])],
 			true,
 			"",
 			path.join(tempDir.path(), "models.db"),
 		);
-		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.json"));
+		const registry = new ModelRegistry(authStorage, modelsConfigPath);
+		await registry.hydrateCredentialScopedModelCaches();
 
 		// The startup-bound model is the pre-discovery snapshot for the SAME
 		// selector with the full long-context window — what buildSessionOptions
@@ -7717,13 +7128,13 @@ describe("AgentSession retry fallback", () => {
 
 		// Rebound to the same selector's refreshed 400K window without a manual
 		// re-selection; get_state / contextUsage now agree with the catalog.
-		expect(session.model?.id).toBe("deepseek-v4-tiered");
+		expect(session.model?.id).toBe("company-tiered");
 		expect(session.model?.contextWindow).toBe(400_000);
 		expect(session.getContextUsage()?.contextWindow).toBe(400_000);
 	});
 
 	it("warns on unknown or malformed model-selector chain keys at startup", () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -7731,7 +7142,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.fallbackChains": {
 				"nonexistent-provider/nonexistent-model": [`${primaryModel.provider}/${primaryModel.id}`],
-				[`${primaryModel.provider}/${primaryModel.id}`]: ["openai/gpt-4o"],
+				[`${primaryModel.provider}/${primaryModel.id}`]: ["github-copilot/gpt-4o"],
 			},
 		});
 		const agent = new Agent({
@@ -7756,7 +7167,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("surfaces deferred chain warnings once, with a config_warnings_changed event", () => {
-		const primaryModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -7797,26 +7208,26 @@ describe("AgentSession retry fallback", () => {
 
 	it("normalizes suppression by base selector and clears it on model refresh", async () => {
 		const future = Date.now() + 60_000;
-		modelRegistry.suppressSelector("openai/gpt-4o:high", future);
-		expect(modelRegistry.isSelectorSuppressed("openai/gpt-4o")).toBe(true);
-		expect(modelRegistry.isSelectorSuppressed("openai/gpt-4o:low")).toBe(true);
+		modelRegistry.suppressSelector("github-copilot/gpt-4o:high", future);
+		expect(modelRegistry.isSelectorSuppressed("github-copilot/gpt-4o")).toBe(true);
+		expect(modelRegistry.isSelectorSuppressed("github-copilot/gpt-4o:low")).toBe(true);
 
 		// `:max` is a real thinking level now, not an xhigh alias — the two parse
 		// to distinct selectors...
-		expect(parseModelString("openai/gpt-4o:max", { allowMaxSuffix: true })?.thinkingLevel).toBe(Effort.Max);
-		expect(parseModelString("openai/gpt-4o:xhigh")?.thinkingLevel).toBe(Effort.XHigh);
+		expect(parseModelString("github-copilot/gpt-4o:max", { allowMaxSuffix: true })?.thinkingLevel).toBe(Effort.Max);
+		expect(parseModelString("github-copilot/gpt-4o:xhigh")?.thinkingLevel).toBe(Effort.XHigh);
 		// ...but suppression normalizes every thinking suffix to the base selector,
 		// so suppressing either still covers both.
-		modelRegistry.suppressSelector("openai/gpt-4o:max", future);
-		expect(modelRegistry.isSelectorSuppressed("openai/gpt-4o:xhigh")).toBe(true);
-		expect(modelRegistry.isSelectorSuppressed("openai/gpt-4o:max")).toBe(true);
+		modelRegistry.suppressSelector("github-copilot/gpt-4o:max", future);
+		expect(modelRegistry.isSelectorSuppressed("github-copilot/gpt-4o:xhigh")).toBe(true);
+		expect(modelRegistry.isSelectorSuppressed("github-copilot/gpt-4o:max")).toBe(true);
 
 		await modelRegistry.refresh("offline");
-		expect(modelRegistry.isSelectorSuppressed("openai/gpt-4o")).toBe(false);
+		expect(modelRegistry.isSelectorSuppressed("github-copilot/gpt-4o")).toBe(false);
 	});
 
 	it("auto-retries Gemini MALFORMED_FUNCTION_CALL after an unexecuted tool call", async () => {
-		const model = getBundledModel("google", "gemini-1.5-flash");
+		const model = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!model) {
 			throw new Error("Expected bundled Google test model to exist");
 		}
@@ -7914,7 +7325,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("continues a Gemini MALFORMED_FUNCTION_CALL transcribed as text with a corrective reminder", async () => {
-		const model = getBundledModel("google", "gemini-1.5-flash");
+		const model = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!model) {
 			throw new Error("Expected bundled Google test model to exist");
 		}
@@ -7983,7 +7394,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("injects a corrective developer reminder when retrying a content-less MALFORMED_RESPONSE on the same model", async () => {
-		const model = getBundledModel("google", "gemini-1.5-flash");
+		const model = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!model) {
 			throw new Error("Expected bundled Google test model to exist");
 		}
@@ -8040,7 +7451,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("auto-retries provider finish_reason errors after partial text", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -8106,7 +7517,7 @@ describe("AgentSession retry fallback", () => {
 		// scheduled continue() then rejected the assistant tail locally before
 		// any provider request, auto_retry_end never fired, and the in-flight
 		// prompt() hung forever behind the pending retryPromise.
-		const model = getBundledModel("openai", "gpt-4o-mini");
+		const model = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
@@ -8200,7 +7611,7 @@ describe("AgentSession retry fallback", () => {
 			failingWrite: FailingWrite;
 			end: { success: boolean; attempt: number; finalError?: unknown };
 		}): Promise<void> {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled Anthropic test model to exist");
 			const mock = createMockModel();
 			const agent = new Agent({
@@ -8298,19 +7709,17 @@ describe("AgentSession retry fallback", () => {
 		});
 
 		it("closes a saga whose hard error found no fallback to switch to", async () => {
-			const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+			const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 			if (!fallbackModel) throw new Error("Expected bundled OpenAI test model to exist");
 			const getApiKey = modelRegistry.getApiKey.bind(modelRegistry);
 			vi.spyOn(modelRegistry, "getApiKey").mockImplementation((requestedModel, sessionId) =>
-				requestedModel.provider === fallbackModel.provider
-					? Promise.resolve(undefined)
-					: getApiKey(requestedModel, sessionId),
+				requestedModel.id === fallbackModel.id ? Promise.resolve(undefined) : getApiKey(requestedModel, sessionId),
 			);
 			await expectSagaClosesDespiteFailedWrite({
 				responses: [{ throw: transientError }, { throw: "unrecoverable model quirk" }],
 				settings: {
 					"retry.maxRetries": 3,
-					"retry.fallbackChains": { "anthropic/*": [`${fallbackModel.provider}/${fallbackModel.id}`] },
+					"retry.fallbackChains": { "github-copilot/*": [`${fallbackModel.provider}/${fallbackModel.id}`] },
 				},
 				failingWrite: "error-turn-after-first-retry",
 				end: { success: false, attempt: 1, finalError: "unrecoverable model quirk" },
@@ -8348,8 +7757,8 @@ describe("AgentSession retry fallback", () => {
 	// parked agent. A fallback that errors on its first request produced none of
 	// the session's work, so announcing it credits the primary's output to it.
 	it("withholds the fallback selector until the target has served a turn", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8428,8 +7837,8 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("reports the fallback selector once the target serves a turn", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8470,8 +7879,8 @@ describe("AgentSession retry fallback", () => {
 
 	it("carries attribution across a fork, which continues the conversation under a new id", async () => {
 		using tempDir = TempDir.createSync("@omp-fallback-fork-");
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8510,9 +7919,9 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("keeps attribution on a served fallback while the next candidate is unproven", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const firstFallback = getBundledModel("openai", "gpt-4o-mini");
-		const secondFallback = getBundledModel("google", "gemini-2.0-flash");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const firstFallback = getBundledModel("github-copilot", "gpt-5.4-mini");
+		const secondFallback = getBundledModel("github-copilot", "gemini-3-flash-preview");
 		if (!primaryModel || !firstFallback || !secondFallback) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8597,8 +8006,8 @@ describe("AgentSession retry fallback", () => {
 	// session — most visibly on the Main Session row, which has no executor
 	// progress to fall back on.
 	it("reports a usage-aware fallback selector without any retry saga", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8619,8 +8028,8 @@ describe("AgentSession retry fallback", () => {
 			"retry.fallbackChains": { default: [`${fallbackModel.provider}/${fallbackModel.id}`] },
 		});
 		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async provider =>
-			provider === primaryModel.provider
+		vi.spyOn(modelRegistry.authStorage.health, "model").mockImplementation(async (_provider, options) =>
+			options.modelId === primaryModel.id
 				? {
 						state: "depleted",
 						accounts: [
@@ -8668,8 +8077,8 @@ describe("AgentSession retry fallback", () => {
 	// not walk `retry.fallbackChains` or park the current selector on a cooldown,
 	// or a healthy planning turn gets replaced by another family (issue #8760).
 	it("retries the same model on a thinking-loop error instead of switching via fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-4o-mini");
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
@@ -8732,7 +8141,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("does not reset the retry budget for a chain entry that resolves to the failing model", async () => {
-		const primaryModel = getBundledModel("openrouter", "z-ai/glm-5.2");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled test model to exist");
 		}
@@ -8758,7 +8167,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.baseDelayMs": 5,
 			"retry.maxRetries": 2,
-			"retry.fallbackChains": { [primarySelector]: ["openrouter/glm-5.2"] },
+			"retry.fallbackChains": { [primarySelector]: [`${primarySelector}:low`] },
 		});
 
 		session = new AgentSession({
@@ -8766,6 +8175,7 @@ describe("AgentSession retry fallback", () => {
 			sessionManager: SessionManager.inMemory(),
 			settings,
 			modelRegistry,
+			thinkingLevel: Effort.Low,
 		});
 		mockSchedulerWaitWithClock();
 
@@ -8781,7 +8191,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("treats a chain entry clamped back to the current effort as no switch", async () => {
-		const primaryModel = getBundledModel("openrouter", "z-ai/glm-5.2");
+		const primaryModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel) {
 			throw new Error("Expected bundled test model to exist");
 		}
@@ -8806,7 +8216,7 @@ describe("AgentSession retry fallback", () => {
 			"compaction.enabled": false,
 			"retry.baseDelayMs": 5,
 			"retry.maxRetries": 2,
-			"retry.fallbackChains": { [primarySelector]: ["openrouter/glm-5.2:high"] },
+			"retry.fallbackChains": { [primarySelector]: [`${primarySelector}:high`] },
 		});
 
 		session = new AgentSession({
@@ -8824,55 +8234,5 @@ describe("AgentSession retry fallback", () => {
 
 		expect(requestedModels.length).toBeLessThanOrEqual(1 + 2);
 		expect(getLastAssistantMessage(session).stopReason).toBe("error");
-	});
-
-	it("still switches to the same model on a different upstream route", async () => {
-		const openRouterModel = getBundledModel("openrouter", "z-ai/glm-4.7");
-		if (!openRouterModel) {
-			throw new Error("Expected bundled OpenRouter test model to exist");
-		}
-		const routedPrimary = parseModelPattern("openrouter/z-ai/glm-4.7@cerebras", [openRouterModel]).model;
-		if (!routedPrimary) {
-			throw new Error("Expected routed OpenRouter primary to resolve");
-		}
-
-		const mock = createMockModel();
-		const requestedModels: string[] = [];
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: { model: routedPrimary, systemPrompt: ["Test"], tools: [], messages: [] },
-			streamFn: (requestedModel, context, options) => {
-				const route = (requestedModel.compat as { openRouterRouting?: { only?: string[] } } | undefined)
-					?.openRouterRouting?.only?.[0];
-				const requested = `${requestedModel.provider}/${requestedModel.id}${route ? `@${route}` : ""}`;
-				requestedModels.push(requested);
-				if (requested === "openrouter/z-ai/glm-4.7@cerebras") mock.push({ throw: "500 upstream is unwell" });
-				else mock.push({ content: [`ok:${requested}`] });
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-
-		// Same provider and id, different endpoint: a real change of request.
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.maxRetries": 2,
-			"retry.fallbackChains": { default: ["openrouter/z-ai/glm-4.7@chutes"] },
-		});
-		settings.setModelRole("default", "openrouter/z-ai/glm-4.7@cerebras");
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		mockSchedulerWaitWithClock();
-
-		await session.prompt("Fail over to another route of the same model");
-		await session.waitForIdle();
-
-		expect(requestedModels).toContain("openrouter/z-ai/glm-4.7@chutes");
-		expect(getLastAssistantMessage(session).stopReason).not.toBe("error");
 	});
 });

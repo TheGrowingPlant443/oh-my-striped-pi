@@ -3,7 +3,6 @@ import type { AssistantMessage, Context, Tool, ToolResultMessage, Usage } from "
 import { ollamaChatDropsOwnThinking, streamOllama } from "@oh-my-pi/pi-ai/providers/ollama";
 import { NON_VISION_IMAGE_PLACEHOLDER } from "@oh-my-pi/pi-ai/providers/vision-guard";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 interface OllamaChatMessagePayload {
 	thinking?: unknown;
@@ -46,7 +45,7 @@ const emptyUsage: Usage = {
 
 function createReasoningOllamaModel(
 	input: Array<"text" | "image"> = ["text"],
-	host: { provider: string; baseUrl: string } = { provider: "ollama-cloud", baseUrl: "https://ollama.com" },
+	host: { provider: string; baseUrl: string } = { provider: "ollama", baseUrl: "http://127.0.0.1:11434" },
 ) {
 	return buildModel({
 		id: "deepseek-v4-flash",
@@ -313,7 +312,7 @@ describe("Ollama chat thinking controls", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: "tool-1", name: "browser", arguments: { action: "screenshot" } }],
 			api: "ollama-chat",
-			provider: "ollama-cloud",
+			provider: "ollama",
 			model: "deepseek-v4-flash",
 			usage: emptyUsage,
 			stopReason: "toolUse",
@@ -365,7 +364,7 @@ describe("Ollama chat thinking controls", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: "tool-1", name: "browser", arguments: { action: "screenshot" } }],
 			api: "ollama-chat",
-			provider: "ollama-cloud",
+			provider: "ollama",
 			model: "deepseek-v4-flash",
 			usage: emptyUsage,
 			stopReason: "toolUse",
@@ -465,28 +464,15 @@ describe("Ollama chat sampling options", () => {
 	});
 });
 
-// #9693: preserve verified cloud history while retaining the legacy guard for other cloud models.
 describe("Ollama assistant thinking history", () => {
 	for (const { provider, id, expectedThinking, compat, foreign } of [
-		{ provider: "ollama-cloud", id: "glm-5.2", expectedThinking: true },
-		{ provider: "ollama-cloud", id: "glm-5.2:cloud", expectedThinking: true },
-		{ provider: "ollama-cloud", id: "deepseek-v4-flash", expectedThinking: false },
-		{ provider: "ollama-cloud", id: "deepseek-v4-flash", expectedThinking: false, foreign: true },
 		{ provider: "ollama", id: "deepseek-v4-flash", expectedThinking: true },
-		{ provider: "ollama-cloud", id: "glm-5.2", expectedThinking: false, compat: { stripThinkingHistory: true } },
-		{
-			provider: "ollama-cloud",
-			id: "deepseek-v4-flash",
-			expectedThinking: true,
-			compat: { stripThinkingHistory: false },
-		},
+		{ provider: "ollama", id: "deepseek-v4-flash", expectedThinking: true, foreign: true },
+		{ provider: "ollama", id: "deepseek-v4-flash", expectedThinking: false, compat: { stripThinkingHistory: true } },
+		{ provider: "ollama", id: "deepseek-v4-flash", expectedThinking: true, compat: { stripThinkingHistory: false } },
 	]) {
-		it(`replays ${provider}/${id} ${foreign ? "foreign" : "own"} plain and tool-call history with thinking=${expectedThinking}`, async () => {
-			const model =
-				provider === "ollama-cloud" && id === "glm-5.2" && compat === undefined
-					? getBundledModel<"ollama-chat">("ollama-cloud", id)
-					: buildModel({ ...createReasoningOllamaModel(), provider, id, compat });
-			if (!model) throw new Error(`Expected bundled ${provider}/${id}`);
+		it(`replays ${provider}/${id} ${foreign ? "foreign" : "own"} plain and tool-call history with native thinking=${expectedThinking && !foreign}`, async () => {
+			const model = buildModel({ ...createReasoningOllamaModel(), provider, id, compat });
 			expect(ollamaChatDropsOwnThinking(model)).toBe(!expectedThinking);
 			let payload: OllamaChatRequestPayload | undefined;
 			const fetchMock = async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
@@ -536,7 +522,7 @@ describe("Ollama assistant thinking history", () => {
 			expect(result.stopReason).toBe("stop");
 			const assistantMessages = payload?.messages?.filter(message => message.role === "assistant");
 			expect(assistantMessages?.map(message => message.thinking)).toEqual(
-				expectedThinking
+				expectedThinking && !foreign
 					? ["Return the requested letter.", "Look up the capital before answering."]
 					: [undefined, undefined],
 			);

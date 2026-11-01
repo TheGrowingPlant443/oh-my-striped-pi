@@ -153,7 +153,6 @@ function hotkeyGroups(bindings: HotkeysMarkdownBindings): HotkeyGroup[] {
 							? "Speech-to-text (push-to-talk): hold to record, release to transcribe"
 							: "Speech-to-text (push-to-talk) (disabled)",
 				},
-				{ keys: [act("app.live.toggle")], action: "Start/stop live voice mode (/live)" },
 				{
 					keys: [
 						act("app.agents.hub"),

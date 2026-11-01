@@ -15,7 +15,7 @@ function errorWithStatus(
 describe("rewriteCopilotError", () => {
 	it("returns original message for non-copilot providers", () => {
 		const err = errorWithStatus(401);
-		expect(rewriteCopilotError("some error", err, "openai")).toBe("some error");
+		expect(rewriteCopilotError("some error", err, "local")).toBe("some error");
 	});
 
 	it("returns original message for non-401/403 errors", () => {
@@ -68,7 +68,7 @@ describe("isGitHubCopilotPolicyDenial", () => {
 	});
 
 	it("does not exempt other providers or non-403 Copilot failures", () => {
-		expect(isGitHubCopilotPolicyDenial("openai", 403, "403 Forbidden")).toBe(false);
+		expect(isGitHubCopilotPolicyDenial("local", 403, "403 Forbidden")).toBe(false);
 		expect(isGitHubCopilotPolicyDenial("github-copilot", 500, "server error")).toBe(false);
 		expect(isGitHubCopilotPolicyDenial("github-copilot", undefined, undefined)).toBe(false);
 	});

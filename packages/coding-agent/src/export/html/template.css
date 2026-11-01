@@ -969,17 +969,6 @@
       padding: 0 2px;
     }
 
-    /* Share viewer fetch/decrypt failure (template.js showLoadError) */
-    .share-load-error {
-      margin: 36px auto;
-      max-width: 640px;
-      padding: 14px 16px;
-      background: color-mix(in srgb, var(--error) 7%, transparent);
-      border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
-      border-radius: var(--radius-card);
-      color: var(--error);
-    }
-
     /* Images */
     .message-images {
       display: flex;

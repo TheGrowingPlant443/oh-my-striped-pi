@@ -3,7 +3,6 @@ import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-comple
 import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 const testContext: Context = {
 	messages: [{ role: "user", content: "hello", timestamp: 0 }],
@@ -22,9 +21,10 @@ function createReasoningEffortModel(): Model<"openai-completions"> {
 		id: "minimal-reasoner",
 		name: "Minimal Reasoner",
 		api: "openai-completions",
-		provider: "custom",
+		provider: "github-copilot",
 		baseUrl: "https://proxy.example.com/v1",
 		reasoning: true,
+		compat: { thinkingFormat: "openai", supportsReasoningParams: true, supportsReasoningEffort: true },
 		thinking: {
 			mode: "effort",
 			efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High],
@@ -42,9 +42,9 @@ function createFireworksReasoningEffortModel(): Model<"openai-completions"> {
 		...base,
 		id: "glm-5.1",
 		name: "GLM 5.1",
-		provider: "fireworks",
-		baseUrl: "https://api.fireworks.ai/inference/v1",
-		compat: base.compatConfig,
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
+		compat: { ...base.compatConfig, reasoningDisableMode: "none-effort" },
 	} as ModelSpec<"openai-completions">);
 }
 
@@ -53,9 +53,15 @@ function createCerebrasQwenModel(): Model<"openai-completions"> {
 		id: "qwen-3.8-27b",
 		name: "Qwen 3.8 27B",
 		api: "openai-completions",
-		provider: "cerebras",
-		baseUrl: "https://api.cerebras.ai/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
+		compat: {
+			thinkingFormat: "openai",
+			supportsReasoningParams: true,
+			supportsReasoningEffort: true,
+			reasoningDisableMode: "none-effort",
+		},
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 131_072,
@@ -108,21 +114,28 @@ describe("OpenAI completions disableReasoning and thinking dialects", () => {
 		expect(payload.reasoning).toBeUndefined();
 	});
 
-	it("maps Fireworks' lowest effort to the provider-supported none literal", async () => {
+	it("uses the configured none literal for explicitly disabled effort", async () => {
 		const payload = await captureDisableReasoningPayload(createFireworksReasoningEffortModel());
 
 		expect(payload.reasoning_effort).toBe("none");
 		expect(payload.reasoning).toBeUndefined();
 	});
 
-	it("sends reasoning_effort none for Azure Astra only when function tools are present", async () => {
+	it("uses the configured reasoning-off effort when function tools are present", async () => {
 		const model = buildModel({
 			id: "gpt-6-astra",
 			name: "GPT-6 Astra",
 			api: "openai-completions",
-			provider: "azure",
-			baseUrl: "https://resource.openai.azure.com/openai/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
+			compat: {
+				thinkingFormat: "openai",
+				supportsReasoningParams: true,
+				supportsReasoningEffort: true,
+				reasoningDisableMode: "none-effort",
+				disableReasoningWithTools: true,
+			},
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 262_144,
@@ -167,35 +180,12 @@ describe("OpenAI completions disableReasoning and thinking dialects", () => {
 		expect(disabledPayload.reasoning_effort).toBe("none");
 	});
 
-	// Additional requested tests for applyChatCompletionsReasoningParams dialect / behavior verification
-	it("sets OpenRouter thinking disabled when disableReasoning: true", async () => {
-		const model = buildModel({
-			id: "openrouter-reasoner",
-			name: "OpenRouter Reasoner",
-			api: "openai-completions",
-			provider: "openrouter",
-			baseUrl: "https://openrouter.ai/api/v1",
-			reasoning: true,
-			compat: {
-				thinkingFormat: "openrouter",
-				supportsReasoningParams: true,
-			},
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 128_000,
-			maxTokens: 16_384,
-		});
-
-		const payload = await captureDisableReasoningPayload(model);
-		expect(payload.reasoning).toEqual({ enabled: false });
-	});
-
 	it("sets Qwen enable_thinking: true with reasoning enabled, and false with forced tool choice", async () => {
 		const model = buildModel({
 			id: "qwen-reasoner",
 			name: "Qwen Reasoner",
 			api: "openai-completions",
-			provider: "custom",
+			provider: "github-copilot",
 			baseUrl: "https://proxy.example.com/v1",
 			reasoning: true,
 			compat: {
@@ -251,7 +241,7 @@ describe("OpenAI completions disableReasoning and thinking dialects", () => {
 			id: "qwen-ct-reasoner",
 			name: "Qwen Chat Template Reasoner",
 			api: "openai-completions",
-			provider: "custom",
+			provider: "github-copilot",
 			baseUrl: "https://proxy.example.com/v1",
 			reasoning: true,
 			compat: {
@@ -273,24 +263,6 @@ describe("OpenAI completions disableReasoning and thinking dialects", () => {
 		const payload = (await promise) as Record<string, unknown>;
 		expect(payload.chat_template_kwargs).toEqual({ enable_thinking: true });
 	});
-	it("does not emit enable_thinking or chat_template_kwargs for the bundled Fireworks Qwen model without reasoning", async () => {
-		// Reproduces the raw 400 from `fireworks/qwen3.7-plus`: before the fix the
-		// `qwen/*` id pattern forced `thinkingFormat: "qwen"`, so an effort-less
-		// turn wrote top-level `enable_thinking: false`, which Fireworks' strict
-		// schema rejects. Build from the real bundled entry so the dialect
-		// classification — not a hardcoded compat override — is what's exercised.
-		const model = getBundledModel<"openai-completions">("fireworks", "qwen3.7-plus");
-
-		const { promise, resolve } = Promise.withResolvers<unknown>();
-		streamOpenAICompletions(model, testContext, {
-			apiKey: "test-key",
-			fetch: createMockFetchForQwen(resolve),
-			// no reasoning requested
-		});
-		const payload = (await promise) as Record<string, unknown>;
-		expect(payload.enable_thinking).toBeUndefined();
-		expect(payload.chat_template_kwargs).toBeUndefined();
-	});
 
 	it("disables Cerebras Qwen reasoning through reasoning_effort", async () => {
 		const payload = await captureDisableReasoningPayload(createCerebrasQwenModel());
@@ -305,7 +277,7 @@ describe("OpenAI completions disableReasoning and thinking dialects", () => {
 			id: "zai-reasoner",
 			name: "Z.AI Reasoner",
 			api: "openai-completions",
-			provider: "custom",
+			provider: "github-copilot",
 			baseUrl: "https://proxy.example.com/v1",
 			reasoning: true,
 			compat: {

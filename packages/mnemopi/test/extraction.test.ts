@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { FetchImpl } from "@oh-my-pi/pi-ai";
 import {
 	buildExtractionPrompt,
 	extractFacts,
@@ -107,10 +106,9 @@ describe("structured extraction", () => {
 		expect(getExtractionStats().totals.calls).toBe(0);
 	});
 
-	it("routes enabled host LLM extraction before remote and keeps temperature zero", async () => {
+	it("routes enabled host LLM extraction with temperature zero", async () => {
 		process.env.MNEMOPI_LLM_ENABLED = "true";
 		process.env.MNEMOPI_HOST_LLM_ENABLED = "true";
-		process.env.MNEMOPI_LLM_BASE_URL = "http://remote.invalid/v1";
 		let capturedTemperature = -1;
 		setHostLlmBackend(
 			new CallableLlmBackend("fake", (_prompt, opts) => {
@@ -125,21 +123,32 @@ describe("structured extraction", () => {
 		expect(getExtractionStats().by_tier.host.successes).toBe(1);
 	});
 
-	it("strips reasoning wrappers from remote extraction so facts are not reasoning prose", async () => {
+	it("keeps local heuristics when the runtime disables a registered host backend", async () => {
+		process.env.MNEMOPI_HOST_LLM_ENABLED = "true";
 		process.env.MNEMOPI_LLM_ENABLED = "true";
-		process.env.MNEMOPI_HOST_LLM_ENABLED = "false";
-		process.env.MNEMOPI_LLM_BASE_URL = "http://reasoning.invalid/v1";
+		let calls = 0;
+		setHostLlmBackend(
+			new CallableLlmBackend("host", () => {
+				calls += 1;
+				return '{"facts":["Must not be called"]}';
+			}),
+		);
+		const facts = await withMnemopiRuntimeOptions({ llm: { enabled: false } }, () =>
+			extractFacts("I prefer dark mode."),
+		);
+		expect(facts).toEqual(["The user prefers dark mode"]);
+		expect(calls).toBe(0);
+		expect(getExtractionStats().by_tier.local.successes).toBe(1);
+	});
+
+	it("strips reasoning wrappers from injected extraction output", async () => {
 		const content =
 			'<think>\nThe user is providing information in English. Let me analyze what qualifies:\n- candidate fact\n</think>\n{"facts":["My preferred shell is zsh"],"instructions":[],"preferences":[],"timelines":[],"kg":[]}';
-		const fetchMock: FetchImpl = async () =>
-			new Response(JSON.stringify({ choices: [{ message: { content } }] }), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
-
-		const facts = await extractFacts("I use zsh.", { fetch: fetchMock });
+		const facts = await withMnemopiRuntimeOptions({ llm: { enabled: true, complete: () => content } }, () =>
+			extractFacts("I use zsh."),
+		);
 		expect(facts).toEqual(["My preferred shell is zsh"]);
-		expect(getExtractionStats().by_tier.remote.successes).toBe(1);
+		expect(getExtractionStats().by_tier.host.successes).toBe(1);
 	});
 
 	it("prefers a configured completion with the extraction-prompt override at temperature zero", async () => {

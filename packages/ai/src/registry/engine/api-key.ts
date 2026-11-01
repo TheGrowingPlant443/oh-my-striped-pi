@@ -11,7 +11,7 @@ import {
 	validateOpenAICompatibleApiKey,
 } from "../api-key-validation";
 import type { OAuthController } from "../oauth/types";
-import { loadHeadersHook } from "./common";
+import { HOOKS } from "../hooks";
 
 async function runValidation(
 	validate: CompiledAuthValidation,
@@ -49,7 +49,11 @@ async function runValidation(
 			const modelsUrl = envBase
 				? `${envBase.replace(/\/+$/, "")}${validate.baseUrlPath ?? "/models"}`
 				: validate.url;
-			const headers = validate.headersHook ? (await loadHeadersHook(validate.headersHook))() : undefined;
+			const hook = validate.headersHook ? HOOKS.headers[validate.headersHook] : undefined;
+			if (validate.headersHook && !hook) {
+				throw new AIError.ConfigurationError(`Unknown validation headers hook: ${validate.headersHook}`);
+			}
+			const headers = hook ? (await hook())() : undefined;
 			await validateApiKeyAgainstModelsEndpoint({
 				provider,
 				apiKey,

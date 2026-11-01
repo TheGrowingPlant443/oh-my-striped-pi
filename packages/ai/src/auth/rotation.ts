@@ -10,7 +10,6 @@ import {
 	AUTH_BLOCK_SCOPE,
 	DEFAULT_BLOCK_MS,
 	credentialBlockScopesForRequest,
-	modelAccountPolicyBlockScope,
 	providerTypeKey,
 } from "./blocks";
 import type { CredentialBlocks } from "./blocks";
@@ -406,8 +405,7 @@ export class RateLimits implements LimitsApi {
 		const error = options?.error;
 		const status = AIError.status(error);
 		const message = error instanceof Error ? error.message : typeof error === "string" ? error : undefined;
-		const exactCursorModelPolicy = AIError.isCursorPlanAccountPolicyError(error, provider);
-		const accountPolicy = exactCursorModelPolicy || AIError.isAccountPolicyError(error);
+		const accountPolicy = AIError.isAccountPolicyError(error);
 		if (!accountPolicy && (AIError.isUsageLimit(error) || isUsageLimitOutcome(status, message))) {
 			// Thread the provider-specified reset window (e.g. Devin "Your limit
 			// will reset in 13 minutes") into the block duration so the credential
@@ -424,33 +422,16 @@ export class RateLimits implements LimitsApi {
 			return awaitSiblingUnblock(mark, options?.signal);
 		}
 
-		const deniedModel = AIError.codexChatGPTAccountPolicyModel(error);
-		const exactCodexModelPolicy =
-			deniedModel !== undefined && AIError.isCodexChatGPTAccountPolicyError(error, provider, options?.modelId);
-		const exactModelPolicy = exactCodexModelPolicy || exactCursorModelPolicy;
 		const sessionCredential = await this.#resolveCredentialTarget(provider, sessionId, {
 			credentialId: options?.credentialId,
 			apiKey: options?.apiKey,
-			allowStaleOAuthBearer: accountPolicy || exactModelPolicy,
+			allowStaleOAuthBearer: accountPolicy,
 		});
 		if (!sessionCredential) return { switched: false };
-		// The exact sentence is provider-controlled input. A non-Codex provider,
-		// absent request model, or mismatched model must not turn it into either a
-		// global block or a hard-auth invalidation.
-		if (deniedModel !== undefined && !exactCodexModelPolicy) return { switched: false };
-		if (exactModelPolicy || accountPolicy) {
-			const modelPolicyScope = exactModelPolicy
-				? modelAccountPolicyBlockScope(provider, options?.modelId)
-				: undefined;
-			if (exactModelPolicy && modelPolicyScope === undefined) return { switched: false };
-			const routing = this.#credentialBlockRouting(
-				provider,
-				sessionCredential.type,
-				options?.modelId,
-				modelPolicyScope,
-			);
+		if (accountPolicy) {
+			const routing = this.#credentialBlockRouting(provider, sessionCredential.type, options?.modelId);
 			// Account-wide denials must not inherit a quota scope that healthy usage can heal.
-			routing.blockScope = modelPolicyScope ?? ACCOUNT_POLICY_BLOCK_SCOPE;
+			routing.blockScope = ACCOUNT_POLICY_BLOCK_SCOPE;
 			const sticky = this.#deps.affinity.get(provider, sessionId);
 			if (
 				!sessionCredential.explicit ||

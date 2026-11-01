@@ -1,6 +1,5 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { hostMatchesUrl } from "@oh-my-pi/pi-catalog/hosts";
 import {
 	type Env,
 	envBool,
@@ -19,12 +18,8 @@ export { envBool, envDisabled, envFloat, envInt, envOneOf, envOptionalString, en
 export const DEFAULT_DATA_DIR = join(homedir(), ".hermes", "mnemopi", "data");
 export const DEFAULT_DB_FILENAME = "mnemopi.db";
 export const FASTEMBED_CACHE_DIR = join(homedir(), ".hermes", "cache", "fastembed");
-export const MODEL_CACHE_DIR = join(homedir(), ".hermes", "mnemopi", "models");
 
 export const DEFAULT_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5";
-export const DEFAULT_EMBEDDING_API_URL = "https://openrouter.ai/api/v1";
-export const DEFAULT_LLM_MODEL_REPO = "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
-export const DEFAULT_LLM_MODEL_FILE = "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
 export const HOST_LLM_TIMEOUT_SECONDS = 15.0;
 
 export type VecType = "float32" | "int8" | "bit";
@@ -79,22 +74,6 @@ export function embeddingDim(env: Env = process.env): number {
 	return EMBEDDING_DIMS[embeddingModel(env)] ?? 384;
 }
 
-export function embeddingApiKey(env: Env = process.env): string {
-	return envString(
-		"MNEMOPI_EMBEDDING_API_KEY",
-		envString("OPENROUTER_API_KEY", envString("OPENAI_API_KEY", "", env), env),
-		env,
-	);
-}
-
-export function embeddingApiUrl(env: Env = process.env): string {
-	return envString("MNEMOPI_EMBEDDING_API_URL", envString("OPENROUTER_BASE_URL", DEFAULT_EMBEDDING_API_URL, env), env);
-}
-
-export function embeddingsViaApi(env: Env = process.env): boolean {
-	return envTruthy("MNEMOPI_EMBEDDINGS_VIA_API", env);
-}
-
 export function embeddingsDisabled(env: Env = process.env): boolean {
 	return envString("MNEMOPI_NO_EMBEDDINGS", "", env) !== "";
 }
@@ -102,36 +81,13 @@ export function embeddingsDisabled(env: Env = process.env): boolean {
 /**
  * Per-input character cap applied inside `embed()` before any provider sees the text.
  *
- * Long retention transcripts (full multi-turn session windows) routinely outgrow
- * embedding model context windows: BGE/E5 defaults are 512 tokens, bge-m3 is
- * 8192, and OpenAI's text-embedding-3-* is 8192. llama.cpp's `/embeddings`
- * server rejects oversized requests with `request (N tokens) exceeds the
- * available context size`; OpenAI silently right-truncates. Capping at the
- * source gives both backends deterministic behavior and prevents the silent
- * recall degradation we saw in issue #3126.
- *
- * Default `8192` chars is intentionally conservative for 8192-token embedding
- * contexts (bge-m3, OpenAI text-embedding-3) and CJK-heavy transcripts. Raise
- * it for larger local contexts (for example Qwen3-Embedding with 32k ctx).
+ * Long retention transcripts can outgrow local embedding model context windows.
+ * Capping at the source keeps input sizes deterministic and limits recall degradation.
+ * Default `8192` chars is conservative for larger local contexts and CJK-heavy transcripts.
  * `0` disables the cap.
  */
 export function embeddingMaxInputChars(env: Env = process.env): number {
 	return Math.max(0, envInt("MNEMOPI_EMBEDDING_MAX_INPUT_CHARS", 8192, env));
-}
-
-export function isApiEmbeddingModel(model = embeddingModel(), env: Env = process.env): boolean {
-	if (model.startsWith("openai/") || model.includes("text-embedding") || model.startsWith("text-embedding"))
-		return true;
-	const baseUrl = envString("MNEMOPI_EMBEDDING_API_URL", envString("OPENROUTER_BASE_URL", "", env), env);
-	if (baseUrl && !hostMatchesUrl(baseUrl, "openrouter")) return true;
-	return embeddingsViaApi(env);
-}
-
-export function apiEmbeddingsAvailable(env: Env = process.env): boolean {
-	if (embeddingsDisabled(env)) return false;
-	if (!isApiEmbeddingModel(embeddingModel(env), env)) return false;
-	const baseUrl = envString("MNEMOPI_EMBEDDING_API_URL", envString("OPENROUTER_BASE_URL", "", env), env);
-	return Boolean(baseUrl && !hostMatchesUrl(baseUrl, "openrouter")) || Boolean(embeddingApiKey(env));
 }
 
 export function workingMemoryMaxItems(env: Env = process.env): number {
@@ -330,38 +286,8 @@ export function llmMaxTokens(env: Env = process.env): number {
 	return envInt("MNEMOPI_LLM_MAX_TOKENS", 2048, env);
 }
 
-export function llmThreads(env: Env = process.env): number {
-	return envInt("MNEMOPI_LLM_N_THREADS", 4, env);
-}
-
 export function llmContext(env: Env = process.env): number {
 	return envInt("MNEMOPI_LLM_N_CTX", 2048, env);
-}
-
-export function llmRepo(env: Env = process.env): string {
-	return envString("MNEMOPI_LLM_REPO", DEFAULT_LLM_MODEL_REPO, env);
-}
-
-export function llmFile(env: Env = process.env): string {
-	return envString("MNEMOPI_LLM_FILE", DEFAULT_LLM_MODEL_FILE, env);
-}
-
-export function llmModelFiles(env: Env = process.env): readonly [repo: string, file: string] {
-	const repo = envOptionalString("MNEMOPI_LLM_REPO", env);
-	const file = envOptionalString("MNEMOPI_LLM_FILE", env);
-	return repo && file ? [repo, file] : [DEFAULT_LLM_MODEL_REPO, DEFAULT_LLM_MODEL_FILE];
-}
-
-export function llmBaseUrl(env: Env = process.env): string {
-	return envString("MNEMOPI_LLM_BASE_URL", "", env).replace(/\/+$/, "");
-}
-
-export function llmApiKey(env: Env = process.env): string {
-	return envString("MNEMOPI_LLM_API_KEY", "", env);
-}
-
-export function llmModel(env: Env = process.env): string {
-	return envString("MNEMOPI_LLM_MODEL", "", env);
 }
 
 export function hostLlmEnabled(env: Env = process.env): boolean {

@@ -1,26 +1,37 @@
-import { afterAll, describe, expect, it, vi } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { AuthStorage, FetchImpl } from "@oh-my-pi/pi-ai";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resolveFirecrawlUrl } from "@oh-my-pi/pi-coding-agent/web/firecrawl";
 import { FirecrawlProvider, searchFirecrawl } from "@oh-my-pi/pi-coding-agent/web/search/providers/firecrawl";
+import { getSearchEngineModel } from "@oh-my-pi/pi-coding-agent/web/search/provider";
 import { SearchProviderError } from "@oh-my-pi/pi-coding-agent/web/search/types";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 
 const TEST_KEY = "test-firecrawl-key";
+const originalBaseUrl = process.env.FIRECRAWL_BASE_URL;
+const originalApiUrl = process.env.FIRECRAWL_API_URL;
 
-function createFirecrawlFixture(authStorage: AuthStorage) {
-	const modelRegistry = new ModelRegistry(authStorage);
-	const model = modelRegistry.find("web", "firecrawl");
-	if (!model) throw new Error("Expected bundled web/firecrawl model");
-	return { model, modelRegistry };
-}
+beforeEach(() => {
+	process.env.FIRECRAWL_BASE_URL = "http://firecrawl.internal";
+	delete process.env.FIRECRAWL_API_URL;
+});
+
+afterEach(() => {
+	if (originalBaseUrl === undefined) delete process.env.FIRECRAWL_BASE_URL;
+	else process.env.FIRECRAWL_BASE_URL = originalBaseUrl;
+	if (originalApiUrl === undefined) delete process.env.FIRECRAWL_API_URL;
+	else process.env.FIRECRAWL_API_URL = originalApiUrl;
+});
+
+const firecrawlModel = (() => {
+	const model = getSearchEngineModel("firecrawl");
+	if (!model) throw new Error("Expected independent web/firecrawl search descriptor");
+	return model;
+})();
 
 const providerAuthStorage = createInMemoryAuthStorage();
 providerAuthStorage.keys.setRuntime("firecrawl", TEST_KEY);
-const providerFixture = createFirecrawlFixture(providerAuthStorage);
 
 const keylessAuthStorage = createInMemoryAuthStorage();
-const keylessFixture = createFirecrawlFixture(keylessAuthStorage);
 const keylessResolverSpy = vi.spyOn(keylessAuthStorage.keys, "resolver").mockImplementation((provider, options) => {
 	expect(provider).toBe("firecrawl");
 	expect(options?.sessionId).toBe("session-firecrawl-test");
@@ -39,17 +50,10 @@ afterAll(() => {
 });
 
 function makeParams(query: string, authStorage: AuthStorage = providerAuthStorage) {
-	const fixture =
-		authStorage === providerAuthStorage
-			? providerFixture
-			: authStorage === keylessAuthStorage
-				? keylessFixture
-				: createFirecrawlFixture(authStorage);
 	return {
 		query,
 		authStorage,
-		...fixture,
-		systemPrompt: "Firecrawl test prompt",
+		model: firecrawlModel,
 		sessionId: "session-firecrawl-test",
 	} as const;
 }
@@ -65,6 +69,34 @@ function getHeader(headers: RequestInit["headers"] | undefined, name: string): s
 }
 
 describe("Firecrawl web search provider", () => {
+	it("rejects missing endpoint before resolving credentials or fetching", async () => {
+		delete process.env.FIRECRAWL_BASE_URL;
+		delete process.env.FIRECRAWL_API_URL;
+		const request = vi.fn(async () => new Response("{}"));
+		const before = keylessResolverSpy.mock.calls.length;
+		await expect(searchFirecrawl({ ...makeParams("private", keylessAuthStorage), fetch: request })).rejects.toThrow(
+			"requires FIRECRAWL_BASE_URL",
+		);
+		expect(keylessResolverSpy.mock.calls.length).toBe(before);
+		expect(request).not.toHaveBeenCalled();
+	});
+
+	it("does not downgrade a failed configured credential to keyless access", async () => {
+		const authStorage = createInMemoryAuthStorage();
+		authStorage.keys.setRuntime("firecrawl", "private-key");
+		const resolver = vi.spyOn(authStorage.keys, "resolver").mockReturnValue(async () => undefined);
+		const request = vi.fn(async () => new Response("{}"));
+		try {
+			await expect(searchFirecrawl({ ...makeParams("private", authStorage), fetch: request })).rejects.toThrow(
+				"Configured Firecrawl credentials could not be resolved",
+			);
+			expect(request).not.toHaveBeenCalled();
+		} finally {
+			resolver.mockRestore();
+			authStorage.close();
+		}
+	});
+
 	it("sends the Firecrawl POST request and maps web results", async () => {
 		const captured: { url?: string; init?: RequestInit; body?: unknown } = {};
 
@@ -103,7 +135,7 @@ describe("Firecrawl web search provider", () => {
 			fetch: fetchMock,
 		});
 
-		expect(captured.url).toBe("https://api.firecrawl.dev/v2/search");
+		expect(captured.url).toBe("http://firecrawl.internal/v2/search");
 		expect(captured.init?.method).toBe("POST");
 		expect(getHeader(captured.init?.headers, "Authorization")).toBe(`Bearer ${TEST_KEY}`);
 		expect(getHeader(captured.init?.headers, "Content-Type")).toBe("application/json");
@@ -270,7 +302,7 @@ describe("Firecrawl web search provider", () => {
 		}
 	});
 
-	it("joins the auto chain in hosted keyless mode", () => {
+	it("does not join the auto chain without an explicit endpoint", () => {
 		const originalApiKey = process.env.FIRECRAWL_API_KEY;
 		const originalBaseUrl = process.env.FIRECRAWL_BASE_URL;
 		const originalApiUrl = process.env.FIRECRAWL_API_URL;
@@ -278,7 +310,7 @@ describe("Firecrawl web search provider", () => {
 		delete process.env.FIRECRAWL_BASE_URL;
 		delete process.env.FIRECRAWL_API_URL;
 		try {
-			expect(new FirecrawlProvider().isAvailable(keylessAuthStorage)).toBe(true);
+			expect(new FirecrawlProvider().isAvailable(keylessAuthStorage)).toBe(false);
 		} finally {
 			if (originalApiKey === undefined) delete process.env.FIRECRAWL_API_KEY;
 			else process.env.FIRECRAWL_API_KEY = originalApiKey;
@@ -348,7 +380,7 @@ describe("Firecrawl web search provider", () => {
 			fetch: fetchMock,
 		});
 
-		expect(captured.url).toBe("https://api.firecrawl.dev/v2/search");
+		expect(captured.url).toBe("http://firecrawl.internal/v2/search");
 		expect(captured.init?.method).toBe("POST");
 		expect(getHeader(captured.init?.headers, "Authorization")).toBeNull();
 		expect(getHeader(captured.init?.headers, "Content-Type")).toBe("application/json");
@@ -384,10 +416,10 @@ describe("resolveFirecrawlUrl", () => {
 		}
 	};
 
-	it("defaults to the hosted v2 API when no base URL is configured", () => {
+	it("requires an explicit endpoint instead of defaulting to a public service", () => {
 		withBaseUrl(undefined, () => {
-			expect(resolveFirecrawlUrl("/search")).toBe("https://api.firecrawl.dev/v2/search");
-			expect(resolveFirecrawlUrl("/scrape")).toBe("https://api.firecrawl.dev/v2/scrape");
+			expect(() => resolveFirecrawlUrl("/search")).toThrow("requires FIRECRAWL_BASE_URL");
+			expect(() => resolveFirecrawlUrl("/scrape")).toThrow("requires FIRECRAWL_BASE_URL");
 		});
 	});
 
@@ -427,4 +459,11 @@ describe("resolveFirecrawlUrl", () => {
 			expect(() => resolveFirecrawlUrl("/scrape")).toThrow("URL credentials are not allowed");
 		});
 	});
+});
+
+it("uses the private endpoint alias when the primary endpoint is blank", () => {
+	process.env.FIRECRAWL_BASE_URL = " ";
+	process.env.FIRECRAWL_API_URL = "http://reader.internal/company/v1/";
+	expect(resolveFirecrawlUrl("/search")).toBe("http://reader.internal/company/v1/search");
+	expect(resolveFirecrawlUrl("/scrape")).toBe("http://reader.internal/company/v1/scrape");
 });

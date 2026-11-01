@@ -57,7 +57,6 @@ function createFocusedContext() {
 		focusedAgentId: "Worker",
 		skillCommands: new Map(),
 		fileSlashCommands: new Set<string>(),
-		collabGuest: false,
 		compactionQueuedMessages: [],
 		locallySubmittedUserSignatures: new Set<string>(),
 		showStatus: vi.fn(),
@@ -67,7 +66,6 @@ function createFocusedContext() {
 		handleExportCommand: vi.fn(async () => {}),
 		handleBtwCommand: vi.fn(async () => {}),
 		handleJobsCommand: vi.fn(async () => {}),
-		showResetUsageSelector: vi.fn(async () => {}),
 		withLocalSubmission: vi.fn(async <T>(_text: string, fn: () => Promise<T>) => fn()),
 	};
 	return { ctx: ctx as unknown as InteractiveModeContext, raw: ctx, editor, prompt, resume };
@@ -250,15 +248,6 @@ describe("focused subagent view slash commands", () => {
 		const { editor, prompt } = await submit("/compact");
 		expect(editor.getText()).toBe("/compact");
 		expect(prompt).not.toHaveBeenCalled();
-	});
-
-	it("keeps the mutating /usage reset form gated to the main session", async () => {
-		for (const text of ["/usage reset", "/usage reset anthropic/active"]) {
-			const { raw, editor } = await submit(text);
-			expect(raw.showResetUsageSelector).not.toHaveBeenCalled();
-			expect(raw.handleUsageCommand).not.toHaveBeenCalled();
-			expect(editor.getText()).toBe(text);
-		}
 	});
 
 	it("keeps the mutating /jobs kill form gated to the main session", async () => {

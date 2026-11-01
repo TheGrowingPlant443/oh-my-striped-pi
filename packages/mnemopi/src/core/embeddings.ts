@@ -1,18 +1,9 @@
 import { mkdirSync } from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as nodePath from "node:path";
-import { type ApiKey, getOpenRouterHeaders, withAuth } from "@oh-my-pi/pi-ai";
+import { type ApiKey, withAuth } from "@oh-my-pi/pi-ai";
 import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { hostMatchesUrl } from "@oh-my-pi/pi-catalog/hosts";
-import {
-	$env,
-	$flag,
-	extractHttpStatusFromError,
-	fetchWithRetry,
-	getFastembedCacheDir,
-	logger,
-	withLoopPhase,
-} from "@oh-my-pi/pi-utils";
+import { $env, $flag, fetchWithRetry, getFastembedCacheDir, logger, withLoopPhase } from "@oh-my-pi/pi-utils";
 import { LRUCache } from "@oh-my-pi/pi-utils/lru";
 import type { EmbeddingModel } from "fastembed";
 import { loadFastembed, withEmbedSessionBudget } from "./fastembed-runtime";
@@ -54,7 +45,6 @@ const QUERY_CACHE_MAX = 512;
 let providerOverride: EmbeddingProvider | null = null;
 let localModelPromise: Promise<LocalEmbeddingModel> | null = null;
 let localModelInitializer: LocalModelInitializer = defaultLocalModelInitializer;
-let apiCallCount = 0;
 const queryCache = new LRUCache<string, Vector>({ max: QUERY_CACHE_MAX });
 
 // Provider identity table for the cache key. Each unique `provider` object/function
@@ -128,8 +118,8 @@ function activeEmbeddingOptions() {
 
 /**
  * Compose the per-query cache key. Includes the active provider's identity, the
- * resolved model name, and the API base URL so two `Mnemopi` instances in the same
- * process that point at different providers/models never share a cached query
+ * resolved model name, so two `Mnemopi` instances in the same
+ * process that use different providers/models never share a cached query
  * vector. Provider identity comes from `providerIds` (WeakMap-assigned integer);
  * `0` is the sentinel for "no provider configured, fall back to env defaults".
  */
@@ -147,8 +137,7 @@ function queryCacheKey(text: string): string {
 		}
 	}
 	const model = defaultModel();
-	const apiUrl = active?.apiUrl ?? "";
-	return `${providerId}::${model}::${apiUrl}::${text}`;
+	return `${providerId}::${model}::${embeddingBaseUrl()}::${text}`;
 }
 
 function inTestRuntime(): boolean {
@@ -215,24 +204,11 @@ function capInputs(texts: readonly string[]): readonly string[] {
 }
 
 function embeddingApiKey(): ApiKey {
-	const active = activeEmbeddingOptions();
-	if (active?.apiKey !== undefined) {
-		return active.apiKey;
-	}
-	return $env.MNEMOPI_EMBEDDING_API_KEY || $env.OPENROUTER_API_KEY || $env.OPENAI_API_KEY || "";
-}
-
-/** A resolver always counts as configured; a static key only when non-empty. */
-function embeddingKeyConfigured(key: ApiKey = embeddingApiKey()): boolean {
-	return typeof key === "function" || key !== "";
+	return activeEmbeddingOptions()?.apiKey ?? $env.MNEMOPI_EMBEDDING_API_KEY ?? "";
 }
 
 function embeddingBaseUrl(): string {
-	const active = activeEmbeddingOptions();
-	if (active?.apiUrl !== undefined) {
-		return active.apiUrl;
-	}
-	return $env.MNEMOPI_EMBEDDING_API_URL || $env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
+	return (activeEmbeddingOptions()?.apiUrl ?? $env.MNEMOPI_EMBEDDING_API_URL ?? "").trim().replace(/\/+$/, "");
 }
 
 function defaultModel(): string {
@@ -253,22 +229,6 @@ function defaultModel(): string {
  */
 export function currentEmbeddingModel(): string {
 	return defaultModel();
-}
-
-export function isApiModel(modelName: string): boolean {
-	if (
-		modelName.startsWith("openai/") ||
-		modelName.includes("text-embedding") ||
-		modelName.startsWith("text-embedding")
-	) {
-		return true;
-	}
-	const active = activeEmbeddingOptions();
-	const baseUrl = active?.apiUrl ?? ($env.MNEMOPI_EMBEDDING_API_URL || $env.OPENROUTER_BASE_URL);
-	if (baseUrl !== undefined && baseUrl !== "" && !hostMatchesUrl(baseUrl, "openrouter")) {
-		return true;
-	}
-	return $flag("MNEMOPI_EMBEDDINGS_VIA_API");
 }
 
 const MODEL_DIMS: Record<string, number> = {
@@ -330,7 +290,7 @@ export function fastembedModelName(modelName: string): StandardEmbeddingModel | 
 }
 
 async function getLocalModel(): Promise<LocalEmbeddingModel | null> {
-	if (isApiModel(defaultModel()) || embeddingsDisabled() || inTestRuntime()) {
+	if (embeddingBaseUrl() !== "" || embeddingsDisabled() || inTestRuntime()) {
 		return null;
 	}
 	if (localModelPromise !== null) {
@@ -363,27 +323,16 @@ async function getLocalModel(): Promise<LocalEmbeddingModel | null> {
 
 async function embedApi(texts: readonly string[]): Promise<EmbeddingMatrix | null> {
 	const baseUrl = embeddingBaseUrl();
-	const isCustom = !hostMatchesUrl(baseUrl, "openrouter");
-	const apiKey = embeddingApiKey();
-	if (!isCustom && !embeddingKeyConfigured(apiKey)) {
-		return null;
-	}
-
+	if (!baseUrl) return null;
 	const body = JSON.stringify({ model: defaultModel(), input: texts });
 	try {
-		// withAuth re-resolves the key on 401 (force-refresh, then sibling
-		// rotation) when `apiKey` is a resolver. The 429 backoff stays inside
-		// the attempt via fetchWithRetry. An empty static key attempts without
-		// an Authorization header (local/proxy setups).
-		const response = await withAuth(apiKey, async key => {
-			const headers: Record<string, string> = {
-				"Content-Type": "application/json",
-				...getOpenRouterHeaders(),
-			};
-			if (key !== "") {
-				headers.Authorization = `Bearer ${key}`;
-			}
-			const res = await fetchWithRetry(`${baseUrl.replace(/\/+$/, "")}/embeddings`, {
+		const url = new URL(baseUrl);
+		if (url.protocol !== "http:" && url.protocol !== "https:")
+			throw new Error("Mnemopi embedding endpoint must use HTTP(S).");
+		const response = await withAuth(embeddingApiKey(), async key => {
+			const headers: Record<string, string> = { "Content-Type": "application/json" };
+			if (key !== "") headers.Authorization = `Bearer ${key}`;
+			const res = await fetchWithRetry(`${baseUrl}/embeddings`, {
 				method: "POST",
 				headers,
 				body,
@@ -391,25 +340,29 @@ async function embedApi(texts: readonly string[]): Promise<EmbeddingMatrix | nul
 				maxAttempts: 3,
 				defaultDelayMs: attempt => 2 ** attempt * 1000,
 			});
-			if (res.status === 401) {
+			if (res.status === 401)
 				throw new ProviderHttpError("mnemopi embedding request unauthorized (401)", 401, { headers: res.headers });
-			}
 			return res;
 		});
-		if (!response.ok) {
+		if (!response.ok) return null;
+		const data = (await response.json()) as { data?: Array<{ embedding: number[]; index?: number }> };
+		if (!Array.isArray(data.data) || data.data.length !== texts.length) return null;
+		const rows = data.data;
+		if (rows.every(row => Number.isInteger(row.index))) rows.sort((a, b) => a.index! - b.index!);
+		if (
+			rows.some(
+				row =>
+					!Array.isArray(row.embedding) ||
+					row.embedding.length === 0 ||
+					row.embedding.some(value => !Number.isFinite(value)),
+			)
+		)
 			return null;
-		}
-		const data = (await response.json()) as { data?: Array<{ embedding: number[] }> };
-		return withLoopPhase("mnemopi.embed", () => {
-			const { data: rows } = data;
-			if (rows === undefined) {
-				return null;
-			}
-			apiCallCount += 1;
-			return rows.map(row => new Float32Array(row.embedding));
-		});
+		const dimensions = rows[0]?.embedding.length;
+		if (rows.some(row => row.embedding.length !== dimensions)) return null;
+		return withLoopPhase("mnemopi.embed", () => rows.map(row => new Float32Array(row.embedding)));
 	} catch (error) {
-		logger.debug("mnemopi embedding request failed", { status: extractHttpStatusFromError(error) });
+		logger.debug("mnemopi embedding request failed", { error: String(error) });
 		return null;
 	}
 }
@@ -452,7 +405,6 @@ export function resetEmbeddingProviderForTests(): void {
 	providerOverride = null;
 	localModelPromise = null;
 	localModelInitializer = defaultLocalModelInitializer;
-	apiCallCount = 0;
 	queryCache.clear();
 }
 
@@ -470,21 +422,11 @@ export async function available(): Promise<boolean> {
 	if (providerOverride !== null) {
 		return providerAvailable(providerOverride);
 	}
-	if (isApiModel(defaultModel())) {
-		const baseUrl = active?.apiUrl ?? ($env.MNEMOPI_EMBEDDING_API_URL || $env.OPENROUTER_BASE_URL);
-		if (baseUrl !== undefined && baseUrl !== "" && !hostMatchesUrl(baseUrl, "openrouter")) {
-			return true;
-		}
-		return embeddingKeyConfigured();
-	}
+	if (embeddingBaseUrl() !== "") return true;
 	if (inTestRuntime()) {
 		return false;
 	}
 	return fastembedModelName(defaultModel()) !== null;
-}
-
-export function availableApi(): boolean {
-	return embeddingKeyConfigured();
 }
 
 export async function embedQuery(text: string): Promise<Vector | null> {
@@ -524,9 +466,6 @@ export async function embed(texts: readonly string[]): Promise<EmbeddingMatrix |
 			return null;
 		}
 	}
-	if (isApiModel(defaultModel())) {
-		return embedApi(texts);
-	}
 	if (texts.length === 1) {
 		const key = queryCacheKey(texts[0] ?? "");
 		const cached = queryCache.get(key);
@@ -534,6 +473,7 @@ export async function embed(texts: readonly string[]): Promise<EmbeddingMatrix |
 			return [cached];
 		}
 	}
+	if (embeddingBaseUrl() !== "") return embedApi(texts);
 	const model = await getLocalModel();
 	if (model === null) {
 		return null;
@@ -554,10 +494,6 @@ export async function embed(texts: readonly string[]): Promise<EmbeddingMatrix |
 		});
 		return null;
 	}
-}
-
-export function getEmbeddingApiCallCountForTests(): number {
-	return apiCallCount;
 }
 
 export const DEFAULT_MODEL = defaultModel();

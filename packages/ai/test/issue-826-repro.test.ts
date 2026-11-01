@@ -8,9 +8,8 @@ const baseModel: Model<"anthropic-messages"> = buildModel({
 	id: "claude-sonnet-4-5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl:
-		"https://us-east5-aiplatform.googleapis.com/v1/projects/example/locations/us-east5/publishers/anthropic/models/claude-sonnet-4-5:streamRawPredict",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -46,7 +45,6 @@ function captureParams(
 	const { promise, resolve } = Promise.withResolvers<{ tools?: Array<{ name: string; strict?: unknown }> }>();
 	void streamAnthropic(model, baseContext, {
 		apiKey: "sk-ant-api-test",
-		isOAuth: false,
 		signal: abortedSignal(),
 		onPayload: payload => {
 			resolve(payload as { tools?: Array<{ name: string; strict?: unknown }> });
@@ -56,9 +54,9 @@ function captureParams(
 	return promise;
 }
 
-describe("issue #826: Anthropic strict-tools opt-out for Vertex-style proxies", () => {
-	it("preserves strict:true on allowlisted tools by default (api.anthropic.com baseline)", async () => {
-		const params = await captureParams(baseModel);
+describe("issue #826: Anthropic strict-tools compatibility overrides", () => {
+	it("honors an explicit strict-tools opt-in", async () => {
+		const params = await captureParams(buildModel({ ...baseModel, compat: { disableStrictTools: false } }));
 		const edit = params.tools?.find(t => t.name === "edit");
 		expect(edit).toBeDefined();
 		expect(edit?.strict).toBe(true);
@@ -90,7 +88,6 @@ describe("issue #826: Anthropic strict-tools opt-out for Vertex-style proxies", 
 		const { promise, resolve } = Promise.withResolvers<{ thinking?: { type?: string } }>();
 		void streamAnthropic(adaptiveModel, baseContext, {
 			apiKey: "sk-ant-api-test",
-			isOAuth: false,
 			signal: abortedSignal(),
 			thinkingEnabled: true,
 			onPayload: payload => {
@@ -116,7 +113,6 @@ describe("issue #826: Anthropic strict-tools opt-out for Vertex-style proxies", 
 		const { promise, resolve } = Promise.withResolvers<{ thinking?: { type?: string; budget_tokens?: number } }>();
 		void streamAnthropic(adaptiveModel, baseContext, {
 			apiKey: "sk-ant-api-test",
-			isOAuth: false,
 			signal: abortedSignal(),
 			thinkingEnabled: true,
 			onPayload: payload => {

@@ -34,8 +34,7 @@ describe("auto thinking classifier helpers", () => {
 	}
 
 	function createLocalClassifierFixture(autoThinkingModel: TinyMemoryLocalModelKey) {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!model) throw new Error("Expected bundled Claude Sonnet 4.6 model");
+		const model = buildLadderModel("company-target", [Effort.Low, Effort.Medium, Effort.High]);
 		const judge = getBundledModel("local", autoThinkingModel);
 		if (!judge) throw new Error(`Expected bundled local judge ${autoThinkingModel}`);
 
@@ -149,8 +148,7 @@ describe("auto thinking classifier helpers", () => {
 	});
 
 	it("uses a reasoning-safe online classifier budget when the catalog disables reasoning", async () => {
-		const baseModel = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!baseModel) throw new Error("Expected bundled Claude Sonnet 4.6 model");
+		const baseModel = buildLadderModel("company-target", [Effort.Low, Effort.Medium, Effort.High]);
 		const classifierModel = { ...baseModel, reasoning: false };
 		const settings = Settings.isolated({
 			modelRoles: { judge: `${classifierModel.provider}/${classifierModel.id}` },
@@ -184,8 +182,7 @@ describe("auto thinking classifier helpers", () => {
 	});
 
 	function createOnlineFixture(targetModel: Model, answer: string, maxEffort: "xhigh" | "max" = "xhigh") {
-		const classifierModel = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!classifierModel) throw new Error("Expected bundled Claude Sonnet 4.6 model");
+		const classifierModel = buildLadderModel("company-judge", [Effort.Low, Effort.Medium, Effort.High]);
 		const settings = Settings.isolated({
 			modelRoles: { judge: `${classifierModel.provider}/${classifierModel.id}` },
 			"providers.autoThinkingMaxEffort": maxEffort,
@@ -220,9 +217,9 @@ describe("auto thinking classifier helpers", () => {
 		return buildModel({
 			id,
 			name: id,
-			api: "openai-completions",
-			provider: "mock",
-			baseUrl: "https://example.com",
+			api: "anthropic-messages",
+			provider: "company-messages",
+			baseUrl: "https://models.company.test/v1",
 			reasoning: true,
 			thinking: { mode: "effort", efforts },
 			input: ["text"],
@@ -395,8 +392,7 @@ describe("auto thinking classifier helpers", () => {
 	});
 
 	it("clamps auto effort to model support while never resolving below low", () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!model) throw new Error("Expected bundled Claude Sonnet 4.6 model");
+		const model = buildLadderModel("company-target", [Effort.Low, Effort.Medium, Effort.High]);
 
 		expect(clampAutoThinkingEffort(model, Effort.XHigh)).toBe(Effort.High);
 		expect(clampAutoThinkingEffort(model, Effort.Minimal)).toBe(Effort.Low);
@@ -428,9 +424,9 @@ describe("auto thinking classifier helpers", () => {
 		const devinModel = {
 			id: "glm-5-2",
 			name: "GLM-5.2",
-			api: "devin-agent",
-			provider: "devin",
-			baseUrl: "https://server.codeium.com",
+			api: "openai-completions",
+			provider: "company-uncontrolled",
+			baseUrl: "https://models.company.test/v1",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -471,8 +467,7 @@ describe("auto thinking classifier helpers", () => {
 		expect(resolveTaskEffortLevel(xhighCeilingModel, "lo")).toBe(Effort.Low);
 		expect(resolveTaskEffortLevel(xhighCeilingModel, "med")).toBe(Effort.Medium);
 
-		const sonnet = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!sonnet) throw new Error("Expected bundled Claude Sonnet 4.6 model");
+		const sonnet = buildLadderModel("company-target", [Effort.Low, Effort.Medium, Effort.High]);
 		const sonnetEfforts = sonnet.thinking?.efforts ?? [];
 		expect(resolveTaskEffortLevel(sonnet, "hi")).toBe(sonnetEfforts[sonnetEfforts.length - 1]);
 		expect(resolveTaskEffortLevel(sonnet, "lo")).toBe(sonnetEfforts[0]);
@@ -499,9 +494,9 @@ describe("auto thinking classifier helpers", () => {
 		const devinModel = {
 			id: "glm-5-2",
 			name: "GLM-5.2",
-			api: "devin-agent",
-			provider: "devin",
-			baseUrl: "https://server.codeium.com",
+			api: "openai-completions",
+			provider: "company-uncontrolled",
+			baseUrl: "https://models.company.test/v1",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

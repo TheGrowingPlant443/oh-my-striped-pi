@@ -8,18 +8,18 @@ import type { HindsightConfig } from "./config";
 import {
 	composeRecallQuery,
 	formatMemories,
-	type HindsightMessage,
+	type MemoryMessage as HindsightMessage,
 	prepareRetentionTranscript,
 	sliceLastTurnsByUserBoundary,
 	truncateRecallQuery,
-} from "./content";
+} from "../memory-backend/content";
 import {
 	ensureMentalModels,
 	MENTAL_MODEL_FIRST_TURN_DEADLINE_MS,
 	resolveSeedsForScope,
 	tryLoadMentalModelsBlock,
 } from "./mental-models";
-import { countUserTurns, extractMessages } from "./transcript";
+import { countUserTurns, extractMessages } from "../memory-backend/transcript";
 
 /** `notice` source of Hindsight recall/retain failures; print mode writes these to stderr. */
 export const HINDSIGHT_NOTICE_SOURCE = "Hindsight";
@@ -533,10 +533,9 @@ export class HindsightSessionState {
 			// is idempotent (PUT) and skips after the first call via `banksSet`.
 			await ensureBankExists(this.client, this.bankId, this.config, this.banksSet);
 
-			// Seeding is opt-in (`hindsight.mentalModelAutoSeed`). Default behaviour is
-			// read-only: we surface whatever models the operator has curated on the
-			// bank, but we do NOT POST to create new ones unless they explicitly
-			// asked. `/memory mm seed` remains the explicit-write entry point.
+			// Seeding is controlled by hindsight.mentalModelAutoSeed; existing
+			// operator-curated models are never overwritten. `/memory mm seed`
+			// also provides an explicit maintenance entry point.
 			if (this.config.mentalModelAutoSeed) {
 				const seeds = resolveSeedsForScope(scope, this.config.scoping);
 				if (seeds.length > 0) {

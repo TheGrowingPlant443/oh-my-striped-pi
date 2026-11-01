@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { AssistantMessage, Context, Model } from "@oh-my-pi/pi-ai/types";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
 // Issue #8248: with prewalk enabled, OMP switches into a DeepSeek Responses
 // target (opencode-go) after mid-run compaction. The replayed assistant turns
@@ -63,7 +63,25 @@ function reasoningTextOf(item: ResponsesInputItem): string {
 		.join("");
 }
 
-const deepseek = getBundledModel("opencode-go", "deepseek-v4-flash") as Model<"openai-responses">;
+const deepseek = buildModel({
+	id: "deepseek-v4-flash",
+	name: "Reasoning Replay",
+	api: "openai-responses",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: [Effort.Low, Effort.High], defaultLevel: Effort.High },
+	compat: {
+		requiresReasoningContentForAllAssistantTurns: true,
+		requiresReasoningContentForToolCalls: true,
+		replayReasoningContent: true,
+		supportsReasoningEffort: true,
+	},
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 16_000,
+});
 
 const usage = {
 	input: 0,
@@ -126,7 +144,7 @@ describe("issue #8248: DeepSeek Responses reasoning replay after prewalk/compact
 		const prior: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "opencode-go",
+			provider: "github-copilot",
 			model: "deepseek-v4-flash",
 			stopReason: "stop",
 			usage,
@@ -181,13 +199,17 @@ describe("issue #8248: DeepSeek Responses reasoning replay after prewalk/compact
 	});
 
 	it("does not synthesize reasoning items for non-DeepSeek Responses targets", async () => {
-		const openai = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+		const openai = buildModel({
+			...deepseek,
+			id: "without-reasoning-replay",
+			compat: { requiresReasoningContentForAllAssistantTurns: false },
+		});
 		expect(openai.compat.requiresReasoningContentForAllAssistantTurns).toBe(false);
 
 		const prior: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-sonnet-4-5",
 			stopReason: "stop",
 			usage,

@@ -7,6 +7,10 @@
 - Added the TSP `json` kind for displaying raw JSON values as interactive, expandable trees in the terminal.
 - Added `TspEditorProps.typeahead` support so programs that cannot yet read input can preserve typed text, display it at the caret, and submit it when input becomes available.
 
+### Removed
+
+- Removed hosted snapshot-sharing, public stream/clip upload and skill-publication contracts while retaining private collaboration, local recording and transcript types.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

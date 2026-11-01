@@ -32,7 +32,7 @@ The cascade follows the semantic-search strategy of [jegrep](https://github.com/
 
 Internal URLs are searched in place: the native listing and lexical scan and the file reads go through the session's URL filesystem (`InternalUrlFilesystem`, at the call's approval tier: `read`, or `exec` when `path` names `ssh://`, as for `grep`), which is the same one the bash tool uses. Virtual documents need no local files, and file-backed schemes resolve to their host files. Hits under a URL scope are URLs (`omp://tools/read.md`). Open them directly with `read`, including with `:start-end` selectors (`read omp://tools/read.md:50-100`). Hidden files are excluded unless the file is named as the scope. Host hit paths are cwd-relative within the session cwd and absolute outside it, not relative to the searched directory, so `read` and hyperlinks resolve without knowing the scope.
 
-`find.enabled` is `auto` by default: `find` is enabled only when the `judge` model role resolves first to a native System One model (TypeSafe `typesafe/jev-1.14.0`, directly or through OpenRouter), not a prompted on-device or chat model. `on` enables it whichever model judges; `off` disables it. Once enabled it is an essential (top-level) tool, never mounted under `xd://`.
+`find.enabled` is `auto` by default: `find` is enabled only when the `judge` model role resolves first to a configured native judgment backend (System One or compatible Decisions), not a prompted on-device or chat model. `on` enables it whichever model judges; `off` disables it. Once enabled it is an essential (top-level) tool, never mounted under `xd://`.
 
 Use `find` first when the implementing location is unknown. Use `grep` for known literals, regexes, or symbols, and `glob` for names. Scope a known subsystem and batch related questions. Scores below about `0.4` are weak evidence: widen the description or use `grep` before concluding absence. The tool has no hidden-file option; the CLI's `--hidden` is not a tool parameter.
 
@@ -68,7 +68,7 @@ Each judged phase drains through a dispatcher with 16 requests in flight before 
 ## Limits & Caps
 
 - Candidates judged by name: 128; files read: 20; windows per file: 24; window size: 8 KB; sketch: 384 B; passages verified: 40; sketch cutoff 0.45; hit threshold 0.20 (`packages/coding-agent/src/tools/jfind/cascade.ts`).
-- Native lexical scan timeout: 30 s. Native judgments use `NativeJudge` (10 s per attempt, up to three attempts); the tool's 20 s wall budget can abort them earlier.
+- Native lexical scan timeout: 30 s. Judgments run through the local or Copilot role chain and share the tool's wall-clock budget.
 - Per-call wall-clock budget: `20_000ms` (`FIND_TIMEOUT_MS` in `packages/coding-agent/src/tools/jfind/index.ts`); hitting it raises `find timed out after 20.0s` instead of blocking the turn. The `omp find` CLI is not bounded this way.
 - Files over 4 MB are scanned by the lexical pass only up to the native grep cap and read only up to 4 MB (trimmed to the last full line).
 

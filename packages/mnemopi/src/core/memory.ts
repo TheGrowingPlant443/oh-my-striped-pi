@@ -222,30 +222,28 @@ function resolveRuntimeOptions(options: MnemopiOptions): ResolvedMnemopiRuntimeO
 	} else {
 		const nestedLlm = options.llm !== undefined && !isPiAiModel(options.llm) ? options.llm : undefined;
 		const llmModel = nestedLlm?.model ?? options.llmModel;
+		const llmBaseUrl = nestedLlm?.baseUrl ?? options.llmBaseUrl;
+		const llmApiKey = nestedLlm?.apiKey ?? options.llmApiKey;
 		const llmEnabled = hasOwn(options, "llmEnabled")
 			? options.llmEnabled
 			: (nestedLlm?.enabled ??
-				  (nestedLlm?.baseUrl !== undefined ||
-						nestedLlm?.apiKey !== undefined ||
-						nestedLlm?.maxTokens !== undefined ||
-						nestedLlm?.complete !== undefined ||
-						llmModel !== undefined ||
-						hasOwn(options, "llmBaseUrl") ||
-						hasOwn(options, "llmApiKey") ||
-						hasOwn(options, "llmModel")))
-				? true
-				: undefined;
-		const llmBaseUrl = options.llmBaseUrl ?? nestedLlm?.baseUrl;
-		const llmApiKey = options.llmApiKey ?? nestedLlm?.apiKey;
+				(nestedLlm?.maxTokens !== undefined ||
+				llmBaseUrl !== undefined ||
+				llmApiKey !== undefined ||
+				nestedLlm?.complete !== undefined ||
+				llmModel !== undefined ||
+				hasOwn(options, "llmModel")
+					? true
+					: undefined));
 		const llmMaxTokens = nestedLlm?.maxTokens;
 		const llmComplete = nestedLlm?.complete;
 		const llmExtractionPrompt = nestedLlm?.extractionPrompt;
 		const llmConsolidationPrompt = nestedLlm?.consolidationPrompt;
 		if (
 			llmEnabled !== undefined ||
+			llmModel !== undefined ||
 			llmBaseUrl !== undefined ||
 			llmApiKey !== undefined ||
-			llmModel !== undefined ||
 			llmMaxTokens !== undefined ||
 			llmComplete !== undefined ||
 			llmExtractionPrompt !== undefined ||
@@ -253,9 +251,9 @@ function resolveRuntimeOptions(options: MnemopiOptions): ResolvedMnemopiRuntimeO
 		) {
 			llm = {
 				enabled: llmEnabled,
+				model: llmModel,
 				baseUrl: llmBaseUrl,
 				apiKey: llmApiKey,
-				model: llmModel,
 				maxTokens: llmMaxTokens,
 				complete: llmComplete,
 				extractionPrompt: llmExtractionPrompt,

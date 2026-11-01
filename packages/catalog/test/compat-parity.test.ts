@@ -9,9 +9,8 @@
  * exemption rows, which keep their explicit metadata.
  *
  * Hermetic (no network). Zero diffs required — a failure names each divergent
- * field as `provider/model.field: baked=X engine=Y`; fix the KDL rules (or a
- * host-detection seam in `resolve.ts`) or regenerate the provider's rows
- * (`bun run gen:models --provider <id>`), never hand-edit the baked values.
+ * field as `provider/model.field: baked=X engine=Y`; fix the KDL rules or
+ * regenerate the bundled seed catalog, never hand-edit baked values.
  */
 import { describe, expect, test } from "bun:test";
 import { isCollapsedVariantSpec } from "../src/compat/collapse";
@@ -68,16 +67,7 @@ function keepsExplicitThinking(row: RowLike): boolean {
 		row.thinking
 	)
 		return true;
-	if (
-		row.provider === "alibaba-token-plan" &&
-		(row.id === "qwen3.8-max-preview" || row.id === "qwen3.8-max") &&
-		row.thinking
-	) {
-		return true;
-	}
-	if (row.provider === "cline-pass" && row.thinking) return true;
 	if (row.compatConfig?.trustExplicitThinkingOnly === true) return true;
-	if (row.provider === "openrouter" && row.thinking?.requiresEffort === true) return true;
 	return false;
 }
 
@@ -105,8 +95,6 @@ describe("compat parity", () => {
 				}
 				const exempt = keepsExplicitThinking(row);
 				if (!exempt) (rest as Record<string, unknown>).thinking = undefined;
-				const umansAuthored =
-					provider === "umans" && (row.thinking?.requiresEffort === true || row.id === "umans-kimi-k2.7");
 				let policy: ReturnType<typeof resolveModelPolicy>;
 				try {
 					policy = resolveModelPolicy(rest as unknown as ModelSpec<Api>);
@@ -114,10 +102,8 @@ describe("compat parity", () => {
 					diffs.push(`${label}: engine threw ${(error as Error).message}`);
 					continue;
 				}
-				let thinking = policy.thinking;
-				if (!exempt && umansAuthored && thinking) thinking = { ...thinking, requiresEffort: true };
 				diffValues(`${label}.compat`, jsonClone(row.compat), jsonClone(policy.compat), diffs);
-				diffValues(`${label}.thinking`, jsonClone(row.thinking), jsonClone(thinking), diffs);
+				diffValues(`${label}.thinking`, jsonClone(row.thinking), jsonClone(policy.thinking), diffs);
 			}
 		}
 		if (diffs.length > 0) {

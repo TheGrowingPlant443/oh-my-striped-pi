@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { getEditStore } from "@oh-my-pi/pi-coding-agent/edit/store";
@@ -11,6 +10,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
 
 describe("sdk edit-store session reset", () => {
 	let authStorage: AuthStorage;
@@ -28,10 +28,9 @@ describe("sdk edit-store session reset", () => {
 
 	it("clears the tool-side hashline store on /new so stale tags stop resolving (#13370)", async () => {
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
+		const bundled = getTestModel("github-copilot");
 		tempDir = TempDir.createSync("@omp-edit-store-reset-");
 		const settings = Settings.isolated({
 			"async.enabled": false,

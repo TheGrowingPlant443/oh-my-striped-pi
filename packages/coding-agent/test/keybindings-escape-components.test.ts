@@ -66,9 +66,9 @@ describe("component escape bindings", () => {
 		});
 		setKeybindings(keybindings);
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled model anthropic/claude-sonnet-4-5");
+			throw new Error("Expected bundled model github-copilot/claude-sonnet-4.5");
 		}
 
 		const settings = Settings.isolated({

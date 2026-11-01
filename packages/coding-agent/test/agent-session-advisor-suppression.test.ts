@@ -98,7 +98,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 	 */
 	async function createParkedSession(tailResponses: MockResponse[] = []): Promise<ParkedHarness> {
 		const started = Promise.withResolvers<void>();
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({
 			responses: [
 				() => {
@@ -117,7 +117,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false });
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({ agent, sessionManager, settings, modelRegistry });
 		return { session, sessionManager, mock, streamStarted: started.promise };
@@ -192,7 +192,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		} = {},
 	): Promise<CompletedAdvisorHarness> {
 		const { severity = "nit", continueSeverity, extensionRunner } = opts;
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({
 			responses: [
 				{ content: ["EXACT VERDICT"], stopReason: "stop" },
@@ -226,10 +226,10 @@ describe("AgentSession advisor auto-resume suppression", () => {
 			"retry.enabled": false,
 			...(continueSeverity ? { "advisor.continueSeverity": continueSeverity } : {}),
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({
 			agent,
@@ -282,7 +282,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 	}
 
 	it("preserves a final-yield blocker without starting a hidden post-yield turn", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({
 			responses: [
 				createYieldMockResponse({ data: "FINAL RESULT" }),
@@ -314,10 +314,10 @@ describe("AgentSession advisor auto-resume suppression", () => {
 			"compaction.enabled": false,
 			"retry.enabled": false,
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({
 			agent,
@@ -675,7 +675,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		// stay authoritative at the boundary flush afterwards: the blocker the
 		// review already delivered is preserved as a visible card, never steered
 		// into a continuation of the run the user just stopped.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({
 			responses: [
 				{ content: ["FINAL ANSWER"], stopReason: "stop" },
@@ -726,10 +726,10 @@ describe("AgentSession advisor auto-resume suppression", () => {
 			"compaction.enabled": false,
 			"retry.enabled": false,
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({
 			agent,
@@ -783,8 +783,8 @@ describe("AgentSession advisor auto-resume suppression", () => {
 	});
 
 	it("stops an idle IRC wake after a terminal yield", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = getBundledModel("github-copilot", "gpt-5.4");
+		if (!model) throw new Error("Expected bundled Copilot model to exist");
 		let providerCalls = 0;
 		const mock = createMockModel({
 			handler: () => {
@@ -804,7 +804,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false });
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({ agent, sessionManager, settings, modelRegistry });
 		const msg: IrcMessage = { id: "m-yield", from: "peer", to: "me", body: "status?", ts: Date.now() };
@@ -887,7 +887,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		// Reported bug: one Esc on an idle session killed every later background wake for
 		// the rest of that session's life. An interrupt with nothing streaming and nothing
 		// queued stops nothing, so it has no run to protect from a background completion.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({ responses: [{ content: ["reading the background result"] }] });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -898,7 +898,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false });
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({ agent, sessionManager, settings, modelRegistry });
 		registerBackgroundDelivery(session);
@@ -969,7 +969,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 				await releaseSettle.promise;
 			},
 		};
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "gpt-5.4")!;
 		const mock = createMockModel({
 			responses: [{ content: ["done"] }, { content: ["reading the background result"] }],
 		});
@@ -982,7 +982,7 @@ describe("AgentSession advisor auto-resume suppression", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false, "retry.enabled": false });
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({
 			agent,

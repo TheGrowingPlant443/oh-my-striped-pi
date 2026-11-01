@@ -39,7 +39,7 @@ describe("AgentSession queue_update events", () => {
 		tempDir = path.join(os.tmpdir(), `pi-queue-update-${Snowflake.next()}`);
 		fs.mkdirSync(tempDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(tempDir, "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
 	});
 
@@ -54,7 +54,7 @@ describe("AgentSession queue_update events", () => {
 		followUpMode: "all" | "one-at-a-time" = "one-at-a-time",
 		streamFn: StreamFn = createMockModel({ responses }).stream,
 	) {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 		const agent = new Agent({
 			getApiKey: () => "test-key",
 			initialState: { model, systemPrompt: ["Test"], tools: [] },

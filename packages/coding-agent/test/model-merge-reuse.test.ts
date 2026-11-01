@@ -5,6 +5,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { readModelCache, writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { fingerprintStaticModels } from "@oh-my-pi/pi-catalog/model-manager";
 import * as catalogModels from "@oh-my-pi/pi-catalog/models";
+import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
 import { mergeDiscoveredModel } from "@oh-my-pi/pi-coding-agent/config/model-patch";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
@@ -15,8 +16,8 @@ function fixtureModel(id = "merge-fixture"): Model<"openai-completions"> {
 		id,
 		name: "Merge fixture",
 		api: "openai-completions",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
+		provider: "vllm",
+		baseUrl: "http://127.0.0.1:8000/v1",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -47,7 +48,7 @@ describe("model merge reuse", () => {
 
 		const merged = mergeDiscoveredModel(discovered, existing);
 
-		expect(merged.baseUrl).toBe("https://api.openai.com/v1");
+		expect(merged.baseUrl).toBe("http://127.0.0.1:8000/v1");
 		expect(merged.contextWindow).toBe(8192);
 		expect(merged.supportsTools).toBe(false);
 		expect(merged).toBe(discovered);
@@ -78,7 +79,7 @@ describe("model merge reuse", () => {
 
 		expect(outOfScope).toBe(discovered);
 		expect(matching.baseUrl).toBe(override.baseUrl);
-		expect(discovered.baseUrl).toBe("https://api.openai.com/v1");
+		expect(discovered.baseUrl).toBe("http://127.0.0.1:8000/v1");
 	});
 
 	test("normalizes stale resolved compatibility before deciding a discovery merge is unchanged", () => {
@@ -101,20 +102,19 @@ describe("model merge reuse", () => {
 		tempDirs.push(tempDir);
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("openai", "fixture-key");
+		authStorage.keys.setRuntime("vllm", "fixture-key");
 		const existing = ["fallback", "explicit"].map(id => ({
 			...fixtureModel(id),
 			omitMaxOutputTokens: true,
 			supportsTools: true,
 		}));
 		spies.push(
-			spyOn(catalogModels, "getBundledModels").mockImplementation(provider =>
-				provider === "openai" ? existing : [],
-			),
+			spyOn(catalogModels, "getBundledModels").mockImplementation(provider => (provider === "vllm" ? existing : [])),
 		);
 		const cachePath = path.join(tempDir.path(), "models.db");
+		const cacheProviderId = resolveModelCacheProviderId("vllm", { baseUrl: fixtureModel().baseUrl });
 		writeModelCache(
-			"openai",
+			cacheProviderId,
 			Date.now(),
 			[
 				{ ...fixtureModel("fallback"), contextWindow: null, maxTokens: null },
@@ -130,28 +130,28 @@ describe("model merge reuse", () => {
 			fingerprintStaticModels(existing, false),
 			cachePath,
 		);
-		const cached = readModelCache("openai", 60_000, Date.now, cachePath);
+		const cached = readModelCache(cacheProviderId, 60_000, Date.now, cachePath);
 		expect(cached?.models.map(model => model.id)).toEqual(["fallback", "explicit"]);
 		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 
-		const available = registry.getAvailableForProviders(new Set(["openai"]));
-		const all = registry.getAll().filter(model => model.provider === "openai");
+		const available = registry.getAvailableForProviders(new Set(["vllm"]));
+		const all = registry.getAll().filter(model => model.provider === "vllm");
 
 		expect(available.map(model => model.id)).toEqual(["fallback", "explicit"]);
 		expect(all).toEqual(available);
-		expect(registry.find("openai", "fallback")).toMatchObject({
+		expect(registry.find("vllm", "fallback")).toMatchObject({
 			contextWindow: 8192,
 			maxTokens: 1024,
 			omitMaxOutputTokens: true,
 			supportsTools: true,
 		});
-		expect(registry.find("openai", "explicit")).toMatchObject({
+		expect(registry.find("vllm", "explicit")).toMatchObject({
 			contextWindow: 4096,
 			maxTokens: 512,
 			omitMaxOutputTokens: false,
 			supportsTools: false,
 		});
-		expect(registry.find("openai", "explicit")).toBe(cached?.models[1]);
+		expect(registry.find("vllm", "explicit")).toBe(cached?.models[1]);
 		expect(cached?.models[0].contextWindow).toBeNull();
 		expect(cached?.models[0].maxTokens).toBeNull();
 	});

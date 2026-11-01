@@ -56,14 +56,7 @@ import {
 	readToolSupersedeKey,
 } from "@oh-my-pi/pi-agent-core/compaction/pruning";
 import type { ProtectedToolMatcher } from "@oh-my-pi/pi-agent-core/compaction/tool-protection";
-import type {
-	AssistantMessage,
-	CodexCompactionContext,
-	Context,
-	Message,
-	Model,
-	ProviderSessionState,
-} from "@oh-my-pi/pi-ai";
+import type { AssistantMessage, Context, Message, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { openAIResponsesReplaysNativeHistory } from "@oh-my-pi/pi-ai/providers/openai-responses-state";
 import { sendsImageInputOnWire } from "@oh-my-pi/pi-ai/providers/vision-guard";
@@ -165,13 +158,13 @@ function hasConfiguredCompactionMethod(settings: CompactionSettings): boolean {
 	return resolveCompactionMethodOrder(settings.methodOrder).length > 0;
 }
 
-/** Kept Claude thinking (Anthropic Messages or Bedrock Converse) requires compaction by the same live model. */
+/** Kept thinking requires native Anthropic compaction by the same live model. */
 function canUseLiveProviderNativeCompaction(
 	candidate: Model,
 	liveModel: Model,
 	settings: EngineCompactionSettings,
 ): boolean {
-	const requiresSameModel = candidate.api === "anthropic-messages" || candidate.api === "bedrock-converse-stream";
+	const requiresSameModel = candidate.api === "anthropic-messages";
 	return (
 		candidate.provider === liveModel.provider &&
 		(!requiresSameModel || (candidate.api === liveModel.api && candidate.id === liveModel.id)) &&
@@ -290,21 +283,6 @@ function usageOverflowDeadEndNotice(reportedInputTokens: number, contextWindow: 
 	);
 }
 
-/** Creates one provider-scoped compaction lifecycle descriptor. */
-export function createCodexCompactionContext(options: {
-	trigger: CodexCompactionContext["trigger"];
-	reason: CodexCompactionContext["reason"];
-	phase: CodexCompactionContext["phase"];
-}): CodexCompactionContext {
-	return {
-		operationId: crypto.randomUUID(),
-		trigger: options.trigger,
-		reason: options.reason,
-		phase: options.phase,
-		strategy: "memento",
-	};
-}
-
 /**
  * Per-turn prune cache window. A tool result whose all-message suffix exceeds
  * this is in the warm, already-sent prompt-cache prefix: re-writing it costs the
@@ -341,7 +319,6 @@ interface ArmedSpeculation {
 	result: CompactionResult;
 	action: "context-full" | "handoff" | "remote";
 	method: CompactionMethod;
-	codexCompaction?: CodexCompactionContext;
 	/** Last branch entry covered by the speculated summary's source snapshot. */
 	snapshotLeafId: string;
 	/** Context size when speculation started; drives refresh-on-growth. */
@@ -410,8 +387,6 @@ export interface SessionMaintenanceHost {
 	extensionRunner: ExtensionRunner | undefined;
 	sideStreamFn: StreamFn;
 	providerSessionState: Map<string, ProviderSessionState>;
-	/** Live `providers.openaiWebsockets` hint for provider calls. */
-	preferWebsockets(): boolean | undefined;
 	model(): Model | undefined;
 	thinkingLevel(): ThinkingLevel | undefined;
 	isDisposed(): boolean;
@@ -460,7 +435,7 @@ export interface SessionMaintenanceHost {
 	/** Preserve the eval runtime snapshot at the history rewrite boundary for replay. */
 	persistEvalStateContext(): void;
 	convertToLlmForSideRequest(messages: AgentMessage[]): Message[];
-	/** The provider context a live turn sends for `summarized` + `retained`, cut to the `summarized` range, as `model` reads it. */
+	/** Build the live provider context for the summarized prefix and retained tail. */
 	buildLiveProviderContext(
 		summarized: AgentMessage[],
 		retained: AgentMessage[],
@@ -471,8 +446,6 @@ export interface SessionMaintenanceHost {
 	obfuscatePreparationForProvider(preparation: CompactionPreparation): CompactionPreparation;
 	/** Gated cache identity: the agent's explicit key, else the Task family key when `model` opts in. */
 	getPromptCacheKeyForModel(model: CatalogPolicyInputs | undefined): string | undefined;
-	closeCodexProviderSessionsForHistoryRewrite(): void;
-	resetCodexProviderAfterCompaction(compaction: CodexCompactionContext): void;
 	resetPlanReference(): void;
 	syncTodoPhasesFromBranch(): void;
 	/** `compacted` marks a rewrite that replaced history with a summary. */
@@ -738,7 +711,6 @@ export class SessionMaintenance {
 		this.#host.agent.replaceMessages(sessionContext.messages);
 		this.#host.rebaseAdvisorPrefix("prune-tool-outputs");
 		this.#host.syncTodoPhasesFromBranch();
-		this.#host.closeCodexProviderSessionsForHistoryRewrite();
 		return result;
 	}
 
@@ -788,7 +760,6 @@ export class SessionMaintenance {
 		this.#host.agent.replaceMessages(sessionContext.messages);
 		this.#host.rebaseAdvisorPrefix("prune-stale-tool-results");
 		this.#host.syncTodoPhasesFromBranch();
-		this.#host.closeCodexProviderSessionsForHistoryRewrite();
 		return result;
 	}
 
@@ -797,9 +768,7 @@ export class SessionMaintenance {
 	 * persist the rewrite. Walks `SessionManager.getBranch()` in place — both
 	 * `SessionMessageEntry.message` and `CustomMessageEntry.content` arrays
 	 * are mutated, then `rewriteEntries` durably commits the new shape. The
-	 * agent's runtime view is rebuilt from the freshly-mutated entries so any
-	 * provider sessions caching message identity (Codex Responses) are torn
-	 * down to force a clean replay on the next turn.
+	 * agent's runtime view is rebuilt from the freshly-mutated entries.
 	 *
 	 * Every stripped block is measured with the active tokenizer so callers can
 	 * report real savings, and the share of those savings that predates the
@@ -872,7 +841,6 @@ export class SessionMaintenance {
 		const sessionContext = this.#host.buildDisplaySessionContext();
 		this.#host.agent.replaceMessages(sessionContext.messages);
 		this.#host.resetAdvisorRuntimes("drop-images");
-		this.#host.closeCodexProviderSessionsForHistoryRewrite();
 		return { removed, tokensFreed };
 	}
 
@@ -944,7 +912,6 @@ export class SessionMaintenance {
 			const sessionContext = this.#host.buildDisplaySessionContext();
 			this.#host.agent.replaceMessages(sessionContext.messages);
 			this.#host.resetAdvisorRuntimes("shake");
-			this.#host.closeCodexProviderSessionsForHistoryRewrite();
 			return { mode, toolResultsDropped: 0, blocksDropped: 0, thinkingBlocksDropped: removed, tokensFreed };
 		}
 
@@ -1060,7 +1027,6 @@ export class SessionMaintenance {
 		const sessionContext = this.#host.buildDisplaySessionContext();
 		this.#host.agent.replaceMessages(sessionContext.messages);
 		this.#host.resetAdvisorRuntimes("shake");
-		this.#host.closeCodexProviderSessionsForHistoryRewrite();
 
 		return {
 			mode,
@@ -1392,7 +1358,6 @@ export class SessionMaintenance {
 			let firstKeptEntryId: string;
 			let tokensBefore: number;
 			let details: unknown;
-			let codexCompaction: CodexCompactionContext | undefined;
 
 			// Snapcompact runs locally first. The frame cap is sized from the room
 			// under the compaction trigger via #computeSnapcompactMaxFrames (and
@@ -1502,11 +1467,6 @@ export class SessionMaintenance {
 				details = snapcompactResult.details;
 				preserveData = { ...compactionPrep.preserveData, ...snapcompactResult.preserveData };
 			} else {
-				codexCompaction = createCodexCompactionContext({
-					trigger: "manual",
-					reason: "user_requested",
-					phase: "standalone_turn",
-				});
 				// Generate compaction result. Only convert known abort-shaped
 				// rejections (AbortError raised while the abort signal is set,
 				// or an already-typed sentinel) into `CompactionCancelledError`
@@ -1531,7 +1491,6 @@ export class SessionMaintenance {
 							// compaction shares the live request's cached prefix.
 							remoteSystemPrompt: this.#host.agent.state.systemPrompt,
 							convertToLlm: messages => this.#host.convertToLlmForSideRequest(messages),
-							codexCompaction,
 						},
 						compactionCandidates,
 					);
@@ -1574,7 +1533,6 @@ export class SessionMaintenance {
 				fromExtension,
 				preserveData,
 				method: fromExtension ? undefined : selectedMethod,
-				codexCompaction,
 				providerReplayThroughEntryId,
 				advisorResetReason: "compact",
 			});
@@ -1774,7 +1732,6 @@ export class SessionMaintenance {
 			...result,
 			fromExtension,
 			method: undefined,
-			codexCompaction: undefined,
 			advisorResetReason: "experimental-context-rollover",
 		});
 		this.#experimentalNotesReminderBoundaryId = undefined;
@@ -1946,7 +1903,6 @@ export class SessionMaintenance {
 				...result,
 				fromExtension,
 				method: undefined,
-				codexCompaction: undefined,
 				advisorResetReason: "experimental-context-rollover",
 				detachExtensionEmit: detachPostCommit,
 			});
@@ -2209,7 +2165,6 @@ export class SessionMaintenance {
 				fromExtension: false,
 				preserveData: undefined,
 				method: "handoff",
-				codexCompaction: undefined,
 				advisorResetReason: "handoff",
 			});
 			return result;
@@ -2414,11 +2369,6 @@ export class SessionMaintenance {
 					: undefined,
 			);
 			if (candidates.length === 0) return clear();
-			const codexCompaction = createCodexCompactionContext({
-				trigger: "auto",
-				reason: "context_limit",
-				phase: "standalone_turn",
-			});
 			const result = await this.#compactWithFallbackModel(
 				preparation,
 				undefined,
@@ -2427,12 +2377,10 @@ export class SessionMaintenance {
 					promptOverride: this.#host.obfuscateTextForProvider(compactionPrep.hookPrompt),
 					extraContext: compactionPrep.hookContext,
 					remoteSystemPrompt: this.#host.agent.state.systemPrompt,
-					codexCompaction,
 					// Isolate from the live turn: remote compaction transports key
 					// sticky provider sessions by sessionId, and a speculation
 					// overlapping the live stream must never interleave with it.
 					sessionId: `${this.#host.sessionId()}:spec:${Snowflake.next()}`,
-					preferWebsockets: false,
 				},
 				candidates,
 			);
@@ -2443,7 +2391,6 @@ export class SessionMaintenance {
 				},
 				action: method === "remote" ? "remote" : "context-full",
 				method,
-				codexCompaction,
 				snapshotLeafId,
 				contextTokensAtStart: contextTokens,
 			};
@@ -2584,7 +2531,7 @@ export class SessionMaintenance {
 	 * Append a compaction entry and run the shared post-commit sequence:
 	 * rebuild the display context, swap live agent messages, re-anchor stats,
 	 * reset plan/advisor/todo runtime state derived from the replaced history,
-	 * reset provider sessions, and emit the `session_compact` extension hook.
+	 * and emit the `session_compact` extension hook.
 	 */
 	async #commitCompactionEntry(args: {
 		summary: string;
@@ -2595,7 +2542,6 @@ export class SessionMaintenance {
 		fromExtension: boolean;
 		preserveData: Record<string, unknown> | undefined;
 		method: CompactionMethod | undefined;
-		codexCompaction: CodexCompactionContext | undefined;
 		providerReplayThroughEntryId?: string;
 		advisorResetReason: string;
 		detachExtensionEmit?: boolean;
@@ -2630,11 +2576,6 @@ export class SessionMaintenance {
 		this.#host.resetPlanReference();
 		this.#host.resetAdvisorRuntimes(args.advisorResetReason, { compacted: true });
 		this.#host.syncTodoPhasesFromBranch();
-		if (args.codexCompaction) {
-			this.#host.resetCodexProviderAfterCompaction(args.codexCompaction);
-		} else {
-			this.#host.closeCodexProviderSessionsForHistoryRewrite();
-		}
 		const savedCompactionEntry = newEntries.find(e => e.type === "compaction" && e.id === entryId) as
 			| CompactionEntry
 			| undefined;
@@ -2794,7 +2735,6 @@ export class SessionMaintenance {
 			triggerContextTokens: contextTokens,
 			pendingContextTokens: this.#tokenizer.countMessages(messages, { excludeEncryptedReasoning: true }),
 			preparedContextTokens: this.#estimateStoredContextTokens(),
-			phase: "pre_turn",
 		});
 	}
 
@@ -2847,7 +2787,6 @@ export class SessionMaintenance {
 			const result = await this.runAutoCompaction("threshold", false, {
 				autoContinue: false,
 				suppressContinuation: true,
-				phase: "mid_turn",
 				detachPostCommit: true,
 				explicitNewContextRequest: true,
 			});
@@ -2934,7 +2873,6 @@ export class SessionMaintenance {
 			autoContinue: false,
 			suppressContinuation: true,
 			triggerContextTokens: contextTokens,
-			phase: "mid_turn",
 			detachPostCommit: true,
 		});
 		if (result.automaticContinuationBlocked) {
@@ -3289,9 +3227,8 @@ export class SessionMaintenance {
 			}
 		}
 
-		// Case 3: Output-side incomplete — `response.incomplete` from OpenAI Responses
-		// (and Codex), Anthropic `max_tokens` / `model_context_window_exceeded`, all
-		// map to stopReason === "length". Promotion if available; compaction only
+		// Case 3: Output-side incomplete maps to stopReason === "length".
+		// Promotion if available; compaction only
 		// when the window is what ran out, since shrinking the input cannot raise an
 		// output cap. Unlike overflow, the *input* is fine, so a reachable handoff
 		// preference may run.
@@ -3519,7 +3456,6 @@ export class SessionMaintenance {
 				return await this.runAutoCompaction("threshold", false, {
 					autoContinue,
 					triggerContextTokens: postMaintenanceContextTokens,
-					phase: "pre_turn",
 					terminalTextAnswer: isTerminalTextAssistantAnswer(assistantMessage),
 				});
 			}
@@ -3716,15 +3652,7 @@ export class SessionMaintenance {
 						promptCacheKey: this.#host.getPromptCacheKeyForModel(candidate),
 						remotePromptCacheKey: this.#host.getPromptCacheKeyForModel(remoteCompactionPolicyModel(candidate)),
 						providerSessionState: this.#host.providerSessionState,
-						preferWebsockets: this.#host.preferWebsockets(),
-						// Route every summarization HTTP request through the
-						// session's side-stream transport so the provider
-						// concurrency cap (e.g. providers.ollama-cloud.maxConcurrency)
-						// brackets compaction the same way it brackets the live
-						// agent turn — without this, multiple ollama-cloud
-						// subagents auto/manually compacting issued uncapped
-						// summary requests in parallel (chatgpt-codex review on
-						// #3751).
+						// Keep summaries on the session's side-stream transport.
 						completeImpl: async (requestModel, requestContext, requestOptions) => {
 							const stream = await this.#host.sideStreamFn(requestModel, requestContext, requestOptions);
 							return stream.result();
@@ -4625,7 +4553,6 @@ export class SessionMaintenance {
 		this.#host.resetPlanReference();
 		this.#host.resetAdvisorRuntimes("compaction-rescue", { compacted: true });
 		this.#host.syncTodoPhasesFromBranch();
-		this.#host.closeCodexProviderSessionsForHistoryRewrite();
 		// Extensions must see the entry that is now active, not (only) the one
 		// this rebuild just superseded — mirror the regular append path's hook.
 		const rebuiltEntry = this.#host.sessionManager.getEntries().find(e => e.id === rebuiltEntryId) as
@@ -4884,7 +4811,6 @@ export class SessionMaintenance {
 			/** Stored context before pending messages, measured before preparation rewrites its representation. */
 			preparedContextTokens?: number;
 			suppressContinuation?: boolean;
-			phase?: CodexCompactionContext["phase"];
 			terminalTextAnswer?: boolean;
 			/** Mid-turn: splice history then return; do not await UI/extension fan-out. */
 			detachPostCommit?: boolean;
@@ -5061,7 +4987,6 @@ export class SessionMaintenance {
 					details: armedSpec.result.details,
 					preserveData: armedSpec.result.preserveData,
 					fromExtension: false,
-					codexCompaction: armedSpec.codexCompaction,
 					method: armedSpec.method,
 					providerReplayThroughEntryId:
 						armedSpec.result.providerReplayThroughEntryId ??
@@ -5261,7 +5186,6 @@ export class SessionMaintenance {
 			let hookCompaction: CompactionResult | undefined;
 			let fromExtension = false;
 			let preserveData: Record<string, unknown> | undefined;
-			let codexCompaction: CodexCompactionContext | undefined;
 			let providerReplayThroughEntryId: string | undefined;
 
 			if (this.#host.extensionRunner?.hasHandlers("session_before_compact")) {
@@ -5572,13 +5496,6 @@ export class SessionMaintenance {
 				let compactResult: CompactionResult | undefined;
 				let lastError: unknown;
 				let nativeCompactionFailure: { error: NativeCompactionError; provider: string } | undefined;
-				codexCompaction = createCodexCompactionContext({
-					trigger: "auto",
-					reason: "context_limit",
-					phase:
-						options.phase ??
-						(reason === "threshold" ? "pre_turn" : reason === "idle" ? "standalone_turn" : "mid_turn"),
-				});
 
 				for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
 					const candidate = candidates[candidateIndex];
@@ -5627,8 +5544,6 @@ export class SessionMaintenance {
 										remoteCompactionPolicyModel(candidate),
 									),
 									providerSessionState: this.#host.providerSessionState,
-									preferWebsockets: this.#host.preferWebsockets(),
-									codexCompaction,
 									// This loop already retries the whole compaction attempt on
 									// transient errors, so the summarization oneshots must not
 									// retry too — the budgets would multiply and each outer
@@ -5854,7 +5769,6 @@ export class SessionMaintenance {
 				details,
 				preserveData,
 				fromExtension,
-				codexCompaction,
 				method: fromExtension ? undefined : method,
 				providerReplayThroughEntryId,
 				action,
@@ -5947,7 +5861,6 @@ export class SessionMaintenance {
 		details: unknown;
 		preserveData: Record<string, unknown> | undefined;
 		fromExtension: boolean;
-		codexCompaction: CodexCompactionContext | undefined;
 		method: CompactionMethod | undefined;
 		providerReplayThroughEntryId?: string;
 		action: "context-full" | "handoff" | "snapcompact" | "remote";
@@ -5986,7 +5899,6 @@ export class SessionMaintenance {
 			details: args.details,
 			fromExtension: args.fromExtension,
 			preserveData: args.preserveData,
-			codexCompaction: args.codexCompaction,
 			method: args.method,
 			providerReplayThroughEntryId: args.providerReplayThroughEntryId,
 			advisorResetReason: "auto-compaction",

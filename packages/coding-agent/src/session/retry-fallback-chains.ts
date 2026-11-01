@@ -13,6 +13,7 @@ import {
 } from "@oh-my-pi/pi-tui/thinking";
 import { resolveConfiguredModelPatterns, resolveModelRoleValue } from "../config/model-resolver";
 import { getRoleInfo, isKindRole } from "../config/model-roles";
+import { resolveSearchRoleValue } from "../web/search/selection";
 
 import { cfgRetryFallbackChains, cfgRetryFallbackRevertPolicy, type RetrySettings } from "./settings";
 
@@ -308,6 +309,12 @@ export function validateRetryFallbackChains(
 		for (const selectorStr of chain) {
 			if (typeof selectorStr !== "string") {
 				report(`Fallback chain for ${keyKind} '${key}' contains a non-string selector.`);
+				continue;
+			}
+			if (keyKind === "role" && key === "web") {
+				if (!resolveSearchRoleValue(selectorStr, settings).model) {
+					report(`Fallback chain for role 'web' does not resolve to a compatible model: ${selectorStr}`);
+				}
 				continue;
 			}
 			if (kindRole) {

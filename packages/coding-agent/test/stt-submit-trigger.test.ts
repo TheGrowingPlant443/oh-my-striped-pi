@@ -14,7 +14,9 @@ const registry: STTControllerDependencies["registry"] = {
 	getError: () => undefined,
 	getAvailable: () => DICTATION_MODELS,
 	getAll: () => DICTATION_MODELS,
-	resolver: () => () => "test-key",
+	resolver: () => {
+		throw new Error("Local dictation must not resolve credentials");
+	},
 };
 
 describe("STT Submit Trigger Evaluation", () => {

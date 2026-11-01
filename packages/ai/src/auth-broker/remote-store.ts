@@ -22,6 +22,11 @@ import {
 	type StoredCredentialBlock,
 } from "../auth/types";
 import * as AIError from "../error";
+import {
+	assertSupportedAuthCredential,
+	assertSupportedCredentialProvider,
+	assertSupportedOAuthCredentialProvider,
+} from "../auth/provider-policy";
 import type { OAuthCredentials } from "../registry/oauth/types";
 import type { Provider } from "../types";
 import type { ClientUsageIdentity, ObservedUsageEntry, UsageReport } from "../usage";
@@ -736,6 +741,7 @@ export class RemoteAuthCredentialStore implements AuthCredentialStore {
 	}
 
 	listAuthCredentials(provider?: string): StoredAuthCredential[] {
+		if (provider !== undefined) assertSupportedCredentialProvider(provider);
 		this.#noteActivity();
 		const out: StoredAuthCredential[] = [];
 		for (const entry of this.#snapshot.credentials) {
@@ -971,6 +977,7 @@ export class RemoteAuthCredentialStore implements AuthCredentialStore {
 	 * any concurrent peer (refresh, generation bump) stays in sync.
 	 */
 	async upsertAuthCredential(provider: string, credential: AuthCredential): Promise<StoredAuthCredential[]> {
+		assertSupportedAuthCredential(provider, credential.type);
 		this.#noteActivity();
 		const { entries } = await this.#client.uploadCredential(provider, credential);
 		this.#applyProviderEntries(provider, entries);
@@ -984,6 +991,8 @@ export class RemoteAuthCredentialStore implements AuthCredentialStore {
 	 * key clobbers any previously stored key for the same provider.
 	 */
 	async replaceAuthCredentials(provider: string, credentials: AuthCredential[]): Promise<StoredAuthCredential[]> {
+		assertSupportedCredentialProvider(provider);
+		for (const credential of credentials) assertSupportedAuthCredential(provider, credential.type);
 		const existing = this.listAuthCredentials(provider);
 		for (const entry of existing) {
 			try {
@@ -1297,12 +1306,13 @@ export class RemoteAuthCredentialStore implements AuthCredentialStore {
 	 * the `refresh` slot.
 	 */
 	async refreshOAuthCredential(
-		_provider: Provider,
+		provider: Provider,
 		credentialId: number,
 		_credential: OAuthCredential,
 		signal?: AbortSignal,
 		reason?: OAuthRefreshReason,
 	): Promise<OAuthCredentials> {
+		assertSupportedOAuthCredentialProvider(provider);
 		this.#noteActivity();
 		const refreshed = await this.#refreshThroughBroker(credentialId, signal, reason);
 		if (!this.#streamingActive) {

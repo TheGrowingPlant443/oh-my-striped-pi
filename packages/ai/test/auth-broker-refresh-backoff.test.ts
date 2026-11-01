@@ -12,12 +12,12 @@ import {
 } from "@oh-my-pi/pi-ai/auth-broker";
 import { buildGatewayApiKeyResolver } from "@oh-my-pi/pi-ai/auth-gateway/dispatch";
 import { OAuthError } from "@oh-my-pi/pi-ai/error";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
 import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
 import type { Api, Model } from "@oh-my-pi/pi-ai/types";
 import { removeWithRetries } from "../../utils/src/temp";
+import { mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
 
-const PROVIDER = "unit-broker-refresh-backoff";
+const PROVIDER = "github-copilot";
 const SOURCE = "auth-broker-refresh-backoff-test";
 const TOKEN = "auth-broker-refresh-backoff-bearer";
 const HOUR_MS = 60 * 60_000;
@@ -33,7 +33,7 @@ describe("auth broker OAuth refresh backoff", () => {
 
 	beforeEach(async () => {
 		refreshCalls = 0;
-		registerOAuthProvider({
+		mockOAuthProvider({
 			id: PROVIDER,
 			name: "Broker Refresh Backoff Unit",
 			sourceId: SOURCE,
@@ -73,7 +73,7 @@ describe("auth broker OAuth refresh backoff", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		unregisterOAuthProviders(SOURCE);
+		resetOAuthMocks(SOURCE);
 		clientStorage?.close();
 		remote?.close();
 		await handle?.close();

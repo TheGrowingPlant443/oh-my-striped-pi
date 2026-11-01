@@ -6,8 +6,7 @@ import type { AssistantMessage, AssistantMessageEvent } from "../../src/types";
 import { AssistantMessageEventStream } from "../../src/utils/event-stream";
 
 const completion = process.argv[2] === "complete" ? complete : completeSimple;
-// Exempt this local provider from leaked-thinking healing, which replaces event identities.
-const model = { ...createMockModel().model, provider: "openai", baseUrl: "https://api.openai.com/v1" };
+const model = createMockModel().model;
 const response = new AssistantMessageEventStream();
 const started = Promise.withResolvers<void>();
 registerCustomApi(model.api, () => {
@@ -33,17 +32,26 @@ const message: AssistantMessage = {
 	timestamp: 0,
 };
 
-function emit(): WeakRef<AssistantMessageEvent>[] {
+// Capture each layer's early events: projection may replace provider event identities.
+const references: WeakRef<AssistantMessageEvent>[] = [];
+const emittedCounts = new WeakMap<AssistantMessageEventStream, number>();
+const originalPush = AssistantMessageEventStream.prototype.push;
+AssistantMessageEventStream.prototype.push = function (event: AssistantMessageEvent): void {
+	const count = emittedCounts.get(this) ?? 0;
+	emittedCounts.set(this, count + 1);
+	if (count < 3) references.push(new WeakRef(event));
+	originalPush.call(this, event);
+};
+
+function emit(): void {
 	const events: AssistantMessageEvent[] = [
 		{ type: "start", partial: message },
 		{ type: "text_start", contentIndex: 0, partial: message },
 		{ type: "text_delta", contentIndex: 0, delta: "first ", partial: message },
 	];
-	const references = events.map(event => new WeakRef(event));
 	for (const event of events) response.push(event);
 	// An async iterator may retain its latest yield while waiting for the next event.
 	response.push({ type: "text_delta", contentIndex: 0, delta: "second", partial: message });
-	return references;
 }
 
 let settled = false;
@@ -59,7 +67,7 @@ void result.then(
 	},
 );
 await started.promise;
-const references = emit();
+emit();
 const deadline = performance.now() + 5_000;
 let collected = false;
 do {
@@ -70,6 +78,8 @@ do {
 } while (!collected && performance.now() < deadline);
 assert.equal(settled, false, "completion settled before the producer sent a terminal event");
 assert.equal(collected, true, "completion retained earlier events while the producer was paused");
+assert.ok(references.length >= 3, "producer events were not observed");
+AssistantMessageEventStream.prototype.push = originalPush;
 
 if (process.argv[3] === "failure") {
 	const failure = new Error("producer disconnected before completion");

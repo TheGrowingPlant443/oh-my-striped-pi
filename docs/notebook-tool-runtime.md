@@ -132,7 +132,7 @@ The Python backend uses an NDJSON subprocess runner. There is no `display()`: `p
 
 - `stdout` / `stderr` -> text chunks to `onChunk`; this text is all the model sees
 - `view` -> `onDisplay({type: "view", text, view})`, a table/JSON/Markdown rendering of text already streamed through `stdout`, shown to the user in place of that text
-- `image` -> `onDisplay` image output (with `detail` / `url` / `providerFile` metadata) for the model and the user
+- `image` -> `onDisplay` image output (with `detail` / `url` metadata) for the model and the user
 - `status` -> `onDisplay({type: "status", event})` for the TUI status renderer
 - `reply` -> tool-request envelope, returned as `KernelExecuteResult.reply`
 - `error` -> traceback text and structured error metadata

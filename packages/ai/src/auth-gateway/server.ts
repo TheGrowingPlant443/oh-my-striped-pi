@@ -3,8 +3,8 @@
  *
  * Accepts any provider-format request (OpenAI chat-completions, Anthropic
  * messages, OpenAI Responses) and dispatches through pi-ai's `streamSimple()`
- * — which handles credential injection, anthropic-beta headers, codex
- * websocket transport, and all the per-provider intricacies. The gateway is
+ * — which handles credential injection, protocol headers and configured
+ * transports. The gateway is
  * pure protocol translation: foreign wire → omp Context → pi-ai stream() →
  * omp events → foreign wire.
  *
@@ -17,10 +17,6 @@
  *   POST /v1/messages                      → Anthropic messages in/out
  *   POST /v1/responses                     → OpenAI Responses in/out
  *   POST /v1/pi/stream                     → native pi-ai stream in/out
- *   POST /v1/systemone | /alpha/decisions  → TypeSafe System One judgments (routes/systemone)
- *   POST /v1/images[/generations|/edits]   → image generation, OpenAI/OpenRouter wire (routes/images)
- *   POST /v1/audio/speech                  → text-to-speech, raw audio out (routes/speech)
- *   POST /v1/audio/transcriptions          → speech-to-text, multipart or JSON base64 in (routes/transcriptions)
  *
  * Chat routes live in this file; every other modality is a `routes/*` module
  * built on the shared plumbing in `dispatch.ts`. {@link createAuthGatewayRouter}
@@ -33,6 +29,7 @@ import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-pi/pi-ca
 import { type ModelKind, modelKind } from "@oh-my-pi/pi-catalog/types";
 import { logger } from "@oh-my-pi/pi-utils";
 import { classifyGatewayError } from "../error/gateway";
+import * as AIError from "../error";
 import * as anthropicMessages from "../providers/anthropic-messages-server";
 import * as openaiChat from "../providers/openai-chat-server";
 import * as openaiResponses from "../providers/openai-responses-server";
@@ -65,14 +62,13 @@ import {
 	resolveClientIdentity,
 	withCors,
 } from "./http";
+import { AuthGatewaySessionStateStore } from "./session-state";
 import { handleEmbeddings } from "./routes/embeddings";
 import { handleImageEdits, handleImageGenerations } from "./routes/images";
 import { handleRerank } from "./routes/rerank";
 import { handleSpeech } from "./routes/speech";
 import { handleSystemOne } from "./routes/systemone";
 import { handleTranscriptions } from "./routes/transcriptions";
-import { handleVideoContent, handleVideoPoll, handleVideoSubmit } from "./routes/video";
-import { AuthGatewaySessionStateStore } from "./session-state";
 import type {
 	AuthGatewayServerHandle,
 	AuthGatewayFormatModule as FormatModule,
@@ -94,6 +90,21 @@ const FORMAT_ROUTES: Record<string, FormatRoute> = {
 	"/v1/chat/completions": { module: openaiChat, label: "openai-chat", api: "openai-completions" },
 	"/v1/messages": { module: anthropicMessages, label: "anthropic-messages", api: "anthropic-messages" },
 	"/v1/responses": { module: openaiResponses, label: "openai-responses", api: "openai-responses" },
+};
+
+const MODALITY_ROUTES: Record<
+	string,
+	(options: AuthGatewayRouteOptions, request: Request, peer: string) => Promise<Response>
+> = {
+	"/v1/embeddings": handleEmbeddings,
+	"/v1/rerank": handleRerank,
+	"/v1/images/generations": handleImageGenerations,
+	"/v1/images": handleImageGenerations,
+	"/v1/images/edits": handleImageEdits,
+	"/v1/audio/speech": handleSpeech,
+	"/v1/audio/transcriptions": handleTranscriptions,
+	"/v1/systemone": handleSystemOne,
+	"/alpha/decisions": handleSystemOne,
 };
 
 // (passthrough fast-path removed — it bypassed pi-ai provider logic, in
@@ -188,7 +199,7 @@ function normalizeGatewayThinking(model: Model<Api>, options: SimpleStreamOption
 }
 
 function buildStreamOptions(parsed: ParsedFormatRequest, model: Model<Api>, signal: AbortSignal): SimpleStreamOptions {
-	const opts: SimpleStreamOptions = { signal, cursorExternalToolExecutor: true };
+	const opts: SimpleStreamOptions = { signal };
 	const { options } = parsed;
 	// Backends that reject sampling controls (Codex: `Unsupported parameter: …`, #3117)
 	// get the full set stripped; everything else is harmless to forward —
@@ -208,7 +219,6 @@ function buildStreamOptions(parsed: ParsedFormatRequest, model: Model<Api>, sign
 	if (options.frequencyPenalty !== undefined && sampling) opts.frequencyPenalty = options.frequencyPenalty;
 	if (options.repetitionPenalty !== undefined && sampling) opts.repetitionPenalty = options.repetitionPenalty;
 	if (options.metadata !== undefined) opts.metadata = options.metadata;
-	if (options.userProfileId !== undefined) opts.userProfileId = options.userProfileId;
 	if (options.headers !== undefined) opts.headers = { ...opts.headers, ...options.headers };
 	if (options.toolChoice !== undefined) {
 		opts.toolChoice =
@@ -285,22 +295,10 @@ function clientClosedResponse(route: { module: FormatModule }): Response {
 	return route.module.formatError(499, "request_aborted", "client closed request");
 }
 
-/** Route that serves each non-chat catalog kind the gateway advertises. */
-const KIND_ROUTES: Partial<Record<ModelKind, string>> = {
-	judge: "POST /v1/systemone",
-	image: "POST /v1/images/generations",
-	tts: "POST /v1/audio/speech",
-	stt: "POST /v1/audio/transcriptions",
-	embedding: "POST /v1/embeddings",
-	rerank: "POST /v1/rerank",
-	video: "POST /v1/videos",
-};
-
-/** Chat routes cannot drive a non-chat model; name the route that does, or `undefined` for chat models. */
+/** Chat routes cannot drive a non-chat model. */
 function chatRouteRejection(model: Model<Api>): string | undefined {
 	const kind = modelKind(model);
-	const route = KIND_ROUTES[kind];
-	return route && `Model ${model.provider}/${model.id} is a ${kind} model; use ${route}`;
+	return kind === "chat" ? undefined : `Model ${model.provider}/${model.id} is not a chat model`;
 }
 
 // (handlePassthrough removed — see note above.)
@@ -353,7 +351,7 @@ async function handleFormatEndpoint(
 	// credential it last handed out to that session).
 	let parsed: ParsedFormatRequest;
 	try {
-		parsed = route.module.parseRequest(body, req.headers);
+		parsed = route.module.parseRequest(body, model, req.headers);
 	} catch (error) {
 		if (controller.signal.aborted) return clientClosedResponse(route);
 		const message = error instanceof Error ? error.message : String(error);
@@ -368,28 +366,6 @@ async function handleFormatEndpoint(
 		parsed.options.headers = { ...captured, ...parsed.options.headers };
 	}
 	if (controller.signal.aborted) return clientClosedResponse(route);
-
-	const supportsOpenAIImageFileReferences =
-		model.api === "openai-responses" ||
-		model.api === "azure-openai-responses" ||
-		model.api === "openai-codex-responses";
-	if (
-		route.label === "openai-responses" &&
-		!supportsOpenAIImageFileReferences &&
-		parsed.context.messages.some(
-			message =>
-				message.role === "toolResult" &&
-				message.content.some(
-					block => block.type === "image" && block.providerFile?.provider === "openai" && block.providerFile.id,
-				),
-		)
-	) {
-		return route.module.formatError(
-			400,
-			"invalid_request_error",
-			"OpenAI image file IDs in tool outputs require a Responses-compatible upstream model",
-		);
-	}
 
 	// Sticky credential id: honour the client's `prompt_cache_key` when
 	// supplied (so external session ids align), otherwise derive from
@@ -629,7 +605,6 @@ async function handlePiNative(
 	const streamOpts: SimpleStreamOptions = {
 		...parsed.options,
 		signal: controller.signal,
-		cursorExternalToolExecutor: true,
 		providerSessionState: lease.states,
 	};
 	normalizeGatewayThinking(model, streamOpts);
@@ -842,31 +817,21 @@ function handleModelsList(opts: AuthGatewayRouteOptions): Response {
 	return json(200, { object: "list", data });
 }
 
-/** `GET /v1/videos/:id` (poll) and `GET /v1/videos/:id/content` (download); group 1 = id, group 2 = `/content`. */
-const VIDEO_JOB_PATH = /^\/v1\/videos\/([^/]+)(\/content)?$/;
-
 // Only exact static routes are safe to include in unauthorized request logs.
-// Dynamic video IDs and unknown paths may carry credentials.
 const LOGGABLE_PATHS: Record<string, true> = {
 	"/v1/usage": true,
 	"/v1/credentials/check": true,
 	"/v1/pi/stream": true,
-	"/v1/systemone": true,
-	"/alpha/decisions": true,
-	"/v1/images/generations": true,
-	"/v1/images": true,
-	"/v1/images/edits": true,
-	"/v1/audio/speech": true,
-	"/v1/audio/transcriptions": true,
-	"/v1/embeddings": true,
-	"/v1/rerank": true,
-	"/v1/videos": true,
 	"/v1/models": true,
 };
 
 /** Only static routes reach logs verbatim; dynamic or unknown paths may carry caller-supplied secrets. */
 function loggablePath(pathname: string): string {
-	return Object.hasOwn(FORMAT_ROUTES, pathname) || Object.hasOwn(LOGGABLE_PATHS, pathname) ? pathname : "<unrouted>";
+	return Object.hasOwn(FORMAT_ROUTES, pathname) ||
+		Object.hasOwn(MODALITY_ROUTES, pathname) ||
+		Object.hasOwn(LOGGABLE_PATHS, pathname)
+		? pathname
+		: "<unrouted>";
 }
 
 /** The gateway's `/v1/*` routes, for a transport that has already admitted the caller. */
@@ -940,60 +905,13 @@ export function createAuthGatewayRouter(hostOpts: AuthGatewayRouteOptions): Auth
 			if (formatRoute && req.method === "POST") {
 				return await handleFormatEndpoint(formatRoute, opts, req, peer, sessionStates);
 			}
+			const modalityRoute = MODALITY_ROUTES[pathname];
+			if (modalityRoute && req.method === "POST") return await modalityRoute(opts, req, peer);
 
 			// Pi-native fast path. Same auth + provider plumbing as the
 			// foreign-wire routes, just without the wire-format translation.
 			if (req.method === "POST" && pathname === "/v1/pi/stream") {
 				return await handlePiNative(opts, req, peer, sessionStates);
-			}
-
-			// TypeSafe System One judgments (jev). TypeSafe SDKs and omp's own
-			// judge point `TYPESAFE_BASE_URL` at the gateway; OpenRouter SDKs
-			// reach the same handler through their Decisions path.
-			if (req.method === "POST" && (pathname === "/v1/systemone" || pathname === "/alpha/decisions")) {
-				return await handleSystemOne(opts, req, peer);
-			}
-
-			// Image generation: OpenAI `/v1/images/generations` + OpenRouter `/v1/images`
-			// (JSON), and OpenAI multipart / OpenRouter JSON edits.
-			if (req.method === "POST" && (pathname === "/v1/images/generations" || pathname === "/v1/images")) {
-				return await handleImageGenerations(opts, req, peer);
-			}
-			if (req.method === "POST" && pathname === "/v1/images/edits") {
-				return await handleImageEdits(opts, req, peer);
-			}
-
-			// Text-to-speech, OpenAI/OpenRouter wire; answers raw audio bytes.
-			if (req.method === "POST" && pathname === "/v1/audio/speech") {
-				return await handleSpeech(opts, req, peer);
-			}
-
-			// Speech-to-text, OpenAI multipart or OpenRouter JSON base64 wire.
-			if (req.method === "POST" && pathname === "/v1/audio/transcriptions") {
-				return await handleTranscriptions(opts, req, peer);
-			}
-
-			// Embeddings, OpenAI wire (OpenRouter is compatible).
-			if (req.method === "POST" && pathname === "/v1/embeddings") {
-				return await handleEmbeddings(opts, req, peer);
-			}
-
-			// Rerank, OpenRouter wire.
-			if (req.method === "POST" && pathname === "/v1/rerank") {
-				return await handleRerank(opts, req, peer);
-			}
-
-			// Video generation, OpenRouter's asynchronous wire: submit, then poll
-			// and download by the gateway-issued job id (stateless — the id
-			// encodes provider, model, and upstream job).
-			if (req.method === "POST" && pathname === "/v1/videos") {
-				return await handleVideoSubmit(opts, req, peer);
-			}
-			const videoJob = req.method === "GET" ? VIDEO_JOB_PATH.exec(pathname) : null;
-			if (videoJob) {
-				const gatewayId = decodeURIComponent(videoJob[1]);
-				const handler = videoJob[2] ? handleVideoContent : handleVideoPoll;
-				return await handler(opts, req, peer, gatewayId);
 			}
 
 			// Model catalog.
@@ -1005,6 +923,7 @@ export function createAuthGatewayRouter(hostOpts: AuthGatewayRouteOptions): Auth
 			// plain JSON 404 rather than guessing at a protocol-specific envelope.
 			return json(404, { error: `No route: ${req.method} ${pathname}` });
 		} catch (error) {
+			if (error instanceof AIError.ConfigurationError) return json(400, { error: error.message });
 			logger.error("auth-gateway handler crashed", {
 				method: req.method,
 				path: loggablePath(pathname),

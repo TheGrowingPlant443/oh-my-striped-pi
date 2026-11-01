@@ -11,11 +11,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
-import {
-	cfgProvidersKimiApiFormat,
-	cfgProvidersOpenaiWebsockets,
-	cfgThinkingBudgetsLow,
-} from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgThinkingBudgetsLow } from "@oh-my-pi/pi-coding-agent/session/settings";
 import { cfgToolsFormat } from "@oh-my-pi/pi-coding-agent/session/context-settings";
 
 describe("primary-agent provider settings changed mid-session", () => {
@@ -29,10 +25,10 @@ describe("primary-agent provider settings changed mid-session", () => {
 		else Bun.env.PI_DIALECT = previousDialectEnv;
 	});
 
-	it("applies thinking budgets, Kimi format, websocket policy, and tool format on the next request", async () => {
+	it("applies thinking budgets and tool format on the next request", async () => {
 		delete Bun.env.PI_DIALECT;
 		using tempDir = TempDir.createSync("@pi-live-provider-settings-");
-		const api = "test-live-provider-settings";
+		const api = "openai-responses";
 		const requests: Array<{ context: Context; options: SimpleStreamOptions | undefined }> = [];
 		registerCustomApi(api, (_model, context, options) => {
 			requests.push({ context, options });
@@ -48,8 +44,8 @@ describe("primary-agent provider settings changed mid-session", () => {
 			id: "live-provider-settings",
 			name: "Live provider settings",
 			api,
-			provider: "managed-primary",
-			baseUrl: "http://127.0.0.1:8080/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -83,13 +79,9 @@ describe("primary-agent provider settings changed mid-session", () => {
 		await session.sendUserMessage("first");
 		const first = requests.at(-1);
 		expect(first?.options?.thinkingBudgets?.low).toBe(2048);
-		expect(first?.options?.kimiApiFormat).toBeUndefined();
-		expect(first?.options?.preferWebsockets).toBeUndefined();
 		expect(first?.context.tools?.length).toBeGreaterThan(0);
 
 		cfgThinkingBudgetsLow.set(settings, 777);
-		cfgProvidersKimiApiFormat.set(settings, "openai");
-		cfgProvidersOpenaiWebsockets.set(settings, "off");
 		cfgToolsFormat.set(settings, "glm");
 		// Let the coalesced `tools.format` watcher republish the base prompt.
 		await Promise.resolve();
@@ -98,8 +90,6 @@ describe("primary-agent provider settings changed mid-session", () => {
 		const second = requests.at(-1);
 		expect(second).not.toBe(first);
 		expect(second?.options?.thinkingBudgets?.low).toBe(777);
-		expect(second?.options?.kimiApiFormat).toBe("openai");
-		expect(second?.options?.preferWebsockets).toBe(false);
 		// Owned dialect: no native tool specs; the catalog rides in the system prompt.
 		expect(second?.context.tools).toBeUndefined();
 		expect((second?.context.systemPrompt?.length ?? 0) > (first?.context.systemPrompt?.length ?? 0)).toBe(true);

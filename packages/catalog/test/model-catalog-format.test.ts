@@ -5,7 +5,7 @@ import type { Api, Model } from "../src/types";
 
 describe("compact model catalog", () => {
 	it("preserves absent and false flags across mask words and compat deltas", () => {
-		const original = getBundledModel("openrouter", "~anthropic/claude-fable-latest");
+		const original = getBundledModel("github-copilot", "claude-fable-5");
 		const first = structuredClone(original);
 		const second = structuredClone(original);
 		second.id = "alternate";
@@ -20,10 +20,12 @@ describe("compact model catalog", () => {
 		Reflect.set(first.compat, "codecProbe", false);
 		Reflect.deleteProperty(second.compat, "codecProbe");
 		const input: Record<string, Record<string, Model<Api>>> = {
-			openrouter: { [first.id]: first, [second.id]: second },
+			"github-copilot": { [first.id]: first, [second.id]: second },
 		};
 		const catalog = openModelCatalog(JSON.parse(encodeModelCatalog(input)));
-		expect(getCatalogProvider(catalog, "openrouter")).toEqual(JSON.parse(JSON.stringify(input.openrouter)));
+		expect(getCatalogProvider(catalog, "github-copilot")).toEqual(
+			JSON.parse(JSON.stringify(input["github-copilot"])),
+		);
 		expect(getCatalogProvider(catalog, "missing")).toBeUndefined();
 	});
 });

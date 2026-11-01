@@ -1,29 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import { getBundledModels, getBundledProviders } from "@oh-my-pi/pi-catalog/models";
 
-// Pins the invariant: the bundled catalog must never carry a
-// local/self-hosted provider's catalog. Those providers default to an endpoint
-// on the developer's own machine (e.g. LiteLLM at `http://localhost:4000/v1`),
-// so bundling whatever happens to be running there leaks machine-specific
-// endpoints into the shipped snapshot and pollutes the catalog for every user.
-// They are discovered dynamically at runtime instead.
-//
-// This guards against the litellm leak (1202 localhost:4000 models committed)
-// and any future regression. Local providers are excluded from generation via
-// DISCOVERY_ONLY_PROVIDERS in scripts/generate-models.ts.
-//
-// Failure here means: a local provider slipped into the bundled catalog — add it to
-// DISCOVERY_ONLY_PROVIDERS, then `bun run gen:models` and commit the diff.
-describe("bundled catalog local-endpoint leak guard (regression)", () => {
+// Catalog snapshots contain only the retained backends, never a generator's
+// machine-specific HTTP inference endpoints.
+describe("bundled catalog retained-backend and endpoint guards", () => {
 	const providers = getBundledProviders();
 
-	// Providers whose default endpoint is the local machine. They must never
-	// appear as a top-level key in the bundled catalog.
-	const LOCAL_ONLY_PROVIDERS = ["ollama", "vllm", "lm-studio", "litellm"] as const;
-
-	it("does not bundle any local-only provider block", () => {
-		const leaked = LOCAL_ONLY_PROVIDERS.filter(provider => providers.some(bundled => bundled === provider));
-		expect(leaked, `local provider(s) leaked into the bundled catalog: ${leaked.join(", ")}`).toEqual([]);
+	it("keeps Copilot/local available without requiring fake seeds for discoverable servers", () => {
+		expect(providers).toContain("github-copilot");
+		expect(providers).toContain("local");
 	});
 
 	it("contains no loopback or private-network baseUrls", () => {

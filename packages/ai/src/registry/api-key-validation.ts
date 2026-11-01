@@ -1,5 +1,6 @@
-import { resolveAnthropicApiVersion } from "@oh-my-pi/pi-catalog/compat/anthropic";
+import { LEGACY_ANTHROPIC_API_VERSION } from "@oh-my-pi/pi-catalog/compat/anthropic";
 import { OpenAIHttpError, ProviderHttpError } from "../error/classes";
+import { ConfigurationError } from "../error";
 import type { FetchImpl } from "../types";
 
 type OpenAICompatibleValidationOptions = {
@@ -86,6 +87,7 @@ async function createApiKeyValidationError(
  * Performs a minimal request to verify credentials and endpoint access.
  */
 export async function validateOpenAICompatibleApiKey(options: OpenAICompatibleValidationOptions): Promise<void> {
+	if (!options.baseUrl.trim()) throw new ConfigurationError("API-key validation requires an explicit base URL");
 	const timeoutSignal = AbortSignal.timeout(VALIDATION_TIMEOUT_MS);
 	const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 	const fetchImpl = options.fetch ?? fetch;
@@ -121,6 +123,7 @@ export async function validateOpenAICompatibleApiKey(options: OpenAICompatibleVa
  * Validate an API key against an Anthropic-compatible messages endpoint.
  */
 export async function validateAnthropicCompatibleApiKey(options: AnthropicCompatibleValidationOptions): Promise<void> {
+	if (!options.baseUrl.trim()) throw new ConfigurationError("API-key validation requires an explicit base URL");
 	const timeoutSignal = AbortSignal.timeout(VALIDATION_TIMEOUT_MS);
 	const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 	const baseUrl = normalizeAnthropicCompatibleBaseUrl(options.baseUrl);
@@ -130,7 +133,7 @@ export async function validateAnthropicCompatibleApiKey(options: AnthropicCompat
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			"anthropic-version": resolveAnthropicApiVersion(baseUrl),
+			"anthropic-version": LEGACY_ANTHROPIC_API_VERSION,
 			"x-api-key": options.apiKey,
 		},
 		body: JSON.stringify({
@@ -155,6 +158,7 @@ export async function validateAnthropicCompatibleApiKey(options: AnthropicCompat
  * should not block key validation.
  */
 export async function validateApiKeyAgainstModelsEndpoint(options: ModelListValidationOptions): Promise<void> {
+	if (!options.modelsUrl.trim()) throw new ConfigurationError("API-key validation requires an explicit models URL");
 	const timeoutSignal = AbortSignal.timeout(VALIDATION_TIMEOUT_MS);
 	const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
 	const fetchImpl = options.fetch ?? fetch;

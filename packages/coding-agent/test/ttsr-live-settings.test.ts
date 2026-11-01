@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { Api, Model, ModelSpec } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -10,7 +11,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
-import { cfgTtsrDisabledRules, cfgTtsrEnabled } from "@oh-my-pi/pi-coding-agent/export/ttsr-settings";
+import { cfgTtsrDisabledRules, cfgTtsrEnabled, cfgTtsrJudge } from "@oh-my-pi/pi-coding-agent/export/ttsr-settings";
 
 function buildLocalModel(): Model<Api> {
 	return buildModel({
@@ -42,17 +43,20 @@ async function settleSettingWatchers(session: AgentSession): Promise<void> {
 	await session.runToolRegistryMutation(async () => {});
 }
 
-async function withGuardedSession(run: (session: AgentSession, settings: Settings) => Promise<void>): Promise<void> {
+async function withGuardedSession(
+	run: (session: AgentSession, settings: Settings, registry: ModelRegistry) => Promise<void>,
+): Promise<void> {
 	using tempDir = TempDir.createSync("@pi-ttsr-live-");
 	const authStorage = await AuthStorage.create(tempDir.join("auth.db"));
 	authStorage.keys.setRuntime("managed-primary", "test-key");
 	const settings = Settings.isolated({ "compaction.enabled": false });
+	const registry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 	const { session } = await createAgentSession({
 		cwd: tempDir.path(),
 		agentDir: tempDir.path(),
 		sessionManager: SessionManager.inMemory(tempDir.path()),
 		authStorage,
-		modelRegistry: new ModelRegistry(authStorage, tempDir.join("models.yml")),
+		modelRegistry: registry,
 		settings,
 		model: buildLocalModel(),
 		disableExtensionDiscovery: true,
@@ -65,7 +69,7 @@ async function withGuardedSession(run: (session: AgentSession, settings: Setting
 		skipPythonPreflight: true,
 	});
 	try {
-		await run(session, settings);
+		await run(session, settings, registry);
 	} finally {
 		await session.dispose();
 		authStorage.close();
@@ -73,6 +77,38 @@ async function withGuardedSession(run: (session: AgentSession, settings: Setting
 }
 
 describe("TTSR settings changed mid-session", () => {
+	it("requires native judgments in auto mode but preserves explicit on for local and chat judges", async () => {
+		await withGuardedSession(async (session, settings, registry) => {
+			const native = buildModel({
+				id: "openjev-company",
+				name: "Company judge",
+				provider: "company",
+				api: "typesafe",
+				baseUrl: "https://judge.company.example",
+				kind: "judge",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 8192,
+				maxTokens: 0,
+			});
+			for (const model of [
+				getBundledModel("local", "qwen2.5-1.5b"),
+				getBundledModel("github-copilot", "claude-sonnet-4.6"),
+				native,
+			]) {
+				registry.getAvailable = () => [model];
+				settings.setModelRole("judge", `${model.provider}/${model.id}`);
+				cfgTtsrJudge.set(settings, "auto");
+				expect(session.ruleJudge() !== undefined).toBe(model === native);
+				cfgTtsrJudge.set(settings, "on");
+				expect(session.ruleJudge()).toBeDefined();
+				cfgTtsrJudge.set(settings, "off");
+				expect(session.ruleJudge()).toBeUndefined();
+			}
+		});
+	});
+
 	it("stops and resumes stream matching when ttsr.enabled flips", async () => {
 		await withGuardedSession(async (session, settings) => {
 			const manager = session.ttsrManager!;

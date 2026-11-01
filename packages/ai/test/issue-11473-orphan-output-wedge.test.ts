@@ -15,7 +15,7 @@ const model = buildModel({
 	id: "deepseek-v4-flash",
 	name: "DeepSeek V4 Flash",
 	api: "openai-responses",
-	provider: "opencode-go",
+	provider: "github-copilot",
 	baseUrl: "https://opencode.ai/zen/go/v1",
 	reasoning: true,
 	input: ["text"],

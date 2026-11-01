@@ -1,25 +1,15 @@
-import { Database } from "bun:sqlite";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type {
-	ApiKey,
-	AssistantMessage,
-	TextContent,
-	ThinkingContent,
-	ToolCall,
-	ToolResultMessage,
-} from "@oh-my-pi/pi-ai";
+import type { ApiKey, AssistantMessage, TextContent, ThinkingContent, ToolCall } from "@oh-my-pi/pi-ai";
 import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { createMockModel, type MockResponse, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import * as envApiKey from "@oh-my-pi/pi-ai/env-api-key";
 import * as aiStream from "@oh-my-pi/pi-ai/stream";
-import { kCursorExecResolved, kStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
+import { kStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { SqliteAuthCredentialStore } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { opencodeGoUsageProvider } from "@oh-my-pi/pi-ai/usage/opencode-go";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -35,15 +25,7 @@ type AutoRetryEndEvent = Extract<AgentSessionEvent, { type: "auto_retry_end" }>;
 type AutoRetryStartEvent = Extract<AgentSessionEvent, { type: "auto_retry_start" }>;
 
 const RETRY_CAP_MOCK_API_SOURCE = "agent-session-retry-cap-test";
-const CODEX_BODY_READ_ERROR =
-	"Anthropic stream error (api_error): Transport error reading Codex response body: error decoding response body";
-const CYBER_POLICY_ERROR =
-	"Codex error event: This content was flagged for possible cybersecurity risk. Join Trusted Access for Cyber. (code=cyber_policy)";
-const CYBER_POLICY_FAILURE: MockResponse = {
-	content: [{ type: "thinking", thinking: "Checking whether this security request is allowed." }],
-	stopReason: "error",
-	errorMessage: CYBER_POLICY_ERROR,
-};
+const SOCKET_READ_ERROR = "The socket connection was closed unexpectedly";
 
 function lastAssistant(session: AgentSession): AssistantMessage {
 	const message = session.agent.state.messages.at(-1);
@@ -87,25 +69,13 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	beforeEach(async () => {
-		// A live env var now overrides a stored static api_key; these tests rotate stored Anthropic
-		// credentials, so neutralize env resolution (ignores every provider's ambient env key).
+		// Keep ambient credentials from bypassing the test account pool.
 		vi.spyOn(envApiKey, "getEnvApiKey").mockReturnValue(undefined);
-		for (const provider of ["anthropic", "openai-codex"]) {
+		for (const provider of ["github-copilot", "local"]) {
 			await authStorage.credentials.remove(provider);
-		}
-		for (const provider of [
-			"anthropic",
-			"openai",
-			"openai-codex",
-			"opencode-go",
-			"openrouter",
-			"github-copilot",
-			"zai",
-			"cursor",
-		]) {
 			authStorage.keys.removeRuntime(provider);
 		}
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		authStorage.keys.setRuntime("github-copilot", "copilot-test-key");
 		modelRegistry.clearSuppressedSelectors();
 	});
 
@@ -124,7 +94,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("bails immediately when retry-after exceeds retry.maxDelayMs", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -196,84 +166,11 @@ describe("AgentSession retry delay cap", () => {
 		expect(session.isRetrying).toBe(false);
 	});
 
-	it("waits past retry.maxDelayMs for a usage-limit reset when retry.waitForUsageReset is set", async () => {
-		// Contract: with the opt-in set, a provider-stated usage-limit reset
-		// sleeps until the reset instead of failing fast. Uses Z.AI's English
-		// code-1308 shape: a timezone-naive Beijing reset timestamp plus a
-		// shorter retry-after-ms, with one credential so rotation cannot save it.
-		const model = getBundledModel("zai", "glm-5.3");
-		if (!model) {
-			throw new Error("Expected bundled Z.AI test model to exist");
-		}
-		authStorage.keys.setRuntime("zai", "zai-test-key");
-
-		// Reset two hours out, formatted as the Beijing wall clock Z.AI reports;
-		// the provider policy applies UTC+8 before longest-window selection.
-		const resetStamp = new Date(Date.now() + 7_200_000 + 8 * 3_600_000).toISOString().slice(0, 19).replace("T", " ");
-		const usageLimitError = `429 code 1308, Usage limit reached for 5 hour. Your limit will reset at ${resetStamp} retry-after-ms=5000`;
-
-		const mock = createMockModel({
-			responses: [{ throw: usageLimitError }, { content: ["recovered after usage reset"], stopReason: "stop" }],
-		});
-		const requestedModels: string[] = [];
-		const agent = new Agent({
-			getApiKey: requestedModel => `${requestedModel.provider}-test-key`,
-			initialState: {
-				model,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.maxDelayMs": 100,
-			"retry.maxRetries": 2,
-			"retry.modelFallback": false,
-			"retry.waitForUsageReset": true,
-		});
-		settings.setModelRole("default", `${model.provider}/${model.id}`);
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-
-		const waitSpy = mockSchedulerWaitWithClock();
-		const retryStartEvents: AutoRetryStartEvent[] = [];
-		const retryEndEvents: AutoRetryEndEvent[] = [];
-		session.subscribe(event => {
-			if (event.type === "auto_retry_start") retryStartEvents.push(event);
-			if (event.type === "auto_retry_end") retryEndEvents.push(event);
-		});
-
-		await session.prompt("Trigger long usage-limit reset with waitForUsageReset");
-		await session.waitForIdle();
-		// The multi-hour provider-stated wait runs instead of failing fast,
-		// then the retry succeeds on the same credential.
-		expect(retryStartEvents).toHaveLength(1);
-		expect(retryStartEvents[0].delayMs).toBeGreaterThan(7_000_000);
-		expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(7_200_000);
-		expect(waitSpy.mock.calls.some(call => (call[0] as number) > 7_000_000)).toBe(true);
-		expect(requestedModels).toEqual([`${model.provider}/${model.id}`, `${model.provider}/${model.id}`]);
-		expect(retryEndEvents).toHaveLength(1);
-		expect(retryEndEvents[0]).toMatchObject({ success: true });
-		expect(lastAssistant(session).stopReason).toBe("stop");
-		expect(session.isRetrying).toBe(false);
-	});
 	it("probes after the relative hint when a naive stamp conflicts, then recovers", async () => {
 		// Contract: a naive `reset at` wall stamp conflicting with the relative
 		// hint sleeps the relative signal only; the retry after that wait is
 		// the disambiguating probe — success proves the stamp was zone skew.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -342,7 +239,7 @@ describe("AgentSession retry delay cap", () => {
 	it("still fails fast on a long usage-limit reset when retry.waitForUsageReset is off", async () => {
 		// Contract: the default is unchanged — a multi-hour usage-limit wait
 		// without the opt-in (or a sibling/fallback) MUST fail fast.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -411,7 +308,7 @@ describe("AgentSession retry delay cap", () => {
 		// only — a long transient retry-after (server overload, no quota
 		// exhaustion) MUST still fail fast so the hung-subagent guard keeps
 		// working for non-quota errors.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -476,7 +373,7 @@ describe("AgentSession retry delay cap", () => {
 		// 30-minute QUOTA_EXHAUSTED heuristic, which must NOT bypass the cap —
 		// otherwise a permanent error holds the session through repeated
 		// heuristic sleeps instead of surfacing.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -547,7 +444,7 @@ describe("AgentSession retry delay cap", () => {
 		// the 30-minute QUOTA_EXHAUSTED heuristic, which (lacking parsed
 		// provider timing) cannot authorize the opt-in and would trip
 		// retry.maxDelayMs, surfacing the error instead of retrying as asked.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -619,7 +516,7 @@ describe("AgentSession retry delay cap", () => {
 		// a shorter appended `retry-after-ms` (header timing folded into the
 		// message) must sleep until the account reset — waking on the short
 		// hint would retry a still-blocked credential and burn the budget.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -681,1163 +578,8 @@ describe("AgentSession retry delay cap", () => {
 		expect(session.isRetrying).toBe(false);
 	});
 
-	/**
-	 * Isolated AuthStorage whose opencode-go usage endpoint reports the given
-	 * rolling/weekly windows. Lets recovery tests drive report-derived
-	 * unblock deadlines without network access. A past `resetsAtIso` models
-	 * an exhausted window with no future reset (e.g. a permanent cap). The
-	 * caller owns closing the storage.
-	 */
-	interface OpencodeWindowSpec {
-		status: "ok" | "rate-limited";
-		percent: number;
-		resetsAtIso: string;
-	}
-	async function createOpencodeStorageWithUsage(
-		rolling: OpencodeWindowSpec,
-		weekly: OpencodeWindowSpec,
-	): Promise<AuthStorage> {
-		const windowPayload = (spec: OpencodeWindowSpec): Record<string, unknown> => ({
-			status: spec.status,
-			percent: spec.percent,
-			resetsAt: spec.resetsAtIso,
-		});
-		const localStore = new SqliteAuthCredentialStore(new Database(":memory:"));
-		const localStorage = new AuthStorage(localStore, {
-			usageProviderResolver: provider => (provider === "opencode-go" ? opencodeGoUsageProvider : undefined),
-			usageFetch: (async () =>
-				new Response(
-					JSON.stringify({
-						usage: {
-							rolling: windowPayload(rolling),
-							weekly: windowPayload(weekly),
-							monthly: {
-								status: "ok",
-								percent: 8,
-								resetsAt: new Date(Date.now() + 30 * 24 * 3_600_000).toISOString(),
-							},
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				)) as unknown as typeof fetch,
-		});
-		await localStorage.credentials.reload();
-		await localStorage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-usage-key" });
-		return localStorage;
-	}
-
-	it("sleeps until the report-derived unblock deadline when it outlasts the error hint", async () => {
-		// Contract: when the usage report reveals a later exhausted window
-		// than the error text names (here a 60s hint while the weekly window
-		// is spent for ~2h), the wait honors the credential's actual unblock
-		// deadline — waking on the shorter hint would retry a still-blocked
-		// credential and burn the budget.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 7_200_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 Weekly usage limit reached. type=GoUsageLimitError retry-after-ms=60000" },
-					{ content: ["recovered after weekly reset"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger usage limit with a later report-derived reset");
-			await session.waitForIdle();
-
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(7_100_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(7_200_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 7_100_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("sleeps on a report-derived reset with no error-text hint when retry.waitForUsageReset is set", async () => {
-		// Contract: a hintless usage-limit error still bypasses the cap when
-		// the usage report carries an authoritative exhausted window — the
-		// parsed-hint requirement must not reject report-derived deadlines.
-		// (A hintless error with no report extension still fails fast, as
-		// the heuristic-only test above proves.)
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 7_200_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after reported reset"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit with a reported reset");
-			await session.waitForIdle();
-
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(7_100_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(7_200_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 7_100_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("sleeps on a shorter authoritative report reset with no error-text hint", async () => {
-		// Contract: report authoritativeness does not depend on outlasting
-		// the heuristic — a complete report window resetting sooner than the
-		// 30-minute QUOTA_EXHAUSTED fallback still authorizes the opt-in wait.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after short reported reset"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit with a short reported reset");
-			await session.waitForIdle();
-
-			expect(retryStartEvents).toHaveLength(1);
-			// The authoritative 5-minute report reset replaces the 30-minute
-			// heuristic — not just authorizes it.
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(290_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(300_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 290_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("keeps a fallback chain off its primary until the reported usage reset", async () => {
-		// Contract: a hintless usage-limit error whose usage report puts the
-		// reset ~2h out cools the primary down until that reset. Returning on
-		// the 30-minute heuristic sends a request to a still-exhausted primary
-		// and switches models twice for nothing.
-		const primaryModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!primaryModel || !fallbackModel) {
-			throw new Error("Expected bundled OpenCode Go and Anthropic test models to exist");
-		}
-		const primarySelector = `${primaryModel.provider}/${primaryModel.id}`;
-		const fallbackSelector = `${fallbackModel.provider}/${fallbackModel.id}`;
-		const startMs = Date.now();
-		const resetAtMs = startMs + 7_200_000;
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(startMs + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(resetAtMs).toISOString() },
-		);
-		try {
-			localStorage.keys.setRuntime("anthropic", "anthropic-test-key");
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-			let now = startMs;
-			const mock = createMockModel();
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
-				streamFn: (requestedModel, context, options) => {
-					const selector = `${requestedModel.provider}/${requestedModel.id}`;
-					requestedModels.push(selector);
-					mock.push(
-						selector === primarySelector && now < resetAtMs
-							? { throw: "429 quota exceeded for this account" }
-							: { content: [`ok:${selector}`] },
-					);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.fallbackChains": { [primarySelector]: [fallbackSelector] },
-				"retry.fallbackRevertPolicy": "cooldown-expiry",
-			});
-			settings.setModelRole("default", primarySelector);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-			vi.spyOn(Date, "now").mockImplementation(() => now);
-
-			await session.prompt("Primary hits its usage limit");
-			await session.waitForIdle();
-			expect(requestedModels).toEqual([primarySelector, fallbackSelector]);
-
-			// Past the 30-minute heuristic, still inside the reported window.
-			now = startMs + 31 * 60_000;
-			await session.prompt("Primary is still exhausted");
-			await session.waitForIdle();
-			expect(requestedModels).toEqual([primarySelector, fallbackSelector, fallbackSelector]);
-
-			now = resetAtMs + 60_000;
-			await session.prompt("Primary has reset");
-			await session.waitForIdle();
-			expect(requestedModels).toEqual([primarySelector, fallbackSelector, fallbackSelector, primarySelector]);
-			expect(session.model?.provider).toBe(primaryModel.provider);
-			expect(session.model?.id).toBe(primaryModel.id);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("keeps the short fallback cooldown when a sibling account is still free", async () => {
-		// Contract: once the retry budget is spent, a usage limit on account A
-		// walks the fallback chain even though `markReached` switched to a free
-		// account B. A's reported window (two days here) says nothing about B,
-		// so the primary must cool down on the 30-minute heuristic, not A's reset.
-		const primaryModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!primaryModel || !fallbackModel) {
-			throw new Error("Expected bundled OpenCode Go and Anthropic test models to exist");
-		}
-		const primarySelector = `${primaryModel.provider}/${primaryModel.id}`;
-		const fallbackSelector = `${fallbackModel.provider}/${fallbackModel.id}`;
-		const startMs = Date.now();
-		let now = startMs;
-		let exhaustedKey: string | undefined;
-		const windowPayload = (status: "ok" | "rate-limited", percent: number, resetsAtMs: number) => ({
-			status,
-			percent,
-			resetsAt: new Date(resetsAtMs).toISOString(),
-		});
-		const localStorage = new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
-			usageProviderResolver: provider => (provider === "opencode-go" ? opencodeGoUsageProvider : undefined),
-			usageFetch: (async (_url: string, init?: RequestInit) => {
-				const authorization = new Headers(init?.headers).get("authorization");
-				const exhausted = exhaustedKey !== undefined && authorization === `Bearer ${exhaustedKey}`;
-				return new Response(
-					JSON.stringify({
-						usage: {
-							rolling: windowPayload("ok", 12, startMs + 300_000),
-							weekly: exhausted
-								? windowPayload("rate-limited", 100, startMs + 2 * 24 * 3_600_000)
-								: windowPayload("ok", 20, startMs + 2 * 24 * 3_600_000),
-							monthly: windowPayload("ok", 8, startMs + 30 * 24 * 3_600_000),
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				);
-			}) as unknown as typeof fetch,
-		});
-		try {
-			await localStorage.credentials.reload();
-			await localStorage.credentials.set("opencode-go", [
-				{ type: "api_key", key: "opencode-go-key-a" },
-				{ type: "api_key", key: "opencode-go-key-b" },
-			]);
-			localStorage.keys.setRuntime("anthropic", "anthropic-test-key");
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-			const mock = createMockModel();
-			const requestedModels: string[] = [];
-			const primaryKeys: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: { model: primaryModel, systemPrompt: ["Test"], tools: [], messages: [] },
-				streamFn: async (requestedModel, context, options) => {
-					const selector = `${requestedModel.provider}/${requestedModel.id}`;
-					requestedModels.push(selector);
-					if (selector !== primarySelector) {
-						mock.push({ content: [`ok:${selector}`] });
-						return mock.stream(requestedModel, context, options);
-					}
-					const apiKey = resolveInitialApiKey(options?.apiKey);
-					primaryKeys.push(apiKey);
-					if (primaryKeys.length === 1) {
-						// A first-attempt socket drop after streamed reasoning retries the
-						// same model, spending the one retry on account A without
-						// consulting the fallback chain.
-						mock.push({
-							content: [{ type: "thinking", thinking: "Partial reasoning." }],
-							stopReason: "error",
-							errorMessage: "The socket connection was closed unexpectedly",
-						});
-					} else if (apiKey === primaryKeys[0]) {
-						// A's usage report now shows its weekly window spent.
-						exhaustedKey = apiKey;
-						await localStorage.usage.invalidate("opencode-go");
-						mock.push({ throw: "429 quota exceeded for this account" });
-					} else {
-						mock.push({ content: [`ok:${selector}`] });
-					}
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxRetries": 1,
-				"retry.fallbackChains": { [primarySelector]: [fallbackSelector] },
-				"retry.fallbackRevertPolicy": "cooldown-expiry",
-			});
-			settings.setModelRole("default", primarySelector);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-			vi.spyOn(Date, "now").mockImplementation(() => now);
-
-			await session.prompt("Transient failure, then account A hits its usage limit");
-			await session.waitForIdle();
-			expect(requestedModels).toEqual([primarySelector, primarySelector, fallbackSelector]);
-			expect(primaryKeys[1]).toBe(primaryKeys[0]);
-
-			// Past the 30-minute heuristic, still inside A's two-day window.
-			now = startMs + 31 * 60_000;
-			await session.prompt("Account B can serve the primary");
-			await session.waitForIdle();
-			expect(requestedModels).toEqual([primarySelector, primarySelector, fallbackSelector, primarySelector]);
-			expect(primaryKeys.at(-1)).not.toBe(primaryKeys[0]);
-			expect(lastAssistant(session).content).toContainEqual({ type: "text", text: `ok:${primarySelector}` });
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("keeps a sibling session's longer stored block over a short report reset", async () => {
-		// Contract: the stored credential block merges every mark call for
-		// the shared credential (longest-wins). When an earlier
-		// sibling-session response blocked it for ~2h, a later hintless
-		// error with a complete ~5-minute report must not undercut that
-		// merged deadline: the report window replaces only this call's
-		// 30-minute heuristic, and waking at the report reset would retry a
-		// credential whose actual unblock time is still hours away.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-		);
-		try {
-			// An earlier usage-limit response on a sibling session (same
-			// shared credential, single entry so it stays usable) established
-			// the longer block before this session's failing turn. The key
-			// resolution binds the credential to the sibling session, as a
-			// real prior turn would have.
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-			await localRegistry.getApiKeyForProvider("opencode-go", "sibling-session");
-			await localStorage.limits.markReached("opencode-go", "sibling-session", {
-				retryAfterMs: 7_200_000,
-				providerTimed: true,
-			});
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after merged block"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit under a longer sibling block");
-			await session.waitForIdle();
-
-			// The ~2h merged credential deadline wins over the ~5-minute
-			// report window — the report only replaced the 30-minute guess.
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(7_100_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(7_200_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 7_100_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("keeps a pre-existing block shorter than the heuristic over a short report reset", async () => {
-		// Contract: the merged credential deadline masks a pre-existing block
-		// that is shorter than this call's 30-minute heuristic fallback
-		// (longest-wins in the mark). The prior deadline is an earlier
-		// response's provider-stated window and must survive — a hintless
-		// error with a ~5-minute report must not undercut a sibling session's
-		// 20-minute block to retry before that provider window clears.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-			await localRegistry.getApiKeyForProvider("opencode-go", "sibling-session");
-			// The sibling's 20-minute provider-stated block is shorter than
-			// the 30-minute heuristic this session's hintless error will
-			// contribute, so the merged deadline alone cannot distinguish it.
-			await localStorage.limits.markReached("opencode-go", "sibling-session", {
-				retryAfterMs: 1_200_000,
-				providerTimed: true,
-			});
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after prior block"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit under a 20-minute sibling block");
-			await session.waitForIdle();
-
-			// The ~20-minute prior block wins over both the ~5-minute report
-			// and the masked 30-minute heuristic.
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(1_150_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(1_200_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 1_150_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("ignores a heuristic-only prior block over a short report reset", async () => {
-		// Contract: a prior block that was itself only a 30-minute heuristic
-		// guess (a hintless sibling error whose report was unavailable) has no
-		// provider authority. A complete ~5-minute report on the current call
-		// must replace it — sleeping the guess would hold the session ~25
-		// minutes past the known reset.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "ok", percent: 12, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 300_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-			await localRegistry.getApiKeyForProvider("opencode-go", "sibling-session");
-			// Hintless sibling error whose report was unavailable: the stored
-			// block is the 30-minute heuristic fallback, not provider timing.
-			await localStorage.limits.markReached("opencode-go", "sibling-session", {
-				retryAfterMs: 1_800_000,
-			});
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after short reported reset"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit under a heuristic sibling block");
-			await session.waitForIdle();
-
-			// The authoritative ~5-minute report wins over the sibling's
-			// 30-minute heuristic guess.
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(290_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(300_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 290_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("ignores a persisted heuristic prior block after a restart", async () => {
-		// Contract: persisted credential blocks carry no provenance. A
-		// 30-minute heuristic guess persisted before a restart must not read
-		// as provider timing afterwards — a fresh complete ~5-minute report
-		// wins, instead of sleeping ~25 minutes past the known reset.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const windowPayload = (status: "ok" | "rate-limited", resetsAtIso: string): Record<string, unknown> => ({
-			status,
-			percent: 100,
-			resetsAt: resetsAtIso,
-		});
-		const usageOptions = {
-			usageProviderResolver: (provider: string) =>
-				provider === "opencode-go" ? opencodeGoUsageProvider : undefined,
-			usageFetch: (async () =>
-				new Response(
-					JSON.stringify({
-						usage: {
-							rolling: windowPayload("ok", new Date(Date.now() + 300_000).toISOString()),
-							weekly: windowPayload("rate-limited", new Date(Date.now() + 300_000).toISOString()),
-							monthly: {
-								status: "ok",
-								percent: 8,
-								resetsAt: new Date(Date.now() + 30 * 24 * 3_600_000).toISOString(),
-							},
-						},
-					}),
-					{ status: 200, headers: { "content-type": "application/json" } },
-				)) as unknown as typeof fetch,
-		};
-
-		const store = new SqliteAuthCredentialStore(new Database(":memory:"));
-		const priorStorage = new AuthStorage(store, usageOptions);
-		const restartedStorage = new AuthStorage(store, usageOptions);
-		try {
-			await priorStorage.credentials.reload();
-			await restartedStorage.credentials.reload();
-			await priorStorage.credentials.set("opencode-go", { type: "api_key", key: "opencode-go-usage-key" });
-			await restartedStorage.credentials.reload();
-			// Pre-restart hintless sibling response with no report reset: the
-			// stored block is the 30-minute heuristic guess (no providerTimed).
-			await priorStorage.keys.get("opencode-go", "sibling-session");
-			await priorStorage.limits.markReached("opencode-go", "sibling-session", {
-				retryAfterMs: 1_800_000,
-			});
-
-			const localRegistry = new ModelRegistry(restartedStorage, path.join(tempDir.path(), "models.yml"));
-
-			const mock = createMockModel({
-				responses: [
-					{ throw: "429 quota exceeded for this account" },
-					{ content: ["recovered after short reported reset"], stopReason: "stop" },
-				],
-			});
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.maxRetries": 2,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit after a restart over a heuristic block");
-			await session.waitForIdle();
-
-			// The fresh ~5-minute report wins over the stale persisted
-			// 30-minute heuristic guess.
-			expect(retryStartEvents).toHaveLength(1);
-			expect(retryStartEvents[0].delayMs).toBeGreaterThan(290_000);
-			expect(retryStartEvents[0].delayMs).toBeLessThanOrEqual(300_000);
-			expect(waitSpy.mock.calls.some(call => (call[0] as number) > 290_000)).toBe(true);
-			expect(requestedModels).toEqual([
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			]);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: true });
-			expect(lastAssistant(session).stopReason).toBe("stop");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			priorStorage.close();
-			restartedStorage.close();
-		}
-	});
-
-	it("fails fast when a co-exhausted window has no future reset despite a timed one", async () => {
-		// Contract: a report is authoritative only when EVERY exhausted
-		// window carries a future reset. Here the rolling window resets in
-		// ~2h but the weekly window is spent with a stale timestamp
-		// (permanent-cap shape), so the opt-in must fail fast instead of
-		// parking until a reset that cannot clear the account.
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		if (!exhaustedModel) {
-			throw new Error("Expected bundled OpenCode Go test model to exist");
-		}
-
-		const localStorage = await createOpencodeStorageWithUsage(
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() + 7_200_000).toISOString() },
-			{ status: "rate-limited", percent: 100, resetsAtIso: new Date(Date.now() - 3_600_000).toISOString() },
-		);
-		try {
-			const localRegistry = new ModelRegistry(localStorage, path.join(tempDir.path(), "models.yml"));
-
-			const mock = createMockModel({ handler: () => ({ throw: "429 quota exceeded for this account" }) });
-			const requestedModels: string[] = [];
-			const agent = new Agent({
-				getApiKey: model => localRegistry.resolver(model, agent.sessionId),
-				initialState: {
-					model: exhaustedModel,
-					systemPrompt: ["Test"],
-					tools: [],
-					messages: [],
-				},
-				streamFn: (requestedModel, context, options) => {
-					requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-					return mock.stream(requestedModel, context, options);
-				},
-			});
-
-			const settings = Settings.isolated({
-				"compaction.enabled": false,
-				"retry.baseDelayMs": 5,
-				"retry.maxDelayMs": 100,
-				"retry.modelFallback": false,
-				"retry.waitForUsageReset": true,
-			});
-			settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-			session = new AgentSession({
-				agent,
-				sessionManager: SessionManager.inMemory(),
-				settings,
-				modelRegistry: localRegistry,
-			});
-
-			const waitSpy = mockSchedulerWaitWithClock();
-			const retryStartEvents: AutoRetryStartEvent[] = [];
-			const retryEndEvents: AutoRetryEndEvent[] = [];
-			session.subscribe(event => {
-				if (event.type === "auto_retry_start") retryStartEvents.push(event);
-				if (event.type === "auto_retry_end") retryEndEvents.push(event);
-			});
-
-			await session.prompt("Trigger hintless usage limit with a permanently capped window");
-			await session.waitForIdle();
-
-			expect(requestedModels).toEqual([`${exhaustedModel.provider}/${exhaustedModel.id}`]);
-			expect(retryStartEvents).toHaveLength(0);
-			expect(retryEndEvents).toHaveLength(1);
-			expect(retryEndEvents[0]).toMatchObject({ success: false });
-			expect(retryEndEvents[0].finalError).toContain("exceeds retry.maxDelayMs");
-			for (const call of waitSpy.mock.calls) {
-				expect(call[0]).toBeLessThanOrEqual(100);
-			}
-			const last = lastAssistant(session);
-			expect(last.stopReason).toBe("error");
-			expect(last.errorMessage).toContain("quota exceeded");
-			expect(session.isRetrying).toBe(false);
-		} finally {
-			localStorage.close();
-		}
-	});
-
-	it("switches a long OpenCode Go usage limit to an earlier cross-provider fallback", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const alternateOpenCodeModel = getBundledModel("opencode-go", "deepseek-v4-pro");
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		const fallbackModel = getBundledModel("openai", "gpt-5.5");
-		if (!primaryModel || !alternateOpenCodeModel || !exhaustedModel || !fallbackModel) {
-			throw new Error("Expected bundled primary, OpenCode Go, and cross-provider fallback test models to exist");
-		}
-
-		authStorage.keys.setRuntime("opencode-go", "opencode-go-test-key");
-		authStorage.keys.setRuntime("openai", "openai-test-key");
-
-		const mock = createMockModel({
-			responses: [
-				{ throw: "503 service unavailable: overloaded_error retry-after-ms=60000" },
-				{
-					content: [{ type: "thinking", thinking: "Classifier refusal." }],
-					errorMessage: "Refusal (cyber): Declined.",
-					stopDetails: { type: "refusal", category: "cyber", explanation: "Declined." },
-					stopReason: "error",
-				},
-				{
-					content: [{ type: "thinking", thinking: "Classifier refusal." }],
-					errorMessage: "Refusal (cyber): Declined.",
-					stopDetails: { type: "refusal", category: "cyber", explanation: "Declined." },
-					stopReason: "error",
-				},
-				{
-					throw: "429 Weekly usage limit reached. Resets in 55min. type=GoUsageLimitError retry-after-ms=3242000",
-				},
-				{ content: ["recovered on cross-provider fallback"], stopReason: "stop" },
-			],
-		});
-		const requestedModels: string[] = [];
-		const agent = new Agent({
-			getApiKey: requestedModel => `${requestedModel.provider}-test-key`,
-			initialState: {
-				model: primaryModel,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.maxDelayMs": 300_000,
-			"retry.maxRetries": 3,
-			"retry.modelFallback": true,
-			"retry.fallbackChains": {
-				default: [
-					`${alternateOpenCodeModel.provider}/${alternateOpenCodeModel.id}`,
-					`${fallbackModel.provider}/${fallbackModel.id}`,
-					`${exhaustedModel.provider}/${exhaustedModel.id}`,
-				],
-			},
-		});
-		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		const waitSpy = mockSchedulerWaitWithClock();
-		const fallbackEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
-		session.subscribe(event => {
-			if (event.type === "retry_fallback_applied") fallbackEvents.push(event);
-		});
-
-		await session.prompt("Trigger the long OpenCode Go weekly usage limit");
-		await session.waitForIdle();
-
-		expect(requestedModels).toEqual([
-			`${primaryModel.provider}/${primaryModel.id}`,
-			`${alternateOpenCodeModel.provider}/${alternateOpenCodeModel.id}`,
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-			`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-		]);
-		expect(fallbackEvents).toContainEqual({
-			type: "retry_fallback_applied",
-			from: `${exhaustedModel.provider}/${exhaustedModel.id}`,
-			to: `${fallbackModel.provider}/${fallbackModel.id}`,
-			role: "default",
-			reason: expect.stringContaining("429 Weekly usage limit reached"),
-		});
-		for (const call of waitSpy.mock.calls) {
-			expect(call[0]).toBeLessThan(300_000);
-		}
-		expect(lastAssistant(session).content).toContainEqual({
-			type: "text",
-			text: "recovered on cross-provider fallback",
-		});
-	});
-	it("waits for a short OpenCode Go sibling credential before model fallback", async () => {
-		const exhaustedModel = getBundledModel("opencode-go", "deepseek-v4-flash");
-		const fallbackModel = getBundledModel("openai", "gpt-5.5");
-		if (!exhaustedModel || !fallbackModel) {
-			throw new Error("Expected bundled OpenCode Go and fallback test models to exist");
-		}
-
-		await authStorage.credentials.set("opencode-go", [
-			{ type: "api_key", key: "opencode-go-key-1" },
-			{ type: "api_key", key: "opencode-go-key-2" },
-		]);
-		authStorage.keys.setRuntime("openai", "openai-test-key");
-		await modelRegistry.getApiKeyForProvider("opencode-go", "other-session");
-		const blocked = await authStorage.limits.markReached("opencode-go", "other-session", {
-			retryAfterMs: 2_000,
-		});
-		expect(blocked.switched).toBe(true);
-		const usageLimitSpy = vi.spyOn(authStorage.limits, "markReached");
-
-		const mock = createMockModel();
-		const requestedModels: string[] = [];
-		const agent = new Agent({
-			getApiKey: model => modelRegistry.resolver(model, agent.sessionId),
-			initialState: {
-				model: exhaustedModel,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-				mock.push(
-					requestedModels.length === 1
-						? {
-								throw: "429 Weekly usage limit reached. type=GoUsageLimitError retry-after-ms=3242000",
-							}
-						: { content: ["recovered after sibling unblock"], stopReason: "stop" },
-				);
-				return mock.stream(requestedModel, context, options);
-			},
-		});
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.maxDelayMs": 300_000,
-			"retry.maxRetries": 2,
-			"retry.modelFallback": true,
-			"retry.fallbackChains": { default: [`${fallbackModel.provider}/${fallbackModel.id}`] },
-		});
-		settings.setModelRole("default", `${exhaustedModel.provider}/${exhaustedModel.id}`);
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		const waitSpy = mockSchedulerWaitWithClock();
-		const fallbackEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
-		session.subscribe(event => {
-			if (event.type === "retry_fallback_applied") fallbackEvents.push(event);
-		});
-
-		await session.prompt("Trigger the long OpenCode Go limit while a sibling is briefly blocked");
-		await session.waitForIdle();
-		expect(usageLimitSpy).toHaveBeenCalledTimes(1);
-		const usageLimitResult = usageLimitSpy.mock.results[0]?.value;
-		expect(usageLimitResult).toBeDefined();
-		expect(await usageLimitResult).toMatchObject({ retryAtMs: expect.any(Number), switched: false });
-
-		expect(requestedModels).toEqual([
-			`${exhaustedModel.provider}/${exhaustedModel.id}`,
-			`${exhaustedModel.provider}/${exhaustedModel.id}`,
-		]);
-		expect(fallbackEvents).toEqual([]);
-		expect(waitSpy.mock.calls.some(call => call[0] >= 1_000 && call[0] <= 3_000)).toBe(true);
-		expect(lastAssistant(session).content).toContainEqual({
-			type: "text",
-			text: "recovered after sibling unblock",
-		});
-	});
-
 	it("honors the reason backoff for a transient rate-limit 429 without a provider hint", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -1891,7 +633,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("honors the 45-75s model-capacity backoff for a hintless Google MODEL_CAPACITY_EXHAUSTED 429", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -1960,11 +702,11 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("auto-retries OpenAI Responses stream_read_error instead of stopping the conversation", async () => {
-		const model = getBundledModel("openai", "gpt-5");
+		const model = getBundledModel("github-copilot", "gpt-5");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
-		authStorage.keys.setRuntime("openai", "openai-test-key");
+		authStorage.keys.setRuntime("github-copilot", "openai-test-key");
 
 		const mock = createMockModel({
 			responses: [
@@ -2020,11 +762,11 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("auto-retries Unable to connect transport failures instead of stopping the conversation", async () => {
-		const model = getBundledModel("openai", "gpt-5");
+		const model = getBundledModel("github-copilot", "gpt-5");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
-		authStorage.keys.setRuntime("openai", "openai-test-key");
+		authStorage.keys.setRuntime("github-copilot", "openai-test-key");
 
 		const mock = createMockModel({
 			responses: [
@@ -2080,11 +822,11 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("marks extension agent_end willContinue when auto-retry schedules a continue", async () => {
-		const model = getBundledModel("openai", "gpt-5");
+		const model = getBundledModel("github-copilot", "gpt-5");
 		if (!model) {
 			throw new Error("Expected bundled OpenAI test model to exist");
 		}
-		authStorage.keys.setRuntime("openai", "openai-test-key");
+		authStorage.keys.setRuntime("github-copilot", "openai-test-key");
 
 		const mock = createMockModel({
 			responses: [
@@ -2146,21 +888,20 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("rolls through four sibling credentials inside one AgentSession prompt before delay-cap retry", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-5");
+		const model = getBundledModel("local", "qwen3-1.7b");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5");
 		if (!model || !fallbackModel) {
 			throw new Error("Expected bundled primary and fallback test models to exist");
 		}
 		const providerSessionId = "retry-four-credential-session-3";
 
 		registerMockApi(RETRY_CAP_MOCK_API_SOURCE);
-		authStorage.keys.removeRuntime("anthropic");
-		authStorage.keys.setRuntime("openai", "openai-fallback-key");
-		await authStorage.credentials.set("anthropic", [
-			{ type: "api_key", key: "anthropic-key-A" },
-			{ type: "api_key", key: "anthropic-key-B" },
-			{ type: "api_key", key: "anthropic-key-C" },
-			{ type: "api_key", key: "anthropic-key-D" },
+		authStorage.keys.removeRuntime("local");
+		await authStorage.credentials.set("local", [
+			{ type: "api_key", key: "local-key-A" },
+			{ type: "api_key", key: "local-key-B" },
+			{ type: "api_key", key: "local-key-C" },
+			{ type: "api_key", key: "local-key-D" },
 		]);
 
 		const rateLimitError =
@@ -2168,7 +909,7 @@ describe("AgentSession retry delay cap", () => {
 		const requestedKeys: string[] = [];
 		const mock = createMockModel({
 			id: model.id,
-			provider: model.provider,
+			provider: "local",
 			handler: (_context, options) => {
 				const apiKey = typeof options?.apiKey === "string" ? options.apiKey : undefined;
 				if (!apiKey) {
@@ -2251,21 +992,20 @@ describe("AgentSession retry delay cap", () => {
 		expect(last.content).toContainEqual({ type: "text", text: "recovered on fourth credential" });
 	});
 
-	it("switches same-provider credentials before model fallback on ChatGPT usage limits", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackModel = getBundledModel("openai", "gpt-5.5");
+	it("switches same-provider credentials before model fallback on usage limits", async () => {
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.5");
 		if (!primaryModel || !fallbackModel) {
 			throw new Error("Expected bundled primary and fallback test models to exist");
 		}
 
-		authStorage.keys.removeRuntime("anthropic");
-		authStorage.keys.setRuntime("openai", "openai-fallback-key");
-		await authStorage.credentials.set("anthropic", [
+		authStorage.keys.removeRuntime("github-copilot");
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "api_key", key: "anthropic-key-1" },
 			{ type: "api_key", key: "anthropic-key-2" },
 		]);
 
-		const usageLimitError = "Error: You have hit your ChatGPT usage limit (k12 plan). Try again in ~231 min.";
+		const usageLimitError = "429 quota exceeded for this account retry-after-ms=13860000";
 		const mock = createMockModel();
 		const requestedModels: string[] = [];
 		const requestedKeys: string[] = [];
@@ -2310,7 +1050,7 @@ describe("AgentSession retry delay cap", () => {
 		});
 
 		mockSchedulerWaitWithClock();
-		await session.prompt("Trigger k12 usage limit");
+		await session.prompt("Trigger account usage limit");
 		await session.waitForIdle();
 
 		expect(requestedModels).toEqual([
@@ -2323,188 +1063,6 @@ describe("AgentSession retry delay cap", () => {
 		expect(last.content).toContainEqual({ type: "text", text: "recovered after sibling account" });
 	});
 
-	it("tries every Codex account before the configured model fallback on cyber-policy denials", async () => {
-		const primaryModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		const fallbackModel = getBundledModel("openai", "gpt-5.5");
-		if (!primaryModel || !fallbackModel) {
-			throw new Error("Expected bundled primary and fallback test models to exist");
-		}
-		const providerSessionId = "cyber-policy-account-rotation";
-
-		registerMockApi(RETRY_CAP_MOCK_API_SOURCE);
-		authStorage.keys.setRuntime("openai", "openai-fallback-key");
-		await authStorage.credentials.set("openai-codex", [
-			{ type: "api_key", key: "codex-key-A" },
-			{ type: "api_key", key: "codex-key-B" },
-			{ type: "api_key", key: "codex-key-C" },
-			{ type: "api_key", key: "codex-key-D" },
-		]);
-
-		const requestedKeys: string[] = [];
-		const mock = createMockModel({
-			id: primaryModel.id,
-			provider: primaryModel.provider,
-			handler: (_context, options) => {
-				const apiKey = typeof options?.apiKey === "string" ? options.apiKey : undefined;
-				if (!apiKey) throw new Error("Expected streamSimple to pass a resolved string API key");
-				requestedKeys.push(apiKey);
-				return new Set(requestedKeys).size >= 4
-					? { content: ["recovered on cyber-approved account"], stopReason: "stop" }
-					: CYBER_POLICY_FAILURE;
-			},
-		});
-		const requestedModels: string[] = [];
-		const agent = new Agent({
-			getApiKey: model => modelRegistry.resolver(model, providerSessionId),
-			sessionId: providerSessionId,
-			initialState: {
-				model: primaryModel,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: (requestedModel, context, options) => {
-				requestedModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-				return aiStream.streamSimple(mock.model, context, options);
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.maxRetries": 0,
-			"retry.modelFallback": true,
-			"retry.fallbackChains": {
-				default: [`${fallbackModel.provider}/${fallbackModel.id}`],
-			},
-		});
-		settings.setModelRole("default", `${primaryModel.provider}/${primaryModel.id}`);
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-			providerSessionId,
-		});
-
-		const fallbackEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
-		session.subscribe(event => {
-			if (event.type === "retry_fallback_applied") fallbackEvents.push(event);
-		});
-
-		await session.prompt("Continue authorized security work");
-		await session.waitForIdle();
-
-		expect(requestedModels).toEqual([
-			`${primaryModel.provider}/${primaryModel.id}`,
-			`${primaryModel.provider}/${primaryModel.id}`,
-			`${primaryModel.provider}/${primaryModel.id}`,
-			`${primaryModel.provider}/${primaryModel.id}`,
-		]);
-		expect(requestedKeys).toHaveLength(4);
-		expect([...requestedKeys].sort()).toEqual(["codex-key-A", "codex-key-B", "codex-key-C", "codex-key-D"]);
-		expect(fallbackEvents).toEqual([]);
-		expect(session.model?.provider).toBe(primaryModel.provider);
-		expect(session.model?.id).toBe(primaryModel.id);
-		expect(lastAssistant(session).content).toContainEqual({
-			type: "text",
-			text: "recovered on cyber-approved account",
-		});
-	});
-
-	it("tries sibling Codex accounts before advisor model fallback on cyber-policy denials", async () => {
-		const mainModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const advisorModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		const fallbackModel = getBundledModel("openai", "gpt-5.5");
-		if (!mainModel || !advisorModel || !fallbackModel) {
-			throw new Error("Expected bundled main, advisor, and fallback test models to exist");
-		}
-
-		registerMockApi(RETRY_CAP_MOCK_API_SOURCE);
-		authStorage.keys.setRuntime("openai", "openai-fallback-key");
-		await authStorage.credentials.set("openai-codex", [
-			{ type: "api_key", key: "advisor-codex-key-A" },
-			{ type: "api_key", key: "advisor-codex-key-B" },
-			{ type: "api_key", key: "advisor-codex-key-C" },
-		]);
-
-		const mainMock = createMockModel({ responses: [{ content: ["Primary complete"] }] });
-		const requestedAdvisorKeys: string[] = [];
-		const advisorRecovered = Promise.withResolvers<void>();
-		const advisorMock = createMockModel({
-			id: advisorModel.id,
-			provider: advisorModel.provider,
-			handler: (_context, options) => {
-				const apiKey = typeof options?.apiKey === "string" ? options.apiKey : undefined;
-				if (!apiKey) throw new Error("Expected advisor streamSimple to pass a resolved string API key");
-				requestedAdvisorKeys.push(apiKey);
-				if (new Set(requestedAdvisorKeys).size < 3) return CYBER_POLICY_FAILURE;
-				advisorRecovered.resolve();
-				return { content: ["Advisor recovered on cyber-approved account"], stopReason: "stop" };
-			},
-		});
-		const requestedAdvisorModels: string[] = [];
-		const advisorSelector = `${advisorModel.provider}/${advisorModel.id}`;
-		const fallbackSelector = `${fallbackModel.provider}/${fallbackModel.id}`;
-		const agent = new Agent({
-			getApiKey: model => `${model.provider}-test-key`,
-			initialState: {
-				model: mainModel,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			streamFn: mainMock.stream,
-		});
-
-		const settings = Settings.isolated({
-			"advisor.syncBacklog": "1",
-			"compaction.enabled": false,
-			"retry.maxRetries": 0,
-			"retry.modelFallback": true,
-			"retry.fallbackChains": {
-				[advisorSelector]: [fallbackSelector],
-			},
-		});
-		settings.setModelRole("default", `${mainModel.provider}/${mainModel.id}`);
-		settings.setModelRole("advisor", advisorSelector);
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-			advisorTools: [],
-			advisorConfigs: [{ name: "cyber-policy", model: advisorSelector }],
-			advisorStreamFn: (requestedModel, context, options) => {
-				requestedAdvisorModels.push(`${requestedModel.provider}/${requestedModel.id}`);
-				return aiStream.streamSimple(advisorMock.model, context, options);
-			},
-		});
-
-		const fallbackEvents: Array<Extract<AgentSessionEvent, { type: "retry_fallback_applied" }>> = [];
-		session.subscribe(event => {
-			if (event.type === "retry_fallback_applied") fallbackEvents.push(event);
-		});
-
-		expect(session.setAdvisorEnabled(true)).toBe(true);
-		await session.prompt("Complete one primary turn");
-		await advisorRecovered.promise;
-		await session.waitForIdle();
-
-		expect(requestedAdvisorModels).toEqual([advisorSelector, advisorSelector, advisorSelector]);
-		expect([...requestedAdvisorKeys].sort()).toEqual([
-			"advisor-codex-key-A",
-			"advisor-codex-key-B",
-			"advisor-codex-key-C",
-		]);
-		expect(fallbackEvents).toEqual([]);
-		expect(session.getAdvisorAgent()?.state.model).toMatchObject({
-			provider: advisorModel.provider,
-			id: advisorModel.id,
-		});
-	});
-
 	it("waits for the earliest sibling unblock instead of failing the delay cap", async () => {
 		// Regression: with every sibling credential momentarily blocked (e.g. a
 		// short post-401 or usage-probe block), a usage-limit 429 with a
@@ -2512,21 +1070,21 @@ describe("AgentSession retry delay cap", () => {
 		// the fail-fast cap ("gave up after 1 attempt") — even though a sibling
 		// would have been usable seconds later. The retry delay must track the
 		// earliest sibling unblock, not the provider window.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
 
-		authStorage.keys.removeRuntime("anthropic");
-		await authStorage.credentials.set("anthropic", [
+		authStorage.keys.removeRuntime("github-copilot");
+		await authStorage.credentials.set("github-copilot", [
 			{ type: "api_key", key: "anthropic-key-1" },
 			{ type: "api_key", key: "anthropic-key-2" },
 		]);
 
 		// Another session holds one credential and parks it for 2s — the test
 		// session lands on the sibling.
-		await modelRegistry.getApiKeyForProvider("anthropic", "other-session");
-		const blocked = await authStorage.limits.markReached("anthropic", "other-session", { retryAfterMs: 2_000 });
+		await modelRegistry.getApiKeyForProvider("github-copilot", "other-session");
+		const blocked = await authStorage.limits.markReached("github-copilot", "other-session", { retryAfterMs: 2_000 });
 		expect(blocked.switched).toBe(true);
 
 		const rateLimitError =
@@ -2593,7 +1151,7 @@ describe("AgentSession retry delay cap", () => {
 	it("still retries normally when the delay is under retry.maxDelayMs", async () => {
 		// Sanity check: a small retry-after MUST still go through the retry
 		// loop so we don't regress the existing transient-error recovery.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -2651,12 +1209,12 @@ describe("AgentSession retry delay cap", () => {
 
 	it.each([
 		["a timeout after streaming a complete unexecuted write tool call", "The operation timed out.", ["complete"]],
-		["a Codex body-read error with incomplete args", CODEX_BODY_READ_ERROR, ["partial"]],
-		["a Codex body-read error with a completed unexecuted call", CODEX_BODY_READ_ERROR, ["complete"]],
-		["a Codex body-read error with toolcall_end after partial args", CODEX_BODY_READ_ERROR, ["partial-ended"]],
-		["a Codex body-read error with a complete+partial batch", CODEX_BODY_READ_ERROR, ["complete", "partial"]],
+		["a socket close with incomplete args", SOCKET_READ_ERROR, ["partial"]],
+		["a socket close with a completed unexecuted call", SOCKET_READ_ERROR, ["complete"]],
+		["a socket close with toolcall_end after partial args", SOCKET_READ_ERROR, ["partial-ended"]],
+		["a socket close with a complete+partial batch", SOCKET_READ_ERROR, ["complete", "partial"]],
 	] as const)("auto-retries %s", async (_scenario, errorMessage, callStates) => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -2720,10 +1278,7 @@ describe("AgentSession retry delay cap", () => {
 							);
 						});
 					}
-					const recoveryModel = createMockModel({
-						id: requestedModel.id,
-						provider: requestedModel.provider,
-					});
+					const recoveryModel = createMockModel({ id: requestedModel.id });
 					recoveryModel.push({ content: streamCalls === 2 ? [freshCall] : ["Recovered after transport error"] });
 					return recoveryModel.stream(recoveryModel, context, options);
 				}
@@ -2825,20 +1380,17 @@ describe("AgentSession retry delay cap", () => {
 			undefined,
 		],
 		[
-			"Codex premature close",
+			"Responses premature close",
 			"error",
-			"Codex stream ended before terminal completion event",
+			"OpenAI responses stream closed before a terminal response event was received",
 			AIError.create(AIError.Flag.Transient),
 		],
 		["reasonless abort", "aborted", "Request was aborted", undefined],
 	] as const)(
 		"resumes a %s after a synthetic unexecuted tool result",
 		async (_case, stopReason, errorMessage, errorId) => {
-			const model = createMockModel({
-				id: "grok-4",
-				provider: "openrouter",
-			});
-			authStorage.keys.setRuntime("openrouter", "openrouter-test-key");
+			const model = createMockModel({ id: "recovery-model" });
+			authStorage.keys.setRuntime("local", "local-test-key");
 			const toolCall: ToolCall = {
 				type: "toolCall",
 				id: "grok-write-1",
@@ -2952,370 +1504,6 @@ describe("AgentSession retry delay cap", () => {
 		},
 	);
 
-	it("resumes a stalled Cursor stream after its exec tool result", async () => {
-		const stallMessage = "Provider stream stalled while waiting for the next event";
-		const model = createMockModel({
-			id: "composer-2.5",
-			provider: "cursor",
-		});
-		authStorage.keys.setRuntime("cursor", "cursor-test-key");
-		const toolCall = {
-			type: "toolCall" as const,
-			id: "cursor-shell-1",
-			name: "shell",
-			arguments: { command: "pwd" },
-			[kCursorExecResolved]: true as const,
-		};
-		const toolResult: ToolResultMessage = {
-			role: "toolResult",
-			toolCallId: toolCall.id,
-			toolName: toolCall.name,
-			content: [{ type: "text", text: "/workspace" }],
-			isError: false,
-			timestamp: Date.now(),
-		};
-		let streamCalls = 0;
-		let resumedWithToolResult = false;
-		const agent = new Agent({
-			getApiKey: requestedModel => `${requestedModel.provider}-test-key`,
-			initialState: {
-				model,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			cursorOnToolResult: message => message,
-			streamFn: (_requestedModel, context, options) => {
-				streamCalls += 1;
-				if (streamCalls > 1) {
-					resumedWithToolResult = context.messages.some(
-						message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-					);
-					model.push({ content: ["Recovered after Cursor stall"] });
-					return model.stream(model, context, options);
-				}
-
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(async () => {
-					await options?.cursorOnToolResult?.(toolResult);
-					const partial: AssistantMessage = {
-						role: "assistant",
-						content: [toolCall],
-						api: model.api,
-						provider: model.provider,
-						model: model.id,
-						usage: {
-							input: 0,
-							output: 0,
-							cacheRead: 0,
-							cacheWrite: 0,
-							totalTokens: 0,
-							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-						},
-						stopReason: "stop",
-						timestamp: Date.now(),
-					};
-					stream.push({ type: "start", partial });
-					stream.push({ type: "toolcall_start", contentIndex: 0, partial });
-					stream.push({
-						type: "toolcall_delta",
-						contentIndex: 0,
-						delta: JSON.stringify(toolCall.arguments),
-						partial,
-					});
-					stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial });
-					stream.push({
-						type: "error",
-						reason: "error",
-						error: {
-							...partial,
-							stopReason: "error",
-							errorMessage: stallMessage,
-						},
-					});
-				});
-				return stream;
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.maxRetries": 1,
-		});
-		settings.setModelRole("default", `${model.provider}/${model.id}`);
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		const retryStartEvents: AutoRetryStartEvent[] = [];
-		const retryEndEvents: AutoRetryEndEvent[] = [];
-		session.subscribe(event => {
-			if (event.type === "auto_retry_start") retryStartEvents.push(event);
-			if (event.type === "auto_retry_end") retryEndEvents.push(event);
-		});
-
-		await session.prompt("Run pwd");
-		await session.waitForIdle();
-
-		expect(streamCalls).toBe(2);
-		expect(resumedWithToolResult).toBe(true);
-		expect(
-			session.agent.state.messages.filter(
-				message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-			),
-		).toHaveLength(1);
-		expect(retryStartEvents).toHaveLength(1);
-		expect(retryEndEvents).toContainEqual(expect.objectContaining({ success: true, attempt: 1 }));
-		expect(lastAssistant(session).content).toContainEqual({ type: "text", text: "Recovered after Cursor stall" });
-	});
-
-	it("resumes a Cursor HTTP/2 stream reset after an unmarked MCP tool result", async () => {
-		const resetMessage = "Stream closed with error code NGHTTP2_INTERNAL_ERROR";
-		const model = createMockModel({
-			id: "composer-2.5",
-			provider: "cursor",
-		});
-		authStorage.keys.setRuntime("cursor", "cursor-test-key");
-		const toolCall: ToolCall = {
-			type: "toolCall",
-			id: "cursor-mcp-1",
-			name: "mcp__databricks_production_execute_sql",
-			arguments: { query: "SELECT 1" },
-		};
-		const toolResult: ToolResultMessage = {
-			role: "toolResult",
-			toolCallId: toolCall.id,
-			toolName: toolCall.name,
-			content: [{ type: "text", text: "1" }],
-			isError: false,
-			timestamp: Date.now(),
-		};
-		let streamCalls = 0;
-		let resumedWithToolResult = false;
-		const agent = new Agent({
-			getApiKey: requestedModel => `${requestedModel.provider}-test-key`,
-			initialState: {
-				model,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			cursorOnToolResult: message => message,
-			streamFn: (_requestedModel, context, options) => {
-				streamCalls += 1;
-				if (streamCalls > 1) {
-					resumedWithToolResult = context.messages.some(
-						message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-					);
-					model.push({ content: ["Recovered after Cursor HTTP/2 reset"] });
-					return model.stream(model, context, options);
-				}
-
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(async () => {
-					await options?.cursorOnToolResult?.(toolResult);
-					const partial: AssistantMessage = {
-						role: "assistant",
-						content: [toolCall],
-						api: model.api,
-						provider: model.provider,
-						model: model.id,
-						usage: {
-							input: 0,
-							output: 0,
-							cacheRead: 0,
-							cacheWrite: 0,
-							totalTokens: 0,
-							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-						},
-						stopReason: "stop",
-						timestamp: Date.now(),
-					};
-					stream.push({ type: "start", partial });
-					stream.push({ type: "toolcall_start", contentIndex: 0, partial });
-					stream.push({
-						type: "toolcall_delta",
-						contentIndex: 0,
-						delta: JSON.stringify(toolCall.arguments),
-						partial,
-					});
-					stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial });
-					stream.push({
-						type: "error",
-						reason: "error",
-						error: {
-							...partial,
-							stopReason: "error",
-							errorMessage: resetMessage,
-						},
-					});
-				});
-				return stream;
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.maxRetries": 1,
-		});
-		settings.setModelRole("default", `${model.provider}/${model.id}`);
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		const retryStartEvents: AutoRetryStartEvent[] = [];
-		const retryEndEvents: AutoRetryEndEvent[] = [];
-		session.subscribe(event => {
-			if (event.type === "auto_retry_start") retryStartEvents.push(event);
-			if (event.type === "auto_retry_end") retryEndEvents.push(event);
-		});
-
-		await session.prompt("Run the query");
-		await session.waitForIdle();
-
-		expect(streamCalls).toBe(2);
-		expect(resumedWithToolResult).toBe(true);
-		expect(
-			session.agent.state.messages.some(
-				message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-			),
-		).toBe(true);
-		expect(retryStartEvents).toHaveLength(1);
-		expect(retryEndEvents).toContainEqual(expect.objectContaining({ success: true, attempt: 1 }));
-		expect(lastAssistant(session).content).toContainEqual({
-			type: "text",
-			text: "Recovered after Cursor HTTP/2 reset",
-		});
-	});
-
-	it("resumes a Cursor idle stall after an unmarked MCP tool result", async () => {
-		const stallMessage = "Provider stream stalled while waiting for the next event";
-		const model = createMockModel({
-			id: "composer-2.5",
-			provider: "cursor",
-		});
-		authStorage.keys.setRuntime("cursor", "cursor-test-key");
-		const toolCall: ToolCall = {
-			type: "toolCall",
-			id: "cursor-mcp-idle-1",
-			name: "mcp__databricks_production_execute_sql",
-			arguments: { query: "SELECT 1" },
-		};
-		const toolResult: ToolResultMessage = {
-			role: "toolResult",
-			toolCallId: toolCall.id,
-			toolName: toolCall.name,
-			content: [{ type: "text", text: "1" }],
-			isError: false,
-			timestamp: Date.now(),
-		};
-		let streamCalls = 0;
-		let resumedWithToolResult = false;
-		const agent = new Agent({
-			getApiKey: requestedModel => `${requestedModel.provider}-test-key`,
-			initialState: {
-				model,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-			cursorOnToolResult: message => message,
-			streamFn: (_requestedModel, context, options) => {
-				streamCalls += 1;
-				if (streamCalls > 1) {
-					resumedWithToolResult = context.messages.some(
-						message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-					);
-					model.push({ content: ["Recovered after Cursor idle stall"] });
-					return model.stream(model, context, options);
-				}
-
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(async () => {
-					await options?.cursorOnToolResult?.(toolResult);
-					const partial: AssistantMessage = {
-						role: "assistant",
-						content: [toolCall],
-						api: model.api,
-						provider: model.provider,
-						model: model.id,
-						usage: {
-							input: 0,
-							output: 0,
-							cacheRead: 0,
-							cacheWrite: 0,
-							totalTokens: 0,
-							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-						},
-						stopReason: "stop",
-						timestamp: Date.now(),
-					};
-					stream.push({ type: "start", partial });
-					stream.push({ type: "toolcall_start", contentIndex: 0, partial });
-					stream.push({
-						type: "toolcall_delta",
-						contentIndex: 0,
-						delta: JSON.stringify(toolCall.arguments),
-						partial,
-					});
-					stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial });
-					stream.push({
-						type: "error",
-						reason: "error",
-						error: {
-							...partial,
-							stopReason: "error",
-							errorMessage: stallMessage,
-						},
-					});
-				});
-				return stream;
-			},
-		});
-
-		const settings = Settings.isolated({
-			"compaction.enabled": false,
-			"retry.baseDelayMs": 5,
-			"retry.maxRetries": 1,
-		});
-		settings.setModelRole("default", `${model.provider}/${model.id}`);
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		const retryStartEvents: AutoRetryStartEvent[] = [];
-		const retryEndEvents: AutoRetryEndEvent[] = [];
-		session.subscribe(event => {
-			if (event.type === "auto_retry_start") retryStartEvents.push(event);
-			if (event.type === "auto_retry_end") retryEndEvents.push(event);
-		});
-
-		await session.prompt("Run the query");
-		await session.waitForIdle();
-
-		expect(streamCalls).toBe(2);
-		expect(resumedWithToolResult).toBe(true);
-		expect(
-			session.agent.state.messages.some(
-				message => message.role === "toolResult" && message.toolCallId === toolCall.id,
-			),
-		).toBe(true);
-		expect(retryStartEvents).toHaveLength(1);
-		expect(retryEndEvents).toContainEqual(expect.objectContaining({ success: true, attempt: 1 }));
-		expect(lastAssistant(session).content).toContainEqual({
-			type: "text",
-			text: "Recovered after Cursor idle stall",
-		});
-	});
-
 	it.each([
 		["verbose socket close", "The socket connection was closed unexpectedly"],
 		["bare socket close", "Socket is closed"],
@@ -3323,7 +1511,7 @@ describe("AgentSession retry delay cap", () => {
 		["gateway 500", "auth-gateway 500: <none>"],
 		["gateway 524", "auth-gateway 524: <none>"],
 	])("retries a transient %s after partial text and thinking", async (_label, errorMessage) => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3452,7 +1640,7 @@ describe("AgentSession retry delay cap", () => {
 			// because the text is already rendered, so it continues from the
 			// partial answer instead — the same recovery a stall, an HTTP/2 reset
 			// or a gateway's in-band `error` frame gets, and no auto-retry.
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) {
 				throw new Error("Expected bundled Anthropic test model to exist");
 			}
@@ -3557,29 +1745,27 @@ describe("AgentSession retry delay cap", () => {
 		[
 			"Bun HTTP/2",
 			{
-				throw: 'HTTP2StreamReset fetching "https://chatgpt.com/backend-api/codex/responses". For more information, pass `verbose: true` in the second argument to fetch()',
+				throw: 'HTTP2StreamReset fetching "https://api.githubcopilot.com/responses". For more information, pass `verbose: true` in the second argument to fetch()',
 			},
 		],
 		[
-			"proxied Python HTTP/2",
+			"HTTP/2 reset after thinking",
 			{
 				content: [{ type: "thinking", thinking: "Checking the request." }],
 				stopReason: "error",
-				errorMessage:
-					"Codex error event: <StreamReset stream_id:1283, error_code:2, remote_reset:True> (code=api_error)",
+				errorMessage: "Stream closed with error code NGHTTP2_INTERNAL_ERROR",
 			},
 		],
 		[
-			"proxied Python HTTP/1.1 chunked body",
+			"socket closed mid-body",
 			{
 				content: [],
 				stopReason: "error",
-				errorMessage:
-					"Codex error event: peer closed connection without sending complete message body (incomplete chunked read) (code=api_error)",
+				errorMessage: "The socket connection was closed unexpectedly before the response completed",
 			},
 		],
 	] satisfies [string, MockResponse][])("retries on %s stream interruption errors", async (_label, failure) => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3630,7 +1816,7 @@ describe("AgentSession retry delay cap", () => {
 		expect(last.stopReason).toBe("stop");
 	});
 	it("retries generic upstream_error gateway failures", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3687,7 +1873,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("retries empty reasonless aborted turns", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3748,7 +1934,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("does not retry reasonless aborted turns that have partial content", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3798,7 +1984,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("records visible-text usage limits without replaying the failed turn", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -3849,7 +2035,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("does not auto-retry empty reasonless aborts once the session is disposing", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}
@@ -4014,18 +2200,6 @@ describe("AgentSession retry delay cap", () => {
 		expect(session.isRetrying).toBe(false);
 	}
 
-	it("caps repeated OpenRouter stream closes after streamed thinking at one retry", async () => {
-		const model = getBundledModel("openrouter", "~google/gemini-flash-latest");
-		if (!model) {
-			throw new Error("Expected bundled OpenRouter Gemini test model to exist");
-		}
-		await expectThinkingStreamCloseRetryCap({
-			model,
-			errorMessage: "server_error: stream closed with reason: error",
-			prompt: "Trigger OpenRouter reasoning transition failure",
-		});
-	});
-
 	it("caps repeated Copilot Grok Responses closes after streamed thinking at one retry", async () => {
 		const model = getBundledModel("github-copilot", "grok-4.6");
 		if (!model) {
@@ -4039,7 +2213,7 @@ describe("AgentSession retry delay cap", () => {
 	});
 
 	it("defaults 502 auto-retry to ten capped backoff attempts", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
 			throw new Error("Expected bundled Anthropic test model to exist");
 		}

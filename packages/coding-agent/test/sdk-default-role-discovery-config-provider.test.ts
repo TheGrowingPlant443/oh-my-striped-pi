@@ -1,20 +1,4 @@
-/**
- * Regression: issue #6162.
- *
- * `modelRoles.default` set to a `models.yml` discovery provider model
- * (a custom OpenAI-compatible endpoint with `discovery.type: openai-models-list`)
- * was silently replaced on a cache-cold interactive launch by an unrelated
- * authenticated provider's default. The configured provider ships no static
- * models, so the static+cached catalog the SDK resolves against at startup is
- * empty; the online discovery pass in `main.ts` runs only AFTER
- * `createAgentSession` returns. Unlike issue #6114 (no other authed provider, so
- * the fallback resolved nothing and the later discovery-retry gate fired), here
- * a competing bundled provider key resolves `pickDefaultAvailableModel` first,
- * so the `!model` discovery-retry gate never runs and the configured default is
- * lost. The SDK now runs the discovery pass whenever the configured default role
- * is still unresolved and discoverable providers exist, before accepting the
- * bundled-provider fallback.
- */
+/** Configured discovery defaults must resolve before bundled-model fallback. */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -49,7 +33,7 @@ describe("issue #6162 fresh launch default role from models.yml discovery provid
 
 	const baseUrl = "https://example.com/v1";
 
-	/** Custom provider `/v1/models` (openai-models-list discovery). */
+	/** Configured Copilot `/v1/models` discovery. */
 	function mockDiscovery(models: string[]): FetchImpl {
 		return async input => {
 			const url = String(input);
@@ -60,13 +44,13 @@ describe("issue #6162 fresh launch default role from models.yml discovery provid
 		};
 	}
 
-	test("selects the configured models.yml default over a competing bundled provider on cold cache", async () => {
+	test("selects the configured discovery default instead of a bundled fallback on cold cache", async () => {
 		const modelsPath = path.join(tempDir, "models.yml");
 		fs.writeFileSync(
 			modelsPath,
 			[
 				"providers:",
-				"  my-provider:",
+				"  github-copilot:",
 				`    baseUrl: ${baseUrl}`,
 				"    api: openai-completions",
 				"    apiKey: MY_API_KEY",
@@ -78,20 +62,15 @@ describe("issue #6162 fresh launch default role from models.yml discovery provid
 
 		const authStorage = createInMemoryAuthStorage();
 		authStoragesToClose.push(authStorage);
-		// The configured provider's key resolves the role model; a competing
-		// bundled provider key would otherwise win the startup fallback via
-		// `pickDefaultAvailableModel`.
-		authStorage.keys.setRuntime("my-provider", "test-provider-key");
-		authStorage.keys.setRuntime("openai", "test-openai-key");
+		authStorage.keys.setRuntime("github-copilot", "test-provider-key");
 
-		// Fresh registry: no cached my-provider catalog on disk, so the static
-		// catalog the SDK resolves against at startup is empty for the provider.
+		// The requested model is absent until configured discovery completes.
 		const modelRegistry = new ModelRegistry(authStorage, modelsPath, {
 			fetch: mockDiscovery(["some-model"]),
 		});
 
 		const settings = Settings.isolated();
-		settings.setModelRole("default", "my-provider/some-model");
+		settings.setModelRole("default", "github-copilot/some-model");
 
 		const { session } = await createAgentSession({
 			cwd: tempDir,
@@ -114,7 +93,7 @@ describe("issue #6162 fresh launch default role from models.yml discovery provid
 		});
 
 		try {
-			expect(session.model?.provider).toBe("my-provider");
+			expect(session.model?.provider).toBe("github-copilot");
 			expect(session.model?.id).toBe("some-model");
 		} finally {
 			await session.dispose();

@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { normalizeOpenAIPromptCacheKey } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import type { Model } from "@oh-my-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -10,39 +11,24 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { asGlobalFetch } from "./helpers/fetch-mock";
-import { getTestModel } from "./helpers/model-fixtures";
 import { assistantMsg, userMsg } from "./utilities";
 
 /**
- * Regression for PR16988 review thread PRRT_kwDOQxs0bc6wFtDX:
- * session-maintenance compaction must not pass a sessionId fallback as the
- * compaction `promptCacheKey`. V2's header builder treats a truthy
- * `promptCacheKey` as an EXPLICIT cache identity and flips the Go gateway's
- * `x-opencode-session` affinity to the normalized (`pc_`-hash) cache id, even
- * though only the session id is known. Without an explicit key the raw child
- * conversation id must stay on the header while the body `prompt_cache_key`
- * keeps its 64-char-normalized value — both coding compaction paths
- * (manual `#compactWithFallbackModel` and auto `runAutoCompaction`) are
- * separate callsites, so both are exercised through the real session.
- *
- * Explicit-key / empty-key / retention behavior stays covered by the existing
- * direct-helper suites (packages/agent/test/remote-compaction.test.ts,
- * packages/ai/test/opencode-session-header.test.ts); this file adds only the
- * caller-level provenance checks — including the mirror case of thread
- * PRRT_kwDOQxs0bc6wG-Mm, where a Task child's family key exists only in the
- * session header and MUST still reach the compaction request.
+ * Manual and automatic maintenance preserve a private gateway's distinct
+ * conversation header and normalized body cache identity. An explicit key must
+ * reach both summary callsites without replacing the conversation id.
  */
 
-const OPENCODE_SESSION_HEADER = "x-opencode-session";
+const SESSION_HEADER = "x-litellm-session-id";
 /** Raw SDK session id over the 64-char cache-key wire limit (normalizes to pc_…). */
 const RAW_SESSION_ID = `ses_${"0123456789abcdef".repeat(6)}`;
-/** Task-family affinity key persisted in the session header; also over the 64-char wire limit. */
-const FAMILY_CACHE_KEY = `ses_${"fedcba9876543210".repeat(4)}`;
+/** An explicit prompt-cache identity over the 64-char wire limit. */
+const EXPLICIT_CACHE_KEY = `cache_${"fedcba9876543210".repeat(4)}`;
 
 interface CapturedCompactionRequest {
 	url: string;
 	sessionHeader: string | null;
-	body: { prompt_cache_key?: string; input: Array<Record<string, unknown>> };
+	body: { model?: string; prompt_cache_key?: string; input: Array<Record<string, unknown>> };
 }
 
 function sseResponse(events: Array<Record<string, unknown>>): Response {
@@ -63,20 +49,26 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 	let authStorage: AuthStorage;
 	let modelRegistry: ModelRegistry;
 	let session: AgentSession;
-	let goModel: Model;
+	let gatewayModel: Model;
 	let compactionRequests: CapturedCompactionRequest[];
 
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-compaction-provenance-");
-		// Eligible Go model: opted for task-sibling prompt-cache affinity on the
-		// openai-responses lane (opencode-go.kdl), with V2 streaming compaction.
-		goModel = {
-			...getTestModel(
-				"opencode-go",
-				model => model.api === "openai-responses" && model.id === "muse-spark-1.2-contributor",
-			),
+		// Private Responses gateway opts into its conversation header and V2 protocol.
+		gatewayModel = buildModel({
+			id: "private-contributor",
+			name: "Private compaction gateway fixture",
+			api: "openai-responses",
+			provider: "private-compaction-gateway",
+			baseUrl: "https://gateway.company.invalid/v1",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 32_000,
+			compat: { sessionHeader: "x-litellm-session-id" },
 			remoteCompaction: { enabled: true, v2StreamingEnabled: true },
-		};
+		} satisfies ModelSpec<"openai-responses">);
 		const settings = Settings.isolated({
 			"compaction.autoContinue": false,
 			"compaction.keepRecentTokens": 1,
@@ -84,11 +76,11 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 			"contextPromotion.enabled": false,
 		});
 		const agent = new Agent({
-			initialState: { model: goModel, systemPrompt: ["Test"], tools: [], messages: [] },
+			initialState: { model: gatewayModel, systemPrompt: ["Test"], tools: [], messages: [] },
 		});
 
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime(goModel.provider, "go-token");
+		authStorage.keys.setRuntime(gatewayModel.provider, "private-test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 		session = new AgentSession({
 			agent,
@@ -111,7 +103,7 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 			session.agent.appendMessage(assistant);
 			session.sessionManager.appendMessage(assistant);
 		}
-		vi.spyOn(modelRegistry, "getAvailable").mockReturnValue([goModel]);
+		vi.spyOn(modelRegistry, "getAvailable").mockReturnValue([gatewayModel]);
 		vi.spyOn(modelRegistry, "getApiKey").mockResolvedValue("test-key");
 
 		compactionRequests = [];
@@ -122,7 +114,7 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 				if (body.input?.at(-1)?.type === "compaction_trigger") {
 					compactionRequests.push({
 						url,
-						sessionHeader: new Headers(init?.headers).get(OPENCODE_SESSION_HEADER),
+						sessionHeader: new Headers(init?.headers).get(SESSION_HEADER),
 						body,
 					});
 					return sseResponse([
@@ -151,13 +143,7 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 		tempDir.removeSync();
 	});
 
-	/**
-	 * The one compaction request that went over the wire must carry:
-	 * - body `prompt_cache_key` = the normalized wire cache id (`pc_…` hash of
-	 *   the long session id) — unchanged by this fix;
-	 * - `x-opencode-session` = the RAW child conversation id, never the derived
-	 *   hash (the session-id-derived cache id must not feed family affinity).
-	 */
+	/** The raw conversation id stays independent of the normalized body cache key. */
 	function expectRawChildHeaderNormalizedBodyKey(): void {
 		expect(session.agent.promptCacheKey).toBeUndefined();
 		expect(compactionRequests).toHaveLength(1);
@@ -185,13 +171,13 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 		session.subscribe(event => {
 			if (event.type === "auto_compaction_end") resolve();
 		});
-		const contextWindow = goModel.contextWindow;
+		const contextWindow = gatewayModel.contextWindow;
 		if (!contextWindow) throw new Error("Expected current model context window");
 		const assistant = {
 			...assistantMsg("threshold reached"),
-			api: goModel.api,
-			provider: goModel.provider,
-			model: goModel.id,
+			api: gatewayModel.api,
+			provider: gatewayModel.provider,
+			model: gatewayModel.id,
 			usage: {
 				input: contextWindow,
 				output: 1,
@@ -212,67 +198,39 @@ describe("session-maintenance V2 compaction cache-key provenance", () => {
 		expectRawChildHeaderNormalizedBodyKey();
 	});
 
-	/**
-	 * PR16988 review thread PRRT_kwDOQxs0bc6wG-Mm: a Task child keeps its
-	 * affinity ONLY in the session header — `createAgentSession` persists
-	 * `taskPromptCacheKey` while leaving `agent.promptCacheKey` undefined — so a
-	 * compaction that reads the agent field alone sends no family key, and the Go
-	 * gateway warms its cache under the CHILD conversation id instead of the
-	 * family the child's normal turns share. Returns the normalized family cache
-	 * id both wire fields must carry.
-	 */
-	async function seedTaskFamilyAffinity(): Promise<string> {
-		// The same header write createAgentSession performs for a Task child.
-		await session.sessionManager.setTaskPromptCacheKey(FAMILY_CACHE_KEY);
-		expect(session.sessionManager.getHeader()?.taskPromptCacheKey).toBe(FAMILY_CACHE_KEY);
-		expect(session.agent.promptCacheKey).toBeUndefined();
-		const normalized = normalizeOpenAIPromptCacheKey(FAMILY_CACHE_KEY);
-		if (normalized === undefined || !normalized.startsWith("pc_")) {
-			throw new Error("Expected the family key to normalize to pc_…");
+	it.each(["manual", "auto"] as const)("passes an explicit prompt-cache key into %s compaction", async mode => {
+		session.agent.promptCacheKey = EXPLICIT_CACHE_KEY;
+		const normalized = normalizeOpenAIPromptCacheKey(EXPLICIT_CACHE_KEY);
+		expect(normalized).toMatch(/^pc_/);
+
+		if (mode === "manual") {
+			const result = await session.compact();
+			await session.waitForIdle();
+			expect(result?.shortSummary).toBe("Remote compaction");
+		} else {
+			await triggerAutoCompaction();
 		}
-		expect(normalized).not.toBe(RAW_SESSION_ID);
-		return normalized;
-	}
 
-	function expectFamilyKeyOnWire(familyKey: string): void {
-		expect(session.agent.promptCacheKey).toBeUndefined();
 		expect(compactionRequests).toHaveLength(1);
-		const request = compactionRequests[0];
-		if (!request) throw new Error("Expected a V2 compaction request");
-		// The gateway affinity header and the body cache key must both carry the
-		// family identity — never the child conversation id.
-		expect(request.sessionHeader).toBe(familyKey);
-		expect(request.body.prompt_cache_key).toBe(familyKey);
-		expect(request.url.endsWith("/responses")).toBe(true);
-	}
-
-	it("passes the session-header Task family cache key into manual compaction", async () => {
-		const familyKey = await seedTaskFamilyAffinity();
-		const result = await session.compact();
-		await session.waitForIdle();
-		expect(result?.shortSummary).toBe("Remote compaction");
-		expectFamilyKeyOnWire(familyKey);
+		expect(compactionRequests[0]?.body.prompt_cache_key).toBe(normalized);
+		expect(compactionRequests[0]?.sessionHeader).toBe(RAW_SESSION_ID);
+		expect(compactionRequests[0]?.url.endsWith("/responses")).toBe(true);
 	});
 
-	it("passes the session-header Task family cache key into auto compaction", async () => {
-		const familyKey = await seedTaskFamilyAffinity();
-		await triggerAutoCompaction();
-		expectFamilyKeyOnWire(familyKey);
-	});
-
-	it("gates the remote compaction key on the override target, not the unopted active model", async () => {
-		// Active lane grok-4.7 does not opt into shared prompt caching, but
-		// remote compaction sends the opted Contributor id: the family key must
-		// reach that request even though the live turn would not use it.
-		Object.assign(goModel, {
-			id: "grok-4.7",
-			remoteCompaction: { enabled: true, v2StreamingEnabled: true, model: "muse-spark-1.2-contributor" },
+	it("preserves explicit cache provenance when remote compaction overrides the active model id", async () => {
+		Object.assign(gatewayModel, {
+			id: "private-active-alias",
+			remoteCompaction: { enabled: true, v2StreamingEnabled: true, model: "private-contributor" },
 		});
-		const familyKey = await seedTaskFamilyAffinity();
-		expect(session.getPromptCacheKeyForModel(goModel)).toBeUndefined();
+		session.agent.promptCacheKey = EXPLICIT_CACHE_KEY;
 		const result = await session.compact();
 		await session.waitForIdle();
+
 		expect(result?.shortSummary).toBe("Remote compaction");
-		expectFamilyKeyOnWire(familyKey);
+		expect(compactionRequests).toHaveLength(1);
+		expect(compactionRequests[0]?.body.model).toBe("private-contributor");
+		expect(compactionRequests[0]?.body.prompt_cache_key).toBe(normalizeOpenAIPromptCacheKey(EXPLICIT_CACHE_KEY));
+		expect(compactionRequests[0]?.sessionHeader).toBe(RAW_SESSION_ID);
+		expect(session.model?.id).toBe("private-active-alias");
 	});
 });

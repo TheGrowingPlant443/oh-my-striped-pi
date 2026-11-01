@@ -54,7 +54,7 @@ describe("discovery rows that fail to build", () => {
 			{
 				providerId: "synthetic",
 				staticModels: [],
-				modelsDev: { fetch: async () => null, map: () => [spec("catalog-only-model"), spec(UNBUILDABLE)] },
+				fetchDynamicModels: async () => [spec("catalog-only-model"), spec(UNBUILDABLE)],
 				cacheDbPath: dbPath,
 			},
 			"online",

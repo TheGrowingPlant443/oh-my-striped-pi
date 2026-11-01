@@ -10,7 +10,7 @@ const model: Model<"anthropic-messages"> = buildModel({
 	id: "claude-sonnet-4-5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text"],
@@ -116,7 +116,13 @@ function createResponseClient(responses: Response[]): {
 	};
 	return {
 		calls,
-		client: new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 0, fetch }),
+		client: new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 0,
+			fetch,
+		}),
 	};
 }
 
@@ -497,7 +503,7 @@ describe("anthropic model compat stream idle timeout floor", () => {
 		id: "claude-sonnet-4-5",
 		name: "Claude Sonnet 4.5",
 		api: "anthropic-messages" as const,
-		provider: "anthropic",
+		provider: "github-copilot",
 		baseUrl: "https://api.anthropic.com",
 		reasoning: true,
 		input: ["text"],
@@ -715,7 +721,13 @@ describe("anthropic provider retry delays", () => {
 			if (attempt === 1) throw certError;
 			return createAnthropicSseResponse("recovered from tls certificate retry");
 		};
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 0, fetch: fetchImpl });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 0,
+			fetch: fetchImpl,
+		});
 		const providerRetryWait = vi.fn(async (_delayMs: number, _signal: AbortSignal | undefined) => {});
 
 		const result = await streamAnthropic(model, context, { client, providerRetryWait }).result();

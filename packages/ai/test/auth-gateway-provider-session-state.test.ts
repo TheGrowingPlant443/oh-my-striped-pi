@@ -9,7 +9,7 @@
  * server-side owner, every containerized / robomp turn re-pays the rejected
  * upstream round-trip that already taught the lesson.
  */
-import { describe, expect, it, spyOn } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -26,20 +26,21 @@ import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock
 import type { Api, Context, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { withOfficialAnthropicEndpoint } from "./helpers";
-import { captureFetch, type CapturedRequest, completionsChunks, kimiK3 } from "./helpers/factory-droid";
 
 function makeAnthropicModel(baseUrl: string): Model<"anthropic-messages"> {
 	return buildModel({
 		id: "claude-opus-4-7",
 		name: "claude-opus-4-7",
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		baseUrl,
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000,
 		maxTokens: 8_192,
+		// Exercise the retained compatibility override, not Copilot's non-fast default SKU.
+		compat: { fastMode: true },
 	});
 }
 
@@ -205,129 +206,34 @@ async function priorityTurn(
 }
 
 it.each(["/v1/pi/stream", "/v1/chat/completions"])(
-	"keeps the selected Factory identity after a concurrent token replacement through %s",
+	"keeps the selected credential after a concurrent replacement through %s",
 	async route => {
-		const storage = await AuthStorage.create(":memory:", { usageProviderResolver: () => undefined });
-		const model = kimiK3();
-		const captured: CapturedRequest[] = [];
-		const credential = {
-			type: "oauth" as const,
-			access: "global-token",
-			refresh: "refresh-token",
-			expires: Date.now() + 3_600_000,
-			orgId: "org-global",
-			region: "global" as const,
-			inferenceRegion: "us" as const,
-		};
-		await storage.credentials.set("factory-droid", credential);
-		const gateway = startAuthGateway({
-			bind: "127.0.0.1:0",
-			bearerTokens: ["test-token"],
-			storage,
-			resolveModel: () => model,
-			fetch: captureFetch(captured, completionsChunks("ok", model.id)),
-			version: "test",
-		});
-		const getWithCredential = storage.keys.getWithCredential.bind(storage.keys);
-		let replaceToken = false;
-		const bearerSpy = spyOn(storage.keys, "getWithCredential").mockImplementation(async (...args) => {
+		registerMockApi();
+		const mock = createMockModel({ id: "credential-race", handler: { content: ["ok"] } });
+		const gateway = await startGateway(mock, "local", { apiKeys: ["selected-key"] });
+		const getWithCredential = gateway.storage.keys.getWithCredential.bind(gateway.storage.keys);
+		gateway.storage.keys.getWithCredential = async (...args) => {
 			const selected = await getWithCredential(...args);
-			if (replaceToken) {
-				await storage.credentials.set("factory-droid", {
-					...credential,
-					access: "eu-refreshed-token",
-					orgId: "org-eu",
-					region: "eu",
-					inferenceRegion: "global",
-				});
-			}
+			await gateway.storage.credentials.set("local", { type: "api_key", key: "replacement-key" });
 			return selected;
-		});
-		const turn = async () => {
-			const response = await fetch(`${gateway.url}${route}`, {
-				method: "POST",
-				headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
-				body: JSON.stringify(
-					route === "/v1/pi/stream"
-						? { modelId: model.id, context: CONTEXT, options: { sessionId: "factory-race" }, stream: false }
-						: { model: model.id, messages: [{ role: "user", content: "Hi" }], stream: false },
-				),
-			});
-			const body = await response.json();
-			expect(response.status).toBe(200);
-			expect(JSON.stringify(body)).toContain("ok");
 		};
 		try {
-			// Seed the provider's fallback cache with a different account/host.
-			await turn();
-			await storage.credentials.set("factory-droid", {
-				...credential,
-				access: "eu-selected-token",
-				orgId: "org-eu",
-				region: "eu",
-				inferenceRegion: "global",
-			});
-			replaceToken = true;
-			await turn();
-			expect(storage.credentials.get("factory-droid")).toMatchObject({ access: "eu-refreshed-token" });
-			expect(
-				captured.map(request => [request.url, request.headers["x-factory-org-id"], request.headers.authorization]),
-			).toEqual([
-				["https://api.factory.ai/api/llm/o/v1/chat/completions", "org-global", "Bearer global-token"],
-				["https://api.eu.factory.ai/api/llm/o/v1/chat/completions", "org-eu", "Bearer eu-selected-token"],
-			]);
-		} finally {
-			bearerSpy.mockRestore();
-			await gateway.close();
-			storage.close();
-		}
-	},
-);
-
-it.each(["/v1/pi/stream", "/v1/chat/completions"])(
-	"does not borrow cached Factory organization or EU routing for an unscoped OAuth row through %s",
-	async route => {
-		const storage = await AuthStorage.create(":memory:", { usageProviderResolver: () => undefined });
-		const model = kimiK3();
-		model.baseUrl = "https://api.eu.factory.ai/api/llm/o/v1";
-		model.factoryDroidOrgId = "stale-org";
-		const captured: CapturedRequest[] = [];
-		await storage.credentials.set("factory-droid", {
-			type: "oauth",
-			access: "unscoped-token",
-			refresh: "refresh-token",
-			expires: Date.now() + 3_600_000,
-		});
-		const gateway = startAuthGateway({
-			bind: "127.0.0.1:0",
-			bearerTokens: ["test-token"],
-			storage,
-			resolveModel: () => model,
-			fetch: captureFetch(captured, completionsChunks("ok", model.id)),
-			version: "test",
-		});
-		try {
-			const response = await fetch(`${gateway.url}${route}`, {
+			const response = await fetch(`${gateway.handle.url}${route}`, {
 				method: "POST",
 				headers: { Authorization: "Bearer test-token", "Content-Type": "application/json" },
 				body: JSON.stringify(
 					route === "/v1/pi/stream"
-						? { modelId: model.id, context: CONTEXT, options: { sessionId: "factory-unscoped" }, stream: false }
-						: { model: model.id, messages: [{ role: "user", content: "Hi" }], stream: false },
+						? { modelId: mock.id, context: CONTEXT, stream: false }
+						: { model: mock.id, messages: [{ role: "user", content: "Hi" }], stream: false },
 				),
 			});
-			const body = await response.json();
 			expect(response.status).toBe(200);
-			expect(JSON.stringify(body)).toContain("ok");
-			expect(captured).toHaveLength(1);
-			expect(captured[0]).toMatchObject({
-				url: "https://api.factory.ai/api/llm/o/v1/chat/completions",
-				headers: { authorization: "Bearer unscoped-token" },
-			});
-			expect(captured[0].headers).not.toHaveProperty("x-factory-org-id");
+			await response.json();
+			expect(mock.calls.map(call => call.options?.apiKey)).toEqual(["selected-key"]);
+			expect(gateway.storage.credentials.get("local")).toMatchObject({ type: "api_key", key: "replacement-key" });
 		} finally {
-			await gateway.close();
-			storage.close();
+			await gateway.cleanup();
+			clearCustomApis();
 		}
 	},
 );
@@ -366,11 +272,11 @@ async function priorityChatTurn(
 
 withOfficialAnthropicEndpoint();
 
-describe("auth-gateway provider session state", () => {
+describe("auth-gateway provider session state with an explicit fast-mode override", () => {
 	it("carries a session's learned fast-mode fallback into its next request", async () => {
 		const upstream = startUpstream();
 		const model = makeAnthropicModel(upstream.url);
-		const gateway = await startGateway(model, "anthropic");
+		const gateway = await startGateway(model, "github-copilot");
 		try {
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
@@ -388,7 +294,7 @@ describe("auth-gateway provider session state", () => {
 	it("carries the learned fallback across requests on the foreign-wire routes", async () => {
 		const upstream = startUpstream();
 		const model = makeAnthropicModel(upstream.url);
-		const gateway = await startGateway(model, "anthropic");
+		const gateway = await startGateway(model, "github-copilot");
 		try {
 			expect(await priorityChatTurn(gateway.handle, model.id, "Hi")).toMatchObject({ status: 200 });
 			expect(await priorityChatTurn(gateway.handle, model.id, "Hi")).toMatchObject({ status: 200 });
@@ -412,7 +318,7 @@ describe("auth-gateway provider session state", () => {
 	it("keeps one session's fallback out of another session's requests", async () => {
 		const upstream = startUpstream();
 		const model = makeAnthropicModel(upstream.url);
-		const gateway = await startGateway(model, "anthropic");
+		const gateway = await startGateway(model, "github-copilot");
 		try {
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
 			expect(await priorityTurn(gateway.handle, "session-b", model.id)).toMatchObject({ status: 200 });
@@ -430,7 +336,7 @@ describe("auth-gateway provider session state", () => {
 	it("gives two keyless conversations that share an opening their own retained state", async () => {
 		const upstream = startUpstream();
 		const model = makeAnthropicModel(upstream.url);
-		const gateway = await startGateway(model, "anthropic");
+		const gateway = await startGateway(model, "github-copilot");
 		try {
 			// Conversation A opens and learns the fallback.
 			expect(await priorityChatHistory(gateway.handle, model.id, [{ role: "user", content: "Hi" }])).toMatchObject({
@@ -471,7 +377,7 @@ describe("auth-gateway provider session state", () => {
 	it("re-probes the account-scoped lesson after the session switches credentials", async () => {
 		const upstream = startUpstream();
 		const model = makeAnthropicModel(upstream.url);
-		const gateway = await startGateway(model, "anthropic");
+		const gateway = await startGateway(model, "github-copilot");
 		try {
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
@@ -479,7 +385,7 @@ describe("auth-gateway provider session state", () => {
 			// What markUsageLimitReached does to a session: same conversation, next
 			// credential. Fast mode is an entitlement of the account that was
 			// rejected, not of the endpoint, so the new one has to be asked.
-			gateway.storage.keys.setRuntime("anthropic", "sk-ant-api-sibling");
+			gateway.storage.keys.setRuntime("github-copilot", "sk-ant-api-sibling");
 			expect(await priorityTurn(gateway.handle, "session-a", model.id)).toMatchObject({ status: 200 });
 			// Still the sibling: a switch re-probes once, it does not re-probe every
 			// turn afterwards.
@@ -504,7 +410,7 @@ describe("auth-gateway provider session state", () => {
 		const observed: Array<{ fastModeDisabled: boolean; strictToolsDisabled: boolean }> = [];
 		let attempt = 0;
 		const mock = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "gw-session-account-retry",
 			handler: (_context, options) => {
 				const states = options?.providerSessionState;
@@ -528,7 +434,7 @@ describe("auth-gateway provider session state", () => {
 				return { content: ["ok"] };
 			},
 		});
-		const gateway = await startGateway(mock, "mock", { apiKeys: ["key-one", "key-two"] });
+		const gateway = await startGateway(mock, "local", { apiKeys: ["key-one", "key-two"] });
 		try {
 			expect(await priorityTurn(gateway.handle, "session-a", mock.id)).toMatchObject({ status: 200 });
 			expect(mock.calls.map(call => call.options?.apiKey)).toHaveLength(2);
@@ -590,11 +496,11 @@ describe("auth-gateway provider session state", () => {
 	it("hands the retained state back when a request throws, so the ceiling still applies", async () => {
 		registerMockApi();
 		const mock = createMockModel({
-			provider: "openrouter",
+			provider: "local",
 			id: "gw-session-throw",
 			handler: () => ({ content: ["ok"] }),
 		});
-		const gateway = await startGateway(mock, "openrouter");
+		const gateway = await startGateway(mock, "local");
 		try {
 			mock.push(() => {
 				throw new Error("upstream transport exploded");
@@ -644,8 +550,8 @@ describe("auth-gateway provider session state", () => {
 
 	it("closes every retained provider state when the gateway shuts down", async () => {
 		registerMockApi();
-		const mock = createMockModel({ provider: "openrouter", id: "gw-session-drain" });
-		const gateway = await startGateway(mock, "openrouter");
+		const mock = createMockModel({ provider: "local", id: "gw-session-drain" });
+		const gateway = await startGateway(mock, "local");
 		try {
 			mock.push({ content: ["ok"] });
 			const response = await fetch(`${gateway.handle.url}/v1/pi/stream`, {

@@ -17,9 +17,6 @@ import { bindEffects } from "@oh-my-pi/pi-coding-agent/config/registry";
 
 import * as discovery from "@oh-my-pi/pi-coding-agent/discovery";
 import { editVariantForModel } from "@oh-my-pi/pi-coding-agent/utils/edit-mode";
-import { roleDefaultModels } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { resolveRoleChain } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
 import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
 import { getAgentDbPath, getProjectAgentDir, logger, TempDir } from "@oh-my-pi/pi-utils";
 import * as fileLock from "@oh-my-pi/pi-utils/file-lock";
@@ -50,8 +47,6 @@ import {
 	cfgToolsXdev,
 	cfgTodoReminders,
 	cfgTodoRemindersMax,
-	cfgDevAutoqa,
-	cfgDevAutoqaConsent,
 	cfgGlobEnabled,
 	cfgFindEnabled,
 	cfgGrepEnabled,
@@ -70,10 +65,9 @@ import {
 	cfgTaskAgentModelOverrides,
 } from "@oh-my-pi/pi-coding-agent/task/settings";
 import { cfgMnemopiDbPath, cfgMnemopiScoping } from "@oh-my-pi/pi-coding-agent/mnemopi/settings";
-import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
 import { cfgHindsightBankId, cfgHindsightScoping } from "@oh-my-pi/pi-coding-agent/hindsight/settings";
+import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
 import { cfgEditMode } from "@oh-my-pi/pi-coding-agent/edit/settings";
-import { cfgExaEnabled } from "@oh-my-pi/pi-coding-agent/web/settings";
 import {
 	cfgCompactionMethodOrder,
 	cfgSnapcompactSystemPrompt,
@@ -164,18 +158,18 @@ describe("Settings", () => {
 				inMemory: true,
 				overrides: {
 					enabledModels: [
-						{ path: projectDir, models: ["openai/first"] },
-						{ path: otherProject, models: ["openai/second"] },
+						{ path: projectDir, models: ["github-copilot/gpt-4o"] },
+						{ path: otherProject, models: ["local/lfm2.5-230m"] },
 					],
 				},
 			});
 			const before = settings.revision;
-			expect(cfgEnabledModels.get(settings)).toEqual(["openai/first"]);
+			expect(cfgEnabledModels.get(settings)).toEqual(["github-copilot/gpt-4o"]);
 
 			await settings.reloadForCwd(otherProject);
 
 			expect(settings.revision).toBeGreaterThan(before);
-			expect(cfgEnabledModels.get(settings)).toEqual(["openai/second"]);
+			expect(cfgEnabledModels.get(settings)).toEqual(["local/lfm2.5-230m"]);
 		});
 	});
 
@@ -360,7 +354,7 @@ describe("Settings", () => {
 		it("backs up a config corrupted after startup and retains the pending global change for retry", async () => {
 			await writeSettings({
 				auth: { broker: { token: "TOP-SECRET" } },
-				modelRoles: { default: "keep/default" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 			const corrupted = 'auth:\n  broker:\n    token: TOP-SECRET\nmodelRoles:\n  default: "unterminated\n';
@@ -378,7 +372,7 @@ describe("Settings", () => {
 			await settings.flush();
 			expect(await readSettings()).toEqual({
 				auth: { broker: { token: "TOP-SECRET" } },
-				modelRoles: { default: "keep/default" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 				theme: { dark: "anthracite" },
 			});
 			expect(await Bun.file(backupPath).text()).toBe(corrupted);
@@ -393,13 +387,14 @@ describe("Settings", () => {
 			const projectConfigPath = path.join(projectDir, ".omp", "config.yml");
 			await Bun.write(
 				projectConfigPath,
-				YAML.stringify({ modelRoles: { default: "keep/default" }, custom: { keep: true } }, null, 2),
+				YAML.stringify({ modelRoles: { default: "github-copilot/gpt-4o" }, custom: { keep: true } }, null, 2),
 			);
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-			const corrupted = 'modelRoles:\n  default: keep/default\n  advisor: "unterminated\ncustom:\n  keep: true\n';
+			const corrupted =
+				'modelRoles:\n  default: github-copilot/gpt-4o\n  advisor: "unterminated\ncustom:\n  keep: true\n';
 			await Bun.write(projectConfigPath, corrupted);
 
-			settings.setProjectModelRole("smol", "new/smol");
+			settings.setProjectModelRole("smol", "github-copilot/claude-haiku-4.5");
 			await expect(settings.flush()).rejects.toThrow("Settings config is invalid");
 
 			expect(await Bun.file(projectConfigPath).exists()).toBe(false);
@@ -412,7 +407,7 @@ describe("Settings", () => {
 			await settings.flush();
 			const saved = YAML.parse(await Bun.file(projectConfigPath).text()) as Record<string, unknown>;
 			expect(saved).toEqual({
-				modelRoles: { default: "keep/default", smol: "new/smol" },
+				modelRoles: { default: "github-copilot/gpt-4o", smol: "github-copilot/claude-haiku-4.5" },
 				custom: { keep: true },
 			});
 			expect(await Bun.file(backupPath).text()).toBe(corrupted);
@@ -1047,7 +1042,7 @@ describe("Settings", () => {
 			const original = YAML.stringify(
 				{
 					auth: { broker: { token: "TOP-SECRET" } },
-					modelRoles: { default: "keep/default" },
+					modelRoles: { default: "github-copilot/gpt-4o" },
 				},
 				null,
 				2,
@@ -1066,7 +1061,7 @@ describe("Settings", () => {
 			await settings.flush();
 			expect(await readSettings()).toEqual({
 				auth: { broker: { token: "TOP-SECRET" } },
-				modelRoles: { default: "keep/default" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 				theme: { dark: "anthracite" },
 			});
 		});
@@ -1074,10 +1069,14 @@ describe("Settings", () => {
 		it("leaves an unreadable project config untouched and retains its pending role", async () => {
 			await writeSettings({});
 			const projectConfigPath = path.join(projectDir, ".omp", "config.yml");
-			const original = YAML.stringify({ modelRoles: { default: "keep/default" }, custom: { keep: true } }, null, 2);
+			const original = YAML.stringify(
+				{ modelRoles: { default: "github-copilot/gpt-4o" }, custom: { keep: true } },
+				null,
+				2,
+			);
 			await Bun.write(projectConfigPath, original);
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-			settings.setProjectModelRole("smol", "new/smol");
+			settings.setProjectModelRole("smol", "github-copilot/claude-haiku-4.5");
 			const readSpy = vi.spyOn(fs.promises, "readFile");
 			readSpy.mockRejectedValueOnce(new FsCodeError("EACCES", "injected read failure"));
 
@@ -1090,7 +1089,7 @@ describe("Settings", () => {
 			).toBe(false);
 			await settings.flush();
 			expect(YAML.parse(await Bun.file(projectConfigPath).text())).toEqual({
-				modelRoles: { default: "keep/default", smol: "new/smol" },
+				modelRoles: { default: "github-copilot/gpt-4o", smol: "github-copilot/claude-haiku-4.5" },
 				custom: { keep: true },
 			});
 		});
@@ -1124,11 +1123,11 @@ describe("Settings", () => {
 			const projectConfigPath = path.join(projectDir, ".omp", "config.yml");
 			await writeSettings({
 				setupVersion: 1,
-				modelRoles: { global_role: "openai/global" },
+				modelRoles: { global_role: "github-copilot/gpt-4o" },
 			});
 			await Bun.write(
 				projectConfigPath,
-				YAML.stringify({ modelRoles: { project_role: "openai/project" } }, null, 2),
+				YAML.stringify({ modelRoles: { project_role: "local/lfm2.5-230m" } }, null, 2),
 			);
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 			const malformedGlobal = 'setupVersion: 2\nmodelRoles:\n  global_role: "unterminated\n';
@@ -1147,8 +1146,8 @@ describe("Settings", () => {
 				fs.readdirSync(path.dirname(projectConfigPath)).some(name => name.startsWith("config.yml.broken-")),
 			).toBe(false);
 			expect(cfgSetupVersion.get(settings)).toBe(1);
-			expect(settings.getModelRole("global_role")).toBe("openai/global");
-			expect(settings.getModelRole("project_role")).toBe("openai/project");
+			expect(settings.getModelRole("global_role")).toBe("github-copilot/gpt-4o");
+			expect(settings.getModelRole("project_role")).toBe("local/lfm2.5-230m");
 		});
 		it("refreshes native project settings without changing overlay or runtime precedence", async () => {
 			await writeSettings({
@@ -1197,7 +1196,7 @@ describe("Settings", () => {
 				YAML.stringify(
 					{
 						task: {
-							agentModelOverrides: { task: "openai/gpt-4o" },
+							agentModelOverrides: { task: "github-copilot/gpt-4o" },
 							enableEffort: true,
 							maxConcurrency: 4,
 						},
@@ -1209,7 +1208,7 @@ describe("Settings", () => {
 			);
 			await settings.reloadFromDisk();
 
-			expect(cfgTaskAgentModelOverrides.get(settings)).toEqual({ task: "openai/gpt-4o" });
+			expect(cfgTaskAgentModelOverrides.get(settings)).toEqual({ task: "github-copilot/gpt-4o" });
 			expect(cfgRetryModelFallback.get(settings)).toBe(true);
 			expect(cfgTaskEnableEffort.get(settings)).toBe(false);
 			expect(cfgTaskMaxConcurrency.get(settings)).toBe(7);
@@ -1259,9 +1258,9 @@ describe("Settings", () => {
 		});
 
 		it("preserves runtime overrides and only signals semantic model-role changes", async () => {
-			await writeSettings({ modelRoles: { default: "openai/original" } });
+			await writeSettings({ modelRoles: { default: "github-copilot/gpt-4o" } });
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-			settings.overrideModelRoles({ runtime: "openai/runtime" });
+			settings.overrideModelRoles({ runtime: "local/lfm2.5-230m" });
 			let signalCount = 0;
 			const unsubscribe = cfgModelRoles.listen(settings, () => {
 				signalCount++;
@@ -1271,15 +1270,15 @@ describe("Settings", () => {
 				await settings.reloadFromDisk();
 				await tick();
 				expect(signalCount).toBe(0);
-				expect(settings.getModelRole("runtime")).toBe("openai/runtime");
+				expect(settings.getModelRole("runtime")).toBe("local/lfm2.5-230m");
 
-				await writeSettings({ modelRoles: { default: "openai/updated" } });
+				await writeSettings({ modelRoles: { default: "github-copilot/gpt-5.4" } });
 				await settings.reloadFromDisk();
 				await tick();
 
 				expect(signalCount).toBe(1);
-				expect(settings.getModelRole("default")).toBe("openai/updated");
-				expect(settings.getModelRole("runtime")).toBe("openai/runtime");
+				expect(settings.getModelRole("default")).toBe("github-copilot/gpt-5.4");
+				expect(settings.getModelRole("runtime")).toBe("local/lfm2.5-230m");
 			} finally {
 				unsubscribe();
 			}
@@ -1331,11 +1330,11 @@ describe("Settings", () => {
 			const first = Settings.isolated();
 			const second = Settings.isolated();
 
-			cfgEnabledModels.get(first).push("openai/gpt-test");
-			cfgProvidersMaxInFlightRequests.get(first).openai = 1;
+			cfgEnabledModels.get(first).push("github-copilot/gpt-4o");
+			cfgProvidersMaxInFlightRequests.get(first)["github-copilot"] = 1;
 
-			expect(cfgEnabledModels.get(first)).toEqual(["openai/gpt-test"]);
-			expect(cfgProvidersMaxInFlightRequests.get(first)).toEqual({ openai: 1 });
+			expect(cfgEnabledModels.get(first)).toEqual(["github-copilot/gpt-4o"]);
+			expect(cfgProvidersMaxInFlightRequests.get(first)).toEqual({ "github-copilot": 1 });
 			expect(cfgEnabledModels.get(second)).toEqual([]);
 			expect(cfgProvidersMaxInFlightRequests.get(second)).toEqual({});
 			expect(cfgEnabledModels.definition.default).toEqual([]);
@@ -1356,9 +1355,9 @@ describe("Settings", () => {
 				inMemory: true,
 				overrides: {
 					enabledModels: [
-						"always-model",
-						{ path: projectDir, models: ["project-model"] },
-						{ path: otherDir, models: ["other-model"] },
+						"github-copilot/gpt-4o",
+						{ path: projectDir, models: ["local/lfm2.5-230m"] },
+						{ path: otherDir, models: ["local/lfm2-1.2b"] },
 					],
 					disabledProviders: [
 						"always-provider",
@@ -1368,12 +1367,12 @@ describe("Settings", () => {
 				},
 			});
 
-			expect(cfgEnabledModels.get(settings)).toEqual(["always-model", "project-model"]);
+			expect(cfgEnabledModels.get(settings)).toEqual(["github-copilot/gpt-4o", "local/lfm2.5-230m"]);
 			expect(cfgDisabledProviders.get(settings)).toEqual(["always-provider", "project-provider"]);
 
 			await settings.reloadForCwd(otherDir);
 
-			expect(cfgEnabledModels.get(settings)).toEqual(["always-model", "other-model"]);
+			expect(cfgEnabledModels.get(settings)).toEqual(["github-copilot/gpt-4o", "local/lfm2-1.2b"]);
 			expect(cfgDisabledProviders.get(settings)).toEqual(["always-provider", "other-provider"]);
 		});
 
@@ -1428,7 +1427,7 @@ describe("Settings", () => {
 			// Seed initial settings in config.yml
 			await writeSettings({
 				theme: "dark",
-				modelRoles: { default: "claude-sonnet" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
 			// Settings loads the initial state
@@ -1437,8 +1436,8 @@ describe("Settings", () => {
 			// Simulate external edit (e.g., user modifying DB directly or another process)
 			await writeSettings({
 				theme: { dark: "anthracite" },
-				modelRoles: { default: "claude-sonnet" },
-				enabledModels: ["claude-opus-4-5", "gpt-5.2-codex"],
+				modelRoles: { default: "github-copilot/gpt-4o" },
+				enabledModels: ["github-copilot/claude-opus-4.6", "github-copilot/gpt-5.4"],
 			});
 
 			// Settings saves a change - should merge, not overwrite
@@ -1446,10 +1445,10 @@ describe("Settings", () => {
 			await settings.flush();
 
 			const savedSettings = await readSettings();
-			expect(savedSettings.enabledModels).toEqual(["claude-opus-4-5", "gpt-5.2-codex"]);
+			expect(savedSettings.enabledModels).toEqual(["github-copilot/claude-opus-4.6", "github-copilot/gpt-5.4"]);
 			expect(savedSettings.defaultThinkingLevel).toBe(Effort.High);
 			expect(savedSettings.theme).toEqual({ dark: "anthracite" });
-			expect((savedSettings.modelRoles as { default?: string } | undefined)?.default).toBe("claude-sonnet");
+			expect((savedSettings.modelRoles as { default?: string } | undefined)?.default).toBe("github-copilot/gpt-4o");
 		});
 
 		it("persists native terminal progress only after the user changes it", async () => {
@@ -1471,36 +1470,39 @@ describe("Settings", () => {
 
 			await writeSettings({
 				enabledModels: [
-					"claude-sonnet-4-5",
-					{ path: path.join(projectDir, "work"), values: ["anthropic/claude-opus-4-5"] },
-					{ path: path.join(projectDir, "private"), values: ["openai/gpt-5.2-codex"] },
+					"github-copilot/gpt-4o",
+					{ path: path.join(projectDir, "work"), values: ["github-copilot/claude-opus-4.6"] },
+					{ path: path.join(projectDir, "private"), values: ["github-copilot/gpt-5.4"] },
 				],
 				disabledProviders: [
-					"ollama",
-					{ path: path.join(projectDir, "work"), values: ["openai"] },
-					{ path: path.join(projectDir, "private"), values: ["anthropic"] },
+					"local",
+					{ path: path.join(projectDir, "work"), values: ["github-copilot"] },
+					{ path: path.join(projectDir, "private"), values: [] },
 				],
 			});
 
 			const workSettings = await Settings.init({ cwd: workDir, agentDir });
-			expect(cfgEnabledModels.get(workSettings)).toEqual(["claude-sonnet-4-5", "anthropic/claude-opus-4-5"]);
-			expect(cfgDisabledProviders.get(workSettings)).toEqual(["ollama", "openai"]);
+			expect(cfgEnabledModels.get(workSettings)).toEqual([
+				"github-copilot/gpt-4o",
+				"github-copilot/claude-opus-4.6",
+			]);
+			expect(cfgDisabledProviders.get(workSettings)).toEqual(["local", "github-copilot"]);
 
 			resetSettingsForTest();
 			const privateSettings = await Settings.init({ cwd: privateDir, agentDir });
-			expect(cfgEnabledModels.get(privateSettings)).toEqual(["claude-sonnet-4-5", "openai/gpt-5.2-codex"]);
-			expect(cfgDisabledProviders.get(privateSettings)).toEqual(["ollama", "anthropic"]);
+			expect(cfgEnabledModels.get(privateSettings)).toEqual(["github-copilot/gpt-4o", "github-copilot/gpt-5.4"]);
+			expect(cfgDisabledProviders.get(privateSettings)).toEqual(["local"]);
 		});
 
 		it("should preserve custom settings when changing theme", async () => {
 			await writeSettings({
-				modelRoles: { default: "claude-sonnet" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
 			await writeSettings({
-				modelRoles: { default: "claude-sonnet" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 				shellPath: "/bin/zsh",
 				extensions: ["/path/to/extension.ts"],
 			});
@@ -1560,13 +1562,13 @@ describe("Settings", () => {
 
 			await writeSettings({
 				defaultThinkingLevel: Effort.Low,
-				enabledModels: ["openai/gpt-5.2-codex"],
+				enabledModels: ["github-copilot/gpt-5.4"],
 			});
 			await settings.flush();
 
 			const savedSettings = await readSettings();
 			expect(savedSettings.defaultThinkingLevel).toBe(Effort.High);
-			expect(savedSettings.enabledModels).toEqual(["openai/gpt-5.2-codex"]);
+			expect(savedSettings.enabledModels).toEqual(["github-copilot/gpt-5.4"]);
 		});
 		it("reapplies runtime hooks when a later external edit wins", async () => {
 			await writeSettings({
@@ -1599,46 +1601,46 @@ describe("Settings", () => {
 	describe("model role overrides", () => {
 		it("does not persist temporary default model overrides when another role is saved", async () => {
 			await writeSettings({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			settings.overrideModelRoles({ default: "openai/gpt-5.2-codex" });
-			expect(settings.getModelRole("default")).toBe("openai/gpt-5.2-codex");
+			settings.overrideModelRoles({ default: "github-copilot/gpt-5.4" });
+			expect(settings.getModelRole("default")).toBe("github-copilot/gpt-5.4");
 
-			settings.setModelRole("smol", "anthropic/claude-haiku-4-5");
+			settings.setModelRole("smol", "github-copilot/claude-haiku-4.5");
 			await settings.flush();
 
 			const savedSettings = await readSettings();
 			expect(savedSettings.modelRoles).toEqual({
-				default: "anthropic/claude-sonnet-4-5",
-				smol: "anthropic/claude-haiku-4-5",
+				default: "github-copilot/gpt-4o",
+				smol: "github-copilot/claude-haiku-4.5",
 			});
-			expect(settings.getModelRole("default")).toBe("openai/gpt-5.2-codex");
-			expect(settings.getModelRole("smol")).toBe("anthropic/claude-haiku-4-5");
+			expect(settings.getModelRole("default")).toBe("github-copilot/gpt-5.4");
+			expect(settings.getModelRole("smol")).toBe("github-copilot/claude-haiku-4.5");
 		});
 
 		it("preserves a same-role external edit made after a local save was queued", async () => {
 			await writeSettings({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-			settings.setModelRole("default", "openai/gpt-5.2-codex");
+			settings.setModelRole("default", "github-copilot/gpt-5.4");
 
 			await writeSettings({
-				modelRoles: { default: "moonshot/kimi-k3:max" },
+				modelRoles: { default: "local/lfm2-1.2b" },
 			});
 			await settings.flush();
 
-			expect((await readSettings()).modelRoles).toEqual({ default: "moonshot/kimi-k3:max" });
-			expect(settings.getModelRole("default")).toBe("moonshot/kimi-k3:max");
+			expect((await readSettings()).modelRoles).toEqual({ default: "local/lfm2-1.2b" });
+			expect(settings.getModelRole("default")).toBe("local/lfm2-1.2b");
 		});
 
 		it("preserves concurrent external per-role edits when saving one global role", async () => {
 			await writeSettings({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5", advisor: "moonshot/kimi-k2" },
+				modelRoles: { default: "github-copilot/gpt-4o", advisor: "local/lfm2.5-230m" },
 			});
 
 			// Process loads its #global snapshot.
@@ -1648,32 +1650,32 @@ describe("Settings", () => {
 			// adds vision. This process's #global is now stale.
 			await writeSettings({
 				modelRoles: {
-					default: "anthropic/claude-sonnet-4-5",
-					advisor: "moonshot/kimi-k3:max",
-					vision: "anthropic/claude-haiku-4-5",
+					default: "github-copilot/gpt-4o",
+					advisor: "local/lfm2-1.2b",
+					vision: "github-copilot/claude-haiku-4.5",
 				},
 			});
 
 			// This process makes one global-scope role switch and flushes.
-			settings.setModelRole("smol", "anthropic/claude-haiku-4-5");
+			settings.setModelRole("smol", "github-copilot/claude-haiku-4.5");
 			await settings.flush();
 
 			const savedSettings = await readSettings();
 			// The role we changed lands…
-			expect((savedSettings.modelRoles as Record<string, string>).smol).toBe("anthropic/claude-haiku-4-5");
+			expect((savedSettings.modelRoles as Record<string, string>).smol).toBe("github-copilot/claude-haiku-4.5");
 			// …and the concurrent external per-role edits survive rather than
 			// being clobbered by our stale whole-map snapshot.
 			expect(savedSettings.modelRoles).toEqual({
-				default: "anthropic/claude-sonnet-4-5",
-				advisor: "moonshot/kimi-k3:max",
-				vision: "anthropic/claude-haiku-4-5",
-				smol: "anthropic/claude-haiku-4-5",
+				default: "github-copilot/gpt-4o",
+				advisor: "local/lfm2-1.2b",
+				vision: "github-copilot/claude-haiku-4.5",
+				smol: "github-copilot/claude-haiku-4.5",
 			});
 		});
 
 		it("does not replay a preserved role after the save writes it", async () => {
 			await writeSettings({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 			const firstSaveEntered = Promise.withResolvers<void>();
@@ -1687,68 +1689,68 @@ describe("Settings", () => {
 				return result;
 			});
 
-			settings.setModelRole("smol", "anthropic/claude-haiku-4-5");
+			settings.setModelRole("smol", "github-copilot/claude-haiku-4.5");
 			await firstSaveEntered.promise;
-			settings.setModelRole("advisor", "moonshot/kimi-k3:max");
+			settings.setModelRole("advisor", "local/lfm2-1.2b");
 			releaseFirstSave.resolve();
 			await firstSaveFinished.promise;
 
 			expect((await readSettings()).modelRoles).toEqual({
-				default: "anthropic/claude-sonnet-4-5",
-				smol: "anthropic/claude-haiku-4-5",
-				advisor: "moonshot/kimi-k3:max",
+				default: "github-copilot/gpt-4o",
+				smol: "github-copilot/claude-haiku-4.5",
+				advisor: "local/lfm2-1.2b",
 			});
 
 			await writeSettings({
 				modelRoles: {
-					default: "anthropic/claude-sonnet-4-5",
-					smol: "anthropic/claude-haiku-4-5",
-					advisor: "external/new-advisor",
+					default: "github-copilot/gpt-4o",
+					smol: "github-copilot/claude-haiku-4.5",
+					advisor: "github-copilot/gpt-5.4-mini",
 				},
 			});
 			await settings.flush();
 
 			expect((await readSettings()).modelRoles).toEqual({
-				default: "anthropic/claude-sonnet-4-5",
-				smol: "anthropic/claude-haiku-4-5",
-				advisor: "external/new-advisor",
+				default: "github-copilot/gpt-4o",
+				smol: "github-copilot/claude-haiku-4.5",
+				advisor: "github-copilot/gpt-5.4-mini",
 			});
 		});
 
 		it("restores persisted model roles after clearing runtime overrides", async () => {
 			await writeSettings({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			settings.overrideModelRoles({ default: "openai/gpt-5.2-codex" });
-			expect(settings.getModelRole("default")).toBe("openai/gpt-5.2-codex");
+			settings.overrideModelRoles({ default: "github-copilot/gpt-5.4" });
+			expect(settings.getModelRole("default")).toBe("github-copilot/gpt-5.4");
 
 			cfgModelRoles.clearOverride(settings);
 
-			expect(settings.getModelRole("default")).toBe("anthropic/claude-sonnet-4-5");
+			expect(settings.getModelRole("default")).toBe("github-copilot/gpt-4o");
 		});
 
 		it("keeps the live role value aligned when saving over a runtime override", () => {
 			const settings = Settings.isolated({
-				modelRoles: { default: "anthropic/claude-sonnet-4-5" },
+				modelRoles: { default: "github-copilot/gpt-4o" },
 			});
 
-			settings.overrideModelRoles({ default: "openai/gpt-5.2-codex" });
-			settings.setModelRole("default", "anthropic/claude-opus-4-5");
+			settings.overrideModelRoles({ default: "github-copilot/gpt-5.4" });
+			settings.setModelRole("default", "github-copilot/claude-opus-4.6");
 
-			expect(settings.getModelRole("default")).toBe("anthropic/claude-opus-4-5");
+			expect(settings.getModelRole("default")).toBe("github-copilot/claude-opus-4.6");
 
 			cfgModelRoles.clearOverride(settings);
 
-			expect(settings.getModelRole("default")).toBe("anthropic/claude-opus-4-5");
+			expect(settings.getModelRole("default")).toBe("github-copilot/claude-opus-4.6");
 		});
 		it("clears a role when setModelRole receives undefined", () => {
 			const settings = Settings.isolated();
 
-			settings.setModelRole("smol", "x/y");
-			expect(settings.getModelRole("smol")).toBe("x/y");
+			settings.setModelRole("smol", "github-copilot/gpt-4o");
+			expect(settings.getModelRole("smol")).toBe("github-copilot/gpt-4o");
 
 			settings.setModelRole("smol", undefined);
 
@@ -1758,11 +1760,11 @@ describe("Settings", () => {
 
 		it("clears a role from the runtime override layer so the effective view updates immediately", () => {
 			const settings = Settings.isolated({
-				modelRoles: { smol: "anthropic/claude-haiku-4-5" },
+				modelRoles: { smol: "github-copilot/claude-haiku-4.5" },
 			});
 
-			settings.overrideModelRoles({ smol: "openai/gpt-5.2-codex" });
-			expect(settings.getModelRole("smol")).toBe("openai/gpt-5.2-codex");
+			settings.overrideModelRoles({ smol: "github-copilot/gpt-5.4" });
+			expect(settings.getModelRole("smol")).toBe("github-copilot/gpt-5.4");
 
 			settings.setModelRole("smol", undefined);
 
@@ -1776,14 +1778,14 @@ describe("Settings", () => {
 			await writeSettings({
 				edit: {
 					modelVariants: {
-						kimi: "hashline",
+						lfm2: "hashline",
 					},
 				},
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(editVariantForModel(settings, "openrouter/moonshotai/Kimi-K2-Instruct")).toBe("hashline");
+			expect(editVariantForModel(settings, "local/LFM2.5-230m")).toBe("hashline");
 		});
 
 		it("refreshes cached model variants when the active project settings change", async () => {
@@ -1792,7 +1794,7 @@ describe("Settings", () => {
 
 			await Bun.write(
 				path.join(getProjectAgentDir(projectDir), "settings.json"),
-				JSON.stringify({ edit: { modelVariants: { kimi: "hashline" } } }),
+				JSON.stringify({ edit: { modelVariants: { lfm2: "hashline" } } }),
 			);
 			await Bun.write(
 				path.join(getProjectAgentDir(otherProjectDir), "settings.json"),
@@ -1801,12 +1803,12 @@ describe("Settings", () => {
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(editVariantForModel(settings, "openrouter/moonshotai/Kimi-K2-Instruct")).toBe("hashline");
+			expect(editVariantForModel(settings, "local/LFM2.5-230m")).toBe("hashline");
 
 			await settings.reloadForCwd(otherProjectDir);
 
-			expect(editVariantForModel(settings, "openrouter/moonshotai/Kimi-K2-Instruct")).toBeUndefined();
-			expect(editVariantForModel(settings, "openai/gpt-5.2-codex")).toBe("apply_patch");
+			expect(editVariantForModel(settings, "local/LFM2.5-230m")).toBeUndefined();
+			expect(editVariantForModel(settings, "github-copilot/gpt-5.4")).toBe("apply_patch");
 		});
 	});
 
@@ -1819,113 +1821,26 @@ describe("Settings", () => {
 			expectedChains: Record<string, string[]>,
 		];
 
-		const MODEL_PRIO = roleDefaultModels();
-		const webExaCandidates = ["web/exa", ...MODEL_PRIO.web.filter(selector => selector !== "web/exa")];
-		const webOrderedHead = [
-			"google-gemini-cli/gemini-2.5-flash",
-			"google-antigravity/gemini-2.5-flash",
-			"google/gemini-2.5-flash",
-			"anthropic/claude-haiku-4-5",
-			"openai-codex/gpt-6-luna",
-			"xai/grok-4.5",
-			"web/exa",
-			"web/tavily",
-		];
-		const webOrderedCandidates = [
-			...webOrderedHead,
-			...MODEL_PRIO.web.filter(selector => !webOrderedHead.includes(selector)),
-		];
-		const webExcludedCandidates = MODEL_PRIO.web.filter(selector => selector !== "web/public");
-		const imageOrderedHead = [
-			"openai/gpt-image-2",
-			"openai-codex/gpt-image-2",
-			"google-antigravity/gemini-3-pro-image",
-			"xai/grok-imagine-image",
-			"openrouter/google/gemini-3-pro-image",
-			"google/gemini-3-pro-image",
-			"deepinfra/black-forest-labs/FLUX-2-pro",
-		];
-		const imageOrderedCandidates = [
-			...imageOrderedHead,
-			...MODEL_PRIO.image.filter(selector => !imageOrderedHead.includes(selector)),
-		];
-		const imageXaiCandidates = [
-			"xai/grok-imagine-image",
-			...MODEL_PRIO.image.filter(selector => selector !== "xai/grok-imagine-image"),
-		];
 		const cases: LegacyMigrationCase[] = [
-			[
-				"web search order",
-				"providers.webSearchOrder",
-				["gemini", "anthropic", "codex", "xai", "exa", "tavily"],
-				{ web: webOrderedCandidates[0] },
-				{ web: webOrderedCandidates.slice(1) },
-			],
-			[
-				"web search exclusions",
-				"providers.webSearchExclude",
-				["xai", "public"],
-				{ web: webExcludedCandidates[0] },
-				{ web: webExcludedCandidates.slice(1) },
-			],
-			["Gemini web model override", "providers.webSearchGeminiModel", "gemini-custom", {}, {}],
-			[
-				"image order",
-				"providers.imageOrder",
-				["openai", "openai-codex", "antigravity", "xai", "openrouter", "gemini", "deepinfra"],
-				{ image: imageOrderedCandidates[0] },
-				{ image: imageOrderedCandidates.slice(1) },
-			],
-			["local speech provider", "providers.tts", "local", { speech: "local/kokoro" }, { speech: [] }],
-			["xAI speech provider", "providers.tts", "xai", { speech: "xai/grok-tts" }, { speech: [] }],
-			[
-				"DeepInfra speech provider",
-				"providers.tts",
-				"deepinfra",
-				{ speech: "deepinfra/hexgrad/Kokoro-82M" },
-				{ speech: [] },
-			],
-			[
-				"judgment provider",
-				"providers.judgmentProvider",
-				"llm",
-				{ judge: "@tiny" },
-				{ judge: ["@smol", "@default"] },
-			],
 			[
 				"auto-thinking model",
 				"providers.autoThinkingModel",
 				"qwen3-1.7b",
-				{ judge: "typesafe/jev-1.14.0" },
-				{ judge: ["local/qwen3-1.7b", "@tiny", "@smol", "@default"] },
+				{ judge: "local/qwen3-1.7b" },
+				{ judge: ["@tiny", "@smol", "@default"] },
 			],
 			[
 				"unexpected-stop model",
 				"providers.unexpectedStopModel",
 				"gemma-3-1b",
-				{ judge: "typesafe/jev-1.14.0" },
-				{ judge: ["local/gemma-3-1b", "@tiny", "@smol", "@default"] },
+				{ judge: "local/gemma-3-1b" },
+				{ judge: ["@tiny", "@smol", "@default"] },
 			],
 			["tiny model", "providers.tinyModel", "lfm2.5-230m", { tiny: "local/lfm2.5-230m" }, {}],
 			["memory model", "providers.memoryModel", "lfm2-1.2b", { memory: "local/lfm2-1.2b" }, {}],
-			["local speech model", "tts.localModel", "kokoro", {}, {}],
 			["fast dictation model", "stt.modelName", "fast", { dictation: "local/whisper-base" }, {}],
 			["balanced dictation model", "stt.modelName", "balanced", { dictation: "local/whisper-small" }, {}],
 			["turbo dictation model", "stt.modelName", "turbo", { dictation: "local/whisper-large-v3-turbo" }, {}],
-			[
-				"older web search preference",
-				"providers.webSearch",
-				"exa",
-				{ web: webExaCandidates[0] },
-				{ web: webExaCandidates.slice(1) },
-			],
-			[
-				"older image preference",
-				"providers.image",
-				"xai",
-				{ image: imageXaiCandidates[0] },
-				{ image: imageXaiCandidates.slice(1) },
-			],
 		];
 
 		it.each(cases)(
@@ -1951,63 +1866,6 @@ describe("Settings", () => {
 				}
 			},
 		);
-
-		it("repairs the old generated web fallback pair without changing unrelated chains", async () => {
-			await writeSettings({
-				modelRoles: { web: "web/parallel" },
-				retry: {
-					fallbackChains: {
-						web: [
-							"web/searxng",
-							"openai-codex/gpt-6-luna",
-							"openai-codex/gpt-5.6",
-							"openai-codex/gpt-5.5",
-							"xai/grok-4.5",
-						],
-						slow: ["openai-codex/gpt-5.5"],
-					},
-				},
-			});
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect(cfgRetryFallbackChains.get(settings)).toEqual({
-				web: ["web/searxng", "openai-codex/gpt-6-luna", "openai-codex/gpt-5.6-sol", "xai/grok-4.5"],
-				slow: ["openai-codex/gpt-5.5"],
-			});
-			const codex = getBundledModels("openai-codex").filter(model => model.webSearch);
-			expect(resolveRoleChain("web", settings, codex).map(candidate => candidate.model.id)).toEqual([
-				"gpt-6-luna",
-				"gpt-5.6-sol",
-			]);
-		});
-
-		it("preserves independently configured Codex web selectors", async () => {
-			await writeSettings({
-				retry: { fallbackChains: { web: ["openai-codex/gpt-5.5", "openai-codex/gpt-5.6"] } },
-			});
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect(cfgRetryFallbackChains.get(settings).web).toEqual(["openai-codex/gpt-5.5", "openai-codex/gpt-5.6"]);
-		});
-
-		it("keeps a legacy Gemini wire tier ahead of non-Gemini fallbacks", async () => {
-			await writeSettings({
-				providers: {
-					webSearch: "gemini",
-					webSearchGeminiModel: "gemini-3.8-flash-high",
-				},
-			});
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect([settings.getModelRole("web"), ...cfgRetryFallbackChains.get(settings).web.slice(0, 2)]).toEqual([
-				"google-gemini-cli/gemini-3.8-flash-high",
-				"google-antigravity/gemini-3.8-flash-high",
-				"google/gemini-3.8-flash-high",
-			]);
-		});
 
 		it("drops legacy defaults without materializing kind roles", async () => {
 			await writeSettings({
@@ -2043,35 +1901,28 @@ describe("Settings", () => {
 
 		it("prefers nested legacy values over flat forms", async () => {
 			await writeSettings({
-				providers: { webSearchOrder: ["exa"] },
-				"providers.webSearchOrder": ["gemini"],
+				providers: { tinyModel: "lfm2.5-230m" },
+				"providers.tinyModel": "lfm2-1.2b",
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(settings.getModelRole("web")).toBe(webExaCandidates[0]);
-			expect(cfgRetryFallbackChains.get(settings).web).toEqual(webExaCandidates.slice(1));
+			expect(settings.getModelRole("tiny")).toBe("local/lfm2.5-230m");
+			expect(cfgRetryFallbackChains.get(settings)).toEqual({});
 		});
 
 		it("preserves explicit roles and empty chains while prepending local tiny and memory models", async () => {
 			await writeSettings({
 				modelRoles: {
-					web: "custom/web",
-					image: "custom/image",
-					speech: "custom/speech",
-					dictation: "custom/dictation",
-					judge: "custom/judge",
-					tiny: "custom/tiny,@smol",
-					memory: "custom/memory",
+					dictation: "local/whisper-small",
+					judge: "github-copilot/gpt-4o",
+					tiny: "local/lfm2-1.2b,@smol",
+					memory: "local/lfm2.5-230m",
 				},
 				retry: {
-					fallbackChains: { web: [], image: [], speech: [], dictation: [], judge: [] },
+					fallbackChains: { dictation: [], judge: [] },
 				},
 				providers: {
-					webSearchOrder: ["exa"],
-					imageOrder: ["xai"],
-					tts: "local",
-					judgmentProvider: "llm",
 					autoThinkingModel: "qwen3-1.7b",
 					unexpectedStopModel: "gemma-3-1b",
 					tinyModel: "lfm2.5-230m",
@@ -2083,18 +1934,12 @@ describe("Settings", () => {
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
 			expect(cfgModelRoles.get(settings)).toEqual({
-				web: "custom/web",
-				image: "custom/image",
-				speech: "custom/speech",
-				dictation: "custom/dictation",
-				judge: "custom/judge",
-				tiny: "local/lfm2.5-230m,custom/tiny,@smol",
-				memory: "local/lfm2-1.2b,custom/memory",
+				dictation: "local/whisper-small",
+				judge: "github-copilot/gpt-4o",
+				tiny: "local/lfm2.5-230m,local/lfm2-1.2b,@smol",
+				memory: "local/lfm2-1.2b,local/lfm2.5-230m",
 			});
 			expect(cfgRetryFallbackChains.get(settings)).toEqual({
-				web: [],
-				image: [],
-				speech: [],
 				dictation: [],
 				judge: [],
 			});
@@ -2171,49 +2016,6 @@ describe("Settings", () => {
 			expect(cfgIsolationBackend.get(settings)).toBe("reflink");
 		});
 
-		it("consolidates legacy Exa suite toggles onto exa.enabled", async () => {
-			await writeSettings({
-				exa: {
-					enabled: true,
-					enableSearch: false,
-					enableResearcher: true,
-					enableWebsets: true,
-				},
-			});
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect(cfgExaEnabled.get(settings)).toBe(false);
-			cfgDisplayShowTokenUsage.set(settings, true);
-			await settings.flush();
-			expect((await readSettings()).exa).toEqual({ enabled: false });
-		});
-
-		it("migrates quoted dotted Exa toggles and removes obsolete suite settings", async () => {
-			await Bun.write(
-				getConfigPath(),
-				`"exa.enabled": true\n"exa.enableSearch": false\n"exa.enableResearcher": true\n"exa.enableWebsets": true\n`,
-			);
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect(cfgExaEnabled.get(settings)).toBe(false);
-			cfgDisplayShowTokenUsage.set(settings, true);
-			await settings.flush();
-			expect((await readSettings()).exa).toEqual({ enabled: false });
-		});
-
-		it("removes the legacy Exa block when it contains only retired suite toggles", async () => {
-			await writeSettings({ exa: { enableResearcher: true, enableWebsets: true } });
-
-			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
-			expect(cfgExaEnabled.get(settings)).toBe(true);
-			cfgDisplayShowTokenUsage.set(settings, true);
-			await settings.flush();
-			expect((await readSettings()).exa).toBeUndefined();
-		});
-
 		it("removes the retired computer backend setting", async () => {
 			await writeSettings({ computer: { backend: "auto", enabled: true }, "computer.backend": "native" });
 
@@ -2266,38 +2068,32 @@ describe("Settings", () => {
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
 			expect(cfgEditMode.get(settings)).toBe("hashline");
-			expect(editVariantForModel(settings, "claude-opus-4-5")).toBe("hashline");
-			expect(editVariantForModel(settings, "gpt-5.2")).toBe("apply_patch");
+			expect(editVariantForModel(settings, "github-copilot/claude-opus-4.6")).toBe("hashline");
+			expect(editVariantForModel(settings, "github-copilot/gpt-5.4")).toBe("apply_patch");
 		});
 
 		it("maps legacy hindsight.dynamicBankId=true onto hindsight.scoping=per-project", async () => {
-			await writeSettings({
-				hindsight: { dynamicBankId: true },
-			});
-
+			await writeSettings({ hindsight: { dynamicBankId: true } });
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
 			expect(cfgHindsightScoping.get(settings)).toBe("per-project");
 		});
 
 		it("does not override an explicit hindsight.scoping when migrating", async () => {
-			await writeSettings({
-				hindsight: { dynamicBankId: true, scoping: "global" },
-			});
-
+			await writeSettings({ hindsight: { dynamicBankId: true, scoping: "global" } });
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
 			expect(cfgHindsightScoping.get(settings)).toBe("global");
 		});
 
 		it("promotes legacy hindsight.agentName onto hindsight.bankId when bankId is unset", async () => {
-			await writeSettings({
-				hindsight: { agentName: "ada-cli" },
-			});
-
+			await writeSettings({ hindsight: { agentName: "ada-cli" } });
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-
 			expect(cfgHindsightBankId.get(settings)).toBe("ada-cli");
+		});
+
+		it("renames the legacy statusLine stream segment to record", async () => {
+			await writeSettings({ statusLine: { leftSegments: ["model", "stream"] } });
+			const settings = await Settings.init({ cwd: projectDir, agentDir });
+			expect(cfgStatusLineLeftSegments.get(settings)).toEqual(["model", "record"]);
 		});
 
 		it("migrates the legacy mnemosyne memory backend to mnemopi", async () => {
@@ -2464,78 +2260,53 @@ describe("Settings", () => {
 			expect(cfgGlobEnabled.get(settings)).toBe(false);
 		});
 
-		it("migrates nested dev.autoqa.consent and todo.reminders.max without configuring parents", async () => {
+		it("migrates nested todo.reminders.max without configuring its parent", async () => {
 			await writeSettings({
-				dev: { autoqa: { consent: "granted" } },
 				todo: { reminders: { max: 5 } },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(cfgDevAutoqaConsent.get(settings)).toBe("granted");
-			expect(cfgDevAutoqa.get(settings)).toBe(true);
-			expect(cfgDevAutoqa.isConfigured(settings)).toBe(false);
 			expect(cfgTodoRemindersMax.get(settings)).toBe(5);
 			expect(cfgTodoReminders.get(settings)).toBe(true);
 			expect(cfgTodoReminders.isConfigured(settings)).toBe(false);
 		});
 
-		it("migrates quoted dotted legacy keys for consent and reminders max", async () => {
-			await Bun.write(getConfigPath(), `"dev.autoqa.consent": denied\n"todo.reminders.max": 2\n`);
+		it("migrates quoted dotted legacy reminders max", async () => {
+			await Bun.write(getConfigPath(), `"todo.reminders.max": 2\n`);
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(cfgDevAutoqaConsent.get(settings)).toBe("denied");
-			expect(cfgDevAutoqa.isConfigured(settings)).toBe(false);
 			expect(cfgTodoRemindersMax.get(settings)).toBe(2);
 			expect(cfgTodoReminders.get(settings)).toBe(true);
 		});
 
-		it("lets explicit new keys win over legacy nested consent/max values", async () => {
+		it("lets explicit new keys win over legacy nested max values", async () => {
 			await writeSettings({
-				dev: { autoqa: { consent: "denied" }, autoqaConsent: "granted" },
 				todo: { reminders: { max: 1 }, remindersMax: 9 },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(cfgDevAutoqaConsent.get(settings)).toBe("granted");
-			expect(cfgDevAutoqa.isConfigured(settings)).toBe(false);
 			expect(cfgTodoRemindersMax.get(settings)).toBe(9);
 			expect(cfgTodoReminders.get(settings)).toBe(true);
 		});
 
 		it("preserves recoverable parent booleans alongside legacy leaf keys", async () => {
-			await Bun.write(
-				getConfigPath(),
-				`dev:\n  autoqa: true\n"dev.autoqa.consent": unset\ntodo:\n  reminders: false\n"todo.reminders.max": 4\n`,
-			);
+			await Bun.write(getConfigPath(), `todo:\n  reminders: false\n"todo.reminders.max": 4\n`);
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
 
-			expect(cfgDevAutoqa.get(settings)).toBe(true);
-			expect(cfgDevAutoqaConsent.get(settings)).toBe("unset");
 			expect(cfgTodoReminders.get(settings)).toBe(false);
 			expect(cfgTodoRemindersMax.get(settings)).toBe(4);
 		});
 
-		it("migrates denied/granted/unset legacy consent values", async () => {
-			for (const consent of ["denied", "granted", "unset"] as const) {
-				await writeSettings({ "dev.autoqa.consent": consent });
-				const settings = await Settings.loadIsolated({ cwd: projectDir, agentDir });
-				expect(cfgDevAutoqaConsent.get(settings)).toBe(consent);
-				expect(cfgDevAutoqa.isConfigured(settings)).toBe(false);
-			}
-		});
-
-		it("persists migrated consent/max keys and drops legacy nested parents on save", async () => {
+		it("persists migrated max keys and drops legacy nested parents on save", async () => {
 			await writeSettings({
-				dev: { autoqa: { consent: "denied" } },
 				todo: { reminders: { max: 1 } },
 			});
 
 			const settings = await Settings.init({ cwd: projectDir, agentDir });
-			expect(cfgDevAutoqaConsent.get(settings)).toBe("denied");
 			expect(cfgTodoRemindersMax.get(settings)).toBe(1);
 
 			// Touch an unrelated key so the migrated tree is written back.
@@ -2543,18 +2314,12 @@ describe("Settings", () => {
 			await settings.flush();
 
 			const onDisk = await readSettings();
-			const dev = onDisk.dev as Record<string, unknown>;
 			const todo = onDisk.todo as Record<string, unknown>;
-			expect(dev.autoqaConsent).toBe("denied");
-			expect(dev.autoqa).toBeUndefined();
 			expect(todo.remindersMax).toBe(1);
 			expect(todo.reminders).toBeUndefined();
-			expect(onDisk["dev.autoqa.consent"]).toBeUndefined();
 			expect(onDisk["todo.reminders.max"]).toBeUndefined();
 
 			const reloaded = await Settings.loadIsolated({ cwd: projectDir, agentDir });
-			expect(cfgDevAutoqaConsent.get(reloaded)).toBe("denied");
-			expect(cfgDevAutoqa.isConfigured(reloaded)).toBe(false);
 			expect(cfgTodoRemindersMax.get(reloaded)).toBe(1);
 			expect(cfgTodoReminders.get(reloaded)).toBe(true);
 		});
@@ -2752,7 +2517,7 @@ describe("Settings", () => {
 
 		describe("provider request limits", () => {
 			it("applies the effective merged value as the process-wide limit", async () => {
-				const settings = Settings.isolated({ "providers.maxInFlightRequests": { openai: 1 } });
+				const settings = Settings.isolated({ "providers.maxInFlightRequests": { "company-limiter": 1 } });
 				bindEffects(settings);
 				__providerInFlightForTesting.setRoot(tempDir.join("provider-inflight"));
 				registerMockApi();
@@ -2762,7 +2527,7 @@ describe("Settings", () => {
 				let maxActive = 0;
 				let callIndex = 0;
 				const mock = createMockModel({
-					provider: "openai",
+					provider: "company-limiter",
 					handler: async () => {
 						callIndex++;
 						active++;
@@ -2779,7 +2544,7 @@ describe("Settings", () => {
 					},
 				});
 
-				cfgProvidersMaxInFlightRequests.set(settings, { openai: 4 });
+				cfgProvidersMaxInFlightRequests.set(settings, { "company-limiter": 4 });
 
 				const first = streamSimple(mock.model, context());
 				const firstResult = first.result();
@@ -2787,7 +2552,7 @@ describe("Settings", () => {
 				const second = streamSimple(mock.model, context());
 				await Bun.sleep(20);
 
-				expect(cfgProvidersMaxInFlightRequests.get(settings)).toEqual({ openai: 1 });
+				expect(cfgProvidersMaxInFlightRequests.get(settings)).toEqual({ "company-limiter": 1 });
 				expect(mock.calls).toHaveLength(1);
 
 				releaseFirst.resolve();
@@ -2796,21 +2561,21 @@ describe("Settings", () => {
 			});
 
 			it("rejects invalid provider limits from config.yml", async () => {
-				await writeSettings({ providers: { maxInFlightRequests: { openai: "2" } } });
+				await writeSettings({ providers: { maxInFlightRequests: { "github-copilot": "2" } } });
 
 				await expect(Settings.init({ cwd: projectDir, agentDir })).rejects.toThrow(
-					"Provider request limits must be positive numbers: openai",
+					"Provider request limits must be positive numbers: github-copilot",
 				);
 			});
 
 			it("rejects invalid provider limits from project settings", async () => {
 				await Bun.write(
 					path.join(getProjectAgentDir(projectDir), "settings.json"),
-					JSON.stringify({ providers: { maxInFlightRequests: { anthropic: 0 } } }),
+					JSON.stringify({ providers: { maxInFlightRequests: { local: 0 } } }),
 				);
 
 				await expect(Settings.init({ cwd: projectDir, agentDir, inMemory: true })).rejects.toThrow(
-					"Provider request limits must be positive numbers: anthropic",
+					"Provider request limits must be positive numbers: local",
 				);
 			});
 

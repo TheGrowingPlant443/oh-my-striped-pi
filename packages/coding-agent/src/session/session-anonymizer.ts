@@ -658,7 +658,7 @@ const TOOL_CALL_TYPES: Record<string, true> = {
  */
 const CONTENT_BLOCK_KEYS: Record<string, ReadonlySet<string>> = {
 	text: new Set(["type", "text", "textSignature"]),
-	image: new Set(["type", "data", "mimeType", "detail", "providerFile", "url"]),
+	image: new Set(["type", "data", "mimeType", "detail", "url"]),
 	thinking: new Set(["type", "thinking", "thinkingSignature", "itemId", "summary"]),
 	redactedThinking: new Set(["type", "data"]),
 	toolCall: new Set([

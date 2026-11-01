@@ -33,6 +33,7 @@ import { AuthStorage } from "../src/session/auth-storage";
 import { SessionManager } from "../src/session/session-manager";
 
 import { cfgStartupQuiet } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function makeTool(name: string): AgentTool {
 	return {
@@ -91,11 +92,9 @@ describe("extension autocomplete provider API (#4919)", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		cfgStartupQuiet.set(Settings.instance, true);
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
-		const resolved = registry.find("anthropic", "claude-sonnet-4-5");
-		if (!resolved) throw new Error("Expected anthropic model claude-sonnet-4-5 to exist");
-		model = resolved;
+		model = getTestModel("github-copilot");
 		tools = [makeTool("read")];
 	});
 

@@ -22,13 +22,11 @@ import type { AgentSessionEvent, SessionStats } from "../../session/agent-sessio
 import type { RestoredQueuedMessage } from "../../session/agent-session-types";
 import type { CacheWarmingMode } from "../../session/cache-warmer";
 import type { FileEntry, SessionEntry, SessionTreeNode } from "../../session/session-entries";
-import type { UsageLimitState } from "../../session/usage-limit";
 import type { AvailableSlashCommandSource } from "../../slash-commands/available-commands";
 import type { AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
 import type { SubagentEventPayload, SubagentLifecyclePayload, SubagentProgressPayload } from "../../task";
 import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
 import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
-import type { LivePhase } from "@oh-my-pi/pi-tui/apps/live-visualizer";
 import type { RpcMessagesPage } from "./rpc-messages";
 import type { GoalModeState } from "../../goals/state";
 import type { RpcGoalOp, RpcGoalResult } from "./rpc-goal";
@@ -84,11 +82,6 @@ export type RpcCommand =
 	| { id?: string; type: "get_subagent_messages"; subagentId?: string; sessionFile?: string; fromByte?: number }
 	| { id?: string; type: "cancel_subagent"; subagentId: string }
 	| { id?: string; type: "steer_subagent"; subagentId: string; message: string }
-	// Live voice (GPT live bound to this session)
-	| { id?: string; type: "live_start"; voice?: string; instructions?: string }
-	| { id?: string; type: "live_connect"; sdpOffer: string; voice?: string; instructions?: string }
-	| { id?: string; type: "live_stop" }
-	| { id?: string; type: "live_mute"; muted?: boolean }
 
 	// Draft-only speech-to-text
 	| { id?: string; type: "dictation_start"; captureId: string }
@@ -191,8 +184,6 @@ export interface RpcSessionState {
 	 * session, e.g. Claude low priority) or `session` (this session's flex tier). Absent when unsupported.
 	 */
 	slowModeScope?: "session" | "global";
-	/** Usage-limit stage of the active model's account; absent outside wrap-up and low priority. */
-	usageLimit?: UsageLimitState;
 	tokensPerSecond: number | null;
 	messageCount: number;
 	queuedMessageCount: number;
@@ -280,36 +271,6 @@ export interface RpcSessionSettledFrame {
 // ============================================================================
 // Live Voice Frames (stdout, unsolicited; not session events, so `set_event_filter` never drops them)
 // ============================================================================
-
-/** Live session phase change. */
-export interface RpcLivePhaseFrame {
-	type: "live_phase";
-	phase: LivePhase;
-}
-
-/** Microphone/speaker RMS in [0, 1], at most one frame per 100 ms carrying the latest values. */
-export interface RpcLiveLevelsFrame {
-	type: "live_levels";
-	input: number;
-	output: number;
-}
-
-/** Incremental (`final: false`) or final transcript of one realtime turn; coalesce on `role` + `turn`. */
-export interface RpcLiveTranscriptFrame {
-	type: "live_transcript";
-	role: "user" | "assistant";
-	turn: number;
-	text: string;
-	final: boolean;
-}
-
-/** Emitted exactly once per live session when it has ended; `error` carries the failure cause. */
-export interface RpcLiveEndFrame {
-	type: "live_end";
-	error?: string;
-}
-
-export type RpcLiveFrame = RpcLivePhaseFrame | RpcLiveLevelsFrame | RpcLiveTranscriptFrame | RpcLiveEndFrame;
 
 /** Draft-only dictation frames bypass the session event filter. */
 export interface RpcDictationStateFrame {
@@ -614,17 +575,6 @@ export type RpcResponse =
 			data: { text: string | null };
 	  }
 	| { id?: string; type: "response"; command: "set_session_name"; success: true }
-	// Live voice
-	| { id?: string; type: "response"; command: "live_start"; success: true; data: { voice: string } }
-	| {
-			id?: string;
-			type: "response";
-			command: "live_connect";
-			success: true;
-			data: { voice: string; sdpAnswer: string };
-	  }
-	| { id?: string; type: "response"; command: "live_stop"; success: true }
-	| { id?: string; type: "response"; command: "live_mute"; success: true; data: { muted: boolean } }
 	// Draft-only speech-to-text
 	| { id?: string; type: "response"; command: "dictation_start"; success: true }
 	| { id?: string; type: "response"; command: "dictation_stop"; success: true; data: { text: string } }

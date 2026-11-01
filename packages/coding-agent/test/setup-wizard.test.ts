@@ -32,7 +32,7 @@ function fakeContextWithConfiguredModel(): InteractiveModeContext {
 	return {
 		session: {
 			modelRegistry: {
-				getAvailable: () => [{ provider: "configured", id: "model" }],
+				getAvailable: () => [{ provider: "local", id: "model" }],
 			},
 		},
 	} as unknown as InteractiveModeContext;
@@ -134,7 +134,7 @@ describe("setup wizard model selection", () => {
 		id: "minimax-m3",
 		name: "MiniMax M3",
 		api: "openai-completions",
-		provider: "spark",
+		provider: "local",
 		baseUrl: "http://127.0.0.1:8000/v1",
 		reasoning: true,
 		input: ["text"],
@@ -198,7 +198,7 @@ describe("setup wizard model selection", () => {
 		const result = await pickModelDuringSetup(settings);
 
 		expect(result).toBe("done");
-		expect(settings.getGlobalModelRole("default")).toBe("spark/minimax-m3");
+		expect(settings.getGlobalModelRole("default")).toBe("local/minimax-m3");
 		expect(settings.getProjectModelRole("default")).toBeUndefined();
 	});
 
@@ -208,7 +208,7 @@ describe("setup wizard model selection", () => {
 		const result = await pickModelDuringSetup(settings);
 
 		expect(result).toBe("done");
-		expect(settings.getProjectModelRole("default")).toBe("spark/minimax-m3");
+		expect(settings.getProjectModelRole("default")).toBe("local/minimax-m3");
 		expect(settings.getGlobalModelRole("default")).toBeUndefined();
 	});
 });

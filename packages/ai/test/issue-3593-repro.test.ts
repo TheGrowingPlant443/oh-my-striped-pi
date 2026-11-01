@@ -41,11 +41,11 @@ const forcedResolve: ToolChoice = { type: "tool", name: "resolve" };
 
 function model(overrides: Partial<ModelSpec<"openai-completions">>): Model<"openai-completions"> {
 	return buildModel({
-		id: "qwen-3.6-27b",
-		name: "Qwen 3.6 27B",
+		id: "gpt-4o",
+		name: "GPT-4o",
 		api: "openai-completions",
-		provider: "llama.cpp",
-		baseUrl: "http://localhost:8080/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -57,11 +57,11 @@ function model(overrides: Partial<ModelSpec<"openai-completions">>): Model<"open
 
 function responsesModel(overrides: Partial<ModelSpec<"openai-responses">>): Model<"openai-responses"> {
 	return buildModel({
-		id: "qwen-3.6-27b",
-		name: "Qwen 3.6 27B",
+		id: "gpt-5-mini",
+		name: "GPT-5 Mini",
 		api: "openai-responses",
-		provider: "lm-studio",
-		baseUrl: "http://127.0.0.1:1234/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -106,12 +106,9 @@ function captureResponsesPayload(
 	return promise;
 }
 
-describe("issues #3593 and #6925 — string-only tool_choice hosts", () => {
-	it.each([
-		["llama.cpp", "http://localhost:8080/v1"],
-		["lm-studio", "http://127.0.0.1:1234/v1"],
-	])("drops the forced choice for %s when the named tool is absent", async (provider, baseUrl) => {
-		const payload = await capturePayload(model({ provider, baseUrl }), {
+describe("explicit string-only tool_choice compatibility", () => {
+	it("drops the forced choice when the named tool is absent", async () => {
+		const payload = await capturePayload(model({ compat: { supportsNamedToolChoice: false } }), {
 			context: { messages: context.messages, tools: [] },
 			toolChoice: { type: "tool", name: "resolve" },
 		});
@@ -119,11 +116,8 @@ describe("issues #3593 and #6925 — string-only tool_choice hosts", () => {
 		expect(payload.tool_choice).toBeUndefined();
 	});
 
-	it.each([
-		["llama.cpp", "http://localhost:8080/v1"],
-		["lm-studio", "http://127.0.0.1:1234/v1"],
-	])("narrows the advertised tools to the forced one for %s", async (provider, baseUrl) => {
-		const payload = await capturePayload(model({ provider, baseUrl }), {
+	it("narrows the advertised tools to the forced one", async () => {
+		const payload = await capturePayload(model({ compat: { supportsNamedToolChoice: false } }), {
 			context: multiToolContext,
 			toolChoice: { type: "tool", name: "todo" },
 		});
@@ -132,9 +126,14 @@ describe("issues #3593 and #6925 — string-only tool_choice hosts", () => {
 		expect(payload.tool_choice).toBe("required");
 	});
 
-	it("keeps every tool for OpenAI's named object, without narrowing", async () => {
+	it("keeps every tool for Copilot's named object, without narrowing", async () => {
 		const payload = await capturePayload(
-			model({ provider: "openai", baseUrl: "https://api.openai.com/v1", id: "gpt-4o-mini", name: "GPT-4o mini" }),
+			model({
+				provider: "github-copilot",
+				baseUrl: "https://api.githubcopilot.com",
+				id: "gpt-4o-mini",
+				name: "GPT-4o mini",
+			}),
 			{ context: multiToolContext, toolChoice: { type: "tool", name: "todo" } },
 		);
 
@@ -143,12 +142,13 @@ describe("issues #3593 and #6925 — string-only tool_choice hosts", () => {
 	});
 });
 
-describe("issue #6925 — LM Studio Responses string-only tool_choice", () => {
+describe("Responses explicit string-only tool_choice compatibility", () => {
 	it("narrows the advertised tools before downgrading the named choice", async () => {
-		const payload = await captureResponsesPayload(responsesModel({}), multiToolContext, {
-			type: "tool",
-			name: "todo",
-		});
+		const payload = await captureResponsesPayload(
+			responsesModel({ compat: { supportsNamedToolChoice: false } }),
+			multiToolContext,
+			{ type: "tool", name: "todo" },
+		);
 
 		expect(payload.tools?.map(tool => tool.name)).toEqual(["todo"]);
 		expect(payload.tool_choice).toBe("required");
@@ -164,11 +164,11 @@ describe("issue #6925 — LM Studio Responses string-only tool_choice", () => {
 		expect(payload.tool_choice).toBeUndefined();
 	});
 
-	it("preserves OpenAI's named object and full tool catalogue", async () => {
+	it("preserves Copilot's named object and full tool catalogue", async () => {
 		const payload = await captureResponsesPayload(
 			responsesModel({
-				provider: "openai",
-				baseUrl: "https://api.openai.com/v1",
+				provider: "github-copilot",
+				baseUrl: "https://api.githubcopilot.com",
 				id: "gpt-5-mini",
 				name: "GPT-5 Mini",
 			}),

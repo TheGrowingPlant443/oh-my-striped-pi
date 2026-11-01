@@ -20,8 +20,8 @@ function reply(requestControls?: AssistantMessage["requestControls"]): Assistant
 	return {
 		role: "assistant",
 		content: [{ type: "text", text: "ok" }],
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock",
 		usage: {
 			input: 0,

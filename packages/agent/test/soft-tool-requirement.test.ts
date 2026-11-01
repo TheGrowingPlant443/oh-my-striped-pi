@@ -245,7 +245,7 @@ describe("agentLoop soft tool requirement", () => {
 		const queue: ToolChoice[] = [{ type: "tool", name: "resolve" }];
 		const leak = "Some prose. analysis to=functions.edit code 大发官网";
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [{ content: [leak] }, { content: ["clean retry"] }],
 		});
 		const config: AgentLoopConfig = {

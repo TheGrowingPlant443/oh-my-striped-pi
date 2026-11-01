@@ -50,9 +50,9 @@ describe("context command viewer", () => {
 
 	it("keeps /context focused fullscreen while a real pending turn continues, restoring draft without abort or submission", async () => {
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 test model");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 test model");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const entered = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
 		let requests = 0;

@@ -772,9 +772,9 @@ async function runEmbedding(beam: BeamMemoryState, items: readonly EmbedItem[]):
  *
  * Mirrors the `scheduleFactExtraction` pattern in `beam/store.ts`: `remember()`,
  * `rememberBatch()`, and `consolidateToEpisodic()` are synchronous, but `embed()` is
- * async (it may hit an HTTP provider), so the task is fired-and-forgotten and tracked
- * on `beam.pendingExtractions` so tests and graceful shutdown can drain it via
- * `flushExtractions()`. The active runtime options (provider, model, API URL/key) are
+ * async, so the task is fired-and-forgotten and tracked on `beam.pendingExtractions`
+ * so tests and graceful shutdown can drain it via `flushExtractions()`.
+ * The active runtime options (provider and model) are
  * captured here and re-entered inside the task because the `AsyncLocalStorage` scope
  * set by `Mnemopi.#withRuntimeOptions` has already exited by the time the task runs.
  */

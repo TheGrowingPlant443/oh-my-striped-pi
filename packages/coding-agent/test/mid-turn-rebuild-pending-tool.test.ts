@@ -41,8 +41,8 @@ const danglingAssistant = {
 	role: "assistant",
 	content: [{ type: "toolCall", id: "call-1", name: "bash", arguments: { command: "sleep 60" } }],
 	api: "anthropic-messages",
-	provider: "anthropic",
-	model: "claude-sonnet-4-5",
+	provider: "github-copilot",
+	model: "claude-sonnet-4.5",
 	stopReason: "toolUse",
 	usage,
 	timestamp: Date.now(),
@@ -104,7 +104,7 @@ describe("mid-turn transcript rebuild keeps in-flight tool calls", () => {
 		expect(ctx.pendingTools.size).toBe(0);
 	});
 
-	for (const arrival of ["buffered", "live", "persisted", "during-replay"] as const) {
+	for (const arrival of ["live", "persisted", "during-replay"] as const) {
 		it(`keeps replayed read images visible after ${arrival} completion`, async () => {
 			const protocol = Object.getOwnPropertyDescriptor(TERMINAL, "imageProtocol")!;
 			Object.defineProperty(TERMINAL, "imageProtocol", { value: null });
@@ -120,8 +120,8 @@ describe("mid-turn transcript rebuild keeps in-flight tool calls", () => {
 						{ type: "text", text: "Continuing after the read." },
 					],
 					api: "anthropic-messages",
-					provider: "anthropic",
-					model: "claude-sonnet-4-5",
+					provider: "github-copilot",
+					model: "claude-sonnet-4.5",
 					stopReason: "toolUse",
 					usage,
 					timestamp: 1,
@@ -140,7 +140,6 @@ describe("mid-turn transcript rebuild keeps in-flight tool calls", () => {
 					isError: false,
 					timestamp: 2,
 				};
-				ctx.viewSession.agent.getPendingToolResults = () => (arrival === "buffered" ? [result] : []);
 				controller.resetTranscriptAnchors();
 				if (arrival === "during-replay") {
 					let completion: Promise<void> | undefined;

@@ -9,7 +9,7 @@ import {
 	sanitizeOpenAIResponsesHistoryItemsForReplay,
 } from "@oh-my-pi/pi-ai/utils";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import * as piUtils from "@oh-my-pi/pi-utils";
 
@@ -29,25 +29,32 @@ function createAbortedSignal(): AbortSignal {
 	return controller.signal;
 }
 
-function getOpenAIReasoningModel(provider: GeneratedProvider, id: string): Model<"openai-responses"> {
-	const model = getBundledModel<"openai-responses">(provider, id);
-	return model;
+function getCopilotReasoningModel(
+	id: string,
+	compat: Partial<Model<"openai-responses">["compat"]> = {},
+): Model<"openai-responses"> {
+	const model = getBundledModel<"openai-responses">("github-copilot", id);
+	return {
+		...model,
+		applyPatchToolType: "freeform",
+		supportsComputerUse: true,
+		compat: {
+			...model.compat,
+			connectionBoundNativeHistory: false,
+			strictResponsesPairing: false,
+			supportsDeveloperRole: true,
+			supportsImageDetailOriginal: true,
+			...compat,
+		},
+	};
 }
 
 const ISSUE_5002_PATCH = "*** Begin Patch\n*** End Patch\n";
 const ISSUE_5002_TOOL_OUTPUT = "patch applied";
-const issue5002XaiOAuthModel = buildModel({
-	id: "grok-build",
-	name: "Grok Build",
-	api: "openai-responses",
-	provider: "xai-oauth",
-	baseUrl: "https://api.x.ai/v1",
-	reasoning: true,
-	input: ["text", "image"],
-	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 256000,
-	maxTokens: 64000,
-} satisfies ModelSpec<"openai-responses">);
+const functionOnlyModel: Model<"openai-responses"> = {
+	...getCopilotReasoningModel("gpt-5-mini", { supportsImageDetailOriginal: false }),
+	applyPatchToolType: "function",
+};
 
 const issue5002ZeroUsage = {
 	input: 0,
@@ -84,7 +91,7 @@ const preservedHistoryContext: Context = {
 		{
 			role: "user",
 			content: "summary that should be ignored",
-			providerPayload: createOpenAIResponsesHistoryPayload("openai", preservedHistoryItems, false),
+			providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", preservedHistoryItems, false),
 			timestamp: Date.now(),
 		},
 	],
@@ -118,7 +125,7 @@ const resumedSameProviderContext: Context = {
 		{
 			role: "user",
 			content: "summary that should be preserved",
-			providerPayload: createOpenAIResponsesHistoryPayload("openai", fallbackHistoryItems, false),
+			providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", fallbackHistoryItems, false),
 			timestamp: Date.now(),
 		},
 		{
@@ -155,7 +162,7 @@ const resumedSameProviderWithRemoteCompactionPayloadContext: Context = {
 		{
 			role: "user",
 			content: "summary that should be preserved",
-			providerPayload: createOpenAIResponsesHistoryPayload("openai", preservedHistoryItems, false),
+			providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", preservedHistoryItems, false),
 			timestamp: Date.now(),
 		},
 		{
@@ -183,7 +190,7 @@ const resumedSameProviderWithStaleThinkingContext: Context = {
 				},
 				{ type: "text", text: "generic assistant that should be rebuilt" },
 			],
-			providerPayload: createOpenAIResponsesHistoryPayload("openai", [
+			providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", [
 				{ type: "reasoning", encrypted_content: "enc_snapshot" },
 			]),
 		},
@@ -194,18 +201,23 @@ const resumedSameProviderWithStaleThinkingContext: Context = {
 // A self-hosted Responses server that returns reasoning as plaintext
 // `reasoning_text` (no opaque `encrypted_content`) and caches the prompt it
 // rendered, prior-turn thinking included.
-const plaintextReasoningModel = buildModel({
+const plaintextReasoningBaseModel = buildModel({
 	id: "local-reasoner",
 	name: "Local Reasoner",
 	api: "openai-responses",
-	provider: "self-hosted",
+	provider: "github-copilot",
 	baseUrl: "http://127.0.0.1:8000/v1",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 131_072,
 	maxTokens: 4_096,
+	compat: { strictResponsesPairing: false },
 } satisfies ModelSpec<"openai-responses">);
+const plaintextReasoningModel: Model<"openai-responses"> = {
+	...plaintextReasoningBaseModel,
+	compat: { ...plaintextReasoningBaseModel.compat, connectionBoundNativeHistory: false },
+};
 
 function plaintextReasoningItem(id: string, text: string): Record<string, unknown> {
 	return { type: "reasoning", id, summary: [], content: [{ type: "reasoning_text", text }] };
@@ -314,8 +326,8 @@ const incrementalItems2 = [
 function makeAssistantMessage(
 	items: Record<string, unknown>[],
 	incremental = false,
-	provider: "openai" | "openai-codex" | "github-copilot" = "openai",
-	model = provider === "openai-codex" ? "gpt-5.5" : provider === "github-copilot" ? "gpt-5.4" : "gpt-5-mini",
+	provider: "github-copilot" | "openai-codex" = "github-copilot",
+	model = provider === "openai-codex" ? "gpt-5.5" : "gpt-5-mini",
 ) {
 	return {
 		role: "assistant" as const,
@@ -453,7 +465,7 @@ describe("OpenAI responses history payload", () => {
 		).toEqual(["original", "original"]);
 	});
 
-	it("adapts reconstructed apply_patch replay for xai-oauth while preserving OpenAI custom replay", () => {
+	it("adapts reconstructed apply_patch replay for function-only targets while preserving custom replay", () => {
 		const context: Context = {
 			messages: [
 				{
@@ -476,7 +488,7 @@ describe("OpenAI responses history payload", () => {
 						},
 					],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: issue5002ZeroUsage,
 					stopReason: "toolUse",
@@ -494,28 +506,28 @@ describe("OpenAI responses history payload", () => {
 			tools: [issue5002EditTool],
 		};
 
-		const xaiInput = buildResponsesInput({
-			model: issue5002XaiOAuthModel,
+		const functionInput = buildResponsesInput({
+			model: functionOnlyModel,
 			context,
 			strictResponsesPairing: false,
-			supportsImageDetailOriginal: issue5002XaiOAuthModel.compat.supportsImageDetailOriginal,
-			nativeHistory: { replay: true, filterReasoning: issue5002XaiOAuthModel.compat.filterReasoningHistory },
+			supportsImageDetailOriginal: functionOnlyModel.compat.supportsImageDetailOriginal,
+			nativeHistory: { replay: true, filterReasoning: functionOnlyModel.compat.filterReasoningHistory },
 		});
-		expect(findResponsesInputItemByCallId(xaiInput, "function_call", "call_apply")).toEqual({
+		expect(findResponsesInputItemByCallId(functionInput, "function_call", "call_apply")).toEqual({
 			type: "function_call",
 			call_id: "call_apply",
 			name: "edit",
 			arguments: JSON.stringify({ input: ISSUE_5002_PATCH }),
 		});
-		expect(findResponsesInputItemByCallId(xaiInput, "function_call_output", "call_apply")).toEqual({
+		expect(findResponsesInputItemByCallId(functionInput, "function_call_output", "call_apply")).toEqual({
 			type: "function_call_output",
 			call_id: "call_apply",
 			output: ISSUE_5002_TOOL_OUTPUT,
 		});
-		expect(JSON.stringify(xaiInput)).not.toContain("custom_tool_call");
-		expect(collectResponsesInputImageDetails(xaiInput)).toEqual(["auto"]);
+		expect(JSON.stringify(functionInput)).not.toContain("custom_tool_call");
+		expect(collectResponsesInputImageDetails(functionInput)).toEqual(["auto"]);
 
-		const openaiModel = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const openaiModel = getCopilotReasoningModel("gpt-5-mini");
 		const openaiInput = buildResponsesInput({
 			model: openaiModel,
 			context,
@@ -537,7 +549,7 @@ describe("OpenAI responses history payload", () => {
 		expect(collectResponsesInputImageDetails(openaiInput)).toEqual(["original"]);
 	});
 
-	it("adapts persisted native apply_patch Responses items for xai-oauth continuations", () => {
+	it("adapts persisted native apply_patch items for function-only continuations", () => {
 		const nativeHistoryItems = [
 			{
 				type: "message",
@@ -554,56 +566,56 @@ describe("OpenAI responses history payload", () => {
 				output: ISSUE_5002_TOOL_OUTPUT,
 			},
 		];
-		const xaiContext: Context = {
+		const functionContext: Context = {
 			messages: [
 				{
 					role: "assistant",
 					content: [{ type: "text", text: "fallback should not be replayed" }],
 					api: "openai-responses",
-					provider: "xai-oauth",
-					model: issue5002XaiOAuthModel.id,
+					provider: "github-copilot",
+					model: functionOnlyModel.id,
 					usage: issue5002ZeroUsage,
 					stopReason: "stop",
-					providerPayload: createOpenAIResponsesHistoryPayload("xai-oauth", nativeHistoryItems),
+					providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", nativeHistoryItems),
 					timestamp: Date.now(),
 				},
 				{ role: "user", content: "continue", timestamp: Date.now() },
 			],
 		};
 
-		const xaiInput = buildResponsesInput({
-			model: issue5002XaiOAuthModel,
-			context: xaiContext,
+		const functionInput = buildResponsesInput({
+			model: functionOnlyModel,
+			context: functionContext,
 			strictResponsesPairing: false,
-			supportsImageDetailOriginal: issue5002XaiOAuthModel.compat.supportsImageDetailOriginal,
-			nativeHistory: { replay: true, filterReasoning: issue5002XaiOAuthModel.compat.filterReasoningHistory },
+			supportsImageDetailOriginal: functionOnlyModel.compat.supportsImageDetailOriginal,
+			nativeHistory: { replay: true, filterReasoning: functionOnlyModel.compat.filterReasoningHistory },
 		});
-		expect(findResponsesInputItemByCallId(xaiInput, "function_call", "call_native_apply")).toEqual({
+		expect(findResponsesInputItemByCallId(functionInput, "function_call", "call_native_apply")).toEqual({
 			type: "function_call",
 			call_id: "call_native_apply",
 			name: "edit",
 			arguments: JSON.stringify({ input: ISSUE_5002_PATCH }),
 		});
-		expect(findResponsesInputItemByCallId(xaiInput, "function_call_output", "call_native_apply")).toEqual({
+		expect(findResponsesInputItemByCallId(functionInput, "function_call_output", "call_native_apply")).toEqual({
 			type: "function_call_output",
 			call_id: "call_native_apply",
 			output: ISSUE_5002_TOOL_OUTPUT,
 		});
-		expect(JSON.stringify(xaiInput)).not.toContain("custom_tool_call");
-		expect(collectResponsesInputImageDetails(xaiInput)).toEqual(["auto"]);
+		expect(JSON.stringify(functionInput)).not.toContain("custom_tool_call");
+		expect(collectResponsesInputImageDetails(functionInput)).toEqual(["auto"]);
 
-		const openaiModel = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const openaiModel = getCopilotReasoningModel("gpt-5-mini");
 		const openaiContext: Context = {
 			messages: [
 				{
 					role: "assistant",
 					content: [{ type: "text", text: "fallback should not be replayed" }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: openaiModel.id,
 					usage: issue5002ZeroUsage,
 					stopReason: "stop",
-					providerPayload: createOpenAIResponsesHistoryPayload("openai", nativeHistoryItems),
+					providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", nativeHistoryItems),
 					timestamp: Date.now(),
 				},
 				{ role: "user", content: "continue", timestamp: Date.now() },
@@ -631,11 +643,11 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("uses canonical instructions field for endpoints without developer-role support", async () => {
-		const baseModel = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const baseModel = getCopilotReasoningModel("gpt-5-mini");
 		const model = buildModel({
 			...baseModel,
 			baseUrl: "https://proxy.example.com/v1",
-			compat: baseModel.compatConfig,
+			compat: { ...baseModel.compatConfig, supportsDeveloperRole: false },
 		} as ModelSpec<"openai-responses">);
 		const payload = (await captureResponsesPayload(model, {
 			systemPrompt: ["stable instructions", "second instructions"],
@@ -647,7 +659,7 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("keeps system instruction order ahead of replayed native history", async () => {
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, {
 			...assistantSnapshotContext,
 			systemPrompt: ["stable instructions", "second instructions"],
@@ -662,13 +674,13 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("inlines preserved replacement history for openai-responses", async () => {
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, preservedHistoryContext)) as { input?: unknown[] };
 		expect(payload.input).toEqual(preservedHistoryItems);
 	});
 
 	it("falls back to rebuilt history on resumed connection-bound sessions with fresh session state", async () => {
-		const model = asConnectionBound(getOpenAIReasoningModel("openai", "gpt-5-mini"));
+		const model = asConnectionBound(getCopilotReasoningModel("gpt-5-mini"));
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		const payload = (await captureResponsesPayload(model, resumedSameProviderContext, providerSessionState)) as {
 			input?: unknown[];
@@ -680,7 +692,7 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("does not replay stale thinking signatures when native replay is cold", async () => {
-		const model = asConnectionBound(getOpenAIReasoningModel("openai", "gpt-5-mini"));
+		const model = asConnectionBound(getCopilotReasoningModel("gpt-5-mini"));
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		const payload = (await captureResponsesPayload(
 			model,
@@ -696,7 +708,7 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("preserves remote replacement history on cold openai session state", async () => {
-		const model = asConnectionBound(getOpenAIReasoningModel("openai", "gpt-5-mini"));
+		const model = asConnectionBound(getCopilotReasoningModel("gpt-5-mini"));
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		const payload = (await captureResponsesPayload(
 			model,
@@ -719,7 +731,7 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("replays native history after a connection-bound session state is warmed", async () => {
-		const model = asConnectionBound(getOpenAIReasoningModel("openai", "gpt-5-mini"));
+		const model = asConnectionBound(getCopilotReasoningModel("gpt-5-mini"));
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		await captureResponsesPayload(model, resumedSameProviderContext, providerSessionState);
 		markResponsesProviderSessionStateWarmed(providerSessionState);
@@ -736,21 +748,21 @@ describe("OpenAI responses history payload", () => {
 	it("replays encrypted reasoning on the first resumed request unless the host binds items to a connection", async () => {
 		const replayed: Record<string, boolean> = {};
 		for (const model of [
-			getOpenAIReasoningModel("xai-oauth", "grok-4.7"),
-			getOpenAIReasoningModel("openai", "gpt-5-mini"),
-			getOpenAIReasoningModel("github-copilot", "gpt-5.4"),
+			getCopilotReasoningModel("gpt-5-mini"),
+			asConnectionBound(getCopilotReasoningModel("gpt-5.4")),
 		]) {
 			const payload = (await captureResponsesPayload(model, resumedEncryptedReasoningContext(model), new Map())) as {
 				input?: unknown[];
 			};
-			replayed[model.provider] = containsEncryptedReasoning(payload.input);
+			replayed[model.compat.connectionBoundNativeHistory ? "connection-bound" : "portable"] =
+				containsEncryptedReasoning(payload.input);
 		}
 
-		expect(replayed).toEqual({ "xai-oauth": true, openai: true, "github-copilot": false });
+		expect(replayed).toEqual({ portable: true, "connection-bound": false });
 	});
 
 	it("rebuilds history after the provider session state closes on a host without connection binding", async () => {
-		const model = getOpenAIReasoningModel("xai-oauth", "grok-4.7");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const context = resumedEncryptedReasoningContext(model);
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		const warm = (await captureResponsesPayload(model, context, providerSessionState)) as { input?: unknown[] };
@@ -765,8 +777,8 @@ describe("OpenAI responses history payload", () => {
 	it("reports the replay decision each request makes through openAIResponsesReplaysNativeHistory", async () => {
 		const observed: Array<{ step: string; reported: boolean; replayed: boolean }> = [];
 		for (const model of [
-			getOpenAIReasoningModel("github-copilot", "gpt-5.4"),
-			getOpenAIReasoningModel("xai-oauth", "grok-4.7"),
+			asConnectionBound(getCopilotReasoningModel("gpt-5.4")),
+			getCopilotReasoningModel("gpt-5-mini"),
 		]) {
 			const context = resumedEncryptedReasoningContext(model);
 			const providerSessionState = new Map<string, ProviderSessionState>();
@@ -774,7 +786,7 @@ describe("OpenAI responses history payload", () => {
 				const reported = openAIResponsesReplaysNativeHistory(model, state);
 				const payload = (await captureResponsesPayload(model, context, state)) as { input?: unknown[] };
 				observed.push({
-					step: `${model.provider} ${step}`,
+					step: `${model.id} ${step}`,
 					reported,
 					replayed: containsEncryptedReasoning(payload.input),
 				});
@@ -791,14 +803,14 @@ describe("OpenAI responses history payload", () => {
 			expect({ step, reported }).toEqual({ step, reported: replayed });
 		// Only the connection-bound host starts cold; every host is cold after a close.
 		expect(observed.filter(o => !o.replayed).map(o => o.step)).toEqual([
-			"github-copilot first request",
-			"github-copilot closed",
-			"xai-oauth closed",
+			"gpt-5.4 first request",
+			"gpt-5.4 closed",
+			"gpt-5-mini closed",
 		]);
 	});
 
 	it("keeps a closed provider session state cold when a request started before the close succeeds", async () => {
-		const model = getOpenAIReasoningModel("xai-oauth", "grok-4.7");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const context = resumedEncryptedReasoningContext(model);
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		const requested = Promise.withResolvers<void>();
@@ -837,12 +849,12 @@ describe("OpenAI responses history payload", () => {
 		expect(containsEncryptedReasoning(retry.input)).toBe(false);
 	});
 
-	it("does not warm GitHub Copilot replay when only OpenAI replay state is warmed", async () => {
-		const openAiModel = getOpenAIReasoningModel("openai", "gpt-5-mini");
+	it("does not warm a separate Copilot session when another session's replay state is warmed", async () => {
 		const copilotModel = getBundledModel("github-copilot", "gpt-5.4") as Model<"openai-responses">;
+		const warmedSessionState = new Map<string, ProviderSessionState>();
+		await captureResponsesPayload(copilotModel, resumedCopilotSameProviderContext, warmedSessionState);
+		markResponsesProviderSessionStateWarmed(warmedSessionState);
 		const providerSessionState = new Map<string, ProviderSessionState>();
-		await captureResponsesPayload(openAiModel, resumedSameProviderContext, providerSessionState);
-		markResponsesProviderSessionStateWarmed(providerSessionState);
 		const payload = (await captureResponsesPayload(
 			copilotModel,
 			resumedCopilotSameProviderContext,
@@ -1101,7 +1113,9 @@ describe("OpenAI responses history payload", () => {
 		}
 
 		it("carries the cold rebuild's reasoning_text for targets that require it", async () => {
-			const model = getOpenAIReasoningModel("commandcode", "deepseek/deepseek-v4.1-flash");
+			const model = getCopilotReasoningModel("gpt-5-mini", {
+				requiresReasoningContentForAllAssistantTurns: true,
+			});
 			const context = summaryOnlyReasoningContext(model);
 			const options = { reasoning: Effort.Medium };
 			const cold = (await captureResponsesPayload(asConnectionBound(model), context, new Map(), options)) as {
@@ -1122,11 +1136,11 @@ describe("OpenAI responses history payload", () => {
 			expect(replayedReasoningTexts(warm.input)).toEqual([]);
 		});
 
-		it("replays encrypted summary items verbatim on OpenRouter tool-call turns", async () => {
-			// OpenRouter requires reasoning on tool-call turns for every reasoning
-			// model; an OpenAI-family item's opaque `encrypted_content` is its
-			// reasoning, so the summary must not be injected as `reasoning_text`.
-			const model = getOpenAIReasoningModel("openrouter", "openai/gpt-5");
+		it("replays encrypted summary items verbatim when tool-call turns require reasoning", async () => {
+			// Encrypted reasoning already satisfies the turn; do not inject plaintext.
+			const model = getCopilotReasoningModel("gpt-5", {
+				requiresReasoningContentForToolCalls: true,
+			});
 			const reasoningItem = {
 				type: "reasoning",
 				encrypted_content: "enc_blob",
@@ -1292,7 +1306,7 @@ describe("OpenAI responses history payload", () => {
 	});
 
 	it("builds up history incrementally from multiple assistant messages", async () => {
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, incrementalContext)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			{ role: "user", content: [{ type: "input_text", text: "first question" }] },
@@ -1317,7 +1331,7 @@ describe("OpenAI responses history payload", () => {
 						},
 					],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: {
 						input: 0,
@@ -1333,7 +1347,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "follow-up", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			{ role: "user", content: [{ type: "input_text", text: "first user" }] },
@@ -1356,7 +1370,7 @@ describe("OpenAI responses history payload", () => {
 					role: "assistant",
 					content: [{ type: "text", text: "Legacy answer", textSignature: "msg_legacy" }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: {
 						input: 0,
@@ -1372,7 +1386,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "follow-up", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			{ role: "user", content: [{ type: "input_text", text: "first user" }] },
@@ -1395,7 +1409,7 @@ describe("OpenAI responses history payload", () => {
 					role: "assistant",
 					content: [{ type: "text", text: "Legacy answer", textSignature: legacySignature }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: {
 						input: 0,
@@ -1411,7 +1425,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "follow-up", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			{ role: "user", content: [{ type: "input_text", text: "first user" }] },
@@ -1445,7 +1459,7 @@ describe("OpenAI responses history payload", () => {
 						{ type: "text", text: "Signed answer", textSignature: legacySignature },
 					],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: {
 						input: 0,
@@ -1461,7 +1475,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "follow-up", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			{ role: "user", content: [{ type: "input_text", text: "first user" }] },
@@ -1510,7 +1524,7 @@ describe("OpenAI responses history payload", () => {
 			],
 		};
 		const input = buildResponsesInput({
-			model: getOpenAIReasoningModel("openai", "gpt-5-mini"),
+			model: getCopilotReasoningModel("gpt-5-mini"),
 			context,
 			strictResponsesPairing: true,
 			supportsImageDetailOriginal: true,
@@ -1579,7 +1593,7 @@ describe("OpenAI responses history payload", () => {
 			],
 		};
 
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		const reasoningItem = findResponsesInputItem(payload.input, "reasoning");
 		const messageItem = findResponsesInputItem(payload.input, "message");
@@ -1658,12 +1672,12 @@ describe("OpenAI responses history payload", () => {
 		];
 		const context: Context = {
 			messages: [
-				makeAssistantMessage(nativeComputerHistory, false, "openai", "gpt-5.4"),
+				makeAssistantMessage(nativeComputerHistory, false, "github-copilot", "gpt-5.4"),
 				{ role: "user", content: "continue after interrupt", timestamp: Date.now() },
 			],
 		};
 
-		const model = getOpenAIReasoningModel("openai", "gpt-5.4");
+		const model = getCopilotReasoningModel("gpt-5.4");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 
 		expect(payload.input).toEqual([
@@ -1713,7 +1727,7 @@ describe("OpenAI responses history payload", () => {
 							},
 						],
 						true,
-						"openai",
+						"github-copilot",
 						"gpt-5.4",
 					),
 					content: [
@@ -1748,7 +1762,7 @@ describe("OpenAI responses history payload", () => {
 			],
 		};
 
-		const model = getOpenAIReasoningModel("openai", "gpt-5.4");
+		const model = getCopilotReasoningModel("gpt-5.4");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 
 		expect(findResponsesInputItem(payload.input, "reasoning")?.id).toBe("rs_split_computer_turn");
@@ -1776,7 +1790,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "follow-up", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(payload.input).toEqual([
 			...fullSnapshotItems,
@@ -1792,7 +1806,7 @@ describe("OpenAI responses history payload", () => {
 					role: "assistant",
 					content: [{ type: "toolCall", id: callId, name: "read", arguments: { path: "README.md" } }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: {
 						input: 0,
@@ -1817,7 +1831,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "Resume", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		const functionCallItem = findResponsesInputItem(payload.input, "function_call");
 		const functionCallOutputItem = findResponsesInputItem(payload.input, "function_call_output");
@@ -1859,7 +1873,7 @@ describe("OpenAI responses history payload", () => {
 						{ type: "toolCall", id: "chatcmpl-tool-read", name: "read", arguments: { path: "README.md" } },
 					],
 					api: "openai-completions",
-					provider: "zai",
+					provider: "github-copilot",
 					model: "glm-5.3",
 					usage,
 					stopReason: "toolUse",
@@ -1884,7 +1898,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "continue", timestamp: 5 },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 		expect(listResponsesToolItems(payload.input)).toEqual([
 			["function_call", "chatcmpl-tool-read", "read"],
@@ -1939,7 +1953,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "continue", timestamp: Date.now() },
 			],
 		};
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const providerSessionState = new Map<string, ProviderSessionState>();
 		await captureResponsesPayload(model, context, providerSessionState);
 		markResponsesProviderSessionStateWarmed(providerSessionState);
@@ -1973,7 +1987,7 @@ describe("OpenAI responses history payload", () => {
 			stopReason: "toolUse" as const,
 		};
 		const input = buildResponsesInput({
-			model: getOpenAIReasoningModel("openai", "gpt-5-mini"),
+			model: getCopilotReasoningModel("gpt-5-mini"),
 			context: {
 				messages: [
 					{ role: "user", content: "List the repo", timestamp: 1 },
@@ -2015,7 +2029,7 @@ describe("OpenAI responses history payload", () => {
 				{
 					role: "user",
 					content: "follow-up after aborted turn",
-					providerPayload: createOpenAIResponsesHistoryPayload("openai", [
+					providerPayload: createOpenAIResponsesHistoryPayload("github-copilot", [
 						{
 							type: "function_call",
 							call_id: pairedCallId,
@@ -2038,7 +2052,7 @@ describe("OpenAI responses history payload", () => {
 			],
 		};
 
-		const model = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const model = getCopilotReasoningModel("gpt-5-mini");
 		const payload = (await captureResponsesPayload(model, context)) as { input?: unknown[] };
 
 		const orphanSurvivors = (payload.input ?? []).filter(item => {
@@ -2077,12 +2091,12 @@ describe("OpenAI responses history payload", () => {
 					role: "assistant",
 					content: [{ type: "toolCall", id: orphanCallId, name: "read", arguments: { path: "README.md" } }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: "gpt-5-mini",
 					usage: issue5002ZeroUsage,
 					stopReason: "toolUse",
 					providerPayload: createOpenAIResponsesHistoryPayload(
-						"openai",
+						"github-copilot",
 						[{ type: "message", role: "assistant", content: [{ type: "output_text", text: "snapshot" }] }],
 						false,
 					),
@@ -2099,7 +2113,7 @@ describe("OpenAI responses history payload", () => {
 				{ role: "user", content: "Continue", timestamp: Date.now() },
 			],
 		};
-		const catalogNonStrictModel = getOpenAIReasoningModel("openai", "gpt-5-mini");
+		const catalogNonStrictModel = getCopilotReasoningModel("gpt-5-mini");
 		const catalogStrictModel: Model<"openai-responses"> = {
 			...catalogNonStrictModel,
 			compat: { ...catalogNonStrictModel.compat, strictResponsesPairing: true },

@@ -34,7 +34,6 @@ import prefillInstruction from "../prompts/bench/prefill-instruction.md" with { 
 import { shouldDisableReasoning, toReasoningEffort } from "@oh-my-pi/pi-tui/thinking";
 import {
 	type BenchRuntime,
-	type BenchTarget,
 	createDefaultBenchRuntime,
 	resolveBenchTargets,
 	type StreamSimpleFn,
@@ -704,13 +703,6 @@ async function runBenchRequest(
 			disableReasoning: options.disableReasoning,
 			serviceTier: options.serviceTier,
 			providerSessionState,
-			preferWebsockets: true,
-			// pi-ai opts every OpenRouter request into response caching (1h TTL).
-			// Bench sends a byte-identical request each run, so within the TTL
-			// OpenRouter replays the cached generation with zeroed usage — the run
-			// shows "tokens 0, TPS 0.0" at line speed. Opt back out so every run
-			// measures a fresh generation.
-			headers: model.provider === "openrouter" ? { "X-OpenRouter-Cache": "false" } : undefined,
 		});
 		let message: AssistantMessage | undefined;
 		for await (const event of stream) {
@@ -1016,14 +1008,6 @@ function formatBenchTable(rows: readonly BenchTableRow[], spec: BenchTableSpec, 
 	return table.map(cells => renderTableRow(cells, layout, undefined, { gap: "  " }).trimEnd());
 }
 
-function assertCacheModeSupported(targets: BenchTarget[]): void {
-	if (targets.some(({ model }) => model.api === "openai-codex-responses")) {
-		throw new Error(
-			"--cache is not supported for openai-codex-responses because Codex WebSocket chaining cannot produce independent prompt-cache pairs",
-		);
-	}
-}
-
 export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDependencies = {}): Promise<BenchSummary> {
 	const cacheMode = command.flags.cache === true;
 	const cacheFlagsUsed =
@@ -1152,7 +1136,6 @@ export async function runBenchCommand(command: BenchCommandArgs, deps: BenchDepe
 	const runtime = await (deps.createRuntime ?? createDefaultBenchRuntime)();
 	try {
 		const targets = await resolveBenchTargets(command.models, runtime.modelRegistry, runtime.settings, writeStderr);
-		if (cacheMode) assertCacheModeSupported(targets);
 		// Explicit `--service-tier` (a single value broadcast across families) wins;
 		// otherwise fall back to the configured per-family `tier.*` settings. Each
 		// model resolves its own family's tier below before reaching the wire.

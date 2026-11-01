@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from "bun:test";
 import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { transformRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex/request-transformer";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { createCodexModel } from "./helpers";
 
 // End-to-end guard for the first-class `max` reasoning tier: a user-requested
 // `reasoning: "max"` on a model whose ladder natively includes `Effort.Max`
@@ -51,7 +49,7 @@ describe("first-class max reasoning tier wire coverage", () => {
 			id: "max-wire-chat",
 			name: "Max Wire Chat",
 			api: "openai-completions",
-			provider: "custom",
+			provider: "github-copilot",
 			baseUrl: "https://chat.example.test/v1",
 			reasoning: true,
 			compat: {
@@ -86,7 +84,7 @@ describe("first-class max reasoning tier wire coverage", () => {
 			id: "max-wire-responses",
 			name: "Max Wire Responses",
 			api: "openai-responses",
-			provider: "custom-responses",
+			provider: "github-copilot",
 			baseUrl: "https://responses.example.test/v1",
 			reasoning: true,
 			compat: {
@@ -116,22 +114,12 @@ describe("first-class max reasoning tier wire coverage", () => {
 		expect(reasoningParam?.effort).toBe("max");
 	});
 
-	it("sends reasoning.effort:max through the Codex request transformer", async () => {
-		const model = createCodexModel("codex-max-wire", {
-			thinking: { mode: "effort", efforts: MAX_LADDER },
-		});
-		const transformed = await transformRequestBody({ model: model.id, input: [] }, model, {
-			reasoningEffort: "max",
-		});
-		expect(transformed.reasoning?.effort).toBe("max");
-	});
-
 	it("sends output_config.effort:max on Anthropic adaptive thinking", async () => {
 		const model = buildModel({
 			id: "adaptive-max-wire",
 			name: "Adaptive Max Wire",
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			baseUrl: "https://api.anthropic.com",
 			reasoning: true,
 			thinking: { mode: "anthropic-adaptive", efforts: MAX_LADDER },
@@ -146,7 +134,6 @@ describe("first-class max reasoning tier wire coverage", () => {
 		controller.abort();
 		streamAnthropic(model, context, {
 			apiKey: "sk-ant-test",
-			isOAuth: false,
 			signal: controller.signal,
 			thinkingEnabled: true,
 			reasoning: Effort.Max,

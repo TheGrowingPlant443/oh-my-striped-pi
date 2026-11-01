@@ -1,7 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { scheduler } from "node:timers/promises";
-import { streamAzureOpenAIResponses } from "@oh-my-pi/pi-ai/providers/azure-openai-responses";
-import { streamOpenAICodexResponses } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
@@ -26,30 +23,15 @@ const modelDefaults: Pick<ModelSpec, "id" | "name" | "reasoning" | "input" | "co
 const completionsModel: Model<"openai-completions"> = buildModel({
 	...modelDefaults,
 	api: "openai-completions",
-	provider: "openai",
-	baseUrl: "https://api.openai.test/v1",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 });
 
 const responsesModel: Model<"openai-responses"> = buildModel({
 	...modelDefaults,
 	api: "openai-responses",
-	provider: "openai",
-	baseUrl: "https://api.openai.test/v1",
-});
-
-const azureModel: Model<"azure-openai-responses"> = buildModel({
-	...modelDefaults,
-	api: "azure-openai-responses",
-	provider: "azure",
-	baseUrl: "https://example.openai.azure.com/openai/v1",
-});
-
-const codexModel: Model<"openai-codex-responses"> = buildModel({
-	...modelDefaults,
-	api: "openai-codex-responses",
-	provider: "openai-codex",
-	baseUrl: "https://chatgpt.com/backend-api",
-	preferWebsockets: false,
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 });
 
 function createSseResponse(events: unknown[], done = false): Response {
@@ -127,34 +109,6 @@ function completedCompletionsSse(text: string): Response {
 	);
 }
 
-function completedCodexSse(text: string): Response {
-	return createSseResponse([
-		{
-			type: "response.output_item.added",
-			item: { type: "message", id: "msg_recovered", role: "assistant", status: "in_progress", content: [] },
-		},
-		{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
-		{ type: "response.output_text.delta", delta: text },
-		{
-			type: "response.output_item.done",
-			item: {
-				type: "message",
-				id: "msg_recovered",
-				role: "assistant",
-				status: "completed",
-				content: [{ type: "output_text", text }],
-			},
-		},
-		{
-			type: "response.completed",
-			response: {
-				status: "completed",
-				usage: { input_tokens: 5, output_tokens: 2, total_tokens: 7, input_tokens_details: { cached_tokens: 0 } },
-			},
-		},
-	]);
-}
-
 afterEach(() => {
 	vi.restoreAllMocks();
 });
@@ -202,162 +156,5 @@ describe("OpenAI-family mid-stream socket-close retry", () => {
 		expect(requests).toBe(2);
 		expect(result.stopReason).toBe("stop");
 		expect(result.content.find(block => block.type === "text")?.text).toBe("completions recovered");
-	});
-
-	it("retries Azure OpenAI Responses before replay-unsafe output", async () => {
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			return requests === 1
-				? createSocketCloseResponse([
-						{ type: "response.created", response: { id: "resp_failed", status: "in_progress" } },
-					])
-				: completedResponsesSse("azure recovered");
-		});
-
-		const result = await streamAzureOpenAIResponses(azureModel, context, {
-			apiKey: "test-key",
-			azureBaseUrl: azureModel.baseUrl,
-			azureApiVersion: "v1",
-			fetch: fetchMock,
-			providerRetryWait: async () => {},
-		}).result();
-
-		expect(requests).toBe(2);
-		expect(result.stopReason).toBe("stop");
-		expect(result.content.find(block => block.type === "text")?.text).toBe("azure recovered");
-	});
-
-	it("retries Codex SSE before replay-unsafe output", async () => {
-		vi.spyOn(scheduler, "wait").mockResolvedValue(undefined);
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			return requests === 1
-				? createSocketCloseResponse([
-						{ type: "response.created", response: { id: "resp_failed", status: "in_progress" } },
-					])
-				: completedCodexSse("codex recovered");
-		});
-
-		const result = await streamOpenAICodexResponses(codexModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		}).result();
-
-		expect(requests).toBe(2);
-		expect(result.stopReason).toBe("stop");
-		expect(result.content.find(block => block.type === "text")?.text).toBe("codex recovered");
-	});
-
-	it("retries Codex SSE when a socket close follows an empty opened block", async () => {
-		vi.spyOn(scheduler, "wait").mockResolvedValue(undefined);
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			// First attempt opens a message block (emits text_start) but closes the
-			// socket before any output_text delta — replay-safe, must retry.
-			return requests === 1
-				? createSocketCloseResponse([
-						{
-							type: "response.output_item.added",
-							item: { type: "message", id: "msg_empty", role: "assistant", status: "in_progress", content: [] },
-						},
-						{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
-					])
-				: completedCodexSse("codex recovered after empty block");
-		});
-
-		const events: string[] = [];
-		const stream = streamOpenAICodexResponses(codexModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		});
-		for await (const event of stream) events.push(event.type);
-		const result = await stream.result();
-
-		expect(requests).toBe(2);
-		expect(result.stopReason).toBe("stop");
-		expect(result.content.find(block => block.type === "text")?.text).toBe("codex recovered after empty block");
-		// The abandoned attempt's text_start is balanced by a text_end before the
-		// replay: no orphaned block-start reaches the consumer.
-		expect(events.filter(type => type === "text_start")).toHaveLength(
-			events.filter(type => type === "text_end").length,
-		);
-	});
-
-	it("does not retry Codex SSE after text output commits", async () => {
-		vi.spyOn(scheduler, "wait").mockResolvedValue(undefined);
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			return createSocketCloseResponse([
-				{
-					type: "response.output_item.added",
-					item: { type: "message", id: "msg_partial", role: "assistant", status: "in_progress", content: [] },
-				},
-				{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
-				{ type: "response.output_text.delta", delta: "partial" },
-			]);
-		});
-
-		const result = await streamOpenAICodexResponses(codexModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		}).result();
-
-		expect(requests).toBe(1);
-		expect(result.stopReason).toBe("error");
-		expect(result.content.find(block => block.type === "text")?.text).toBe("partial");
-	});
-
-	it("does not retry Codex SSE after a whitespace-only text delta commits", async () => {
-		vi.spyOn(scheduler, "wait").mockResolvedValue(undefined);
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			// A whitespace-only delta still reached the consumer as text_delta;
-			// replaying would duplicate it, so the socket close must surface.
-			return createSocketCloseResponse([
-				{
-					type: "response.output_item.added",
-					item: { type: "message", id: "msg_ws", role: "assistant", status: "in_progress", content: [] },
-				},
-				{ type: "response.content_part.added", part: { type: "output_text", text: "" } },
-				{ type: "response.output_text.delta", delta: "  \n" },
-			]);
-		});
-
-		const result = await streamOpenAICodexResponses(codexModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		}).result();
-
-		expect(requests).toBe(1);
-		expect(result.stopReason).toBe("error");
-		expect(result.content.find(block => block.type === "text")?.text).toBe("  \n");
-	});
-
-	it("does not retry Codex SSE after thinking output commits", async () => {
-		vi.spyOn(scheduler, "wait").mockResolvedValue(undefined);
-		let requests = 0;
-		const fetchMock: FetchImpl = vi.fn(async () => {
-			requests++;
-			// A reasoning delta already reached the consumer as thinking_delta;
-			// replaying would duplicate it, so the socket close must surface.
-			return createSocketCloseResponse([
-				{ type: "response.output_item.added", item: { type: "reasoning", id: "rs_partial", summary: [] } },
-				{ type: "response.reasoning_text.delta", item_id: "rs_partial", delta: "deliberating" },
-			]);
-		});
-
-		const result = await streamOpenAICodexResponses(codexModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		}).result();
-
-		expect(requests).toBe(1);
-		expect(result.stopReason).toBe("error");
-		expect(result.content.find(block => block.type === "thinking")?.thinking).toBe("deliberating");
 	});
 });

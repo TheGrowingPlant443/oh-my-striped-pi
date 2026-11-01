@@ -205,7 +205,7 @@ export interface ChatUsageSnapshot {
 export interface CostEstimatorContext {
 	/** OTel provider label (`gen_ai.provider.name`). */
 	readonly provider: string;
-	/** Provider id before OTel normalization (e.g. `openai-codex` for the `openai` label). */
+	/** Provider id before optional telemetry normalization. */
 	readonly providerId: string | undefined;
 	/** Model id reported on the response; a provider may report a served model instead of the requested one. */
 	readonly model: string;
@@ -586,7 +586,7 @@ function normalizeProviderName(
 	telemetry: AgentTelemetry | undefined,
 	provider: string | undefined,
 ): string | undefined {
-	const otelProvider = mapProviderNameToOtel(provider);
+	const otelProvider = provider;
 	const normalize = telemetry?.config.normalizeProvider;
 	if (!normalize) return otelProvider;
 	try {
@@ -598,30 +598,6 @@ function normalizeProviderName(
 			error: err,
 		});
 		return otelProvider;
-	}
-}
-
-function mapProviderNameToOtel(provider: string | undefined): string | undefined {
-	switch (provider) {
-		case undefined:
-		case "":
-			return provider;
-		case "amazon-bedrock":
-			return "aws.bedrock";
-		case "google":
-		case "google-antigravity":
-		case "google-gemini-cli":
-			return "gcp.gemini";
-		case "google-vertex":
-			return "gcp.vertex_ai";
-		case "mistral":
-			return "mistral_ai";
-		case "openai-codex":
-			return "openai";
-		case "xai":
-			return "x_ai";
-		default:
-			return provider;
 	}
 }
 
@@ -779,7 +755,7 @@ function buildChatRequestAttributes(stepNumber: number, request: ChatRequestSnap
 	if (request.stopSequences && request.stopSequences.length > 0) {
 		attrs[GenAIAttr.RequestStopSequences] = [...request.stopSequences];
 	}
-	// Record the tier only when it reaches the wire for this model (Codex drops unadvertised tiers).
+	// Record the tier only when it reaches the wire for this model.
 	if (request.serviceTier && shouldSendServiceTier(request.serviceTier, model)) {
 		attrs[OpenAIAttr.RequestServiceTier] = request.serviceTier;
 	}
@@ -1299,15 +1275,6 @@ export function detectGatewayFromHeaders(
 			callId: portkeyId,
 			routedTo: headers["x-portkey-llm-provider"] ?? headers["x-portkey-provider"],
 		};
-	}
-	const openRouterGenerationId = headers["x-generation-id"];
-	if (openRouterGenerationId?.startsWith("gen-")) {
-		// OpenRouter does not surface the upstream provider in response headers
-		// (only the body's `provider` field carries it), so `routedTo` is left
-		// undefined here. The `gen-` prefix on `x-generation-id` is OpenRouter-
-		// specific and disambiguates from other proxies that also expose a
-		// `x-generation-id` header.
-		return { name: "openrouter", callId: openRouterGenerationId, routedTo: undefined };
 	}
 	return undefined;
 }

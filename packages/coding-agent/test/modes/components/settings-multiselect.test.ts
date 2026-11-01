@@ -13,7 +13,7 @@ import { Reconciler } from "@oh-my-pi/pi-tui/native/reconcile";
 import type { TspNode } from "@oh-my-pi/pi-wire";
 import { getProjectAgentDir, removeWithRetries } from "@oh-my-pi/pi-utils";
 
-import { cfgDevAutoqa } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgReadLineNumbers } from "@oh-my-pi/pi-coding-agent/tools/settings";
 import { cfgContextFilesExtra } from "@oh-my-pi/pi-coding-agent/session/context-settings";
 
 beforeAll(async () => {
@@ -88,14 +88,14 @@ function clickOption(component: SettingsSelectorComponent, label: string): void 
 describe("settings section sidebar", () => {
 	it("does not toggle the selected section's first setting", () => {
 		const comp = createSelector();
-		for (let i = 0; i < 7; i++) comp.handleInput("\x1b[C");
-		expect(cfgDevAutoqa.get(settings)).toBe(true);
+		comp.handleNativeEvent({ type: "action", key: "", act: "page", value: "files", mods: [] });
+		expect(cfgReadLineNumbers.get(settings)).toBe(false);
 
-		clickOption(comp, "Developer");
-		expect(cfgDevAutoqa.get(settings)).toBe(true);
+		clickOption(comp, "Reading");
+		expect(cfgReadLineNumbers.get(settings)).toBe(false);
 
-		clickOption(comp, "Developer");
-		expect(cfgDevAutoqa.get(settings)).toBe(true);
+		clickOption(comp, "Reading");
+		expect(cfgReadLineNumbers.get(settings)).toBe(false);
 	});
 });
 

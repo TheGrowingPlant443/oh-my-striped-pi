@@ -15,8 +15,8 @@ function assistantMessage(content: AssistantMessage["content"]): Message {
 	return {
 		role: "assistant",
 		content,
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock",
 		usage: ZERO_USAGE,
 		stopReason: "stop",

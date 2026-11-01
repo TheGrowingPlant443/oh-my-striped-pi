@@ -1,34 +1,54 @@
 # @oh-my-pi/pi-catalog
 
-Model catalog for [omp](https://github.com/can1357/oh-my-pi): bundled model database, provider discovery, model identity, classification, and equivalence.
+Model catalog for [omp](https://github.com/can1357/oh-my-pi): bundled model data, model identity, classification, and compatibility for built-in on-device workers, self-hosted servers, and GitHub Copilot.
 
 ## What's inside
 
 | Module                          | Purpose                                                                                                                                                                                                                                      |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `models.json` + `models`        | Bundled model database (pricing, context windows, modalities, thinking support)                                                                                                                                                              |
-| `provider-models`               | Provider catalog descriptors (`CATALOG_PROVIDERS`), per-provider model resolution rules                                                                                                                                                      |
-| `discovery`                     | Runtime model discovery for OpenAI-compatible endpoints, Gemini, Codex, Cursor, Antigravity, Ollama                                                                                                                                          |
+| `provider-models`               | Provider discovery descriptors (`PROVIDER_DESCRIPTORS`) and per-provider model resolution rules |
+| `discovery`                     | Generic configured-endpoint model discovery and account-scoped GitHub Copilot discovery |
 | `compat/rules`                  | Checked-in KDL policy tree: taxonomy (classes/families/revisions), class/provider cascade rules, runtime behavior vocabulary; compiled by `bun run gen:compat` into the committed `rules.json`                                               |
 | `compat`                        | The rule engine: `classifyModel` (taxonomy), `resolveModelPolicy` (cascade), behavior accessors (`api-routes`, `model-limits`, `exclude-models`, `pricing-peer`), collapse, and OpenAI/Anthropic wire builders that consume resolved records |
 | `identity`                      | Mechanical id utilities: reference resolution against the bundled index, dialects, selection priority, tokenizer families                                                                                                                    |
 | `model-thinking`                | Runtime thinking helpers (`getSupportedEfforts`, effort clamping/mapping, wire-id routing) over resolved model records                                                                                                                       |
 | `model-manager` / `model-cache` | Runtime model registry with discovery refresh and on-disk caching                                                                                                                                                                            |
-| `wire`                          | Wire-level helpers: Codex, Gemini headers, GitHub Copilot                                                                                                                                                                                    |
+| `wire`                          | GitHub Copilot wire-level helpers |
 | `effort`                        | Reasoning-effort level definitions                                                                                                                                                                                                           |
 
 Import from subpaths (`@oh-my-pi/pi-catalog/<module>`) or the root barrel.
 
 ## models.json and rules.json are generated
 
-Never edit `src/models.json` or `src/compat/rules.json` by hand. `models.json` is a compact generated catalog; use `getBundledProviders()` and `getBundledModels()` instead of reading its internal format. It is produced from upstream sources (stencil.so, provider catalog discovery, OpenCode docs) by `scripts/generate-models.ts`; `rules.json` is compiled from the KDL tree in `src/compat/rules/`. Regenerate with:
+Never edit `src/models.json` or `src/compat/rules.json` by hand. `models.json` is a compact generated catalog; use `getBundledProviders()` and `getBundledModels()` instead of reading its internal format. Provider seeds in `src/compat/rules/providers/local.kdl` and `github-copilot.kdl` are the source of truth. `rules.json` is compiled from the KDL tree; `scripts/generate-models.ts` builds `models.json` offline from compiled seeds and policies. From `packages/catalog`, run:
 
 ```sh
 bun run gen:compat   # src/compat/rules/**/*.kdl -> src/compat/rules.json
-bun run gen:models   # upstream sources + rules -> src/models.json
+bun run gen:models   # compiled KDL seeds + rules -> src/models.json (offline)
 ```
 
-Model- or provider-conditional policy (identity, effort ladders, wire quirks, modality/limit/pricing corrections, API routing, roster exclusions) lives in the KDL tree — see `src/compat/rules/README.md` for the grammar and axis vocabulary. TypeScript changes are only for transport mechanics: provider entries in `provider-models/descriptors.ts`, discovery/request plumbing in `provider-models/openai-compat.ts`, and generator wiring in `scripts/generate-models.ts`. Commit `rules.json` (and a rebaked `models.json` when values change) alongside the `.kdl` edit.
+Generation uses no authentication, network requests, live probes, external catalogs, or previous `models.json` snapshot. Every run regenerates all authored providers, even when `--provider` selects one. Dynamic self-hosted providers intentionally bundle no fabricated model rows.
+
+Model- or provider-conditional policy (identity, effort ladders, wire quirks, modality/limit/pricing corrections, API routing, roster exclusions) lives in the KDL tree — see `src/compat/rules/README.md` for the grammar and axis vocabulary. Commit regenerated outputs alongside the `.kdl` edit.
+
+`local` means built-in on-device tiny language models, TTS, and STT. Self-hosted providers are `ollama`, `lm-studio`, `vllm`, and `litellm`; `apple` represents Apple Foundation Models on supported Apple Silicon/macOS hosts. `llama.cpp` has wire/auth policy and discovery but deliberately no bundled catalog descriptor or seed model. Company DNS endpoints keep their declared backend's local-server compatibility semantics; arbitrary configured provider IDs can use supported generic protocols without impersonating Copilot.
+
+`github-copilot` retains account-scoped discovery and its three transports: `openai-completions`, `openai-responses`, and `anthropic-messages`. Public hosted model-provider integrations other than Copilot are not registered. Model lineage classes remain taxonomy, not provider permissions.
+
+### Self-hosted discovery
+
+| Backend | Default endpoint | Discovery |
+| --- | --- | --- |
+| Ollama | `http://127.0.0.1:11434` | OpenAI model listing, native `/api/tags` fallback and `/api/show` capabilities |
+| LM Studio | `http://127.0.0.1:1234/v1` (`LM_STUDIO_BASE_URL`) | OpenAI listing plus optional native VLM, loaded context, and decision-model metadata |
+| vLLM | `http://127.0.0.1:8000/v1` | OpenAI listing with `max_model_len` and reviewed Qwen template policy |
+| LiteLLM | `http://localhost:4000/v1` (`LITELLM_BASE_URL`) | Paginated management metadata, then the same deployment's OpenAI listing |
+| Apple Foundation Models | In-process native bridge | Runtime availability; no HTTP endpoint or bundled model |
+
+All HTTP managers accept `baseUrl`, optional `apiKey`, and an injected `fetch`. LiteLLM discovery never downloads metadata from a public catalog. Its upstream provider/model labels describe routing inside the configured proxy; they do not register hosted clients or redirect requests outside it. Explicit `mode: "decisions"` rows in LM Studio/LiteLLM use the generic `openai-decisions` judge protocol.
+
+Configured in-house runner protocols are `openai-images` (image), `openai-speech` (TTS), `openai-transcriptions` (STT), `openai-embeddings`, `openrouter-rerank` (the existing generic rerank wire name), `typesafe` (System One/OpenJEV), and `openai-decisions`. These names do not imply hosted provider defaults.
 
 ## Install
 
@@ -58,7 +78,7 @@ Timestamps are Unix milliseconds; omitted timestamps use the current time for sc
 
 Pass the request-start timestamp when estimating request usage, then preserve the resulting monetary amounts rather than repricing history at display time. OMP does this using the assistant message timestamp; it is an estimation convention, not a claim about server billing across boundaries. Prefer monetary costs reported by a provider when available.
 
-Schedules are materialized from the [`time-based-cost` KDL axis](src/compat/rules/README.md#time-based-pricing); this does not add a `timeBased` input field to the coding agent's `models.yml`. See [user-facing pricing behavior](../../docs/models.md#usage-costs-and-time-based-pricing) for DeepSeek rates, dates, and footer indicators.
+Schedules are materialized from the [`time-based-cost` KDL axis](src/compat/rules/README.md#time-based-pricing); this does not add a `timeBased` input field to the coding agent's `models.yml`.
 
 ## References
 

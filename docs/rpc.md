@@ -95,8 +95,7 @@ Clients MUST continue reading stdout after closing stdin. Normal EOF and extensi
 12.   Side-question frames (`btw_delta`, `btw_record`); see [Side questions](#side-questions-btw)
 13.   Builtin slash-command side channels (`command_output`, `session_info_update`, `config_update`)
 14.   Transport overflow notifications (`rpc_frame_error`), when an event cannot fit within the transport limits
-15.   Live voice frames (`live_phase`, `live_levels`, `live_transcript`, `live_end`); see [Live Voice Sub-Protocol](#live-voice-sub-protocol)
-16.   Draft-only dictation frames (`dictation_state`, `dictation_transcript`, `dictation_end`); see [Dictation Sub-Protocol](#dictation-sub-protocol)
+15.   Draft-only dictation frames (`dictation_state`, `dictation_transcript`, `dictation_end`); see [Dictation Sub-Protocol](#dictation-sub-protocol)
 
 Protocol v2 may wrap oversized logical frames from these categories in `rpc_chunk` frames.
 
@@ -463,25 +462,10 @@ remain `true` while `fastModeActive` is `false`. An explicit `set_fast_mode`
 enable expresses retry intent and clears that fallback so the provider attempt
 is re-armed.
 
-`slowModeSupported` reports whether `/slow` applies to the active model: the
-`flex` service tier on OpenAI- and Google-family models, or the low-priority
-lane on direct Anthropic models. `slowModeEnabled` reports whether it is on for
-the active model, so it is always `false` when `slowModeSupported` is `false`.
-That does not mean a persisted setting was turned off. `slowModeScope` says
-where the active model's setting lives: `global` for persisted config that
-survives model switches and applies to every session and terminal (Claude low
-priority, `providers.anthropic.slowMode`), or `session` for this session's
-per-family flex tier. It is absent when unsupported. Re-read all three after a
-model change; a `global` change made by another session emits no event.
-
-`usageLimit` reports the active model's account past its usage limit, in a
-provider-neutral shape. `stage` is `wrap_up` during a short allowance after the
-limit or `low_priority` once the account is served on spare capacity.
-`resetsAtSec` is an epoch timestamp for client-local formatting; low priority
-may also report `allowanceLeftPercent`, while wrap-up reports whether
-`extraUsage` follows. Claude subscriptions are the only producer today. The
-field is absent outside both stages. No event carries it, so re-read
-`get_state` while a run is active, after `agent_end`, and after slash commands.
+`slowModeSupported` reports whether the active model supports the flex service
+tier. `slowModeEnabled` reports whether it is on for the active model, and is
+always `false` when unsupported. `slowModeScope` identifies the setting's scope
+and is absent when unsupported. Re-read these fields after a model change.
 
 ```json
 {
@@ -500,12 +484,7 @@ field is absent outside both stages. No event carries it, so re-read
 	"fastModeActive": false,
 	"slowModeSupported": true,
 	"slowModeEnabled": true,
-	"slowModeScope": "global",
-	"usageLimit": {
-		"stage": "low_priority",
-		"resetsAtSec": 1770000000,
-		"allowanceLeftPercent": 62
-	},
+	"slowModeScope": "session",
 	"autoCompactionEnabled": true,
 	"messageCount": 0,
 	"queuedMessageCount": 0,
@@ -1460,64 +1439,6 @@ Completion uses:
 
 Set top-level `isError: true` on `host_tool_result` to reject the pending host tool call and surface the returned text content as a tool error.
 
-## Live Voice Sub-Protocol
-
-RPC hosts can run a GPT live voice session (the realtime surface behind the
-terminal's `/live`) bound to the RPC session. The realtime model talks to the
-user through the machine's microphone and speakers and delegates work into the
-RPC session as ordinary turns, so delegated work runs with the session's model
-and any host tools registered through `set_host_tools`. At most one live
-session runs per RPC server.
-
-### Commands
-
-- `{ id?, type: "live_start", voice?: string, instructions?: string }` → `data: { voice: string }`
-- `{ id?, type: "live_connect", sdpOffer: string, voice?: string, instructions?: string }` → `data: { voice: string, sdpAnswer: string }`
-- `{ id?, type: "live_stop" }`
-- `{ id?, type: "live_mute", muted?: boolean }` → `data: { muted: boolean }`
-
-`live_start` responds once the session is connected and recording, so it is
-dispatched concurrently like `bash`; `live_stop` sent meanwhile cancels the
-connection and the pending `live_start` then fails. `voice` defaults to the
-`live.voice` setting and the response reports the voice used. `instructions`
-replaces the bundled live prompt; it is rendered as a Handlebars template with
-`{{username}}` and `{{firstName}}` of the local OS account. Starting while a
-session is connecting, active, or closing, or while dictation is active, fails.
-
-`live_connect` starts the same session with the audio on the client's own
-WebRTC peer instead of the host's microphone and speakers. `sdpOffer` is that
-peer's offer: one sendrecv Opus audio track plus an `oai-events` data channel.
-Apply the returned `sdpAnswer` to the peer right away; the response comes once
-the call is signaled and its control socket is open. A missing or empty
-`sdpOffer` fails without starting anything. The peer handles echo cancellation
-and mute: `live_mute` only moves the phase to `muted`, so silence the peer's
-microphone track while that phase lasts. The server sends no `live_levels` and
-no `speaking` phase for these sessions. `voice`, `instructions`, `live_stop` and
-the frames work as for `live_start`. The server cannot see the client's peer, so
-send `live_stop` when that peer disconnects (`connectionstatechange` to `failed`
-or `closed`); otherwise the session stays open.
-
-`live_stop` responds after the session has stopped and succeeds when none is
-active. `live_mute` sets the microphone mute, or toggles it when `muted` is
-omitted, and fails when no session is active.
-
-```json
-{ "id": "l1", "type": "live_start", "instructions": "You are Carly. Greet {{firstName}}." }
-{ "id": "l1", "type": "response", "command": "live_start", "success": true, "data": { "voice": "sol" } }
-```
-
-### Frames
-
-Live frames are not session events: `set_event_filter` never drops them.
-
-- `{ type: "live_phase", phase }` on every phase change; `phase` is one of `connecting`, `listening`, `working`, `speaking`, `muted`, `error`.
-- `{ type: "live_levels", input: number, output: number }` — microphone and speaker RMS in `[0, 1]`, at most one frame per 100 ms. Intermediate values are dropped; the latest values are always delivered. Not sent for `live_connect` sessions.
-- `{ type: "live_transcript", role: "user" | "assistant", turn: number, text: string, final: boolean }` — the accumulated text of one turn; later frames for the same `role` and `turn` replace earlier ones until `final: true`.
-- `{ type: "live_end", error?: string }` — exactly once per session when it ends, carrying the failure when it ended on one (including a failed `live_start` or `live_connect`).
-
-Closing stdin, or `pi.shutdown()`, stops an active live session before the
-process exits.
-
 ## Dictation Sub-Protocol
 
 Draft-only dictation captures from the machine's microphone using the session's
@@ -1525,13 +1446,11 @@ configured `modelRoles.dictation` speech-to-text engine and `stt.language`.
 It requires `stt.enabled: true`; when disabled, start fails before opening the
 microphone or initializing a speech model. It does not submit a prompt,
 interpret speech submit triggers, or play audio.
-Live voice and dictation are mutually exclusive, including while either starts
-or stops.
 
 - `{ id?, type: "dictation_start", captureId: string }` starts a capture and responds when recording. `captureId` must be a non-blank string of at most 128 UTF-16 code units; the host must choose a unique ID for each capture.
 - `{ id?, type: "dictation_stop" }` stops the microphone and flushes transcription, then responds with `data: { text: string }`. With no capture it succeeds with empty text. A failure returns an error response.
 
-Bundled clients allow 600 seconds for both dictation commands: start may need to download and load a cold speech model, and stop may need to finish a slow local or cloud transcription flush. The TypeScript `RpcClient.dictationStart(captureId, timeoutMs)` and `RpcClient.dictationStop(timeoutMs)` accept caller-selected deadlines in milliseconds. A client timeout only stops waiting; it does not cancel the server operation. Send `dictation_stop` (or call `dictationStop()`) to cancel a pending start or stop an active capture, and keep the `dictation_end` subscription active to receive a flush result that arrives after a request deadline.
+Bundled clients allow 600 seconds for both dictation commands: start may need to download and load a cold speech model, and stop may need to finish a slow local transcription flush. The TypeScript `RpcClient.dictationStart(captureId, timeoutMs)` and `RpcClient.dictationStop(timeoutMs)` accept caller-selected deadlines in milliseconds. A client timeout only stops waiting; it does not cancel the server operation. Send `dictation_stop` (or call `dictationStop()`) to cancel a pending start or stop an active capture, and keep the `dictation_end` subscription active to receive a flush result that arrives after a request deadline.
 
 Stop can be sent while start is pending: it cancels the start, waits for the
 microphone to close, and causes the pending start to fail. The terminal frame

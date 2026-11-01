@@ -1,31 +1,24 @@
 # @oh-my-pi/pi-wire
 
-Shared TypeScript wire contracts for omp collab live sessions.
+Shared TypeScript contracts for local transcripts, private/local collaboration, terminal recordings, tool intent metadata, and read-only skill registry access.
 
-The package contains only JSON-safe protocol shapes and constants. It has no runtime dependencies and is consumed by both the host CLI (`@oh-my-pi/pi-coding-agent`) and browser guest (`@oh-my-pi/collab-web`).
+The package contains JSON-safe shapes and constants with no runtime dependencies. The coding agent and self-contained HTML export viewer consume these shared types.
 
 ## Exports
 
 ```ts
-import type { GuestFrame, HostFrame, SessionEntry } from "@oh-my-pi/pi-wire";
-import { COLLAB_PROTO, DEFAULT_RELAY_URL, ENVELOPE_HEADER_LENGTH } from "@oh-my-pi/pi-wire";
+import type { SessionEntry, StreamRow } from "@oh-my-pi/pi-wire";
+import { INTENT_FIELD, STREAM_HISTORY_LIMIT } from "@oh-my-pi/pi-wire";
 ```
 
 Key groups:
 
-- message and transcript entry shapes rendered by collab guests,
-- live agent event and task-subagent bus payload shapes,
-- `GuestFrame`, `HostFrame`, and `WireFrame` unions for AES-GCM sealed payloads,
-- relay control TEXT messages,
-- link/envelope constants shared by host, guest, and local relay code.
+- message and transcript entry shapes for local exports,
+- encrypted collaboration frame shapes, protocol version, room capabilities, and relay control messages (no default relay or viewer URL),
+- terminal row and local recording history limits,
+- tool intent metadata and TSP rendering shapes,
+- skill package metadata and read-only registry routes under `@oh-my-pi/pi-wire/skillshare`.
 
-## Protocol boundary
-
-`pi-wire` does not encode, decode, validate, encrypt, or route frames. It defines the shared contract used at those boundaries:
-
-1. callers build a `GuestFrame` or `HostFrame`,
-2. transport code serializes it as JSON inside an encrypted payload,
-3. relay code routes opaque envelopes using the plaintext peer-id prefix,
-4. receivers switch on `frame.t` and tolerate unknown future fields.
-
-Keep protocol changes backward-aware: bump `COLLAB_PROTO` only when old hosts and guests must reject each other.
+Private/local collaboration uses an explicitly configured relay and browser deployment.
+Public streaming, clip uploads, hosted session shares, QA, and skill publishing
+are not available in this fork.

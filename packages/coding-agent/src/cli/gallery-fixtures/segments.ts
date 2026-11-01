@@ -49,7 +49,6 @@ export function createGallerySegmentContext(sessionOptions?: GallerySessionOptio
 		vibeMode: null,
 		vim: null,
 		collab: { role: "host", participantCount: 3 },
-		stream: null,
 		recording: false,
 		usageStats: {
 			input: 12_400,
@@ -225,7 +224,6 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 							fiveHour: { percent: 32, resetMinutes: 71 },
 							daily: { percent: 44, resetMinutes: 310 },
 							sevenDay: { percent: 68, resetHours: 52 },
-							monthly: { percent: 77, resetHours: 216 },
 						},
 					},
 				},
@@ -247,6 +245,8 @@ function variantsFor(id: StatusLineSegmentId): readonly SegmentVariantSpec[] {
 				{ label: "host active", context: { collab: { role: "host", participantCount: 3 } } },
 				{ label: "guest active", context: { collab: { role: "guest", participantCount: 3 } } },
 			];
+		case "record":
+			return [{ label: "recording", context: { recording: true } }];
 		case "vim":
 			return [
 				{

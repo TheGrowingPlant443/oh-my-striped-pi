@@ -176,16 +176,6 @@ _SUBAGENT_LIFECYCLE_STATUS_VALUES: Final[frozenset[str]] = frozenset({"started",
 _decode_subagent_lifecycle_status = cast("Decoder[SubagentLifecycleStatus]", literal(_SUBAGENT_LIFECYCLE_STATUS_VALUES))
 
 
-LivePhase: TypeAlias = Literal["connecting", "listening", "working", "speaking", "muted", "error"]
-_LIVE_PHASE_VALUES: Final[frozenset[str]] = frozenset({"connecting", "listening", "working", "speaking", "muted", "error"})
-_decode_live_phase = cast("Decoder[LivePhase]", literal(_LIVE_PHASE_VALUES))
-
-
-LiveRole: TypeAlias = Literal["user", "assistant"]
-_LIVE_ROLE_VALUES: Final[frozenset[str]] = frozenset({"user", "assistant"})
-_decode_live_role = cast("Decoder[LiveRole]", literal(_LIVE_ROLE_VALUES))
-
-
 WidgetPlacement: TypeAlias = Literal["aboveEditor", "belowEditor"]
 _WIDGET_PLACEMENT_VALUES: Final[frozenset[str]] = frozenset({"aboveEditor", "belowEditor"})
 _decode_widget_placement = cast("Decoder[WidgetPlacement]", literal(_WIDGET_PLACEMENT_VALUES))
@@ -229,7 +219,6 @@ class ImageContent(TypedDict):
     mimeType: str
     detail: NotRequired[Literal["auto", "low", "high", "original"]]
     url: NotRequired[str]
-    providerFile: NotRequired[JsonObject]
 
 
 class ToolCall(TypedDict):
@@ -541,7 +530,6 @@ class ModelInfo:
     """Null when the provider does not report a limit."""
     headers: dict[str, str] | None = None
     premium_multiplier: float | None = None
-    prefer_websockets: bool | None = None
     context_promotion_target: str | None = None
     priority: int | None = None
     thinking: ThinkingConfig | None = None
@@ -618,26 +606,6 @@ class GoalResult:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class UsageLimitLowPriority:
-    """Requests are served on the provider's low-priority (slow) lane."""
-    stage: Literal["low_priority"] = "low_priority"
-    resets_at_sec: float
-    """Epoch seconds when the limit that was hit resets."""
-    allowance_left_percent: int | None = None
-    """Percent of the low-priority allowance still available, when reported."""
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class UsageLimitWrapUp:
-    """Requests run on a short wrap-up allowance past the limit."""
-    stage: Literal["wrap_up"] = "wrap_up"
-    extra_usage: bool
-    """Whether paid extra usage serves requests once the allowance is spent."""
-    resets_at_sec: float | None = None
-    """Epoch seconds when the limit that was hit resets, if reported."""
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
 class SessionState:
     session_id: str
     model: ModelInfo | None = None
@@ -658,8 +626,6 @@ class SessionState:
     """`/slow` is on for the active model; always `false` when `slowModeSupported` is `false`."""
     slow_mode_scope: SlowModeScope | None = None
     """Where the active model's `/slow` lives; absent when unsupported."""
-    usage_limit: UsageLimitState | None = None
-    """Usage-limit stage of the active model's account; absent outside wrap-up and low priority."""
     tokens_per_second: float | None = None
     message_count: int = 0
     queued_message_count: int = 0
@@ -1350,37 +1316,6 @@ class SubagentEvent:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class LivePhaseEvent:
-    type: Literal["live_phase"] = "live_phase"
-    phase: LivePhase
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class LiveLevelsEvent:
-    """Microphone (`input`) and speaker (`output`) RMS in [0, 1], at most every 100 ms."""
-    type: Literal["live_levels"] = "live_levels"
-    input: float
-    output: float
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class LiveTranscriptEvent:
-    """Accumulated text of one realtime turn; replaces earlier frames with the same `role` and `turn`."""
-    type: Literal["live_transcript"] = "live_transcript"
-    role: LiveRole
-    turn: int
-    text: str
-    final: bool
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class LiveEndEvent:
-    """Sent exactly once when a live session ends; `error` carries the failure cause."""
-    type: Literal["live_end"] = "live_end"
-    error: str | None = None
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
 class DictationStateEvent:
     """State of one draft-only microphone capture."""
     type: Literal["dictation_state"] = "dictation_state"
@@ -1649,12 +1584,6 @@ class NegotiateProtocolResult:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class LiveConnectResult:
-    voice: str
-    sdp_answer: str
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
 class LogoutResult:
     remaining_source: str | None = None
 
@@ -1673,15 +1602,11 @@ AssistantMessageEvent: TypeAlias = AssistantStartEvent | AssistantTextStartEvent
 """Streaming update for one assistant message, discriminated by `type`."""
 
 
-UsageLimitState: TypeAlias = UsageLimitLowPriority | UsageLimitWrapUp
-"""Provider-neutral state of an account past its usage limit, discriminated by `stage`."""
-
-
 RpcAgentEvent: TypeAlias = AgentStartEvent | AgentEndEvent | TurnStartEvent | TurnEndEvent | MessageStartEvent | MessageUpdateEvent | MessageEndEvent | ToolExecutionStartEvent | ToolExecutionUpdateEvent | ToolStreamUpdateEvent | ToolExecutionEndEvent | AutoCompactionStartEvent | AutoCompactionEndEvent | ManualCompactionStartEvent | ManualCompactionEndEvent | AutoRetryStartEvent | AutoRetryEndEvent | CacheWarmingStartEvent | CacheWarmingEndEvent | RetryFallbackAppliedEvent | RetryFallbackSucceededEvent | ModelChangedEvent | ConfigWarningsChangedEvent | AdvisorCostChangedEvent | AdvisorYieldedEvent | TtsrTriggeredEvent | TodoReminderEvent | TodoAutoClearEvent | IrcMessageEvent | NoticeEvent | ThinkingLevelChangedEvent | GoalUpdatedEvent | QueueUpdateEvent
 """A session event, discriminated by `type`; `set_event_filter` selects which are sent."""
 
 
-RpcNotification: TypeAlias = ReadyEvent | PromptResultEvent | SessionSettledEvent | ExtensionError | ExtensionUiRequest | AvailableCommandsUpdateEvent | SubagentLifecycleEvent | SubagentProgressEvent | SubagentEvent | LivePhaseEvent | LiveLevelsEvent | LiveTranscriptEvent | LiveEndEvent | DictationStateEvent | DictationTranscriptEvent | DictationEndEvent | BtwDeltaEvent | BtwRecordEvent | CommandOutputEvent | SessionInfoUpdateEvent | ConfigUpdateEvent | RpcFrameErrorEvent | RpcAgentEvent | UnknownNotification
+RpcNotification: TypeAlias = ReadyEvent | PromptResultEvent | SessionSettledEvent | ExtensionError | ExtensionUiRequest | AvailableCommandsUpdateEvent | SubagentLifecycleEvent | SubagentProgressEvent | SubagentEvent | DictationStateEvent | DictationTranscriptEvent | DictationEndEvent | BtwDeltaEvent | BtwRecordEvent | CommandOutputEvent | SessionInfoUpdateEvent | ConfigUpdateEvent | RpcFrameErrorEvent | RpcAgentEvent | UnknownNotification
 """Unsolicited outbound frame (everything except responses and host tool/URI requests), discriminated by `type`."""
 
 
@@ -1886,7 +1811,6 @@ def parse_model_info(value: object, path: str = "ModelInfo") -> ModelInfo:
         max_tokens=required(payload, "maxTokens", nullable(decode_int), path),
         headers=optional(payload, "headers", record(decode_str), path),
         premium_multiplier=optional(payload, "premiumMultiplier", decode_float, path),
-        prefer_websockets=optional(payload, "preferWebsockets", decode_bool, path),
         context_promotion_target=optional(payload, "contextPromotionTarget", decode_str, path),
         priority=optional(payload, "priority", decode_int, path),
         thinking=optional(payload, "thinking", parse_thinking_config, path),
@@ -1973,24 +1897,6 @@ def parse_goal_result(value: object, path: str = "GoalResult") -> GoalResult:
     )
 
 
-def parse_usage_limit_low_priority(value: object, path: str = "UsageLimitLowPriority") -> UsageLimitLowPriority:
-    payload = expect_object(value, path)
-    required(payload, "stage", cast('Decoder[Literal["low_priority"]]', literal(frozenset({"low_priority"}))), path)
-    return UsageLimitLowPriority(
-        resets_at_sec=required(payload, "resetsAtSec", decode_float, path),
-        allowance_left_percent=optional(payload, "allowanceLeftPercent", decode_int, path),
-    )
-
-
-def parse_usage_limit_wrap_up(value: object, path: str = "UsageLimitWrapUp") -> UsageLimitWrapUp:
-    payload = expect_object(value, path)
-    required(payload, "stage", cast('Decoder[Literal["wrap_up"]]', literal(frozenset({"wrap_up"}))), path)
-    return UsageLimitWrapUp(
-        extra_usage=required(payload, "extraUsage", decode_bool, path),
-        resets_at_sec=optional(payload, "resetsAtSec", decode_float, path),
-    )
-
-
 def parse_session_state(value: object, path: str = "SessionState") -> SessionState:
     payload = expect_object(value, path)
     return SessionState(
@@ -2010,7 +1916,6 @@ def parse_session_state(value: object, path: str = "SessionState") -> SessionSta
         slow_mode_supported=defaulted(payload, "slowModeSupported", decode_bool, path, False),
         slow_mode_enabled=defaulted(payload, "slowModeEnabled", decode_bool, path, False),
         slow_mode_scope=optional(payload, "slowModeScope", _decode_slow_mode_scope, path),
-        usage_limit=optional(payload, "usageLimit", parse_usage_limit_state, path),
         tokens_per_second=defaulted(payload, "tokensPerSecond", nullable(decode_float), path, None),
         message_count=defaulted(payload, "messageCount", decode_int, path, 0),
         queued_message_count=defaulted(payload, "queuedMessageCount", decode_int, path, 0),
@@ -2785,42 +2690,6 @@ def parse_subagent_event(value: object, path: str = "SubagentEvent") -> Subagent
     )
 
 
-def parse_live_phase_event(value: object, path: str = "LivePhaseEvent") -> LivePhaseEvent:
-    payload = expect_object(value, path)
-    required(payload, "type", cast('Decoder[Literal["live_phase"]]', literal(frozenset({"live_phase"}))), path)
-    return LivePhaseEvent(
-        phase=required(payload, "phase", _decode_live_phase, path),
-    )
-
-
-def parse_live_levels_event(value: object, path: str = "LiveLevelsEvent") -> LiveLevelsEvent:
-    payload = expect_object(value, path)
-    required(payload, "type", cast('Decoder[Literal["live_levels"]]', literal(frozenset({"live_levels"}))), path)
-    return LiveLevelsEvent(
-        input=required(payload, "input", decode_float, path),
-        output=required(payload, "output", decode_float, path),
-    )
-
-
-def parse_live_transcript_event(value: object, path: str = "LiveTranscriptEvent") -> LiveTranscriptEvent:
-    payload = expect_object(value, path)
-    required(payload, "type", cast('Decoder[Literal["live_transcript"]]', literal(frozenset({"live_transcript"}))), path)
-    return LiveTranscriptEvent(
-        role=required(payload, "role", _decode_live_role, path),
-        turn=required(payload, "turn", decode_int, path),
-        text=required(payload, "text", decode_str, path),
-        final=required(payload, "final", decode_bool, path),
-    )
-
-
-def parse_live_end_event(value: object, path: str = "LiveEndEvent") -> LiveEndEvent:
-    payload = expect_object(value, path)
-    required(payload, "type", cast('Decoder[Literal["live_end"]]', literal(frozenset({"live_end"}))), path)
-    return LiveEndEvent(
-        error=optional(payload, "error", decode_str, path),
-    )
-
-
 def parse_dictation_state_event(value: object, path: str = "DictationStateEvent") -> DictationStateEvent:
     payload = expect_object(value, path)
     required(payload, "type", cast('Decoder[Literal["dictation_state"]]', literal(frozenset({"dictation_state"}))), path)
@@ -3128,23 +2997,11 @@ def parse_negotiate_protocol_result(value: object, path: str = "NegotiateProtoco
     )
 
 
-def parse_live_connect_result(value: object, path: str = "LiveConnectResult") -> LiveConnectResult:
-    payload = expect_object(value, path)
-    return LiveConnectResult(
-        voice=required(payload, "voice", decode_str, path),
-        sdp_answer=required(payload, "sdpAnswer", decode_str, path),
-    )
-
-
 def parse_logout_result(value: object, path: str = "LogoutResult") -> LogoutResult:
     payload = expect_object(value, path)
     return LogoutResult(
         remaining_source=optional(payload, "remainingSource", decode_str, path),
     )
-
-
-def parse_usage_limit_state(value: object, path: str = "UsageLimitState") -> UsageLimitState:
-    return dispatch("stage", _USAGE_LIMIT_STATE_CASES)(value, path)
 
 
 def parse_rpc_agent_event(value: object, path: str = "RpcAgentEvent") -> RpcAgentEvent:
@@ -3158,12 +3015,6 @@ def parse_notification(value: object, path: str = "notification") -> RpcNotifica
     if not isinstance(tag, str) or tag not in _RPC_NOTIFICATION_CASES:
         return UnknownNotification(decode_json_object(payload, path))
     return _RPC_NOTIFICATION_CASES[tag](payload, tag)
-
-
-_USAGE_LIMIT_STATE_CASES: Final[dict[str, Decoder[UsageLimitState]]] = {
-        "low_priority": parse_usage_limit_low_priority,
-        "wrap_up": parse_usage_limit_wrap_up,
-}
 
 
 _RPC_AGENT_EVENT_CASES: Final[dict[str, Decoder[RpcAgentEvent]]] = {
@@ -3213,10 +3064,6 @@ _RPC_NOTIFICATION_CASES: Final[dict[str, Decoder[RpcNotification]]] = {
         "subagent_lifecycle": parse_subagent_lifecycle_event,
         "subagent_progress": parse_subagent_progress_event,
         "subagent_event": parse_subagent_event,
-        "live_phase": parse_live_phase_event,
-        "live_levels": parse_live_levels_event,
-        "live_transcript": parse_live_transcript_event,
-        "live_end": parse_live_end_event,
         "dictation_state": parse_dictation_state_event,
         "dictation_transcript": parse_dictation_transcript_event,
         "dictation_end": parse_dictation_end_event,
@@ -3419,37 +3266,6 @@ class WireClient:
         params["subagentId"] = subagent_id
         params["message"] = message
         self._command("steer_subagent", params)
-
-    def live_start(self, *, voice: str | None = None, instructions: str | None = None) -> str:
-        """Start a live voice session bound to this session; returns the voice in use."""
-        params: dict[str, object] = {}
-        if voice is not None:
-            params["voice"] = voice
-        if instructions is not None:
-            params["instructions"] = instructions
-        return required(expect_object(self._command("live_start", params), "live_start"), "voice", decode_str, "live_start")
-
-    def live_connect(self, sdp_offer: str, *, voice: str | None = None, instructions: str | None = None) -> LiveConnectResult:
-        """Start a live voice session whose audio runs on a caller-owned WebRTC peer: send its SDP offer, apply the returned answer."""
-        params: dict[str, object] = {}
-        params["sdpOffer"] = sdp_offer
-        if voice is not None:
-            params["voice"] = voice
-        if instructions is not None:
-            params["instructions"] = instructions
-        return parse_live_connect_result(self._command("live_connect", params), "live_connect")
-
-    def live_stop(self) -> None:
-        """Stop the live voice session, if any."""
-        params: dict[str, object] = {}
-        self._command("live_stop", params)
-
-    def live_mute(self, muted: bool | None = None) -> bool:
-        """Set microphone mute, or toggle it when `muted` is omitted; returns the new state."""
-        params: dict[str, object] = {}
-        if muted is not None:
-            params["muted"] = muted
-        return required(expect_object(self._command("live_mute", params), "live_mute"), "muted", decode_bool, "live_mute")
 
     def dictation_start(self, capture_id: str) -> None:
         """Start draft-only speech-to-text; resolves once the microphone is recording."""
@@ -3743,22 +3559,6 @@ class WireClient:
         """Subscribe to `subagent_event`: A subagent's own session event; sent only at subscription level "events"."""
         return self._listen("subagent_event", listener)
 
-    def on_live_phase(self, listener: Callable[[LivePhaseEvent], None]) -> Callable[[], None]:
-        """Subscribe to `live_phase` frames."""
-        return self._listen("live_phase", listener)
-
-    def on_live_levels(self, listener: Callable[[LiveLevelsEvent], None]) -> Callable[[], None]:
-        """Subscribe to `live_levels`: Microphone (`input`) and speaker (`output`) RMS in [0, 1], at most every 100 ms."""
-        return self._listen("live_levels", listener)
-
-    def on_live_transcript(self, listener: Callable[[LiveTranscriptEvent], None]) -> Callable[[], None]:
-        """Subscribe to `live_transcript`: Accumulated text of one realtime turn; replaces earlier frames with the same `role` and `turn`."""
-        return self._listen("live_transcript", listener)
-
-    def on_live_end(self, listener: Callable[[LiveEndEvent], None]) -> Callable[[], None]:
-        """Subscribe to `live_end`: Sent exactly once when a live session ends; `error` carries the failure cause."""
-        return self._listen("live_end", listener)
-
     def on_dictation_state(self, listener: Callable[[DictationStateEvent], None]) -> Callable[[], None]:
         """Subscribe to `dictation_state`: State of one draft-only microphone capture."""
         return self._listen("dictation_state", listener)
@@ -4019,13 +3819,6 @@ __all__ = [
     "InputUiRequest",
     "InterruptMode",
     "IrcMessageEvent",
-    "LiveConnectResult",
-    "LiveEndEvent",
-    "LiveLevelsEvent",
-    "LivePhase",
-    "LivePhaseEvent",
-    "LiveRole",
-    "LiveTranscriptEvent",
     "LoginProvider",
     "LogoutAccount",
     "LogoutResult",
@@ -4122,9 +3915,6 @@ __all__ = [
     "TurnStartEvent",
     "Usage",
     "UsageCost",
-    "UsageLimitLowPriority",
-    "UsageLimitState",
-    "UsageLimitWrapUp",
     "UserContent",
     "UserMessage",
     "WidgetPlacement",
@@ -4204,11 +3994,6 @@ __all__ = [
     "parse_image_content",
     "parse_input_ui_request",
     "parse_irc_message_event",
-    "parse_live_connect_result",
-    "parse_live_end_event",
-    "parse_live_levels_event",
-    "parse_live_phase_event",
-    "parse_live_transcript_event",
     "parse_login_provider",
     "parse_logout_account",
     "parse_logout_result",
@@ -4289,9 +4074,6 @@ __all__ = [
     "parse_turn_start_event",
     "parse_usage",
     "parse_usage_cost",
-    "parse_usage_limit_low_priority",
-    "parse_usage_limit_state",
-    "parse_usage_limit_wrap_up",
     "parse_user_content",
     "parse_user_message",
 ]

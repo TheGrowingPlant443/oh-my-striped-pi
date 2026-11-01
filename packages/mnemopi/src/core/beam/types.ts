@@ -40,7 +40,6 @@ export interface TripleStoreLike {
 export interface BeamCaches {
 	timestampParse: Map<string, Date>;
 	polyphonicEngine?: unknown;
-	extractionClient?: unknown;
 	extractionBuffer: unknown[];
 	/** Enhanced-recall result cache; installed lazily while `enhancedRecall` is enabled. */
 	queryCache?: QueryCache<RecallResult>;
@@ -59,7 +58,6 @@ export interface BeamConfig {
 	vecWeight: number;
 	ftsWeight: number;
 	importanceWeight: number;
-	useCloud: boolean;
 	localLlmEnabled: boolean;
 	maxEpisodeChars: number;
 	proactiveLinking?: boolean;
@@ -75,7 +73,6 @@ export interface BeamMemoryOptions {
 	authorId?: string | null;
 	authorType?: string | null;
 	channelId?: string | null;
-	useCloud?: boolean;
 	proactiveLinking?: boolean;
 	/** Route `recallEnhanced` through polyphonic recall. `MNEMOPI_POLYPHONIC_RECALL` wins when set. */
 	polyphonicRecall?: boolean;
@@ -95,7 +92,6 @@ export interface BeamMemoryState {
 	authorId: string | null;
 	authorType: string | null;
 	channelId: string;
-	useCloud: boolean;
 	eventEmitter?: (event: BeamEvent) => void;
 	pluginManager: BeamPluginManager | null;
 	annotations: AnnotationStoreLike | null;

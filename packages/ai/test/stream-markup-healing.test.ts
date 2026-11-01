@@ -5,15 +5,13 @@ import {
 	type InbandScanEvent,
 	ThinkingInbandScanner,
 } from "@oh-my-pi/pi-ai/dialect";
-import { streamGoogleGeminiCli } from "@oh-my-pi/pi-ai/providers/google-gemini-cli";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, TextContent, ThinkingContent, Tool, ToolCall } from "@oh-my-pi/pi-ai/types";
+import type { Context, FetchImpl, Model, ThinkingContent, Tool, ToolCall } from "@oh-my-pi/pi-ai/types";
 import { getStreamMarkupHealingPattern, StreamMarkupHealing } from "@oh-my-pi/pi-ai/utils/stream-markup-healing";
 import { stripDsmlToolMarkup } from "@oh-my-pi/pi-ai/utils/dsml-leak";
 import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
 
 interface SseToolCallDelta {
@@ -63,9 +61,19 @@ function baseContext(): Context {
 }
 
 function kimiModel(): Model<"openai-completions"> {
-	// OpenRouter-hosted Kimi K2 — the model-id gate engages without pulling
-	// in the kimi-code OAuth/device-id paths.
-	return getBundledModel("openrouter", "moonshotai/kimi-k2");
+	// Self-hosted Kimi K2 — the model-id gate engages the Kimi grammar.
+	return buildModel({
+		id: "moonshotai/kimi-k2",
+		name: "Kimi K2",
+		api: "openai-completions",
+		provider: "vllm",
+		baseUrl: "http://localhost:8000/v1",
+		reasoning: true,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 131_072,
+		maxTokens: 8_192,
+	});
 }
 
 function chunk(model: string, delta: SseChoiceDelta, finish: SseChunk["choices"][0]["finish_reason"] = null): SseChunk {
@@ -138,8 +146,8 @@ const deepseekCloudModel: Model<"ollama-chat"> = buildModel({
 	id: "deepseek-v4-pro",
 	name: "DeepSeek V4 Pro",
 	api: "ollama-chat",
-	provider: "ollama-cloud",
-	baseUrl: "https://ollama.com",
+	provider: "ollama",
+	baseUrl: "http://localhost:11434",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -147,17 +155,17 @@ const deepseekCloudModel: Model<"ollama-chat"> = buildModel({
 	maxTokens: 8_192,
 });
 
-function geminiCliModel(): Model<"google-gemini-cli"> {
+function deepseekCompletionsModel(): Model<"openai-completions"> {
 	return buildModel({
-		id: "gemini-3.5-flash",
-		name: "Gemini 3.5 Flash",
-		api: "google-gemini-cli",
-		provider: "google-antigravity",
-		baseUrl: "https://antigravity.test",
+		id: "deepseek/deepseek-v4-pro",
+		name: "DeepSeek V4 Pro",
+		api: "openai-completions",
+		provider: "vllm",
+		baseUrl: "http://localhost:8000/v1",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 1_000_000,
+		contextWindow: 131_072,
 		maxTokens: 8_192,
 	});
 }
@@ -198,14 +206,13 @@ function healingModel(provider: string, id: string): Model<"ollama-chat"> {
 
 describe("StreamMarkupHealing pattern selection", () => {
 	it("routes tool-call leaks to their grammar and everything else to thinking", () => {
-		expect(getStreamMarkupHealingPattern(healingModel("openrouter", "moonshotai/kimi-k2"))).toBe("kimi");
-		expect(getStreamMarkupHealingPattern(healingModel("ollama-cloud", "deepseek-v4-pro"))).toBe("dsml");
-		expect(getStreamMarkupHealingPattern(healingModel("nanogpt", "deepseek/deepseek-v4-pro"))).toBe("dsml");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "moonshotai/kimi-k2"))).toBe("kimi");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "deepseek-v4-pro"))).toBe("dsml");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "deepseek/deepseek-v4-pro"))).toBe("dsml");
 		// Every other model heals leaked reasoning idioms by default.
-		expect(getStreamMarkupHealingPattern(healingModel("opencode-zen", "minimax-m3"))).toBe("thinking");
-		expect(getStreamMarkupHealingPattern(healingModel("openrouter", "google/gemini-3.5-flash"))).toBe("thinking");
-		expect(getStreamMarkupHealingPattern(healingModel("ollama-cloud", "gpt-oss:120b"))).toBe("thinking");
-		expect(getStreamMarkupHealingPattern(healingModel("openai", "deepseek-v4-pro"))).toBe("dsml");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "minimax-m3"))).toBe("thinking");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "google/gemini-3.5-flash"))).toBe("thinking");
+		expect(getStreamMarkupHealingPattern(healingModel("ollama", "gpt-oss:120b"))).toBe("thinking");
 	});
 });
 
@@ -217,8 +224,8 @@ describe("openai-completions leaked thinking healing", () => {
 		id: "google/gemini-3.5-flash",
 		name: "Gemini 3.5 Flash",
 		api: "openai-completions",
-		provider: "openrouter",
-		baseUrl: "https://openrouter.ai/api/v1",
+		provider: "vllm",
+		baseUrl: "http://localhost:8000/v1",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -278,102 +285,6 @@ describe("openai-completions leaked thinking healing", () => {
 		expect(thinking).toBe("structured reasoning");
 		expect(thinking).not.toContain("leaked copy");
 		expect(text.trim()).toBe("visible");
-	});
-});
-
-describe("official OpenAI leaked thinking healing exemption", () => {
-	// The official OpenAI endpoint returns structured reasoning and never leaks
-	// fences, so neither the provider-local healer nor the central
-	// wrapLeakedThinkingStream wrap runs — a ` ```thinking ` block the model chose
-	// to write must stay verbatim visible text. Routed through stream() (not the
-	// provider directly) so both gates are exercised.
-	const officialOpenAI = getBundledModel("openai", "gpt-5.5");
-	const completionsModel = buildModel({
-		...officialOpenAI,
-		api: "openai-completions",
-	});
-
-	it("leaves a leaked fence intact for the official OpenAI endpoint", async () => {
-		const leaked = "```thinking\nWeigh the options.\n```\nFinal answer.";
-		const result = await stream(completionsModel, baseContext(), {
-			apiKey: "test",
-			fetch: mockFetch([
-				chunk(completionsModel.id, { content: leaked }),
-				chunk(completionsModel.id, {}, "stop"),
-				"[DONE]",
-			]),
-		}).result();
-
-		expect(result.content.map(b => b.type)).toEqual(["text"]);
-		expect(result.content.filter((b): b is ThinkingContent => b.type === "thinking")).toHaveLength(0);
-		expect(result.content.map(b => (b.type === "text" ? b.text : "")).join("")).toBe(leaked);
-	});
-});
-
-describe("google-gemini-cli leaked thinking healing", () => {
-	it("lifts a leaked Gemini thinking fence before a native tool call", async () => {
-		const model = geminiCliModel();
-		const fetchMock = mockFetch([
-			{
-				response: {
-					candidates: [
-						{
-							content: {
-								role: "model",
-								parts: [
-									{
-										text: "```thinking\nCheck the provider path.\n```\nI will inspect the file.",
-										thoughtSignature: "visible-text-signature",
-									},
-									{
-										functionCall: {
-											name: "read",
-											args: { path: "packages/ai/src/providers/google-gemini-cli.ts" },
-											id: "call_read_1",
-										},
-										thoughtSignature: "function-call-signature",
-									},
-								],
-							},
-							finishReason: "STOP",
-						},
-					],
-					usageMetadata: {
-						promptTokenCount: 10,
-						candidatesTokenCount: 5,
-						thoughtsTokenCount: 3,
-						totalTokenCount: 18,
-					},
-				},
-			},
-		]);
-
-		const result = await streamGoogleGeminiCli(
-			model,
-			{ ...baseContext(), tools: [readTool] },
-			{
-				apiKey: JSON.stringify({ token: "test-token", projectId: "test-project" }),
-				fetch: fetchMock,
-			},
-		).result();
-
-		expect(result.content.map(block => block.type)).toEqual(["thinking", "text", "toolCall"]);
-		const thinking = result.content
-			.filter((block): block is ThinkingContent => block.type === "thinking")
-			.map(block => block.thinking)
-			.join("");
-		const textBlocks = result.content.filter((block): block is TextContent => block.type === "text");
-		const text = textBlocks.map(block => block.text).join("");
-		const calls = result.content.filter((block): block is ToolCall => block.type === "toolCall");
-
-		expect(thinking).toBe("Check the provider path.\n");
-		expect(text).toBe("\nI will inspect the file.");
-		expect(text).not.toContain("```thinking");
-		expect(calls).toHaveLength(1);
-		expect(textBlocks[0]?.textSignature).toBe("visible-text-signature");
-		expect(calls[0]?.id).toBe("call_read_1");
-		expect(calls[0]?.thoughtSignature).toBe("function-call-signature");
-		expect(result.stopReason).toBe("toolUse");
 	});
 });
 
@@ -1263,13 +1174,13 @@ describe("Ollama provider DSML envelope healing", () => {
 });
 
 describe("OpenAI completions MiniMax thinking healing", () => {
-	it("parses OpenCode Zen MiniMax think tags into a thinking block", async () => {
+	it("parses MiniMax think tags into a thinking block", async () => {
 		const model: Model<"openai-completions"> = buildModel({
 			id: "minimax-m3",
 			name: "MiniMax M3",
 			api: "openai-completions",
-			provider: "opencode-zen",
-			baseUrl: "https://opencode.ai/zen/v1",
+			provider: "vllm",
+			baseUrl: "http://localhost:8000/v1",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1300,18 +1211,7 @@ describe("OpenAI completions MiniMax thinking healing", () => {
 
 describe("OpenAI completions provider DSML envelope healing", () => {
 	it("heals the envelope into a structured tool call and suppresses leaked text", async () => {
-		const model: Model<"openai-completions"> = buildModel({
-			id: "deepseek-v4-pro",
-			name: "DeepSeek V4 Pro",
-			api: "openai-completions",
-			provider: "deepseek",
-			baseUrl: "https://api.deepseek.com",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 131_072,
-			maxTokens: 8_192,
-		});
+		const model: Model<"openai-completions"> = deepseekCompletionsModel();
 		const fetchMock = mockFetch([
 			chunk(model.id, { content: "I'll check.\n" }),
 			chunk(model.id, { content: `${REPORTED_DSML_LEAK}\nThat should give us the package list.` }),
@@ -1351,8 +1251,8 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 		expect(result.stopReason).toBe("toolUse");
 	});
 
-	it("heals NanoGPT-hosted DeepSeek V4 Pro DSML leaks (issue #1488)", async () => {
-		const model = getBundledModel<"openai-completions">("nanogpt", "deepseek/deepseek-v4-pro");
+	it("heals DSML leaks from a self-hosted DeepSeek V4 Pro completions server", async () => {
+		const model = deepseekCompletionsModel();
 
 		let payload: Record<string, unknown> | undefined;
 		const fetchMock = mockFetch([
@@ -1375,11 +1275,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 			},
 		).result();
 
-		// Issue #1488: `:tools` triggers NanoGPT's server-side tool-call parser
-		// which 502s on complex DeepSeek payloads. We route via the default
-		// path and rely on DSML healing instead.
-		expect(payload?.model).toBe("deepseek/deepseek-v4-pro");
-		expect(payload?.reasoning_effort).toBe("high");
+		expect(payload?.model).toBe(model.id);
 		expect(payload?.tools).toBeDefined();
 		const text = result.content
 			.filter((b): b is { type: "text"; text: string } => b.type === "text")
@@ -1399,7 +1295,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 	});
 
 	it("dispatches a Fireworks DeepSeek V4.1 Flash call written in re-spelled template tokens", async () => {
-		const model = getBundledModel<"openai-completions">("fireworks", "deepseek-v4.1-flash");
+		const model = deepseekCompletionsModel();
 		const leak = RESPELLED_TEMPLATE_LEAKS["dropped bar, doubled section close"];
 		const fetchMock = mockFetch([
 			chunk(model.id, { content: leak.slice(0, 40) }),
@@ -1424,7 +1320,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 	});
 
 	it("keeps indexed parallel NanoGPT read deltas attached to their own tool calls", async () => {
-		const model = getBundledModel<"openai-completions">("nanogpt", "deepseek/deepseek-v4-pro");
+		const model = deepseekCompletionsModel();
 		const fetchMock = mockFetch([
 			chunk(model.id, {
 				tool_calls: [
@@ -1457,7 +1353,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 	});
 
 	it("keeps parallel tool calls isolated when separate chunks reuse index 0 with distinct IDs", async () => {
-		const model = getBundledModel<"openai-completions">("nanogpt", "deepseek/deepseek-v4-pro");
+		const model = deepseekCompletionsModel();
 		const fetchMock = mockFetch([
 			chunk(model.id, {
 				tool_calls: [
@@ -1491,7 +1387,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 	});
 
 	it("keeps one tool call whole when a gateway mints a new id for each argument fragment at index 0", async () => {
-		const model = getBundledModel<"openai-completions">("nanogpt", "deepseek/deepseek-v4-pro");
+		const model = deepseekCompletionsModel();
 		const fetchMock = mockFetch([
 			chunk(model.id, {
 				tool_calls: [
@@ -1516,7 +1412,7 @@ describe("OpenAI completions provider DSML envelope healing", () => {
 	});
 
 	it("routes id-less continuations at a reused index to the call that resumed by id", async () => {
-		const model = getBundledModel<"openai-completions">("nanogpt", "deepseek/deepseek-v4-pro");
+		const model = deepseekCompletionsModel();
 		const fetchMock = mockFetch([
 			chunk(model.id, {
 				tool_calls: [

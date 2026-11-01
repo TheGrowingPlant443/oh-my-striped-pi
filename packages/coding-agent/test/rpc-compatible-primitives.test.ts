@@ -134,6 +134,29 @@ interface RpcServer {
 
 async function startRpcServer(): Promise<RpcServer> {
 	const temp = await TempDir.create("@rpc-compatible-primitives-");
+	await Bun.write(
+		temp.join("agent", "models.yml"),
+		JSON.stringify({
+			providers: {
+				"rpc-native": {
+					api: "openai-responses",
+					baseUrl: "http://127.0.0.1:9/v1",
+					apiKey: "test-key",
+					models: [
+						{
+							id: "gpt-5.2",
+							name: "Private GPT fixture",
+							reasoning: true,
+							input: ["text", "image"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 200_000,
+							maxTokens: 8192,
+						},
+					],
+				},
+			},
+		}),
+	);
 	const child = Bun.spawn(
 		[
 			process.execPath,
@@ -145,9 +168,9 @@ async function startRpcServer(): Promise<RpcServer> {
 			"--no-tools",
 			"--no-session",
 			"--provider",
-			"anthropic",
+			"rpc-native",
 			"--model",
-			"claude-sonnet-4-5",
+			"gpt-5.2",
 		],
 		{
 			cwd: temp.path(),
@@ -293,11 +316,11 @@ describe("RPC Pi-compatible primitives (live server)", () => {
 		});
 	}, 60000);
 
-	test("set_slow_mode rejects a non-boolean enabled before touching the persisted Claude setting", async () => {
+	test("set_slow_mode rejects a non-boolean enabled before touching the session flex tier", async () => {
 		const { send, next } = server;
 		send({ type: "get_state", id: "slow-state" });
 		const state = (await next()).data as { slowModeSupported: unknown; slowModeScope: unknown };
-		expect([state.slowModeSupported, state.slowModeScope]).toEqual([true, "global"]);
+		expect([state.slowModeSupported, state.slowModeScope]).toEqual([true, "session"]);
 		send({ type: "set_slow_mode", id: "slow-bad", enabled: "false" });
 		expect(await next()).toEqual({
 			id: "slow-bad",

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept every bullet-list fact returned by configured memory backends instead of discarding all but the last line.
+
+### Removed
+
+- Removed public OpenRouter/Gemini extraction defaults and borrowed public-provider credentials; local/managed execution and explicitly configured private HTTP endpoints remain.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

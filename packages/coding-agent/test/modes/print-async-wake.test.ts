@@ -287,13 +287,17 @@ describe("print mode async-result wake with a real session", () => {
 		});
 		const agent = new Agent({
 			getApiKey: () => "test-key",
-			initialState: { model: getBundledModel("anthropic", "claude-sonnet-4-5")!, systemPrompt: ["Test"], tools: [] },
+			initialState: {
+				model: getBundledModel("github-copilot", "claude-sonnet-4.5")!,
+				systemPrompt: ["Test"],
+				tools: [],
+			},
 			convertToLlm,
 			streamFn: mock.stream,
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const settings = Settings.isolated();
 		if (printWake) cfgAsyncPrintWake.override(settings, true);
 		const session = new AgentSession({

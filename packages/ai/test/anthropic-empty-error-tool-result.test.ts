@@ -16,14 +16,14 @@ const baseModel: Omit<ModelSpec<"anthropic-messages">, "provider" | "baseUrl"> =
 
 const anthropicModel: Model<"anthropic-messages"> = buildModel({
 	...baseModel,
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 });
 
 const visionModel: Model<"anthropic-messages"> = buildModel({
 	...baseModel,
 	input: ["text", "image"],
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 });
 
@@ -44,7 +44,7 @@ const assistant: AssistantMessage = {
 		},
 	],
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	model: "claude-sonnet-4-6",
 	usage: {
 		input: 0,
@@ -62,7 +62,7 @@ function getToolResultBlock(
 	model: Model<"anthropic-messages">,
 	toolResult: ToolResultMessage,
 ): Record<string, unknown> {
-	const params = convertAnthropicMessages([user, assistant, toolResult], model, false);
+	const params = convertAnthropicMessages([user, assistant, toolResult], model);
 	const last = params.at(-1);
 	expect(last?.role).toBe("user");
 	const blocks = last?.content as unknown as Array<Record<string, unknown>>;

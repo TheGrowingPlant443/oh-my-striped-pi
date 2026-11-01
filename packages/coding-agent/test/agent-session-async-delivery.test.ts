@@ -66,7 +66,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("delivers background text and images to the owning model and reaches quiescence", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -76,7 +76,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		AsyncJobManager.setInstance(manager);
 
@@ -136,7 +136,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("exposes a process job's full command in the async job snapshot", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -177,7 +177,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("delivers a background task's whole inline report without cutting it again", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -187,7 +187,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		AsyncJobManager.setInstance(manager);
 		session = new AgentSession({
@@ -241,7 +241,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("does not spill an incomplete background capture as full output during follow-up delivery", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -251,7 +251,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		const sessionManager = SessionManager.inMemory();
 		const allocate = vi.spyOn(sessionManager, "allocateArtifactPath");
@@ -308,7 +308,7 @@ describe("AgentSession owner-routed async delivery", () => {
 
 	it("keeps healthy follow-up output recoverable when another job's capture failed", async () => {
 		await using temp = await TempDir.create("@capture-followup-mixed-");
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -318,7 +318,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		AsyncJobManager.setInstance(manager);
 		const store = SessionManager.inMemory(temp.path());
@@ -392,7 +392,7 @@ describe("AgentSession owner-routed async delivery", () => {
 
 	it("links a background bash follow-up to the sink's raw capture instead of its elided body", async () => {
 		await using temp = await TempDir.create("@bash-followup-raw-");
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -402,7 +402,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		AsyncJobManager.setInstance(manager);
 		const store = SessionManager.inMemory(temp.path());
@@ -831,7 +831,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("routes an advisor-owned launch completion through the session", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -841,7 +841,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const sessionManager = SessionManager.inMemory();
 		const owner = `${sessionManager.getSessionId()}-advisor`;
 		session = new AgentSession({
@@ -885,7 +885,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("purges finished owned jobs when starting a new session", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -895,7 +895,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({ retentionMs: 60_000 });
 		AsyncJobManager.setInstance(manager);
 
@@ -939,7 +939,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("does not inject a prior session's pending async result after a new session", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -949,7 +949,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({ retentionMs: 60_000 });
 		AsyncJobManager.setInstance(manager);
 
@@ -994,7 +994,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("drops a prior session's late delivery even after its job id is reused", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -1004,7 +1004,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({ retentionMs: 60_000 });
 		AsyncJobManager.setInstance(manager);
 
@@ -1058,7 +1058,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		mock: MockModel;
 		targetSessionFile: string;
 	}> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -1068,7 +1068,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({ retentionMs: 60_000 });
 		AsyncJobManager.setInstance(manager);
 
@@ -1251,7 +1251,7 @@ describe("AgentSession owner-routed async delivery", () => {
 	});
 
 	it("keeps delivery pending until the queued follow-up is injected", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ handler: () => ({ content: ["Done"] }) });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -1261,7 +1261,7 @@ describe("AgentSession owner-routed async delivery", () => {
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const manager = new AsyncJobManager({});
 		AsyncJobManager.setInstance(manager);
 

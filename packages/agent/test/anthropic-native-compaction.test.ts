@@ -50,34 +50,16 @@ function makeAnthropicModel(overrides: Partial<ModelSpec<"anthropic-messages">> 
 		id: "claude-fable-5",
 		name: "Claude Fable 5",
 		api: "anthropic-messages",
-		provider: "anthropic",
-		baseUrl: "https://api.anthropic.com",
+		provider: "company",
+		baseUrl: "https://inference.company.example/v1",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
 		contextWindow: 1_000_000,
 		maxTokens: 128_000,
+		compat: { supportsServerCompaction: true },
 		...overrides,
 	} as ModelSpec<"anthropic-messages">);
-}
-
-/** Bedrock support resolves from the authored identity and compat rules, not generated model data. */
-function makeBedrockModel(
-	overrides: Partial<ModelSpec<"bedrock-converse-stream">> = {},
-): Model<"bedrock-converse-stream"> {
-	return buildModel({
-		id: "global.anthropic.claude-opus-5-5",
-		name: "Claude Opus 5.5 (Global)",
-		api: "bedrock-converse-stream",
-		provider: "amazon-bedrock",
-		baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 200_000,
-		maxTokens: 32_000,
-		...overrides,
-	} as ModelSpec<"bedrock-converse-stream">);
 }
 
 function makeOpenAiModel(): Model<"openai-responses"> {
@@ -85,8 +67,8 @@ function makeOpenAiModel(): Model<"openai-responses"> {
 		id: "gpt-5",
 		name: "GPT-5",
 		api: "openai-responses",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -140,7 +122,7 @@ afterEach(() => {
 });
 
 describe("shouldUseAnthropicNativeCompaction", () => {
-	test("covers beta-supported first-party models on supported endpoints", () => {
+	test("uses explicitly configured company Messages compaction and respects capability opt-outs", () => {
 		expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel())).toBe(true);
 		expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel({ remoteCompaction: { enabled: false } }))).toBe(
 			false,
@@ -148,77 +130,19 @@ describe("shouldUseAnthropicNativeCompaction", () => {
 		expect(
 			shouldUseAnthropicNativeCompaction(makeAnthropicModel({ compat: { supportsServerCompaction: false } })),
 		).toBe(false);
-		// These generations lack the on-demand compaction capability in catalog policy.
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeAnthropicModel({ id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200_000 }),
-			),
-		).toBe(false);
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeAnthropicModel({ id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", contextWindow: 1_000_000 }),
-			),
-		).toBe(false);
-		// A first-party model routed through a proxy is not assumed to accept the beta.
-		expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel({ baseUrl: "https://proxy.example" }))).toBe(false);
-		const proxy = makeAnthropicModel({ provider: "custom-anthropic-proxy", baseUrl: "https://proxy.example" });
-		expect(shouldUseAnthropicNativeCompaction(proxy)).toBe(false);
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeAnthropicModel({
-					provider: "custom-anthropic-proxy",
-					baseUrl: "https://proxy.example",
-					remoteCompaction: { enabled: true },
-				}),
-			),
-		).toBe(false);
+		expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel({ compat: {} }))).toBe(false);
 		expect(shouldUseAnthropicNativeCompaction(makeOpenAiModel())).toBe(false);
 	});
 
-	test("resolves the endpoint the way the transport does, so an ANTHROPIC_BASE_URL reroute is excluded", async () => {
-		const previous = Bun.env.ANTHROPIC_BASE_URL;
-		Bun.env.ANTHROPIC_BASE_URL = "https://gateway.example.com";
-		try {
-			expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel())).toBe(false);
-			expect(shouldUseAnthropicNativeCompaction(makeAnthropicModel({ remoteCompaction: { enabled: true } }))).toBe(
-				false,
-			);
-		} finally {
-			if (previous === undefined) delete Bun.env.ANTHROPIC_BASE_URL;
-			else Bun.env.ANTHROPIC_BASE_URL = previous;
-		}
+	test("does not infer native compaction support for Copilot from the model family", () => {
+		const model = getBundledModel("github-copilot", "claude-fable-5");
+		if (!model) throw new Error("Bundled Copilot fixture missing");
+		expect(shouldUseAnthropicNativeCompaction(model)).toBe(false);
 	});
 
 	test("counts as provider-native compaction behind the remote setting", () => {
 		expect(shouldUseProviderNativeCompaction(makeAnthropicModel(), { remoteEnabled: true })).toBe(true);
 		expect(shouldUseProviderNativeCompaction(makeAnthropicModel(), { remoteEnabled: false })).toBe(false);
-	});
-
-	test("routes catalog-capable Bedrock Converse models on AWS endpoints, gateways only by opt-in", () => {
-		expect(shouldUseAnthropicNativeCompaction(makeBedrockModel())).toBe(true);
-		expect(shouldUseProviderNativeCompaction(makeBedrockModel(), { remoteEnabled: false })).toBe(false);
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeBedrockModel({ baseUrl: "https://vpce-0abc-xyz.bedrock-runtime.us-west-2.vpce.amazonaws.com" }),
-			),
-		).toBe(true);
-		expect(shouldUseAnthropicNativeCompaction(makeBedrockModel({ remoteCompaction: { enabled: false } }))).toBe(
-			false,
-		);
-		// A gateway may implement only Converse: native compaction needs an explicit opt-in.
-		const gateway = "https://llm-gateway.example.com/bedrock";
-		expect(shouldUseAnthropicNativeCompaction(makeBedrockModel({ baseUrl: gateway }))).toBe(false);
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeBedrockModel({ baseUrl: gateway, remoteCompaction: { enabled: true } }),
-			),
-		).toBe(true);
-		// Revisions without the model-card capability never take the lane, even when opted in.
-		expect(
-			shouldUseAnthropicNativeCompaction(
-				makeBedrockModel({ id: "anthropic.claude-sonnet-4-6", remoteCompaction: { enabled: true } }),
-			),
-		).toBe(false);
 	});
 });
 
@@ -230,7 +154,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: NATIVE_SUMMARY,
 					signature: "sig_state_1",
 				},
@@ -249,7 +173,7 @@ describe("compact() Anthropic native lane", () => {
 			},
 		];
 
-		const result = await compact(preparation, model, "sk-ant-test", "keep the codeword", undefined, {
+		const result = await compact(preparation, model, "test-key", "keep the codeword", undefined, {
 			completeImpl,
 			remoteSystemPrompt: ["You are the live agent."],
 			tools,
@@ -284,7 +208,7 @@ describe("compact() Anthropic native lane", () => {
 		// entry and back out as the replay payload.
 		expect(result.preserveData).toEqual({
 			anthropicCompaction: {
-				provider: "anthropic",
+				provider: "company",
 				content: NATIVE_SUMMARY,
 				signature: "sig_state_1",
 				filesText: "<files>\n# /repo/src/\nhandlers.ts (Read)\n</files>",
@@ -295,7 +219,7 @@ describe("compact() Anthropic native lane", () => {
 		});
 		expect(getAnthropicCompactionPayload(result.preserveData)).toEqual({
 			type: "anthropicCompaction",
-			provider: "anthropic",
+			provider: "company",
 			content: NATIVE_SUMMARY,
 			signature: "sig_state_1",
 			filesText: "<files>\n# /repo/src/\nhandlers.ts (Read)\n</files>",
@@ -324,13 +248,13 @@ describe("compact() Anthropic native lane", () => {
 			});
 		});
 
-		const first = await compact(makePreparation(), model, "sk-ant-test", undefined, undefined, { completeImpl });
+		const first = await compact(makePreparation(), model, "test-key", undefined, undefined, { completeImpl });
 		expect(getAnthropicCompactionPayload(first.preserveData)?.toolChanges).toEqual(toolChanges);
 
 		await compact(
 			makePreparation({ previousSummary: first.summary, previousPreserveData: first.preserveData }),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -341,12 +265,12 @@ describe("compact() Anthropic native lane", () => {
 	});
 
 	test("replays a signed summary written by another model of the same provider", async () => {
-		const model = makeAnthropicModel({ id: "claude-opus-5-5", name: "Claude Opus 5.5" });
+		const model = makeAnthropicModel({ id: "claude-opus-5.5", name: "Claude Opus 5.5" });
 		const { calls, completeImpl } = recordingCompleteImpl(() =>
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "next",
 					signature: "sig_2",
 				},
@@ -359,7 +283,7 @@ describe("compact() Anthropic native lane", () => {
 				previousSummary: "prior signed summary",
 				previousPreserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "company",
 						content: "prior signed summary",
 						signature: "fable_sig",
 						model: "claude-fable-5",
@@ -367,7 +291,7 @@ describe("compact() Anthropic native lane", () => {
 				},
 			}),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -375,52 +299,6 @@ describe("compact() Anthropic native lane", () => {
 
 		expect(calls[0]?.ctx.messages[0]).toMatchObject({
 			providerPayload: { type: "anthropicCompaction", signature: "fable_sig" },
-		});
-	});
-
-	test("compacts Bedrock Converse models through the native lane and persists the signed block", async () => {
-		const model = makeBedrockModel();
-		const { calls, completeImpl } = recordingCompleteImpl(() =>
-			assistantMessage(model, {
-				providerPayload: {
-					type: "anthropicCompaction",
-					provider: model.provider,
-					content: NATIVE_SUMMARY,
-					signature: "bedrock_sig_2",
-				},
-				stopDetails: { type: "compaction" },
-			}),
-		);
-
-		const result = await compact(
-			makePreparation({
-				previousSummary: "prior Bedrock summary",
-				previousPreserveData: {
-					anthropicCompaction: {
-						provider: model.provider,
-						content: "prior Bedrock summary",
-						signature: "bedrock_sig_1",
-					},
-				},
-				recentMessages: [assistantMessage(model, { content: [{ type: "text", text: "recent" }], timestamp: 2 })],
-			}),
-			model,
-			"bedrock-test-key",
-			undefined,
-			undefined,
-			{ completeImpl },
-		);
-
-		expect(calls).toHaveLength(1);
-		expect(calls[0]?.model).toBe(model);
-		expect(calls[0]?.options.anthropicCompaction).toEqual({ instructions: expect.any(String), filesDueBefore: 2 });
-		expect(calls[0]?.ctx.messages[0]).toMatchObject({
-			providerPayload: { type: "anthropicCompaction", signature: "bedrock_sig_1" },
-		});
-		expect(result.preserveData?.anthropicCompaction).toMatchObject({
-			provider: "amazon-bedrock",
-			content: NATIVE_SUMMARY,
-			signature: "bedrock_sig_2",
 		});
 	});
 
@@ -456,7 +334,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "summary",
 					signature: "sig",
 				},
@@ -470,7 +348,7 @@ describe("compact() Anthropic native lane", () => {
 			],
 			recentEntryIds: ["kept-1", "kept-2"],
 		});
-		const advanced = await compact(preparation, model, "sk-ant-test", undefined, undefined, { completeImpl });
+		const advanced = await compact(preparation, model, "test-key", undefined, undefined, { completeImpl });
 		expect(advanced.firstKeptEntryId).toBe("kept-2");
 		expect(calls[0]?.ctx.messages.map(message => message.content)).toEqual(["long history", "same-role tail"]);
 
@@ -481,7 +359,7 @@ describe("compact() Anthropic native lane", () => {
 				recentEntryIds: ["kept-1"],
 			}),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -496,7 +374,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "second summary",
 					signature: "sig_2",
 				},
@@ -509,7 +387,7 @@ describe("compact() Anthropic native lane", () => {
 			previousSummaryTimestamp: new Date(1_500).toISOString(),
 			previousPreserveData: {
 				anthropicCompaction: {
-					provider: "anthropic",
+					provider: "company",
 					content: "first summary",
 					encryptedContent: "enc_state_0",
 					filesText: "<files>\n# /repo/src/\nold.ts (Read)\n</files>",
@@ -519,14 +397,14 @@ describe("compact() Anthropic native lane", () => {
 			},
 		});
 
-		const result = await compact(preparation, model, "sk-ant-test", undefined, undefined, { completeImpl });
+		const result = await compact(preparation, model, "test-key", undefined, undefined, { completeImpl });
 
 		const [{ ctx }] = calls;
 		expect(ctx.messages[0]).toMatchObject({
 			role: "user",
 			providerPayload: {
 				type: "anthropicCompaction",
-				provider: "anthropic",
+				provider: "company",
 				content: "first summary",
 				encryptedContent: "enc_state_0",
 				filesText: "<files>\n# /repo/src/\nold.ts (Read)\n</files>",
@@ -537,7 +415,7 @@ describe("compact() Anthropic native lane", () => {
 		expect(result.preserveData).toEqual({
 			appKey: "kept",
 			anthropicCompaction: {
-				provider: "anthropic",
+				provider: "company",
 				content: result.summary,
 				signature: "sig_2",
 				// The previous summary predates `exactTail`: its metadata replayed
@@ -555,7 +433,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "second",
 					signature: "sig_2",
 				},
@@ -569,7 +447,7 @@ describe("compact() Anthropic native lane", () => {
 				previousSummaryTimestamp: new Date(1_500).toISOString(),
 				previousPreserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "company",
 						content: "first summary",
 						signature: "sig_1",
 						filesText: "<files>old.ts (Read)</files>",
@@ -578,7 +456,7 @@ describe("compact() Anthropic native lane", () => {
 				},
 			}),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -595,7 +473,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "second",
 					signature: "sig_2",
 				},
@@ -619,7 +497,7 @@ describe("compact() Anthropic native lane", () => {
 				previousSummaryTimestamp: new Date(1_500).toISOString(),
 				previousPreserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "company",
 						content: "first summary",
 						signature: "sig_1",
 						filesText: "<files>old.ts (Read)</files>",
@@ -628,7 +506,7 @@ describe("compact() Anthropic native lane", () => {
 				},
 			}),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -648,7 +526,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "summary",
 					signature: "sig",
 				},
@@ -665,7 +543,7 @@ describe("compact() Anthropic native lane", () => {
 			messages.map(message =>
 				"content" in message && typeof message.content === "string" ? message.content : message.role,
 			);
-		await compact(makePreparation(), model, "sk-ant-test", undefined, undefined, {
+		await compact(makePreparation(), model, "test-key", undefined, undefined, {
 			completeImpl,
 			remoteSystemPrompt: ["stale prompt"],
 			buildProviderContext: async (summarized, retained) => {
@@ -685,7 +563,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "second",
 					signature: "sig_2",
 				},
@@ -700,7 +578,7 @@ describe("compact() Anthropic native lane", () => {
 				previousSummaryTimestamp: new Date(1).toISOString(),
 				previousPreserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "company",
 						content: "first summary",
 						signature: "sig_1",
 						filesText: "<files>old.ts (Read)</files>",
@@ -709,7 +587,7 @@ describe("compact() Anthropic native lane", () => {
 				},
 			}),
 			model,
-			"sk-ant-test",
+			"test-key",
 			undefined,
 			undefined,
 			{ completeImpl },
@@ -723,7 +601,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "second summary",
 					signature: "sig_2",
 				},
@@ -737,11 +615,11 @@ describe("compact() Anthropic native lane", () => {
 			previousSummary: "first summary",
 			previousSummaryTimestamp: new Date(90_000).toISOString(),
 			previousPreserveData: {
-				anthropicCompaction: { provider: "anthropic", content: "first summary" },
+				anthropicCompaction: { provider: "company", content: "first summary" },
 			},
 		});
 
-		await compact(preparation, model, "sk-ant-test", undefined, undefined, { completeImpl });
+		await compact(preparation, model, "test-key", undefined, undefined, { completeImpl });
 
 		const [{ ctx }] = calls;
 		const first = ctx.messages[0] as { historyRewriteAt?: number };
@@ -756,23 +634,16 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "small summary",
 					signature: "sig",
 				},
 				stopDetails: { type: "compaction" },
 			}),
 		);
-		const result = await compact(
-			makePreparation({ tokensBefore: 1_000 }),
-			model,
-			"sk-ant-test",
-			undefined,
-			undefined,
-			{
-				completeImpl,
-			},
-		);
+		const result = await compact(makePreparation({ tokensBefore: 1_000 }), model, "test-key", undefined, undefined, {
+			completeImpl,
+		});
 		expect(calls[0]?.ctx.systemPrompt).toEqual([]);
 		expect(calls[0]?.options.anthropicCompaction).toEqual({ instructions: expect.any(String), filesDueBefore: 2 });
 		expect(result.preserveData?.anthropicCompaction).toMatchObject({ signature: "sig", content: "small summary" });
@@ -792,7 +663,7 @@ describe("compact() Anthropic native lane", () => {
 			const { calls, completeImpl } = recordingCompleteImpl(() =>
 				assistantMessage(model, { ...stop, content: [{ type: "text", text: "not a summary" }] }),
 			);
-			const failure = compact(makePreparation(), model, "sk-ant-test", undefined, undefined, { completeImpl });
+			const failure = compact(makePreparation(), model, "test-key", undefined, undefined, { completeImpl });
 			await expect(failure).rejects.toBeInstanceOf(NativeCompactionError);
 			// The log line is the only place a user sees why native compaction fell back.
 			await expect(failure).rejects.toThrow(`stop reason: ${stop.stopDetails?.type}`);
@@ -805,12 +676,12 @@ describe("compact() Anthropic native lane", () => {
 		const model = makeAnthropicModel();
 		const { completeImpl } = recordingCompleteImpl(() =>
 			assistantMessage(model, {
-				providerPayload: { type: "anthropicCompaction", provider: "anthropic", content: "unsigned" },
+				providerPayload: { type: "anthropicCompaction", provider: "company", content: "unsigned" },
 				stopDetails: { type: "compaction" },
 			}),
 		);
 		await expect(
-			compact(makePreparation(), model, "sk-ant-test", undefined, undefined, { completeImpl }),
+			compact(makePreparation(), model, "test-key", undefined, undefined, { completeImpl }),
 		).rejects.toBeInstanceOf(NativeCompactionError);
 	});
 
@@ -823,7 +694,7 @@ describe("compact() Anthropic native lane", () => {
 		});
 
 		await expect(
-			compact(makePreparation(), model, "sk-ant-test", undefined, controller.signal, { completeImpl }),
+			compact(makePreparation(), model, "test-key", undefined, controller.signal, { completeImpl }),
 		).rejects.toBeInstanceOf(AIError.AbortError);
 	});
 
@@ -836,7 +707,7 @@ describe("compact() Anthropic native lane", () => {
 		});
 
 		await expect(
-			compact(makePreparation(), model, "sk-ant-test", undefined, controller.signal, { completeImpl }),
+			compact(makePreparation(), model, "test-key", undefined, controller.signal, { completeImpl }),
 		).rejects.toBeInstanceOf(AIError.AbortError);
 	});
 
@@ -846,7 +717,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, { stopReason: "error", errorMessage: "invalid x-api-key", errorStatus: 401 }),
 		);
 
-		const failure = await compact(makePreparation(), model, "sk-ant-test", undefined, undefined, {
+		const failure = await compact(makePreparation(), model, "test-key", undefined, undefined, {
 			completeImpl,
 		}).catch((error: unknown) => error);
 
@@ -864,7 +735,7 @@ describe("compact() Anthropic native lane", () => {
 		});
 
 		await expect(
-			compact(makePreparation(), model, "sk-ant-test", undefined, undefined, { completeImpl, oneshotRetry: false }),
+			compact(makePreparation(), model, "test-key", undefined, undefined, { completeImpl, oneshotRetry: false }),
 		).rejects.toBeInstanceOf(NativeCompactionError);
 		expect(calls).toHaveLength(1);
 
@@ -872,7 +743,7 @@ describe("compact() Anthropic native lane", () => {
 		// single attempt above is the opt-out at work, not an unretryable error.
 		calls.length = 0;
 		await expect(
-			compact(makePreparation(), model, "sk-ant-test", undefined, undefined, { completeImpl }),
+			compact(makePreparation(), model, "test-key", undefined, undefined, { completeImpl }),
 		).rejects.toBeInstanceOf(NativeCompactionError);
 		expect(calls.length).toBeGreaterThan(1);
 	});
@@ -883,7 +754,7 @@ describe("compact() Anthropic native lane", () => {
 			assistantMessage(model, {
 				providerPayload: {
 					type: "anthropicCompaction",
-					provider: "anthropic",
+					provider: "company",
 					content: "after archive",
 					signature: "sig_archive",
 				},
@@ -903,14 +774,14 @@ describe("compact() Anthropic native lane", () => {
 			},
 		});
 
-		const result = await compact(preparation, model, "sk-ant-test", undefined, undefined, { completeImpl });
+		const result = await compact(preparation, model, "test-key", undefined, undefined, { completeImpl });
 
 		const wire = JSON.stringify(calls[0]?.ctx.messages);
 		expect(wire.split(archiveText).length - 1).toBe(1);
 		expect(calls[0]?.ctx.messages.map(message => message.role)).toEqual(["user", "user"]);
 		expect(result.preserveData).toEqual({
 			anthropicCompaction: {
-				provider: "anthropic",
+				provider: "company",
 				content: result.summary,
 				signature: "sig_archive",
 				exactTail: true,
@@ -963,7 +834,7 @@ describe("compact() Anthropic native lane", () => {
 					content: [{ type: "text", text: "summarized" }],
 					providerPayload: {
 						type: "anthropicCompaction",
-						provider: "anthropic",
+						provider: "company",
 						content: "summarized",
 						signature: "sig",
 					},
@@ -981,7 +852,8 @@ describe("compact() Anthropic native lane", () => {
 					settings: { ...DEFAULT_COMPACTION_SETTINGS, remoteEnabled },
 				});
 
-				await compact(preparation, model, "sk-ant-test", undefined, undefined, { completeImpl });
+				await compact(preparation, model, "test-key", undefined, undefined, { completeImpl });
+				expect(calls.some(call => call.options.anthropicCompaction !== undefined)).toBe(remoteEnabled);
 
 				const wire = JSON.stringify(calls.map(call => call.ctx.messages));
 				expect(wire).toContain("reply 3");
@@ -993,7 +865,15 @@ describe("compact() Anthropic native lane", () => {
 	});
 
 	describe("budgets thinking for the effort in force, not one selected since the last turn", () => {
-		const model = getBundledModel("anthropic", "claude-opus-5-5") as Model<"anthropic-messages">;
+		const model = makeAnthropicModel({
+			id: "claude-opus-5.5",
+			name: "Claude Opus 5.5",
+			compat: { supportsServerCompaction: true, supportsPerMessageEffort: true },
+			thinking: {
+				mode: "anthropic-adaptive",
+				efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max],
+			},
+		});
 		const cases: Array<{
 			name: string;
 			recorded: AnthropicRequestControls["effort"];
@@ -1047,7 +927,7 @@ describe("compact() Anthropic native lane", () => {
 				await expect(
 					requestAnthropicNativeCompaction(
 						model,
-						"sk-ant-test",
+						"test-key",
 						{
 							context: { systemPrompt: ["Audit."], messages },
 							instructions: "Summarize.",
@@ -1070,7 +950,7 @@ describe("native compaction entries read back", () => {
 	test("a native summary stays readable by every model and keeps its retained tail", () => {
 		const ts = (n: number) => new Date(n).toISOString();
 		const preserveData = withAnthropicCompactionPreserveData(undefined, {
-			provider: "anthropic",
+			provider: "company",
 			content: "native summary text",
 		});
 		const entries: SessionEntry[] = [
@@ -1147,7 +1027,7 @@ describe("native compaction entries read back", () => {
 		expect(
 			getAnthropicCompactionPayload({
 				anthropicCompaction: {
-					provider: "anthropic",
+					provider: "company",
 					content: "signed summary",
 					signature: "signature",
 					toolChanges: [{ type: "tool_addition" }, "malformed"],

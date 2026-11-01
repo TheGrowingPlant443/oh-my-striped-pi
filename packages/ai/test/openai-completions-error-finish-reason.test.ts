@@ -17,7 +17,7 @@ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 const RETRYABLE_PATTERN = /provider.?returned.?error/i;
 
 const completionsModel = {
-	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
+	...(getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">),
 	api: "openai-completions",
 } satisfies Model<"openai-completions">;
 
@@ -243,7 +243,6 @@ describe("native_finish_reason", () => {
 		expect(AIError.retriable(AIError.classifyMessage(result))).toBe(true);
 		expect(result.responseId).toBe("chatcmpl-error-finish");
 		expect(result.usage).toMatchObject({ input: 80, output: 40, cacheRead: 20, totalTokens: 140 });
-		expect(result.usage.cost.total).toBeGreaterThan(0);
 	});
 
 	it.each(["malformed_function_call", "Unexpected_Tool_Call", "NETWORK_ERROR"])(

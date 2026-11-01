@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import {
 	type AuthCredential,
@@ -115,7 +119,7 @@ function serializeTestCredential(credential: AuthCredential): string {
 	return "";
 }
 
-async function disableCredential(authStorage: AuthStorage, id: number, provider = "anthropic"): Promise<void> {
+async function disableCredential(authStorage: AuthStorage, id: number, provider = "github-copilot"): Promise<void> {
 	expect(await authStorage.credentials.disable(id, "oauth refresh failed: invalid_grant")).toBe(true);
 	expect(authStorage.credentials.has(provider)).toBe(false);
 }
@@ -160,13 +164,13 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 					events.push(event);
 				},
 			});
-			await authStorage.credentials.set("anthropic", [expiredOAuthFor("alice@example.com")]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuthFor("alice@example.com")]);
 			failOAuthRefresh();
 
-			await authStorage.keys.get("anthropic", "session-disabled-identity");
+			await authStorage.keys.get("github-copilot", "session-disabled-identity");
 
 			const expected = {
-				provider: "anthropic",
+				provider: "github-copilot",
 				disabledCause: expect.stringContaining("invalid_grant"),
 				credentialId: 1,
 				...identityOf("alice@example.com"),
@@ -183,12 +187,12 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 					events.push(event);
 				},
 			});
-			await authStorage.credentials.set("anthropic", [expiredOAuthFor("bob@example.com")]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuthFor("bob@example.com")]);
 
 			await disableCredential(authStorage, 1);
 
 			const expected = {
-				provider: "anthropic",
+				provider: "github-copilot",
 				disabledCause: "oauth refresh failed: invalid_grant",
 				credentialId: 1,
 				...identityOf("bob@example.com"),
@@ -204,12 +208,12 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 					events.push(event);
 				},
 			});
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			failOAuthRefresh("fetch failed: ECONNRESET");
 
-			await expect(authStorage.keys.getWithCredential("anthropic", "session-transient-failure")).rejects.toThrow(
-				"ECONNRESET",
-			);
+			await expect(
+				authStorage.keys.getWithCredential("github-copilot", "session-transient-failure"),
+			).rejects.toThrow("ECONNRESET");
 			expect(events).toHaveLength(0);
 		});
 
@@ -219,7 +223,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 					throw new Error("subscriber exploded");
 				},
 			});
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 		});
 
@@ -233,7 +237,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 					throw new Error("async subscriber exploded");
 				},
 			});
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 
 			const unhandled: unknown[] = [];
 			const onUnhandled = (reason: unknown): void => {
@@ -264,12 +268,12 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 				runtimeEvents.push(event);
 			});
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 			expect(constructorEvents).toHaveLength(1);
 			expect(runtimeEvents).toHaveLength(1);
-			expect(constructorEvents[0]?.provider).toBe("anthropic");
-			expect(runtimeEvents[0]?.provider).toBe("anthropic");
+			expect(constructorEvents[0]?.provider).toBe("github-copilot");
+			expect(runtimeEvents[0]?.provider).toBe("github-copilot");
 		});
 
 		test("unsubscribe removes only that listener; others continue to fire", async () => {
@@ -283,8 +287,8 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 				bEvents.push(event);
 			});
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
-			await authStorage.credentials.set("openai", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
+			await authStorage.credentials.set("local", [expiredOAuth()]);
 
 			await disableCredential(authStorage, 1);
 			expect(aEvents).toHaveLength(1);
@@ -292,7 +296,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 
 			unsubscribeA();
 
-			await disableCredential(authStorage, 2, "openai");
+			await disableCredential(authStorage, 2, "local");
 			expect(aEvents).toHaveLength(1);
 			expect(bEvents).toHaveLength(2);
 		});
@@ -311,7 +315,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 			unsubscribeA();
 			unsubscribeA();
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 
 			expect(aEvents).toHaveLength(0);
@@ -328,7 +332,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 				tailEvents.push(event);
 			});
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 
 			await disableCredential(authStorage, 1);
 			expect(tailEvents).toHaveLength(1);
@@ -347,7 +351,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 				tailEvents.push(event);
 			});
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 
 			const unhandled: unknown[] = [];
 			const onUnhandled = (reason: unknown): void => {
@@ -370,7 +374,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 		test("replays buffered events to the first subscriber that triggers the empty→non-empty transition", async () => {
 			const authStorage = openStorage();
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 
 			const replayed: CredentialDisabledEvent[] = [];
@@ -381,14 +385,14 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 			await Promise.resolve();
 
 			expect(replayed).toHaveLength(1);
-			expect(replayed[0]?.provider).toBe("anthropic");
+			expect(replayed[0]?.provider).toBe("github-copilot");
 			expect(replayed[0]?.disabledCause).toContain("invalid_grant");
 		});
 
 		test("drains once: a later subscriber attached after the first does not re-receive past events", async () => {
 			const authStorage = openStorage();
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 
 			const firstEvents: CredentialDisabledEvent[] = [];
@@ -414,14 +418,14 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 				events.push(event);
 			});
 
-			await authStorage.credentials.set("anthropic", [expiredOAuth()]);
+			await authStorage.credentials.set("github-copilot", [expiredOAuth()]);
 			await disableCredential(authStorage, 1);
 			expect(events).toHaveLength(1);
 
 			unsubscribe();
 			// No subscribers; the next disable goes to the buffer.
-			await authStorage.credentials.set("openai", [expiredOAuth()]);
-			await disableCredential(authStorage, 2, "openai");
+			await authStorage.credentials.set("local", [expiredOAuth()]);
+			await disableCredential(authStorage, 2, "local");
 			expect(events).toHaveLength(1);
 
 			const replayed: CredentialDisabledEvent[] = [];
@@ -430,7 +434,7 @@ describe("AuthStorage credential_disabled subscriptions", () => {
 			});
 			await Promise.resolve();
 			expect(replayed).toHaveLength(1);
-			expect(replayed[0]?.provider).toBe("openai");
+			expect(replayed[0]?.provider).toBe("local");
 		});
 	});
 });

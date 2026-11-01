@@ -43,7 +43,7 @@ describe("InteractiveMode restart", () => {
 
 	async function restart(argv: string[]): Promise<string[]> {
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!model) throw new Error("expected bundled model");
 		session = new AgentSession({
 			agent: new Agent({ initialState: { model, systemPrompt: ["test"], tools: [], messages: [] } }),
@@ -97,7 +97,7 @@ describe("InteractiveMode restart", () => {
 			"--session",
 			file,
 			"--model",
-			"anthropic/claude-sonnet-4-5",
+			"github-copilot/claude-sonnet-4.5",
 			"--append-system-prompt",
 			"persona prompt",
 			"--skills",
@@ -105,11 +105,11 @@ describe("InteractiveMode restart", () => {
 			"-e",
 			"/office/extension.ts",
 			"--model",
-			"openai-codex/gpt-6.1-sol:high",
+			"github-copilot/gpt-6.1-sol:high",
 			"initial request",
 		]);
 		const parsed = parseArgs(command.slice(command.indexOf("--model")));
-		expect(parsed.model).toBe("openai-codex/gpt-6.1-sol:high");
+		expect(parsed.model).toBe("github-copilot/gpt-6.1-sol:high");
 		expect(parsed.messages).toEqual([]);
 		const resumed = await createSessionManager(parsed, tempDir.path(), Settings.isolated());
 		if (!resumed) throw new Error("expected resumed journal");
@@ -131,7 +131,11 @@ describe("InteractiveMode restart", () => {
 		const file = sessionManager.getSessionFile();
 		if (!file) throw new Error("expected persisted journal");
 		const id = sessionManager.getSessionId();
-		const command = await restart(["--model", "anthropic/claude-sonnet-4-5", `--session-dir=${relativeDir.path()}`]);
+		const command = await restart([
+			"--model",
+			"github-copilot/claude-sonnet-4.5",
+			`--session-dir=${relativeDir.path()}`,
+		]);
 		const parsed = parseArgs(command.slice(command.indexOf("--model")));
 		const resumed = await createSessionManager(parsed, tempDir.path(), Settings.isolated());
 		if (!resumed) throw new Error("expected resumed journal");
@@ -148,7 +152,7 @@ describe("InteractiveMode restart", () => {
 
 	it("does not resume a journal that has never materialized", async () => {
 		const file = sessionManager.getSessionFile();
-		const command = await restart(["--model", "anthropic/claude-sonnet-4-5", "initial request"]);
+		const command = await restart(["--model", "github-copilot/claude-sonnet-4.5", "initial request"]);
 		const parsed = parseArgs(command.slice(command.indexOf("--model")));
 		expect(parsed.resume).toBeUndefined();
 		expect(parsed.messages).toEqual([]);

@@ -17,8 +17,6 @@ import type {
 	UsageLogger,
 	UsageProvider,
 	UsageReport,
-	UsageResetCredit,
-	UsageResetCredits,
 } from "../usage";
 
 /** Default remaining quota protected for accounts without an explicit policy override. */
@@ -658,61 +656,6 @@ export interface StoredOAuthRefreshResult<T extends OAuthCredential = OAuthCrede
 	removed: boolean;
 }
 
-/** A saved-reset option bound to one provider and durable stored credential. */
-export interface ResetCreditTarget {
-	provider: string;
-	credentialId: number;
-	/** Grant selected by the caller; a changed offer must be confirmed again. */
-	creditId?: string;
-	accountId?: string;
-	email?: string;
-	orgId?: string;
-}
-
-/** Outcome of {@link AuthStorage.resets.redeem}. */
-export interface ResetCreditRedeemOutcome {
-	/** `true` only when a reset was actually applied (`code === "reset"`). */
-	ok: boolean;
-	/**
-	 * Result code. Backend codes: `reset` (success), `already_redeemed`,
-	 * `no_credit`, `nothing_to_reset`. Locally-synthesized: `no_account`
-	 * (target not found), `account_unavailable` (token refresh failed),
-	 * `credit_list_failed` (transport/auth failure while listing credits —
-	 * retryable, unlike a genuine `no_credit`), `http_<status>` (unexpected
-	 * HTTP).
-	 */
-	code: string;
-	provider?: string;
-	accountId?: string;
-	email?: string;
-	orgId?: string;
-	/** Provider explanation for an unavailable or refused reset. */
-	reason?: string;
-	/** Normalized usage limit IDs the provider confirmed it cleared. */
-	cleared?: string[];
-	/** The credit that was spent (when one was). */
-	creditId?: string;
-}
-
-/** One stored account's live saved-reset status, from {@link AuthStorage.resets.list}. */
-export interface ResetCreditAccountStatus extends UsageResetCredits {
-	provider: string;
-	/** Live quota evidence from this exact account's reset-discovery response. */
-	report?: UsageReport;
-	/** Provider-requested wait before retrying throttled reset discovery (not redemption). */
-	retryAfterMs?: number;
-	credentialId: number;
-	accountId?: string;
-	email?: string;
-	orgId?: string;
-	orgName?: string;
-	credits: UsageResetCredit[];
-	/** Whether this is the given session's active account. */
-	active: boolean;
-	/** Set when the account's token refresh or list call failed. */
-	error?: string;
-}
-
 /** Env-var leg handling for {@link KeysApi.source}. */
 export interface AuthSourceOptions {
 	/**
@@ -794,21 +737,6 @@ export interface CredentialRotation {
 	switched: boolean;
 	afterSiblingWait?: boolean;
 }
-
-/** Filter saved reset credits by provider and session. */
-export type ListResetCreditsOptions = {
-	provider?: string;
-	sessionId?: string;
-	baseUrlResolver?: (provider: string) => string | undefined;
-	signal?: AbortSignal;
-};
-
-/** Select a saved reset credit and optional provider endpoint. */
-export type RedeemResetCreditOptions = {
-	target: ResetCreditTarget;
-	baseUrlResolver?: (provider: string) => string | undefined;
-	signal?: AbortSignal;
-};
 
 /** Controller accepted by {@link OAuthApi.login}; onAuth/onPrompt are required. */
 export type OAuthLoginController = OAuthController & {
@@ -1392,17 +1320,6 @@ export interface LimitsApi {
 		apiKey: string,
 		options?: InvalidateCredentialMatchingOptions,
 	): Promise<boolean>;
-}
-
-/** Saved reset-credit listing and redemption. */
-export interface ResetsApi {
-	/** List live saved-reset balances and eligibility for stored OAuth accounts. */
-	list(options?: ListResetCreditsOptions): Promise<ResetCreditAccountStatus[]>;
-	/**
-	 * Redeem a stored account's saved reset after checking its live offer.
-	 * Business refusals return a code; transport errors may throw without losing Claude's request ID.
-	 */
-	redeem(options: RedeemResetCreditOptions): Promise<ResetCreditRedeemOutcome>;
 }
 
 /** Persisted credential rate-limit block operations. */

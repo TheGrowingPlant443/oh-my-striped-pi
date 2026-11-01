@@ -20,9 +20,9 @@ function reply(stopReason: StopReason, content: AssistantMessage["content"], err
 		role: "assistant",
 		content,
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -37,8 +37,8 @@ function reply(stopReason: StopReason, content: AssistantMessage["content"], err
 }
 
 function getModel(): Model {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic/claude-sonnet-4-5 to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected bundled github-copilot/claude-sonnet-4.5 model");
 	return model;
 }
 
@@ -124,7 +124,7 @@ describe("compaction short summary isolation", () => {
 
 describe("compaction short summary isolation on a remote summarization endpoint", () => {
 	const remote = { remoteEnabled: true, remoteEndpoint: "https://remote.invalid/compact" };
-	const remoteModel = getBundledModel("google", "gemini-2.5-flash");
+	const remoteModel = getBundledModel("github-copilot", "gemini-2.5-pro");
 
 	/** The remote endpoint serves the full summary first, then the short summary via `shortResponse`. */
 	function remoteFetch(shortResponse: () => Response) {

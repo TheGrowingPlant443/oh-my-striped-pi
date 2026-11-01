@@ -42,10 +42,6 @@ export const collabHelp = {
 		"List active local Collab host metadata without URLs; use collab link <instanceId|pid> to retrieve a control link (--view for view-only)",
 } satisfies CommandMetadata;
 
-export const clipHelp = {
-	description: "Upload a /record recording to live.omp.sh as a public clip and print its URL",
-} satisfies CommandMetadata;
-
 export const commitHelp = { description: "Generate a commit message and update changelogs" } satisfies CommandMetadata;
 
 export const completionsHelp = {
@@ -83,23 +79,17 @@ export const findHelp = {
 
 export const grepHelp = { description: "Test grep tool" } satisfies CommandMetadata;
 
-export const grievancesHelp = {
-	description: "View, clean, or push reported tool issues (auto-QA grievances)",
-} satisfies CommandMetadata;
-
 export const loginHelp = {
 	description: "Log in to a model provider (terminal counterpart of /login)",
-} satisfies CommandMetadata;
-
-export const imagesHelp = {
-	description: "Inspect, diagnose, probe, and purge image publication backends",
 } satisfies CommandMetadata;
 
 export const installHelp = {
 	description: "Install or link an extension package (alias of `plugin install`/`plugin link`)",
 } satisfies CommandMetadata;
 
-export const joinHelp = { description: "Join a shared collab session (same as /join)" } satisfies CommandMetadata;
+export const joinHelp = {
+	description: "Join a private or local collab session (same as /join)",
+} satisfies CommandMetadata;
 
 export const modelsHelp = { description: "List, search, and refresh available models" } satisfies CommandMetadata;
 
@@ -134,10 +124,6 @@ export const sessionHelp = {
 	description: "Hand a session to another machine: pack it, unpack it, or mark the local copy moved",
 } satisfies CommandMetadata;
 
-export const shareHelp = {
-	description: "Share a saved session via an encrypted link (same as /share)",
-} satisfies CommandMetadata;
-
 export const setupHelp = {
 	description: "Run onboarding setup or install dependencies for optional features",
 } satisfies CommandMetadata;
@@ -145,16 +131,12 @@ export const setupHelp = {
 export const shellHelp = { description: "Interactive shell console" } satisfies CommandMetadata;
 
 export const skillHelp = {
-	description: "Install, search, publish, and manage skills on the Skillshare registry (skills.omp.sh)",
+	description: "Install, search, and manage skills from the Skillshare registry (skills.omp.sh)",
 } satisfies CommandMetadata;
 
 export const sshHelp = { description: "Manage SSH host configurations" } satisfies CommandMetadata;
 
 export const statsHelp = { description: "View usage statistics" } satisfies CommandMetadata;
-
-export const streamHelp = {
-	description: "Broadcast local omp session screens and chat to your public live channel",
-} satisfies CommandMetadata;
 
 export const tinyModelsHelp = {
 	description: "Download tiny local models (session titles, memory, word completion)",
@@ -170,7 +152,9 @@ export const ttsrHelp = {
 	description: "Inspect and test Time-Traveling Stream Rules (TTSR)",
 } satisfies CommandMetadata;
 
-export const updateHelp = { description: "Check for and install updates" } satisfies CommandMetadata;
+export const updateHelp = {
+	description: "Show company-managed application update guidance or update installed plugins",
+} satisfies CommandMetadata;
 
 export const usageHelp = {
 	description: "Show provider usage limits for every authenticated account",

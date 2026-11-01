@@ -76,7 +76,7 @@ Flow:
 3. Emit `session_before_tree` with `TreePreparation`.
 4. Optionally summarize abandoned entries (hook-provided summary or built-in summarizer).
 5. Compute the new leaf target:
-   - selecting a **user** message or user-invoked skill/collaboration custom prompt: leaf moves to its parent; the original draft and image attachments are returned for editor restoration
+   - selecting a **user** message or user-invoked skill prompt: leaf moves to its parent; the original draft and image attachments are returned for editor restoration
    - selecting another **custom_message** other than a skill-prompt injection: same parent/prefill rule (text only)
    - selecting an agent/autoload skill-prompt injection or any other entry: leaf = selected entry id
 6. Apply leaf move:
@@ -142,7 +142,7 @@ Tree selector behavior (`tree-selector.ts`):
 - Flattens tree for navigation, keeps active-path highlighting, and prioritizes displaying the active branch first.
 - Supports filter modes: `default`, `no-tools`, `user-only`, `labeled-only`, `all`.
    - `default` suppresses settings/bookkeeping entries: `label`, `custom`, model/thinking/service-tier/title changes, `model_usage`, credential pins, session initialization, TTSR injections, mode changes, and reset boundaries.
-   - `user-only` includes ordinary user messages and user-invoked skill/collaboration custom prompts.
+   - `user-only` includes ordinary user messages and user-invoked skill prompts.
 - Supports free-text search over rendered semantic content.
 - `Shift+L` opens inline label editing and writes via `appendLabelChange`.
 

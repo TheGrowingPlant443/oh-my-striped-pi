@@ -6,72 +6,18 @@
  * Markers are case-insensitive substrings matched against the base URL, NOT
  * parsed hostnames: proxies regularly embed the upstream host in a path
  * segment, and the historical call sites all used substring semantics.
- * Callers that need strict hostname matching — where a substring false
- * positive is dangerous, e.g. the Anthropic official-endpoint OAuth gate —
- * parse the URL and compare the hostname themselves.
+ * Callers that need strict hostname matching parse the URL themselves.
  */
 
 interface HostClassSpec {
 	/** Provider ids that imply this host class regardless of baseUrl. */
 	readonly providers?: readonly string[];
-	/** Provider-id prefixes that imply this host class (e.g. `xiaomi-token-plan-`). */
-	readonly providerPrefixes?: readonly string[];
 	/** Lowercase ASCII substrings matched case-insensitively against the base URL. */
 	readonly urlMarkers: readonly string[];
-	// Strict hostname matching is intentionally not modeled here: the one
-	// auth-sensitive consumer (Anthropic official-endpoint) parses the URL
-	// itself; every other call site is benign and uses substring matching.
 }
 
 export const KNOWN_HOSTS = {
-	openai: { providers: ["openai"], urlMarkers: ["api.openai.com"] },
-	/** URL-only: a Codex provider rerouted through a proxy does not imply the subscription backend's capabilities. */
-	openaiCodex: { urlMarkers: ["chatgpt.com/backend-api", "chat.openai.com/backend-api"] },
-	azureOpenAI: {
-		providers: ["azure"],
-		urlMarkers: [".openai.azure.com", "azure.com/openai", "models.inference.ai.azure.com"],
-	},
-	openrouter: { providers: ["openrouter"], urlMarkers: ["openrouter.ai"] },
-	vercelAIGateway: { providers: ["vercel-ai-gateway"], urlMarkers: ["ai-gateway.vercel.sh"] },
 	githubCopilot: { providers: ["github-copilot"], urlMarkers: ["githubcopilot.com", "copilot-api."] },
-	anthropic: { providers: ["anthropic"], urlMarkers: ["api.anthropic.com"] },
-	/** DeepSeek's first-party API only — gates direct-API quirks (max_tokens field, thinking extraBody). */
-	deepseekDirect: { providers: ["deepseek"], urlMarkers: ["api.deepseek.com"] },
-	/** Any DeepSeek-operated host (first-party API, web-chat fronts). Wider than `deepseekDirect` on purpose. */
-	deepseekFamily: { providers: ["deepseek"], urlMarkers: ["deepseek.com"] },
-	cerebras: { providers: ["cerebras"], urlMarkers: ["cerebras.ai"] },
-	zai: { providers: ["zai"], urlMarkers: ["api.z.ai"] },
-	zhipu: { providers: ["zhipu-coding-plan"], urlMarkers: ["open.bigmodel.cn"] },
-	kilo: { providers: ["kilo"], urlMarkers: ["api.kilo.ai"] },
-	alibabaDashscope: {
-		providers: ["alibaba-coding-plan", "alibaba-token-plan"],
-		urlMarkers: ["dashscope", "token-plan."],
-	},
-	umans: { providers: ["umans"], urlMarkers: ["api.code.umans.ai"] },
-	xiaomi: { providers: ["xiaomi"], providerPrefixes: ["xiaomi-token-plan-"], urlMarkers: ["xiaomimimo.com"] },
-	xai: { providers: ["xai", "xai-oauth"], urlMarkers: ["api.x.ai"] },
-	mistral: { providers: ["mistral"], urlMarkers: ["mistral.ai"] },
-	together: { providers: ["together"], urlMarkers: ["api.together.xyz"] },
-	baseten: { providers: ["baseten"], urlMarkers: ["baseten.co"] },
-	/** URL-only on purpose: the `fireworks`/`firepass` providers route per-model and not every model is Fireworks-shaped. */
-	fireworks: { urlMarkers: ["fireworks.ai"] },
-	groq: { providers: ["groq"], urlMarkers: ["api.groq.com"] },
-	minimax: {
-		providers: ["minimax", "minimax-code", "minimax-code-cn"],
-		urlMarkers: ["api.minimax.io", "api.minimaxi.com"],
-	},
-	qwenPortal: { providers: ["qwen-portal"], urlMarkers: ["portal.qwen.ai"] },
-	/** NVIDIA NIM (`integrate.api.nvidia.com`). Qwen NIM endpoints take `chat_template_kwargs.enable_thinking`, never top-level `enable_thinking`. */
-	nvidia: { providers: ["nvidia"], urlMarkers: ["integrate.api.nvidia.com"] },
-	/** Venice AI (`api.venice.ai`). OpenAI-compatible; drives reasoning via top-level `reasoning_effort` (and `venice_parameters.disable_thinking`), and rejects DashScope's top-level `enable_thinking` with a 400 (`additionalProperties: false` request schema). */
-	venice: { providers: ["venice"], urlMarkers: ["api.venice.ai"] },
-	moonshotNative: { providers: ["moonshot", "kimi-code"], urlMarkers: ["api.moonshot.ai", "api.kimi.com"] },
-	/** Google AI Studio's OpenAI-compatible shim (`/v1beta/openai`) — a subset of chat-completions; rejects `store` with a 400. Native Gemini uses `google-generative-ai` api instead. */
-	googleAistudio: { providers: [], urlMarkers: ["generativelanguage.googleapis.com"] },
-	opencode: { providers: ["opencode-go", "opencode-zen"], urlMarkers: ["opencode.ai"] },
-	/** ZenMux's Anthropic-compatible proxy (`zenmux.ai/api/anthropic`) forwards to signature-enforcing Anthropic. */
-	zenmux: { providers: ["zenmux"], urlMarkers: ["zenmux.ai"] },
-	chutes: { urlMarkers: ["chutes.ai"] },
 } as const satisfies Record<string, HostClassSpec>;
 
 export type KnownHost = keyof typeof KNOWN_HOSTS;
@@ -115,11 +61,6 @@ export function modelMatchesHost(model: { provider: string; baseUrl: string }, h
 			if (model.provider === provider) return true;
 		}
 	}
-	if (spec.providerPrefixes) {
-		for (const prefix of spec.providerPrefixes) {
-			if (model.provider.startsWith(prefix)) return true;
-		}
-	}
 	return hostMatchesUrl(model.baseUrl, host);
 }
 
@@ -134,97 +75,4 @@ function includesAsciiCaseInsensitive(value: string, lowerNeedle: string): boole
 		if (offset === needleLength) return true;
 	}
 	return false;
-}
-
-// --- Endpoint-shape predicates (URL path/verb shapes, not vendor hosts) ---
-
-/**
- * Hostname for a Vertex AI GenerateContent / rawPredict / OpenAI-compat
- * request for the given location.
- *
- * - `global` → global endpoint (`aiplatform.googleapis.com`)
- * - `eu` / `us` multi-regions → REP endpoints (`aiplatform.{eu|us}.rep.googleapis.com`)
- * - every other location → regional (`{location}-aiplatform.googleapis.com`)
- *
- * Multi-region codes do NOT follow the regional `{location}-aiplatform` pattern;
- * interpolating them that way yields hosts like `eu-aiplatform.googleapis.com`
- * that 404.
- */
-export function resolveVertexEndpointHost(location: string): string {
-	if (location === "global") return "aiplatform.googleapis.com";
-	if (location === "eu" || location === "us") return `aiplatform.${location}.rep.googleapis.com`;
-	return `${location}-aiplatform.googleapis.com`;
-}
-
-/** Vertex AI express-mode OpenAI-compatible endpoint (`…/endpoints/openapi`). */
-export function isVertexExpressOpenAIUrl(baseUrl: string): boolean {
-	return baseUrl.includes("/endpoints/openapi");
-}
-
-/** Vertex AI Anthropic raw-predict endpoints (`:streamRawPredict` / `:rawPredict`). */
-export function isVertexRawPredictUrl(baseUrl: string): boolean {
-	return baseUrl.includes(":streamRawPredict") || baseUrl.includes(":rawPredict");
-}
-
-/** Azure OpenAI deployment-scoped path (`…/deployments/<name>/…`). */
-export function isAzureDeploymentsUrl(baseUrl: string): boolean {
-	return baseUrl.includes("/deployments/");
-}
-
-// Bedrock inference endpoints, per AWS's endpoint and PrivateLink docs:
-// - bedrock-runtime: `bedrock-runtime.<region>.amazonaws.com`, FIPS `bedrock-runtime-fips.<region>.amazonaws.com`
-// - bedrock-mantle: `bedrock-mantle.<region>.api.aws`; the bundled provider keeps a `{region}`
-//   template until request preparation fills it in
-// - PrivateLink endpoint-specific names for either service, Regional or zonal:
-//   `<vpce-id>[-<az>].<service>.<region>.vpce.amazonaws.com`
-// With private DNS enabled, a VPC endpoint answers on the public names above.
-const BEDROCK_PUBLIC_HOST =
-	/^(?:(?<runtime>bedrock-runtime(?:-fips)?)\.[a-z0-9-]+\.amazonaws\.com|bedrock-mantle\.(?:[a-z0-9-]+|\{region\})\.api\.aws)$/;
-const BEDROCK_PRIVATELINK_HOST =
-	/^vpce-[a-z0-9-]+\.(?:(?<runtime>bedrock-runtime(?:-fips)?)|bedrock-mantle)\.[a-z0-9-]+\.vpce\.amazonaws\.com$/;
-
-function hasPathPrefix(pathname: string, prefix: string): boolean {
-	return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-/**
- * Amazon Bedrock API route on a bedrock-runtime or bedrock-mantle endpoint
- * (public, FIPS, or PrivateLink hostname):
- * - `anthropic`: the Anthropic Messages API under `/anthropic`.
- * - `openai`: the OpenAI-compatible APIs under `/openai`, plus Mantle's
- *   documented `/v1` base (`https://bedrock-mantle.<region>.api.aws/v1`).
- * - `runtime`: the bedrock-runtime origin itself, where Converse and
- *   InvokeModel live under `/model/<id>/…`.
- *
- * Hostnames are parsed strictly so proxies that embed these hosts in a path
- * do not match.
- */
-export function isBedrockRouteUrl(baseUrl: string | undefined, route: "openai" | "anthropic" | "runtime"): boolean {
-	if (!baseUrl) return false;
-	let url: URL;
-	try {
-		url = new URL(baseUrl);
-	} catch {
-		return false;
-	}
-	if (url.protocol !== "https:") return false;
-	const host = BEDROCK_PUBLIC_HOST.exec(url.hostname) ?? BEDROCK_PRIVATELINK_HOST.exec(url.hostname);
-	if (!host) return false;
-	const isMantle = host.groups?.runtime === undefined;
-	if (route === "runtime") return !isMantle && url.pathname === "/";
-	if (route === "anthropic") return hasPathPrefix(url.pathname, "/anthropic");
-	return hasPathPrefix(url.pathname, "/openai") || (isMantle && hasPathPrefix(url.pathname, "/v1"));
-}
-
-/** Amazon Bedrock's OpenAI-compatible routes; see {@link isBedrockRouteUrl}. */
-export function isBedrockOpenAIUrl(baseUrl: string | undefined): boolean {
-	return isBedrockRouteUrl(baseUrl, "openai");
-}
-
-/** Alibaba DashScope consumer `compatible-mode` endpoint (rejects multimodal arrays for some text-only SKUs). */
-export function isDashscopeCompatibleModeUrl(baseUrl: string): boolean {
-	const normalized = baseUrl.toLowerCase();
-	return (
-		normalized.includes("dashscope") && normalized.includes("aliyuncs.com") && normalized.includes("/compatible-mode")
-	);
 }

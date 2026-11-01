@@ -1,7 +1,7 @@
 /**
- * API Keys and OAuth
+ * Copilot Credentials
  *
- * Configure API key resolution via AuthStorage and ModelRegistry.
+ * Run `omp login github-copilot` first to populate the auth store.
  */
 import {
 	AuthStorage,
@@ -13,7 +13,7 @@ import {
 } from "@oh-my-pi/pi-coding-agent";
 
 // Default: discoverAuthStorage() uses ~/.omp/agent/agent.db
-// discoverModels() loads built-in + custom models from ~/.omp/agent/models.json
+// discoverModels() loads built-in models and overrides from ~/.omp/agent/models.yml.
 const authStorage = await discoverAuthStorage();
 const modelRegistry = await discoverModels(authStorage);
 
@@ -26,7 +26,7 @@ console.log("Session with default auth storage and model registry");
 
 // Custom auth storage location
 const customAuthStorage = await AuthStorage.create("/tmp/my-app/agent.db");
-const customModelRegistry = await ModelRegistry.create(customAuthStorage, "/tmp/my-app/models.json");
+const customModelRegistry = await ModelRegistry.create(customAuthStorage, "/tmp/my-app/models.yml");
 
 await createAgentSession({
 	sessionManager: SessionManager.inMemory(),
@@ -35,8 +35,9 @@ await createAgentSession({
 });
 console.log("Session with custom auth storage location");
 
-// Runtime API key override (not persisted to disk)
-authStorage.keys.setRuntime("anthropic", "sk-my-temp-key");
+// Runtime Copilot credential override (not persisted to disk).
+// The keyless local provider only serves tiny text, TTS, and STT workers.
+authStorage.keys.setRuntime("github-copilot", Bun.env.COPILOT_GITHUB_TOKEN!);
 await createAgentSession({
 	sessionManager: SessionManager.inMemory(),
 	authStorage,
@@ -44,11 +45,12 @@ await createAgentSession({
 });
 console.log("Session with runtime API key override");
 
-// No models.json - only built-in models
-const simpleRegistry = await ModelRegistry.create(authStorage); // null = no models.json
+// Default registry using the standard configuration path.
+// Removed persisted provider selectors fail rather than choosing Copilot.
+const simpleRegistry = await ModelRegistry.create(authStorage);
 await createAgentSession({
 	sessionManager: SessionManager.inMemory(),
 	authStorage,
 	modelRegistry: simpleRegistry,
 });
-console.log("Session with only built-in models");
+console.log("Session with the default model registry");

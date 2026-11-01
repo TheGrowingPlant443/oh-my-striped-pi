@@ -35,7 +35,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
 const model: Model<"anthropic-messages"> = buildModel({
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	id: "claude-opus-4-8",
 	name: "Claude Opus 4.8",
 	baseUrl: "https://api.anthropic.com",
@@ -65,7 +65,7 @@ function buildHistory(stopReason: AssistantMessage["stopReason"], signature: str
 			{ type: "toolCall", id: "toolu_1", name: "get_weather", arguments: { location: "Paris" } },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		usage: emptyUsage,
 		stopReason,
@@ -86,7 +86,7 @@ function buildHistory(stopReason: AssistantMessage["stopReason"], signature: str
 type WireBlock = { type: string; signature?: string; thinking?: string; text?: string };
 
 function assistantBlocks(messages: Message[]): WireBlock[] {
-	const params = convertAnthropicMessages(messages, model, false);
+	const params = convertAnthropicMessages(messages, model);
 	const assistant = params.find(p => p.role === "assistant");
 	return (assistant?.content as WireBlock[] | undefined) ?? [];
 }
@@ -150,7 +150,7 @@ describe("Anthropic abandoned/aborted tool-use replay", () => {
 				{ type: "thinking", thinking: "now decide", thinkingSignature: "trunc" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: emptyUsage,
 			stopReason: "aborted",
@@ -186,14 +186,14 @@ describe("Anthropic abandoned/aborted tool-use replay", () => {
 				{ type: "text", text: "Updating the phones now" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: emptyUsage,
 			stopReason: "aborted",
 			timestamp: 2,
 		};
 		const followUp: UserMessage = { role: "user", content: "don't update phones", timestamp: 3 };
-		const params = convertAnthropicMessages([user, aborted, followUp], gatewayModel, false);
+		const params = convertAnthropicMessages([user, aborted, followUp], gatewayModel);
 		const assistant = params.find(p => p.role === "assistant");
 		const blocks = (assistant?.content as WireBlock[] | undefined) ?? [];
 		expectNoUnsignedThinking(blocks);
@@ -213,7 +213,7 @@ function buildHistoryWithLaterAssistant(
 			role: "assistant",
 			content: [{ type: "text", text: "done" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: emptyUsage,
 			stopReason: "stop",
@@ -234,7 +234,7 @@ function buildHistoryWithTrailingTruncatedThinking(
 			role: "assistant",
 			content: [{ type: "thinking", thinking: "truncated final thought", thinkingSignature: "sig_truncated" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: emptyUsage,
 			stopReason: "length",

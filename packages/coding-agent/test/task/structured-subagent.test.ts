@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import {
 	disableProvider,
@@ -223,7 +223,9 @@ describe("structured subagent primitive", () => {
 		mockDiscovery(seanceAgent);
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-seance-policy-"));
 		const authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		const defaultModel = "github-copilot/claude-sonnet-4.5";
+		const activeModel = "github-copilot/claude-sonnet-4.6";
 		const modelRegistry = new ModelRegistry(authStorage);
 		const cwd = path.join(tempDir, "project");
 		const sourceFile = path.join(tempDir, "sessions", "source.jsonl");
@@ -237,7 +239,7 @@ describe("structured subagent primitive", () => {
 					id: "default-model",
 					parentId: null,
 					timestamp: "2026-10-01T00:00:01.000Z",
-					model: "anthropic/claude-sonnet-4-5",
+					model: defaultModel,
 					role: "default",
 				},
 				{
@@ -245,7 +247,7 @@ describe("structured subagent primitive", () => {
 					id: "active-model",
 					parentId: "default-model",
 					timestamp: "2026-10-01T00:00:02.000Z",
-					model: "anthropic/claude-sonnet-4-6",
+					model: activeModel,
 					role: "fast",
 				},
 			]
@@ -259,7 +261,7 @@ describe("structured subagent primitive", () => {
 			);
 			expect(saved.preparedSession?.fork.sourceFile).toBe(sourceFile);
 
-			expect(saved.modelOverride).toEqual(["anthropic/claude-sonnet-4-6", "anthropic/claude-sonnet-4-5"]);
+			expect(saved.modelOverride).toEqual([activeModel, defaultModel]);
 			expect(saved.enableLsp).toBe(false);
 			expect(saved.enableIrc).toBe(false);
 
@@ -268,10 +270,10 @@ describe("structured subagent primitive", () => {
 					session: caller,
 					agent: "seance",
 					sourceSession: sourceFile,
-					model: "anthropic/claude-sonnet-4-5",
+					model: defaultModel,
 				}),
 			);
-			expect(overridden.modelOverride).toEqual(["anthropic/claude-sonnet-4-5"]);
+			expect(overridden.modelOverride).toEqual([defaultModel]);
 		} finally {
 			authStorage.close();
 			await fs.rm(tempDir, { recursive: true, force: true });
@@ -757,16 +759,19 @@ describe("structured subagent primitive", () => {
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime("mock", "test-key");
 		const sourceId = "structured-subagent-unstructured-regression";
-		registerMockApi(sourceId);
 		const report = "The direct answer is complete without a yield call.";
 		const model = createMockModel({
+			provider: "mock",
 			id: "structured-subagent-unstructured",
 			handler: () => ({ content: [report] }),
 		});
 		const modelRegistry = new ModelRegistry(authStorage, path.join(root, "models.yml"));
-		const find = modelRegistry.find.bind(modelRegistry);
-		modelRegistry.find = (provider, id) => (provider === "mock" && id === model.id ? model : find(provider, id));
-		modelRegistry.getAvailable = () => [model];
+		modelRegistry.registerProvider(model.provider, {
+			api: model.api,
+			baseUrl: model.baseUrl,
+			models: [model],
+		});
+		registerCustomApi(model.api, model.stream, sourceId);
 		mockDiscovery({
 			...AGENT,
 			tools: ["read", "yield"],
@@ -823,19 +828,22 @@ describe("structured subagent primitive", () => {
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime("mock", "test-key");
 		const sourceId = "plan-default-scout-regression";
-		registerMockApi(sourceId);
 		const agentId = "PlanModeDefaultScout";
 		let artifactDir: string | undefined;
 		try {
 			const report = "The permitted plan-mode scout returned this answer.";
 			const model = createMockModel({
+				provider: "mock",
 				id: "plan-default-scout",
 				handler: () => ({ content: [report] }),
 			});
 			const modelRegistry = new ModelRegistry(authStorage, path.join(root, "models.yml"));
-			const find = modelRegistry.find.bind(modelRegistry);
-			modelRegistry.find = (provider, id) => (provider === "mock" && id === model.id ? model : find(provider, id));
-			modelRegistry.getAvailable = () => [model];
+			modelRegistry.registerProvider(model.provider, {
+				api: model.api,
+				baseUrl: model.baseUrl,
+				models: [model],
+			});
+			registerCustomApi(model.api, model.stream, sourceId);
 			const seanceAgent = getBundledAgent("seance");
 			const scoutAgent = getBundledAgent("scout");
 			if (!seanceAgent || !scoutAgent) throw new Error("Expected bundled seance and scout agents");
@@ -1323,7 +1331,6 @@ describe("agent frontmatter structured opt-in", () => {
 		setAgentDir(path.join(home, ".omp", "agent"));
 		AgentRegistry.resetGlobalForTests();
 		AgentLifecycleManager.resetGlobalForTests();
-		registerMockApi(MOCK_API_SOURCE);
 	});
 
 	afterEach(async () => {
@@ -1358,6 +1365,7 @@ describe("agent frontmatter structured opt-in", () => {
 			const childTools = new Map<string, string[]>();
 			const rejections = new Map<string, string>();
 			const mock = createMockModel({
+				provider: "mock",
 				handler: context => {
 					const system = context.systemPrompt?.join("\n") ?? "";
 					const agent = ["reporter", "plain"].find(name => system.includes(`Role marker ${name}.`));
@@ -1377,8 +1385,12 @@ describe("agent frontmatter structured opt-in", () => {
 					};
 				},
 			});
-			const catalogAvailable = modelRegistry.getAvailable.bind(modelRegistry);
-			vi.spyOn(modelRegistry, "getAvailable").mockImplementation(kind => [mock, ...catalogAvailable(kind)]);
+			modelRegistry.registerProvider(mock.provider, {
+				api: mock.api,
+				baseUrl: mock.baseUrl,
+				models: [mock],
+			});
+			registerCustomApi(mock.api, mock.stream, MOCK_API_SOURCE);
 
 			const tool = await TaskTool.create({
 				cwd,

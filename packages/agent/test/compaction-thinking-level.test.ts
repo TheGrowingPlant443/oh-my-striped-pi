@@ -15,11 +15,8 @@ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 // Pins fix #1 of the compaction effort-override bug. Before this fix,
 // `generateHandoff` (and the three other compaction summarizers) hardcoded
 // `reasoning: Effort.High`, ignoring the user's `/model` thinking selection.
-// On a model with `compat.supportsReasoningEffort: false` (xai-oauth/grok-build),
-// this produced "Compaction failed: Thinking effort high is not supported by
-// xai-oauth/grok-build" — but the underlying defect (silent user-intent
-// override) was present on every model, just invisible because most models
-// silently accept the override.
+// A model with no selectable reasoning efforts must not receive a forced high
+// effort; models that support reasoning still honor the user's selection.
 //
 // `resolveCompactionEffort` is the per-call resolver:
 // - `Off`              → `undefined` (user said no thinking; honored)
@@ -37,9 +34,9 @@ function createAssistantMessage(content: AssistantMessage["content"]): Assistant
 		role: "assistant",
 		content,
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -53,14 +50,14 @@ function createAssistantMessage(content: AssistantMessage["content"]): Assistant
 }
 
 function getAnthropicModel(): Model {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic/claude-sonnet-4-5 to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected bundled github-copilot/claude-sonnet-4.5 model");
 	return model;
 }
 
-function getGrokBuildModel(): Model {
-	const model = getBundledModel("xai-oauth", "grok-build");
-	if (!model) throw new Error("Expected built-in xai-oauth/grok-build to exist");
+function getNonReasoningModel(): Model {
+	const model = getBundledModel("github-copilot", "gpt-4.1");
+	if (!model) throw new Error("Expected bundled github-copilot/gpt-4.1 model");
 	return model;
 }
 
@@ -117,21 +114,18 @@ describe("compaction thinking-level resolution (regression)", () => {
 		expect(call[2]?.reasoning).toBe(ai.Effort.Low);
 	});
 
-	test("ThinkingLevel.High on xai-oauth/grok-build → reasoning=undefined (clamp)", async () => {
+	test("ThinkingLevel.High on a non-reasoning Copilot model → reasoning=undefined (clamp)", async () => {
 		const spy = vi
 			.spyOn(ai, "completeSimple")
 			.mockResolvedValue(createAssistantMessage([{ type: "text", text: "handoff" }]));
-		await generateHandoff(messages, getGrokBuildModel(), "test-key", {
+		await generateHandoff(messages, getNonReasoningModel(), "test-key", {
 			systemPrompt: ["sp"],
 			tools: [],
 			thinkingLevel: ThinkingLevel.High,
 		});
 		const call = spy.mock.calls[0];
 		if (!call) throw new Error("expected completeSimple call");
-		// clampThinkingLevelForModel(grokBuild, High) === undefined because
-		// supportsReasoningEffort: false ⇒ getSupportedEfforts returns [] ⇒
-		// no clamp target. The omitReasoningEffort gate at the wire layer is
-		// the actual strip; this just ensures the upstream throw doesn't fire.
+		// No supported efforts means there is no clamp target.
 		expect(call[2]?.reasoning).toBeUndefined();
 	});
 
@@ -233,12 +227,12 @@ describe("compact() propagates thinkingLevel to all three summarizers (regressio
 		}
 	});
 
-	test("xai-oauth/grok-build + ThinkingLevel.High → every fan-out call gets reasoning=undefined (clamp)", async () => {
+	test("non-reasoning Copilot model + ThinkingLevel.High → every fan-out call gets reasoning=undefined (clamp)", async () => {
 		const spy = vi
 			.spyOn(ai, "completeSimple")
 			.mockResolvedValue(createAssistantMessage([{ type: "text", text: "summary" }]));
 
-		await compact(makePreparation(), getGrokBuildModel(), "test-key", undefined, undefined, {
+		await compact(makePreparation(), getNonReasoningModel(), "test-key", undefined, undefined, {
 			thinkingLevel: ThinkingLevel.High,
 		});
 

@@ -1,41 +1,28 @@
-import { toClinePassWireModelId } from "@oh-my-pi/pi-catalog/cline-pass-model-id";
 import type { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { toFirepassWireModelId, toFireworksWireModelId } from "@oh-my-pi/pi-catalog/fireworks-model-id";
 import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import type {
 	CatalogPolicyInputs,
 	OpenAICompat,
 	OpenAIReasoningDisableMode,
-	OpenAIStreamMarkupHealingPattern,
-	OpenRouterRouting,
 	ResolvedOpenAICompat,
 	ResolvedOpenAIResponsesCompat,
 	ResolvedOpenAISharedCompat,
-	VercelGatewayRouting,
 } from "@oh-my-pi/pi-catalog/types";
-import { parseAlibabaTokenPlanCredential } from "@oh-my-pi/pi-catalog/wire/alibaba-token-plan";
-import {
-	COREWEAVE_PROJECT_HEADER,
-	coreWeaveProjectHeaders,
-	hasCoreWeaveProjectHeader,
-	removeBlankCoreWeaveProjectHeaders,
-} from "@oh-my-pi/pi-catalog/wire/coreweave";
 import { parseGitHubCopilotApiKey } from "@oh-my-pi/pi-catalog/wire/github-copilot";
 import {
-	$env,
 	classifyJsonPrefix,
 	cloneJsonTree,
 	extractHttpStatusFromError,
-	isRecord,
 	logger,
 	parseImageMetadata,
 	parseStreamingJsonThrottled,
 	stringifyJson,
-	USER_AGENT,
 } from "@oh-my-pi/pi-utils";
 import { NO_AUTH_SENTINEL } from "../auth-retry";
+import { resolveProviderApiKey } from "../env-api-key";
 import * as AIError from "../error";
+import type { StreamMarkupHealingPattern } from "../utils/stream-markup-healing";
 import { parseToolCallArguments, replayableToolCallArguments } from "../utils/tool-call-arguments";
 import {
 	type Api,
@@ -49,8 +36,6 @@ import {
 	type MessageAttribution,
 	type Model,
 	OPENAI_MAX_OUTPUT_TOKENS,
-	getPremiumServiceTierRequests,
-	parseServiceTier,
 	type ServiceTier,
 	type StopReason,
 	type StreamOptions,
@@ -64,7 +49,6 @@ import {
 	type Usage,
 } from "../types";
 import { resolveCopilotRequestIdentity } from "./github-copilot-headers";
-import { resolveXaiBaseUrl } from "./xai-base-url";
 
 export type { OpenAIPromptCacheOptions } from "../types";
 
@@ -95,7 +79,6 @@ import {
 	isHarmonyDialectModel,
 } from "../utils/harmony-leak";
 import type { CapturedHttpErrorResponse } from "../utils/http-inspector";
-import { getOpenRouterHeaders } from "../utils/openrouter-headers";
 import { isForcedToolChoice } from "../utils/tool-choice";
 import {
 	buildCopilotDynamicHeaders,
@@ -104,10 +87,8 @@ import {
 	hasCopilotVisionInput,
 	resolveGitHubCopilotBaseUrl,
 } from "./github-copilot-headers";
-import { servedModelFromOpenRouterReasoning } from "./anthropic-signature";
 import { getNativeFinishReasonError } from "./native-finish-reason";
 import type { ChatCompletionCreateParamsStreaming } from "./openai-chat-wire";
-import { type InputItem, sanitizeCodexCallId } from "./openai-codex/request-transformer";
 import type {
 	Response as OpenAIResponse,
 	ResponseComputerToolCall,
@@ -126,12 +107,7 @@ import type {
 	ResponseStatus,
 	ResponseStreamEvent,
 } from "./openai-responses-wire";
-import {
-	applyInferenceHeaders,
-	applySessionHeader,
-	resolveOpenCodeGoCacheAffinity,
-	setHeaderIfAbsent,
-} from "./inference-headers";
+import { applyInferenceHeaders, applySessionHeader, setHeaderIfAbsent } from "./inference-headers";
 import { isValidToolCallId, transformMessages } from "./transform-messages";
 import { joinTextWithImagePlaceholder, NON_VISION_IMAGE_PLACEHOLDER, partitionVisionContent } from "./vision-guard";
 
@@ -154,14 +130,7 @@ export interface OpenAIStrictToolsState {
 	};
 }
 
-/**
- * The model a request setup may be built from: the transport facts it reads
- * plus every fact the catalog policy cascade reads ({@link CatalogPolicyInputs}).
- * `api` is required — the Go sibling cache-affinity rules are all `on-api`
- * scoped, so a reduced model that omits it used to typecheck and silently
- * leave the family header off. Callers handing a reduced model object must
- * pass the real policy inputs; there is no default, inference, or fallback.
- */
+/** Transport facts and catalog policy inputs used to prepare an OpenAI-family request. */
 export interface OpenAIRequestSetupModel extends OpenAIModelIdentity, CatalogPolicyInputs {
 	headers?: Record<string, string>;
 	premiumMultiplier?: number;
@@ -180,24 +149,9 @@ export interface OpenAIRequestSetupOptions {
 	extraHeaders?: Record<string, string>;
 	initiatorOverride?: MessageAttribution;
 	messages: Message[];
-	defaultBaseUrl?: string;
 	prependHeaders?: () => Record<string, string>;
-	alibabaCodingPlanAuth?: boolean;
-	azureChatCompletions?: {
-		apiVersion: string;
-		deploymentName: string;
-	};
 	sessionId?: string;
 	promptCacheSessionId?: string;
-	/**
-	 * Explicit prompt-cache identity only, never the sessionId fallback:
-	 * callers set it from the already-resolved `promptCacheSessionId` when an
-	 * explicit `promptCacheKey` was supplied, and leave it unset otherwise.
-	 * Feeds the Go sibling cache-affinity header so an ordinary conversation
-	 * id (especially one long enough to normalize to a `pc_` hash) can never
-	 * flip `x-opencode-session` on opted-in lanes.
-	 */
-	promptCacheAffinityKey?: string;
 }
 
 export interface OpenAIRequestSetup {
@@ -216,51 +170,20 @@ export interface OpenAIRequestSetup {
 	copilotCacheSnapshot: string | null | undefined;
 }
 
-function normalizeSakanaRequestBaseUrl(baseUrl: string | undefined): string | undefined {
-	const value = baseUrl?.trim();
-	if (!value) return undefined;
-	const normalized = value.replace(/\/+$/, "");
-	return normalized.endsWith("/v1") ? normalized : `${normalized}/v1`;
-}
-
-function resolveSakanaRequestBaseUrl(): string | undefined {
-	return normalizeSakanaRequestBaseUrl($env.SAKANA_BASE_URL) ?? normalizeSakanaRequestBaseUrl($env.FUGU_BASE_URL);
-}
-
-function applyCoreWeaveProjectHeader(headers: Record<string, string>): void {
-	removeBlankCoreWeaveProjectHeaders(headers);
-	if (hasCoreWeaveProjectHeader(headers)) {
-		return;
-	}
-	const projectHeaders = coreWeaveProjectHeaders($env);
-	if (projectHeaders) {
-		headers[COREWEAVE_PROJECT_HEADER] = projectHeaders[COREWEAVE_PROJECT_HEADER];
-	}
-}
-
 export function resolveOpenAIRequestSetup(
 	model: OpenAIRequestSetupModel,
 	options: OpenAIRequestSetupOptions,
 ): OpenAIRequestSetup {
-	let apiKey = options.apiKey;
-	if (!apiKey) {
-		if (!$env.OPENAI_API_KEY) {
-			throw new AIError.MissingApiKeyError(
-				undefined,
-				"OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it as an argument.",
-			);
-		}
-		apiKey = $env.OPENAI_API_KEY;
+	if (model.provider !== "github-copilot" && !model.baseUrl?.trim()) {
+		throw new AIError.ConfigurationError("OpenAI-compatible request setup requires an explicit base URL");
+	}
+	let apiKey = resolveProviderApiKey(model.provider, options.apiKey) ?? NO_AUTH_SENTINEL;
+	if (model.provider === "github-copilot" && apiKey === NO_AUTH_SENTINEL) {
+		throw new AIError.MissingApiKeyError(model.provider);
 	}
 	const rawApiKey = apiKey;
 	let headers = { ...model.headers };
-	if (model.provider === "openrouter") {
-		Object.assign(headers, getOpenRouterHeaders());
-	}
 	Object.assign(headers, options.extraHeaders);
-	if (model.provider === "coreweave") {
-		applyCoreWeaveProjectHeader(headers);
-	}
 	if (options.prependHeaders) {
 		headers = { ...options.prependHeaders(), ...headers };
 	}
@@ -269,25 +192,6 @@ export function resolveOpenAIRequestSetup(
 	let copilotCacheKey: string | undefined;
 	let copilotCacheSnapshot: string | null | undefined;
 	let baseUrl = model.baseUrl;
-	if (model.provider === "moonshot") {
-		// Bundled `moonshot` catalog models hardcode the international endpoint
-		// (`api.moonshot.ai`). MOONSHOT_BASE_URL lets users redirect the provider
-		// at the China platform (`api.moonshot.cn`), which only accepts China keys
-		// and rejects the international host. (#2883)
-		const moonshotBaseUrl = $env.MOONSHOT_BASE_URL?.trim();
-		if (moonshotBaseUrl) {
-			baseUrl = moonshotBaseUrl;
-		}
-	}
-	if (model.provider === "sakana") {
-		const sakanaBaseUrl = resolveSakanaRequestBaseUrl();
-		if (sakanaBaseUrl) {
-			baseUrl = sakanaBaseUrl;
-		}
-	}
-	if (model.provider === "xai" || model.provider === "xai-oauth") {
-		baseUrl = resolveXaiBaseUrl(model.provider, baseUrl, rawApiKey);
-	}
 	if (model.provider === "github-copilot") {
 		const copilotApiKey = parseGitHubCopilotApiKey(rawApiKey);
 		apiKey = copilotApiKey.accessToken;
@@ -310,76 +214,36 @@ export function resolveOpenAIRequestSetup(
 		copilotCacheSnapshot = copilotCached ?? null;
 	}
 
-	if (model.provider === "alibaba-token-plan") {
-		// Require an explicitly resolved Token Plan credential. The generic
-		// `$env.OPENAI_API_KEY` fallback above matches the broad `sk-*` token
-		// grammar and would otherwise be sent to QwenCloud as bearer material.
-		if (!options.apiKey) {
-			throw new AIError.MissingApiKeyError("alibaba-token-plan");
-		}
-		const credential = parseAlibabaTokenPlanCredential(rawApiKey);
-		if (!credential) throw new AIError.ConfigurationError("Invalid QwenCloud Token Plan credential");
-		apiKey = credential.token;
-		if (credential.baseUrl) baseUrl = credential.baseUrl;
-	}
-
-	if (options.alibabaCodingPlanAuth && model.provider === "alibaba-coding-plan") {
-		try {
-			const parsed = JSON.parse(rawApiKey);
-			if (typeof parsed?.token === "string") {
-				apiKey = parsed.token;
-			}
-			if (typeof parsed?.enterpriseUrl === "string") {
-				baseUrl = parsed.enterpriseUrl;
-			}
-		} catch {
-			// Not JSON — use raw apiKey and catalog baseUrl.
-		}
-	}
-
-	let query: Record<string, string> | undefined;
-	if (options.azureChatCompletions && baseUrl?.includes(".openai.azure.com")) {
-		if (!baseUrl.includes("/deployments/")) {
-			baseUrl = `${baseUrl}/deployments/${options.azureChatCompletions.deploymentName}`;
-		}
-		query = { "api-version": options.azureChatCompletions.apiVersion };
-	}
-
-	// The conversation id stays authoritative for every native session header.
-	// On Go lanes opted into KDL `shared-prompt-cache`, `x-opencode-session`
-	// carries the explicit shared cache key instead (see
-	// resolveOpenCodeGoCacheAffinity).
 	const sessionId = options.sessionId ?? options.promptCacheSessionId;
 	applyInferenceHeaders(headers, {
 		provider: model.provider,
 		providerType: model.providerType,
 		protocol: "openai",
 		sessionId,
-		cacheAffinity: resolveOpenCodeGoCacheAffinity(model, options.promptCacheAffinityKey),
 	});
 	if (options.promptCacheSessionId && model.compat?.promptCacheSessionHeader) {
 		setHeaderIfAbsent(headers, model.compat.promptCacheSessionHeader, options.promptCacheSessionId);
 	}
 	applySessionHeader(headers, model.compat, options.sessionId);
 
-	if (options.defaultBaseUrl !== undefined) {
-		baseUrl = baseUrl ?? ($env.OPENAI_BASE_URL?.trim() || options.defaultBaseUrl);
-	}
-	// Attribute xAI traffic as omp unless a User-Agent is already set.
-	if (model.provider === "xai" || model.provider === "xai-oauth") {
-		setHeaderIfAbsent(headers, "User-Agent", USER_AGENT);
-	}
 	const requestHeaders = { ...headers };
 	// A keyless provider (`auth: none` in models.yml) resolves to the `N/A`
 	// sentinel rather than a real key. Injecting `Authorization: Bearer N/A`
 	// breaks custom endpoints that authenticate via their own headers (e.g.
-	// `headers.x-api-key`) and reject the bogus bearer — mirror the sentinel
-	// guards in google-vertex / amazon-bedrock and send no Authorization here
-	// (#6188). A caller-supplied Authorization in `model.headers` still wins.
+	// `headers.x-api-key`) and reject the bogus bearer. A caller-supplied
+	// Authorization in `model.headers` still wins.
 	if (apiKey !== NO_AUTH_SENTINEL) {
 		headers.Authorization ??= `Bearer ${apiKey}`;
 	}
-	return { copilotPremiumRequests, baseUrl, headers, query, requestHeaders, copilotCacheKey, copilotCacheSnapshot };
+	return {
+		copilotPremiumRequests,
+		baseUrl,
+		headers,
+		query: undefined,
+		requestHeaders,
+		copilotCacheKey,
+		copilotCacheSnapshot,
+	};
 }
 
 export function applyOpenAIServiceTier(
@@ -391,122 +255,12 @@ export function applyOpenAIServiceTier(
 	params.service_tier = serviceTier;
 }
 
-/**
- * Standard OpenAI Responses service-tier cost multipliers. The non-Codex
- * Responses path bills the tier it was served (or requested): Flex processing is
- * half price; Priority (Fast mode) is a 2x premium. Codex bills the same tiers
- * with its own table (Fast is 2.5x on every model) and applies that separately.
- * `ultrafast` has no API-generic default — only models with a published
- * ultrafast price carry a `serviceTierCost.ultrafast` entry (GPT-6 Astra and
- * GPT-6.1 Sol, 6x) and everything else stays at 1x rather than an invented
- * multiplier.
- */
-function getOpenAIResponsesServiceTierCostMultiplier(
-	model: Pick<Model, "serviceTierCost">,
-	tier: string | null | undefined,
-): number {
-	const resolvedMultiplier =
-		tier === "flex" || tier === "priority" || tier === "ultrafast" ? model.serviceTierCost?.[tier] : undefined;
-	if (resolvedMultiplier !== undefined) return resolvedMultiplier;
-	switch (tier) {
-		case "flex":
-			return 0.5;
-		case "priority":
-			return 2;
-		default:
-			return 1;
-	}
-}
-
-/**
- * Adjust resolved cost by the service tier OpenAI actually billed — parity with
- * Codex (`applyCodexServiceTierPricing`), but with the standard (non-Codex)
- * multipliers. The served tier comes from the response echo, falling back to the
- * resolved request tier. Scoped to `provider: "openai"` (the only standard
- * Responses biller) so an echoed `service_tier` from an Azure/OpenRouter/Copilot
- * proxy can never skew those costs.
- *
- * Returns the tier the turn ran on for the caller to record on the message, and
- * counts the premium request the tier bills.
- */
-export function applyOpenAIResponsesServiceTierCost(
-	model: Pick<Model, "provider" | "serviceTierCost" | "api" | "identity">,
-	usage: AssistantMessage["usage"],
-	responseServiceTier: unknown,
-	requestServiceTier: ServiceTier | null | undefined,
-): ServiceTier | undefined {
-	if (model.provider !== "openai") return undefined;
-	// The response echo is authoritative when present (OpenAI may downgrade a
-	// requested priority/flex turn to default under load); only fall back to the
-	// requested tier when the response omits the echo entirely.
-	const served = parseServiceTier(responseServiceTier) ?? requestServiceTier ?? undefined;
-	usage.premiumRequests ??= getPremiumServiceTierRequests(served, model);
-	const multiplier = getOpenAIResponsesServiceTierCostMultiplier(model, served);
-	if (multiplier === 1) return served;
-	usage.cost.input *= multiplier;
-	usage.cost.output *= multiplier;
-	usage.cost.cacheRead *= multiplier;
-	usage.cost.cacheWrite *= multiplier;
-	usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite;
-	return served;
-}
-
-/**
- * Reconcile token-price estimates with a gateway's authoritative account charge.
- * BYOK turns (`is_byok: true`) price from the provider spend in
- * `cost_details.upstream_inference_cost` plus whatever credits charge
- * OpenRouter reports in `cost` (its BYOK fee is plan-dependent and can be $0),
- * so both are covered.
- */
-export function applyProviderReportedCost(model: Pick<Model, "provider">, usage: Usage, rawUsage: unknown): void {
-	if (
-		(model.provider !== "openrouter" && model.provider !== "cline-pass") ||
-		typeof rawUsage !== "object" ||
-		rawUsage === null
-	)
-		return;
-	let reportedCost = Reflect.get(rawUsage, "cost");
-	// BYOK turns run on the account's own provider key: `cost` carries only the
-	// credits charge OpenRouter bills the turn (its BYOK fee, plan-dependent and
-	// $0 inside the free allowance) while `cost_details.upstream_inference_cost`
-	// carries the provider spend. Both are real charges, so add them (verified
-	// live 2026-10-02: openrouter/openai/gpt-6.1-sol returned `cost: 0,
-	// is_byok: true, cost_details.upstream_inference_cost: 6.6e-05`).
-	if (Reflect.get(rawUsage, "is_byok") === true) {
-		const details = Reflect.get(rawUsage, "cost_details");
-		const upstreamCost =
-			typeof details === "object" && details !== null ? Reflect.get(details, "upstream_inference_cost") : undefined;
-		if (typeof upstreamCost === "number" && Number.isFinite(upstreamCost) && upstreamCost >= 0) {
-			const creditsCharge =
-				typeof reportedCost === "number" && Number.isFinite(reportedCost) && reportedCost >= 0 ? reportedCost : 0;
-			reportedCost = creditsCharge + upstreamCost;
-		}
-	}
-	if (typeof reportedCost !== "number" || !Number.isFinite(reportedCost) || reportedCost < 0) return;
-
-	const estimatedCost = usage.cost.total;
-	if (Number.isFinite(estimatedCost) && estimatedCost > 0) {
-		const scale = reportedCost / estimatedCost;
-		usage.cost.input *= scale;
-		usage.cost.output *= scale;
-		usage.cost.cacheRead *= scale;
-		usage.cost.cacheWrite *= scale;
-	} else {
-		// Keep legacy component-only aggregators additive when catalog pricing is unavailable.
-		usage.cost.input = reportedCost;
-		usage.cost.output = 0;
-		usage.cost.cacheRead = 0;
-		usage.cost.cacheWrite = 0;
-	}
-	usage.cost.total = reportedCost;
-}
-
 export interface OpenAIUsageAccountingInput {
 	promptTokens: number;
 	outputTokens: number;
 	cachedTokens: number;
 	reasoningTokens: number;
-	cacheWriteOpenRouter: number | undefined;
+	cacheWriteTokens: number | undefined;
 	cacheWriteDeepSeek: number | undefined;
 	hasDeepSeekCacheHitAndMiss: boolean;
 }
@@ -522,10 +276,10 @@ export interface OpenAIUsageAccounting {
 }
 
 export function calculateOpenAIUsageAccounting(accounting: OpenAIUsageAccountingInput): OpenAIUsageAccounting {
-	const cacheWriteTokens = accounting.cacheWriteOpenRouter ?? accounting.cacheWriteDeepSeek ?? 0;
+	const cacheWriteTokens = accounting.cacheWriteTokens ?? accounting.cacheWriteDeepSeek ?? 0;
 	const isDeepSeekUsage =
 		accounting.hasDeepSeekCacheHitAndMiss &&
-		accounting.cacheWriteOpenRouter === undefined &&
+		accounting.cacheWriteTokens === undefined &&
 		(accounting.cacheWriteDeepSeek ?? 0) > 0;
 	const input = isDeepSeekUsage
 		? Math.max(0, accounting.promptTokens - accounting.cachedTokens)
@@ -546,10 +300,6 @@ export function normalizeOpenAIPromptCacheKey(sessionId: string | undefined): st
 	return normalizeOpenAIStableId(sessionId, 64, "pc_");
 }
 
-export function normalizeOpenRouterResponsesSessionId(sessionId: string | undefined): string | undefined {
-	return normalizeOpenAIStableId(sessionId, 256, "session_");
-}
-
 /** Resolve a prompt-cache identity, falling back to the provider session unless caching is disabled. */
 export function getOpenAIPromptCacheKey(options: OpenAICacheOptions | undefined): string | undefined {
 	if (resolveCacheRetention(options?.cacheRetention) === "none") return undefined;
@@ -561,26 +311,6 @@ export function getOpenAIResponsesRoutingSessionId(
 ): string | undefined {
 	if (resolveCacheRetention(options?.cacheRetention) === "none") return undefined;
 	return normalizeOpenAIPromptCacheKey(options?.sessionId);
-}
-
-export function getOpenRouterResponsesSessionId(
-	options: Pick<OpenAICacheOptions, "cacheRetention" | "sessionId"> | undefined,
-): string | undefined {
-	if (resolveCacheRetention(options?.cacheRetention) === "none") return undefined;
-	return normalizeOpenRouterResponsesSessionId(options?.sessionId);
-}
-
-export function parseAzureDeploymentNameMap(value: string | undefined): Map<string, string> {
-	const map = new Map<string, string>();
-	if (!value) return map;
-	for (const entry of value.split(",")) {
-		const trimmed = entry.trim();
-		if (!trimmed) continue;
-		const [modelId, deploymentName] = trimmed.split("=", 2);
-		if (!modelId || !deploymentName) continue;
-		map.set(modelId.trim(), deploymentName.trim());
-	}
-	return map;
 }
 
 export function createOpenAIStrictToolsState(): OpenAIStrictToolsState {
@@ -624,40 +354,6 @@ export function disableStrictToolsForScope(
 	state?.strictTools.disabledModelScopes.add(`${scope.provider}:${scope.baseUrl ?? ""}:${scope.modelId}`);
 }
 
-/**
- * Append an OpenRouter routing-variant suffix (e.g. `:nitro`, `:floor`, `:online`, `:exacto`)
- * to a model id when no explicit variant is already present. A variant is considered
- * "already present" when `modelId` contains a colon after the last `/` separator —
- * which covers both user-typed selectors (`anthropic/claude-haiku:nitro`) and catalog
- * entries that bake the variant in (`deepseek/deepseek-v3.1-terminus:exacto`).
- */
-export function applyOpenRouterRoutingVariant(modelId: string, variant: string | undefined): string {
-	if (!variant) return modelId;
-	const lastSlash = modelId.lastIndexOf("/");
-	const lastColon = modelId.lastIndexOf(":");
-	if (lastColon > lastSlash) return modelId;
-	return `${modelId}:${variant}`;
-}
-
-export function applyWireModelIdTransform(
-	baseId: string,
-	mode: ResolvedOpenAISharedCompat["wireModelIdMode"],
-	openrouterVariant?: string,
-): string {
-	switch (mode) {
-		case "cline-pass":
-			return toClinePassWireModelId(baseId);
-		case "firepass":
-			return toFirepassWireModelId(baseId);
-		case "fireworks":
-			return toFireworksWireModelId(baseId);
-		case "openrouter":
-			return applyOpenRouterRoutingVariant(baseId, openrouterVariant);
-		default:
-			return baseId;
-	}
-}
-
 export interface OpenAIOutputTokenParam {
 	field: "max_tokens" | "max_completion_tokens" | "max_output_tokens";
 	value: number;
@@ -668,36 +364,17 @@ export interface ResolveOpenAIOutputTokenInput {
 	field: OpenAIOutputTokenParam["field"];
 	/** Caller-supplied output cap (model-defaulted by `stream.ts`, or null/undefined on direct provider calls). */
 	maxTokens: number | null | undefined;
-	/** Whether the caller explicitly set `maxTokens` (routing omission only applies when false). */
-	maxTokensExplicit: boolean;
 	/** Model output cap (`model.maxTokens`). */
 	modelMaxTokens: number | null | undefined;
-	/** Drop the field entirely — proxies with unknown upstream caps (Ollama via `model.omitMaxOutputTokens`). */
+	/** Drop the field entirely when the upstream output cap is unknown. */
 	omitMaxOutputTokens: boolean;
-	/** The model sits behind OpenRouter (catalog default caps are omitted so each upstream self-caps). */
-	isOpenRouterHost: boolean;
 	/** Endpoint always needs a cap (Kimi-family TPM math); supplies the model default when the caller did not. */
 	alwaysSendMaxTokens: boolean;
 	/** Hard provider clamp; defaults to {@link OPENAI_MAX_OUTPUT_TOKENS}. */
 	providerOutputClamp?: number;
 }
 
-/**
- * Resolve the single output-token wire parameter shared by Chat Completions
- * (`max_tokens`/`max_completion_tokens`) and the Responses family
- * (`max_output_tokens`). Centralizes the provider exceptions that previously
- * lived inline in both `buildParams`:
- *  - `alwaysSendMaxTokens`: Kimi-family endpoints derive TPM limits from the
- *    cap and require one on every call, so default from the model cap (or
- *    {@link OPENAI_MAX_OUTPUT_TOKENS}) when the caller omitted it.
- *  - OpenRouter routing omission: OpenRouter fans out to upstreams whose output
- *    caps differ from the catalog value, so a catalog default above the routed
- *    upstream's cap makes OpenRouter skip that upstream. Omit catalog defaults
- *    (explicit caller caps still win) so `provider.order`/`only` is honored.
- *  - model/provider clamp: never exceed `model.maxTokens` or the provider clamp
- *    (`OPENAI_MAX_OUTPUT_TOKENS`, raised for GLM-5.2 reasoning by the caller).
- *  - `omitMaxOutputTokens`: proxies (Ollama) with unknown upstream caps drop it.
- */
+/** Resolve the endpoint's output-token field, bounded by model and provider limits. */
 export function resolveOpenAIOutputTokenParam(
 	input: ResolveOpenAIOutputTokenInput,
 ): OpenAIOutputTokenParam | undefined {
@@ -705,7 +382,6 @@ export function resolveOpenAIOutputTokenParam(
 	const requested =
 		input.maxTokens ?? (input.alwaysSendMaxTokens ? (input.modelMaxTokens ?? OPENAI_MAX_OUTPUT_TOKENS) : undefined);
 	if (requested === undefined) return undefined;
-	if (input.isOpenRouterHost && !input.alwaysSendMaxTokens && !input.maxTokensExplicit) return undefined;
 	const value = Math.min(
 		requested,
 		input.modelMaxTokens ?? Number.POSITIVE_INFINITY,
@@ -715,121 +391,12 @@ export function resolveOpenAIOutputTokenParam(
 	return { field: input.field, value };
 }
 
-export interface OpenAIGatewayRoutingParams {
-	provider?: OpenRouterRouting;
-	providerOptions?: { gateway?: Pick<VercelGatewayRouting, "only" | "order" | "caching"> };
-}
-
-export interface OpenAIGatewayRoutingCompat {
-	isOpenRouterHost: boolean;
-	openRouterRouting?: OpenRouterRouting;
-	isVercelGatewayHost?: boolean;
-	vercelGatewayRouting?: VercelGatewayRouting;
-}
-
-/**
- * Apply gateway routing preferences to the request body. OpenRouter routes via
- * the top-level `provider` field; the Vercel AI Gateway routes Chat
- * Completions through `providerOptions.gateway`.
- */
-export function applyOpenAIGatewayRouting(
-	params: OpenAIGatewayRoutingParams,
-	compat: OpenAIGatewayRoutingCompat,
-	cacheEnabled = true,
-): void {
-	if (compat.isOpenRouterHost && compat.openRouterRouting) {
-		params.provider = compat.openRouterRouting;
-	}
-	if (compat.isVercelGatewayHost && compat.vercelGatewayRouting) {
-		const routing = compat.vercelGatewayRouting;
-		if (routing.only || routing.order || (cacheEnabled && routing.caching)) {
-			const gatewayOptions: Pick<VercelGatewayRouting, "only" | "order" | "caching"> = {};
-			if (routing.only) gatewayOptions.only = routing.only;
-			if (routing.order) gatewayOptions.order = routing.order;
-			if (cacheEnabled && routing.caching) gatewayOptions.caching = routing.caching;
-			params.providerOptions = { gateway: gatewayOptions };
-		}
-	}
-}
-
-export interface VercelResponsesCacheParams {
-	caching?: "auto";
-	cache_anchor_items?: number;
-	cache_ttl?: "5m" | "1h";
-	providerOptions?: { gateway?: Pick<VercelGatewayRouting, "only" | "order"> };
-}
-
-export interface VercelResponsesCacheCompat {
-	isVercelGatewayHost: boolean;
-	vercelGatewayRouting?: VercelGatewayRouting;
-}
-
-/**
- * Apply Vercel AI Gateway's Responses-only automatic cache controls and
- * provider routing. Cache settings are top-level Responses fields, while
- * `only` and `order` remain under `providerOptions.gateway`.
- */
-export function applyVercelResponsesCacheControls(
-	params: VercelResponsesCacheParams,
-	compat: VercelResponsesCacheCompat,
-	cacheRetention: CacheRetention = "short",
-): void {
-	const routing = compat.vercelGatewayRouting;
-	if (!compat.isVercelGatewayHost) return;
-
-	if (routing?.only || routing?.order) {
-		const gateway: Pick<VercelGatewayRouting, "only" | "order"> = {};
-		if (routing.only) gateway.only = routing.only;
-		if (routing.order) gateway.order = routing.order;
-		params.providerOptions = { gateway };
-	}
-
-	if (cacheRetention === "none" || routing?.caching !== "auto") return;
-
-	params.caching = "auto";
-	if (routing.cacheAnchorItems !== undefined) params.cache_anchor_items = routing.cacheAnchorItems;
-	// A configured 1h TTL is capped by resolved retention; default and short intentionally omit it.
-	if (routing.cacheTtl !== undefined && (routing.cacheTtl !== "1h" || cacheRetention === "long")) {
-		params.cache_ttl = routing.cacheTtl;
-	}
-}
-
-export interface OpenAIExtraBodyOptions {
-	/**
-	 * Fireworks rejects DeepSeek-style `thinking` toggles alongside OpenAI-style
-	 * `reasoning_effort`; drop `thinking` when the effort field carries the level.
-	 */
-	dropThinkingWhenReasoningEffort?: boolean;
-}
-
-/**
- * Merge a compat/options `extraBody` blob into the request params. An encoded
- * Venice disable signal takes precedence over static `venice_parameters`, so
- * an explicit per-turn Thinking Off selection cannot be re-enabled by config.
- * When `dropThinkingWhenReasoningEffort` is set and `reasoning_effort` is
- * present, delete the conflicting `thinking` toggle (Fireworks rejects both).
- */
+/** Merge caller or catalog wire fields into the request params. */
 export function applyOpenAIExtraBody<P extends object>(
-	params: P & { venice_parameters?: Record<string, unknown> },
+	params: P,
 	extraBody: Record<string, unknown> | undefined,
-	options?: OpenAIExtraBodyOptions,
 ): void {
-	if (!extraBody) return;
-	const encodedVeniceParameters = params.venice_parameters;
-	Object.assign(params, extraBody);
-	if (encodedVeniceParameters?.disable_thinking === true) {
-		const configuredVeniceParameters = extraBody.venice_parameters;
-		params.venice_parameters = {
-			...(isRecord(configuredVeniceParameters) ? configuredVeniceParameters : {}),
-			...encodedVeniceParameters,
-		};
-	}
-	if (options?.dropThinkingWhenReasoningEffort) {
-		const shaped = params as { reasoning_effort?: unknown; thinking?: unknown };
-		if (shaped.reasoning_effort !== undefined) {
-			delete shaped.thinking;
-		}
-	}
+	if (extraBody) Object.assign(params, extraBody);
 }
 
 /**
@@ -859,11 +426,7 @@ export function coerceNullMessageContentInPlace(
 }
 
 /**
- * Chat Completions streaming request body shaped by the OpenAI-family providers.
- * (binary `thinking`, Qwen `enable_thinking`/`chat_template_kwargs`, Venice
- * `venice_parameters`, nested `reasoning`, gateway `provider`/`providerOptions`,
- * sampling extras). Lives in the shared module beside the request-shaping
- * helpers that mutate it.
+ * Chat Completions streaming body with model-family reasoning and sampling fields.
  */
 export type OpenAICompletionsParams = Omit<ChatCompletionCreateParamsStreaming, "reasoning_effort" | "service_tier"> & {
 	top_k?: number;
@@ -879,12 +442,9 @@ export type OpenAICompletionsParams = Omit<ChatCompletionCreateParamsStreaming, 
 		reasoning_effort?: string;
 	};
 	reasoning?: { effort?: string; enabled?: boolean; max_tokens?: number };
-	venice_parameters?: { disable_thinking?: boolean; [key: string]: unknown };
 	reasoning_effort?: string | null;
 	service_tier?: ServiceTier;
 	tool_stream?: boolean;
-	provider?: OpenAICompat["openRouterRouting"];
-	providerOptions?: { gateway?: { only?: string[]; order?: string[] } };
 };
 
 /** Reasoning-relevant slice of caller options the Chat Completions dialect dispatch reads. */
@@ -948,7 +508,7 @@ export interface OpenAICompatPolicy {
 	};
 	stream: {
 		stripSpecialTokens: "deepseek" | false;
-		markupHealingPattern?: OpenAIStreamMarkupHealingPattern;
+		markupHealingPattern: StreamMarkupHealingPattern | false;
 		reasoningDeltasMayBeCumulative: boolean;
 		emptyLengthFinishIsContextError: boolean;
 	};
@@ -1115,7 +675,7 @@ export function resolveOpenAICompatPolicy<TApi extends Api>(
 		},
 		stream: {
 			stripSpecialTokens: compat.stripDeepseekSpecialTokens ? "deepseek" : false,
-			markupHealingPattern: compat.streamMarkupHealingPattern,
+			markupHealingPattern: compat.streamMarkupHealingPattern ?? false,
 			reasoningDeltasMayBeCumulative: compat.reasoningDeltasMayBeCumulative,
 			emptyLengthFinishIsContextError: compat.emptyLengthFinishIsContextError,
 		},
@@ -1142,13 +702,6 @@ function encodeChatCompletionsDisabledReasoning(
 			break;
 		case "chat-template-thinking-false":
 			params.chat_template_kwargs = { ...params.chat_template_kwargs, thinking: false };
-			break;
-		case "openrouter-enabled-false":
-		case "cline-enabled-false":
-			params.reasoning = { enabled: false };
-			break;
-		case "venice-disable-thinking":
-			params.venice_parameters = { ...params.venice_parameters, disable_thinking: true };
 			break;
 		default:
 			delete params.reasoning;
@@ -1259,13 +812,6 @@ export function applyChatCompletionsCompatPolicy(params: OpenAICompletionsParams
 					...(reasoning.wireEffort !== undefined ? { reasoning_effort: reasoning.wireEffort } : {}),
 				};
 				break;
-			case "openrouter-enabled-false":
-				if (reasoning.wireEffort !== undefined) {
-					(params as typeof params & { reasoning?: { effort?: string } }).reasoning = {
-						effort: reasoning.wireEffort,
-					};
-				}
-				break;
 			default:
 				if (!reasoning.omitReasoningEffort && reasoning.wireEffort !== undefined) {
 					params.reasoning_effort = reasoning.wireEffort as Effort;
@@ -1336,20 +882,13 @@ function isZaiReasoningEffortDialect(_model: Model<"openai-completions">, compat
 }
 
 /**
- * Provider-specific Chat Completions output clamp.
- *
- * Most OpenAI-compatible endpoints retain the conservative 64k ceiling from
- * {@link resolveOpenAIOutputTokenParam}. ClinePass, Z.AI/GLM-5.2 reasoning,
- * and native Moonshot K3 explicitly accept their full advertised model caps,
- * so those routes clamp to `model.maxTokens` instead.
+ * Model-family Chat Completions output clamp. Reasoning dialects and explicit
+ * catalog policy may allow the full model cap above the conservative default.
  */
 export function resolveOpenAICompletionsOutputClamp(
 	model: Model<"openai-completions">,
 	compat: ResolvedOpenAICompat,
 ): number | undefined {
-	if (model.provider === "cline-pass") {
-		return model.maxTokens ?? OPENAI_MAX_OUTPUT_TOKENS;
-	}
 	if (isZaiReasoningEffortDialect(model, compat)) {
 		return model.maxTokens ?? OPENAI_MAX_OUTPUT_TOKENS;
 	}
@@ -1415,47 +954,16 @@ interface StrictToolsRetryContext {
 	tools: Tool[] | undefined;
 }
 
-/**
- * Read OpenRouter's `error.metadata.raw` from a captured non-2xx body.
- *
- * OpenRouter routes to a different upstream per request, so its top-level
- * `error.message` is a generic policy sentence ("Access denied by security
- * policy") and the only place the routed provider's own words appear is
- * `error.metadata.raw`. Providers that proxy through OpenRouter also hang the
- * upstream provider name there.
- *
- * The detail lives in the decoded body captured on the thrown
- * {@link AIError.OpenAIHttpError}, not on the error object itself: no error
- * class in this package carries an `error` property, so reading
- * `error.error.metadata.raw` unconditionally yielded `undefined` and the
- * upstream detail was dropped from every surfaced message.
- */
-export function readOpenRouterRawMetadata(
-	capturedErrorResponse: CapturedHttpErrorResponse | undefined,
-): string | undefined {
-	const body = capturedErrorResponse?.bodyJson;
-	if (!body || typeof body !== "object" || !("error" in body)) return undefined;
-	const errorBody = body.error;
-	if (!errorBody || typeof errorBody !== "object" || !("metadata" in errorBody)) return undefined;
-	const metadata = errorBody.metadata;
-	if (!metadata || typeof metadata !== "object" || !("raw" in metadata)) return undefined;
-	const raw = metadata.raw;
-	if (typeof raw !== "string") return undefined;
-	const trimmed = raw.trim();
-	return trimmed.length > 0 ? trimmed : undefined;
-}
-
 /** Decide whether an OpenAI-family request should retry once with non-strict tools. */
 export function shouldRetryWithoutStrictTools(
 	error: unknown,
 	capturedErrorResponse: CapturedHttpErrorResponse | undefined,
 	context: StrictToolsRetryContext,
 ): boolean {
-	const { model, strictToolsApplied, tools } = context;
+	const { strictToolsApplied, tools } = context;
 	if (!tools || tools.length === 0 || !strictToolsApplied) return false;
 	const status = extractHttpStatusFromError(error) ?? capturedErrorResponse?.status;
 	if (status !== 400 && status !== 422) return false;
-	const errorMessage = error instanceof Error ? error.message.trim() : "";
 	const messageParts = [error instanceof Error ? error.message : undefined, capturedErrorResponse?.bodyText]
 		.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
 		.join("\n");
@@ -1466,19 +974,7 @@ export function shouldRetryWithoutStrictTools(
 	) {
 		return true;
 	}
-	if (model.provider !== "openrouter" || !/^(?:400\s+)?Provider returned error$/i.test(errorMessage)) return false;
-	const body = capturedErrorResponse?.bodyJson;
-	if (body && typeof body === "object" && "error" in body) {
-		const errorBody = body.error;
-		if (errorBody && typeof errorBody === "object" && "metadata" in errorBody) {
-			const metadata = errorBody.metadata;
-			if (metadata && typeof metadata === "object" && "raw" in metadata) {
-				const raw = metadata.raw;
-				if (typeof raw === "string" ? raw.trim().length > 0 : raw != null) return false;
-			}
-		}
-	}
-	return true;
+	return false;
 }
 
 function normalizeOpenAIStableId(value: string | undefined, maxLength: number, hashPrefix: string): string | undefined {
@@ -1547,6 +1043,19 @@ export function encodeResponsesToolCallId(callId: string, itemId: string | null 
 	return `${callId}|${stableItemId}`;
 }
 
+/** Normalize a Responses call id without losing identity when characters are replaced. */
+function sanitizeResponsesCallId(rawCallId: string): string {
+	if (!rawCallId) return `call_${Bun.hash("empty").toString(36)}`;
+	const sep = rawCallId.search(/[\n|]/);
+	const base = sep > 0 ? rawCallId.slice(0, sep) : sep === 0 ? rawCallId.slice(1) : rawCallId;
+	const sanitized = base.replace(/[^a-zA-Z0-9_-]/g, "_").replace(/_+$/, "");
+	if (sanitized.length > 0 && sanitized.length <= 64 && sanitized === base) return sanitized;
+	const hash = Bun.hash(base || rawCallId).toString(36);
+	const effectiveBase = sanitized.length > 0 ? sanitized : "call";
+	const prefixLen = Math.max(0, 63 - hash.length);
+	return `${effectiveBase.slice(0, prefixLen)}_${hash}`.slice(0, 64);
+}
+
 export function normalizeResponsesToolCallIdForTransform(
 	id: string,
 	model?: Model<Api>,
@@ -1558,7 +1067,7 @@ export function normalizeResponsesToolCallIdForTransform(
 		source != null && model != null && (source.provider !== model.provider || source.api !== model.api);
 	if (isForeignToolCall || sep >= 0 || id.length > 64) {
 		const [callId, itemId] = sep > 0 ? [id.slice(0, sep), id.slice(sep + 1)] : [id, undefined];
-		const normalizedCallId = sanitizeCodexCallId(callId);
+		const normalizedCallId = sanitizeResponsesCallId(callId);
 		let normalizedItemId = itemId ? `fc_${Bun.hash(itemId).toString(36)}` : `fc_${Bun.hash(id).toString(36)}`;
 		if (normalizedItemId.length > 64) normalizedItemId = normalizedItemId.slice(0, 64);
 		return `${normalizedCallId}|${normalizedItemId}`;
@@ -1877,9 +1386,6 @@ function clampResponsesImageDetail(
 
 function convertResponsesInputImage(image: ImageContent, supportsImageDetailOriginal: boolean): ResponseInputImage {
 	const detail = clampResponsesImageDetail(image.detail, supportsImageDetailOriginal);
-	if (image.providerFile?.provider === "openai" && image.providerFile.id) {
-		return { type: "input_image", detail, file_id: image.providerFile.id };
-	}
 	return {
 		type: "input_image",
 		detail,
@@ -2820,17 +2326,7 @@ export function appendResponsesToolResultMessages<TApi extends Api>(
 	}
 }
 
-/**
- * Per-block accumulation helpers shared by the two Responses decode loops —
- * {@link processResponsesStream} (generic Responses) and the Codex stream
- * handler in `openai-codex-responses.ts`. Each endpoint keeps its own
- * item-routing, terminal handling, and transport bookkeeping; these own only
- * the leaf mutations on an already-resolved open block, so the
- * append/parse/finalize logic lives in exactly one place. The caller passes the
- * `contentIndex` its router resolved (generic uses `output.content.indexOf`;
- * Codex uses the open item's recorded index) so the emitted stream events match
- * each decoder's existing behavior byte-for-byte.
- */
+/** Per-block accumulation shared by Responses event decoding and replay. */
 type ResponsesToolCallBlock = ToolCall & { [kStreamingPartialJson]: string; [kStreamingLastParseLen]?: number };
 
 // Proxies sometimes send payloadless progress frames. They carry no text; a
@@ -3232,11 +2728,6 @@ export interface ProcessResponsesStreamOptions {
 	 * without a recognized terminal event).
 	 */
 	onCompleted?: () => void;
-	/**
-	 * Caller-requested service tier, used to bill the served tier when the
-	 * response omits the `service_tier` echo. Only applied for `provider: "openai"`.
-	 */
-	requestServiceTier?: ServiceTier;
 }
 
 export function computerCallMetadata(item: ResponseComputerToolCall): ComputerToolCallMetadata {
@@ -3727,7 +3218,6 @@ export async function processResponsesStream<TApi extends Api>(
 					reasoningBlock.thinking = finalizeReasoningThinking(item, reasoningBlock.thinking);
 					reasoningBlock.thinkingSignature = JSON.stringify(item);
 					settleReasoningSummary(item, reasoningBlock);
-					if (!output.upstreamModel) output.upstreamModel = servedModelFromOpenRouterReasoning(item);
 					stream.push({
 						type: "thinking_end",
 						contentIndex: contentIndexOf(reasoningBlock),
@@ -3869,13 +3359,6 @@ export async function processResponsesStream<TApi extends Api>(
 			}
 			populateResponsesUsageFromResponse(output, response?.usage);
 			calculateCost(model, output.usage, output.timestamp);
-			applyProviderReportedCost(model, output.usage, response?.usage);
-			output.serviceTier = applyOpenAIResponsesServiceTierCost(
-				model,
-				output.usage,
-				(response as { service_tier?: unknown } | undefined)?.service_tier,
-				options?.requestServiceTier,
-			);
 			output.stopReason = mapOpenAIResponsesStopReason(response?.status);
 			const nativeError = getNativeFinishReasonError(
 				(response as { native_finish_reason?: unknown } | undefined)?.native_finish_reason,
@@ -4157,7 +3640,7 @@ type ReasoningOptions = {
  * whenever reasoning is engaged, so the policy never fills the `"auto"` default.
  */
 export function resolveReasoningSummaryOption(
-	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
+	model: Model<"openai-responses">,
 	options: { reasoning?: string; reasoningSummary?: "auto" | "detailed" | "concise" | null } | undefined,
 ): "auto" | "detailed" | "concise" | null | undefined {
 	if (model.compat.supportsReasoningSummary) return options?.reasoningSummary;
@@ -4195,10 +3678,6 @@ export function applyResponsesCompatPolicy<P extends ResponseCreateParamsStreami
 	}
 
 	if (reasoning.disabled) {
-		if (reasoning.disableMode === "openrouter-enabled-false") {
-			params.reasoning = { enabled: false } as P["reasoning"];
-			return;
-		}
 		if (
 			(reasoning.disableMode === "lowest-effort" || reasoning.disableMode === "none-effort") &&
 			reasoning.wireEffort !== undefined &&
@@ -4241,7 +3720,7 @@ export function applyResponsesCompatPolicy<P extends ResponseCreateParamsStreami
  */
 export function applyResponsesReasoningParams<P extends ResponseCreateParamsStreaming>(
 	params: P,
-	model: Model<"openai-responses" | "azure-openai-responses" | "openai-codex-responses">,
+	model: Model<"openai-responses">,
 	options: ReasoningOptions | undefined,
 	mapEffort?: (effort: string) => string,
 	includeEncryptedReasoning?: boolean,
@@ -4310,7 +3789,7 @@ export function populateResponsesUsageFromResponse(
 		outputTokens: Math.max(0, reportedOutputTokens - (primaryIncludesOrchestration ? orchestrationOutputTokens : 0)),
 		cachedTokens: Math.max(0, reportedCachedTokens - (primaryIncludesOrchestration ? orchestrationInputCached : 0)),
 		reasoningTokens: outputDetails?.reasoning_tokens ?? 0,
-		cacheWriteOpenRouter: details?.cache_write_tokens ?? undefined,
+		cacheWriteTokens: details?.cache_write_tokens ?? undefined,
 		cacheWriteDeepSeek: usage.prompt_cache_miss_tokens ?? undefined,
 		hasDeepSeekCacheHitAndMiss:
 			usage.prompt_cache_hit_tokens !== undefined && usage.prompt_cache_miss_tokens !== undefined,
@@ -4404,15 +3883,11 @@ const REPLAY_SANITIZED_ITEM_EXCLUDE_MAP = {
 };
 
 /**
- * Strict-prefix delta for stateful `previous_response_id` chaining (used by the
- * platform Responses provider and the Codex provider on both transports):
- * returns the input items the current request appends beyond the previous
- * request's input plus the previous response's output items, or null when the
- * request options differ or history mutated (the chain must break). Per-turn
- * `client_metadata` (e.g. rotating turn ids) is excluded from the option
- * comparison; codex-rs excludes it from the same check.
+ * Strict-prefix delta for stateful `previous_response_id` chaining: return the
+ * new input beyond the prior request and response, or null when options or
+ * history changed. Per-turn `client_metadata` is excluded from identity.
  */
-export function buildResponsesDeltaInput<TItem extends ResponseInputItem | InputItem>(
+export function buildResponsesDeltaInput<TItem extends ResponseInputItem>(
 	previous: { input?: TItem[] } | undefined,
 	previousResponseItems: readonly TItem[] | undefined,
 	current: { input?: TItem[] },

@@ -7,8 +7,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getModelCacheWriteStats, readModelCache, writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { resolveProviderModels } from "@oh-my-pi/pi-catalog/model-manager";
 import { type GeneratedProvider, getBundledModels, getBundledProviders } from "@oh-my-pi/pi-catalog/models";
-import { modelsDevCatalogFallback } from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
-import type { FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
+import type { Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { removeWithRetries } from "../../utils/src/temp";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -232,24 +231,21 @@ describe("model cache write churn", () => {
 		expect(rejected).toEqual([]);
 	});
 
-	it("keeps an offline fallback snapshot instead of writing and deleting it every startup", async () => {
-		const offlineFetch: FetchImpl = async () => {
-			throw new Error("offline");
+	it("keeps an offline static snapshot instead of rewriting it every startup", async () => {
+		const options = {
+			providerId: "offline-static-test",
+			staticModels: [spec("static-only", "offline-static-test")],
+			cacheDbPath: dbPath,
+			fetchDynamicModels: async () => {
+				throw new Error("offline");
+			},
 		};
-		const modelsDev = modelsDevCatalogFallback("azure", offlineFetch);
-		if (!modelsDev) throw new Error("azure has no shared catalog fallback");
-		const options = { providerId: "azure", modelsDev, cacheDbPath: dbPath };
-		const bundled = getBundledModels("azure");
-		expect(bundled.length).toBeGreaterThan(0);
-		expect(bundled.some(m => m.baseUrl === "")).toBe(true);
-
 		await resolveProviderModels(options, "online");
-		const snapshot = readModelCache("azure", TTL_MS, Date.now, dbPath);
-		expect(snapshot?.models.length).toBe(bundled.length);
-
 		const before = payloadWrites();
 		await resolveProviderModels(options, "online");
 		expect(payloadWrites()).toBe(before);
-		expect(readModelCache("azure", TTL_MS, Date.now, dbPath)?.models.length).toBe(bundled.length);
+		expect(readModelCache(options.providerId, TTL_MS, Date.now, dbPath)?.models.map(model => model.id)).toEqual([
+			"static-only",
+		]);
 	});
 });

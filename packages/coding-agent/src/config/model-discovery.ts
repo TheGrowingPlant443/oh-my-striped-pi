@@ -1,10 +1,4 @@
-/**
- * HTTP discovery protocols for configured and implicit providers — ollama,
- * llama.cpp, lm-studio, openai-models-list, and new-api/one-api-style proxies.
- * `ModelRegistry` owns the orchestration (status, state, caching) and calls
- * `discoverModelsByProviderType` with a `DiscoveryContext`; built-in provider
- * discovery lives in pi-catalog's provider-models.
- */
+/** Configured OpenAI-compatible model-list discovery. Built-in discovery lives in pi-catalog. */
 import { type ApiKey, withAuth } from "@oh-my-pi/pi-ai/auth-retry";
 import { getAppleFoundationModelsAvailability } from "@oh-my-pi/pi-ai/providers/apple-foundation-models";
 import type { Api, FetchImpl, Model, RemoteCompactionConfig } from "@oh-my-pi/pi-ai/types";
@@ -20,9 +14,9 @@ import {
 	fetchLiteLLMRichModels,
 	fetchLmStudioNativeModelMetadata,
 	isSelectableLiteLLMModelMode,
+	resolveLiteLLMApi,
 	OPENAI_COMPAT_DISCOVERY_DEFAULT_CONTEXT_WINDOW,
 	OPENAI_COMPAT_DISCOVERY_DEFAULT_MAX_TOKENS,
-	resolveLiteLLMApi,
 } from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
 import {
 	type KindApiKind,
@@ -35,15 +29,7 @@ import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { isRecord } from "@oh-my-pi/pi-utils";
 import type { ProviderDiscovery } from "./models-config-schema";
 
-// Default cap on `max_tokens` for auto-discovered models that do not advertise
-// their own output limit (OpenAI-models-list, Ollama, llama.cpp, new-api/
-// one-api proxies). 32K matches the upper end of what mainstream
-// OpenAI-compatible providers (DeepSeek, MiMo, OpenRouter, etc.) actually
-// accept and keeps `min(contextWindow, …)` honoring smaller local windows.
-// Conservative caps below this caused providers to drop the connection
-// mid-stream when models hit the cap on legitimate large tool calls (see
-// issue #1528: `write` payloads >~5KB on deepseek-v4-pro surfaced as
-// "socket connection was closed unexpectedly").
+// A conservative fallback when a configured model list omits token limits.
 export const DISCOVERY_DEFAULT_CONTEXT_WINDOW = OPENAI_COMPAT_DISCOVERY_DEFAULT_CONTEXT_WINDOW;
 export const DISCOVERY_DEFAULT_MAX_TOKENS = OPENAI_COMPAT_DISCOVERY_DEFAULT_MAX_TOKENS;
 
@@ -193,11 +179,6 @@ export interface DiscoveryProviderConfig {
 	remoteCompaction?: RemoteCompactionConfig<Api>;
 	discovery: ProviderDiscovery;
 	optional?: boolean;
-	/**
-	 * Extra roots probed in order when `baseUrl` yields no reachable server.
-	 * Only the implicit llama.cpp provider sets this, so both its legacy (8080)
-	 * and current (9931) default ports are discovered.
-	 */
 	fallbackBaseUrls?: string[];
 }
 
@@ -557,48 +538,52 @@ export async function discoverOllamaModels(
 	const tagsUrl = `${endpoint}/api/tags`;
 	const headers = { ...providerConfig.headers };
 	const customTimeoutMs = providerConfig.discovery.timeoutMs;
-	const payload = await withTimeoutSignal(discoveryProbeTimeoutMs(endpoint, 250, customTimeoutMs), async signal => {
-		const response = await ctx.fetch(tagsUrl, {
-			headers,
-			signal,
+	const attempt = async (headers: Record<string, string>) => {
+		const payload = await withTimeoutSignal(discoveryProbeTimeoutMs(endpoint, 250, customTimeoutMs), async signal => {
+			const response = await ctx.fetch(tagsUrl, {
+				headers,
+				signal,
+			});
+			if (!response.ok) {
+				throw new DiscoveryHttpError(response.status, tagsUrl);
+			}
+			return (await response.json()) as { models?: Array<{ name?: string; model?: string }> };
 		});
-		if (!response.ok) {
-			throw new DiscoveryHttpError(response.status, tagsUrl);
-		}
-		return (await response.json()) as { models?: Array<{ name?: string; model?: string }> };
-	});
-	const entries = (payload.models ?? []).flatMap(item => {
-		const id = item.model || item.name;
-		return id ? [{ id, name: item.name || id }] : [];
-	});
-	const metadataById = new Map(
-		await Promise.all(
-			entries.map(
-				async entry =>
-					[
-						entry.id,
-						await discoverOllamaModelMetadata(ctx, endpoint, entry.id, headers, customTimeoutMs),
-					] as const,
+		const entries = (payload.models ?? []).flatMap(item => {
+			const id = item.model || item.name;
+			return id ? [{ id, name: item.name || id }] : [];
+		});
+		const metadataById = new Map(
+			await Promise.all(
+				entries.map(
+					async entry =>
+						[
+							entry.id,
+							await discoverOllamaModelMetadata(ctx, endpoint, entry.id, headers, customTimeoutMs),
+						] as const,
+				),
 			),
-		),
-	);
-	return entries.map(entry => {
-		const metadata = metadataById.get(entry.id);
-		return buildModel({
-			id: entry.id,
-			name: entry.name,
-			api: providerConfig.api,
-			provider: providerConfig.provider,
-			baseUrl: `${endpoint}/v1`,
-			reasoning: metadata?.reasoning ?? false,
-			input: metadata?.input ?? ["text"],
-			imageInputDecoder: "stb",
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: metadata?.contextWindow ?? DISCOVERY_DEFAULT_CONTEXT_WINDOW,
-			maxTokens: Math.min(metadata?.contextWindow ?? Number.POSITIVE_INFINITY, DISCOVERY_DEFAULT_MAX_TOKENS),
-			headers: providerConfig.headers,
-		} as ModelSpec<Api>);
-	});
+		);
+		return entries.map(entry => {
+			const metadata = metadataById.get(entry.id);
+			return buildModel({
+				id: entry.id,
+				name: entry.name,
+				api: providerConfig.api,
+				provider: providerConfig.provider,
+				baseUrl: `${endpoint}/v1`,
+				reasoning: metadata?.reasoning ?? false,
+				input: metadata?.input ?? ["text"],
+				imageInputDecoder: "stb",
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: metadata?.contextWindow ?? DISCOVERY_DEFAULT_CONTEXT_WINDOW,
+				maxTokens: Math.min(metadata?.contextWindow ?? Number.POSITIVE_INFINITY, DISCOVERY_DEFAULT_MAX_TOKENS),
+				headers: providerConfig.headers,
+			} as ModelSpec<Api>);
+		});
+	};
+	const apiKey = await ctx.getBearerApiKeyResolver(providerConfig.provider);
+	return apiKey ? withAuth(apiKey, key => attempt({ ...headers, Authorization: `Bearer ${key}` })) : attempt(headers);
 }
 
 async function discoverLlamaCppServerMetadata(
@@ -882,19 +867,19 @@ function extractOpenAIModelsListInputCapabilities(item: {
  * `/images/generations` surfaces of the same OpenAI-compatible root the
  * provider already serves its model list from.
  *
- * Anything else stays chat. Rows that also emit `text` are ordinary (multimodal)
- * chat models, and an `audio` or `video` output alone cannot distinguish a TTS
- * SKU from a music generator, or a chat response from a video-job API — those
- * need explicit task metadata this list shape does not carry.
+ * Text-producing rows stay chat (`undefined`). A non-chat output with no
+ * unambiguous runner is excluded (`null`): audio alone cannot distinguish
+ * speech from music, and video has no retained inference route.
  */
 function extractOpenAIModelsListOutputTask(item: {
 	output?: unknown;
 	output_modalities?: unknown;
 	architecture?: unknown;
-}): { kind: KindApiKind; api: Api } | undefined {
+}): { kind: KindApiKind; api: Api } | null | undefined {
 	const architecture = isRecord(item.architecture) ? item.architecture : undefined;
 	const modalities = collectModalities([item.output, item.output_modalities, architecture?.output_modalities]);
-	if (modalities.size !== 1) return undefined;
+	if (modalities.size === 0 || modalities.has("text")) return undefined;
+	if (modalities.size !== 1) return null;
 	const [modality] = modalities;
 	switch (modality) {
 		case "embedding":
@@ -903,7 +888,7 @@ function extractOpenAIModelsListOutputTask(item: {
 		case "image":
 			return { kind: "image", api: "openai-images" };
 		default:
-			return undefined;
+			return null;
 	}
 }
 /**
@@ -1097,7 +1082,16 @@ export async function discoverOpenAIModelsList(
 	providerConfig: DiscoveryProviderConfig,
 	ctx: DiscoveryContext,
 ): Promise<Model<Api>[]> {
+	if (
+		providerConfig.provider === "local" ||
+		providerConfig.api === "local-inference" ||
+		providerConfig.api === "apple-foundation-models"
+	)
+		throw new Error("On-device inference does not support HTTP discovery.");
 	const injectV1 = providerConfig.discovery.injectV1 ?? true;
+	const configuredBaseUrl =
+		providerConfig.baseUrl ??
+		(providerConfig.discovery.type === "lm-studio" ? "http://127.0.0.1:1234/v1" : undefined);
 	// `injectV1: false` resolves `/models` against the configured base URL
 	// verbatim — no `/v1` suffix is injected. Gateways that root their
 	// OpenAI-compatible surface at a versioned path (e.g.
@@ -1105,8 +1099,8 @@ export async function discoverOpenAIModelsList(
 	// model list under a forced `/v1/models`; discovery must match the chat
 	// base URL exactly so the full catalog is surfaced.
 	const baseUrl = injectV1
-		? normalizeOpenAIModelsListBaseUrl(providerConfig.baseUrl)
-		: normalizeBareDiscoveryBaseUrl(providerConfig.baseUrl);
+		? normalizeOpenAIModelsListBaseUrl(configuredBaseUrl)
+		: normalizeBareDiscoveryBaseUrl(configuredBaseUrl);
 	const modelsUrl = appendModelsPath(baseUrl);
 
 	const baseHeaders: Record<string, string> = { ...providerConfig.headers };
@@ -1222,6 +1216,7 @@ export async function discoverOpenAIModelsList(
 			toPositiveNumberOrUndefined(item.max_model_len) ??
 			toPositiveNumberOrUndefined(item.context_length) ??
 			toPositiveNumberOrUndefined(metadata?.context_window) ??
+			toPositiveNumberOrUndefined(topProvider?.context_length) ??
 			reportedLimitsContextWindow ??
 			nativeMetadataForModel?.contextWindow ??
 			reference?.contextWindow ??
@@ -1232,9 +1227,10 @@ export async function discoverOpenAIModelsList(
 		// cannot serve (issue #13021). LM Studio lists decision models beside chat
 		// models on `/v1/models`; only its native listing says they answer on
 		// `/v1/decisions`, OpenAI's Decisions API.
-		const task: { kind: ModelKind; api: Api } | undefined = nativeMetadataForModel?.decision
+		const task: { kind: ModelKind; api: Api } | null | undefined = nativeMetadataForModel?.decision
 			? { kind: "judge", api: "openai-decisions" }
 			: extractOpenAIModelsListOutputTask(item);
+		if (task === null) continue;
 		if (task) {
 			specs.push({
 				id,
@@ -1383,6 +1379,12 @@ export async function discoverProxyModels(
 	providerConfig: DiscoveryProviderConfig,
 	ctx: DiscoveryContext,
 ): Promise<Model<Api>[]> {
+	if (
+		providerConfig.provider === "local" ||
+		providerConfig.api === "local-inference" ||
+		providerConfig.api === "apple-foundation-models"
+	)
+		throw new Error("On-device inference does not support HTTP discovery.");
 	const baseUrl = normalizeOpenAIModelsListBaseUrl(providerConfig.baseUrl);
 	const modelsUrl = `${baseUrl}/models`;
 
@@ -1403,10 +1405,15 @@ export async function discoverProxyModels(
 					name?: string;
 					supported_endpoint_types?: string[];
 					context_length?: number;
+					input?: unknown;
+					input_modalities?: unknown;
 					metadata?: unknown;
 					supported_reasoning_levels?: unknown;
 					default_reasoning_level?: unknown;
 					reasoning?: unknown;
+					output?: unknown;
+					output_modalities?: unknown;
+					architecture?: unknown;
 				}>;
 			};
 		});
@@ -1419,6 +1426,7 @@ export async function discoverProxyModels(
 	for (const item of items) {
 		const id = item.id;
 		if (!id) continue;
+		if (extractOpenAIModelsListOutputTask(item) !== undefined) continue;
 		const endpoints = item.supported_endpoint_types ?? [];
 		const api: Api | undefined = endpoints.includes("anthropic")
 			? "anthropic-messages"
@@ -1434,9 +1442,12 @@ export async function discoverProxyModels(
 		// ids are absent from the bundled catalog would otherwise stay
 		// non-reasoning and never send `reasoning_effort`.
 		const advertised = advertisedReasoningEnabled(providerConfig) ? extractAdvertisedReasoning(item) : undefined;
+		const metadata = isRecord(item.metadata) ? item.metadata : undefined;
+		const advertisedName = typeof metadata?.display_name === "string" ? metadata.display_name.trim() : "";
 		const discoveryName = typeof item.name === "string" ? item.name.trim() : "";
 		const displayName =
 			(discoveryName && discoveryName !== id ? discoveryName : undefined) ??
+			(advertisedName || undefined) ??
 			reference?.name ??
 			stripBracketedModelIdAffixes(id) ??
 			id;
@@ -1448,7 +1459,7 @@ export async function discoverProxyModels(
 			baseUrl,
 			reasoning: reference?.reasoning ?? false,
 			thinking: inheritReferenceThinking(undefined, reference, providerConfig.provider),
-			input: reference?.input ?? ["text"],
+			input: extractOpenAIModelsListInputCapabilities(item) ?? reference?.input ?? ["text"],
 			// Proxy pricing is provider-specific and usually does not match
 			// upstream bundled catalogs, so keep costs local-unknown even when
 			// we successfully recover the upstream model identity.
@@ -1457,6 +1468,7 @@ export async function discoverProxyModels(
 			// back to the bundled reference, then a sane default.
 			contextWindow:
 				toPositiveNumberOrUndefined(item.context_length) ??
+				toPositiveNumberOrUndefined(metadata?.context_window) ??
 				reference?.contextWindow ??
 				DISCOVERY_DEFAULT_CONTEXT_WINDOW,
 			maxTokens: reference?.maxTokens ?? discoveryDefaultMaxTokens(api),
@@ -1514,8 +1526,8 @@ export function normalizeLiteLLMDiscoveryBaseUrl(baseUrl?: string): string {
 }
 
 export function normalizeOpenAIModelsListBaseUrl(baseUrl?: string): string {
-	const defaultBaseUrl = "http://127.0.0.1:1234/v1";
-	const raw = baseUrl || defaultBaseUrl;
+	if (!baseUrl) throw new Error("Configured model discovery requires a baseUrl.");
+	const raw = baseUrl;
 	try {
 		const parsed = new URL(raw);
 		const trimmedPath = parsed.pathname.replace(/\/+$/g, "");
@@ -1537,7 +1549,8 @@ export function normalizeOpenAIModelsListBaseUrl(baseUrl?: string): string {
  * string, so a retained query would corrupt the inference URL.
  */
 export function normalizeBareDiscoveryBaseUrl(baseUrl: string | undefined): string {
-	const raw = baseUrl || "http://127.0.0.1:1234";
+	if (!baseUrl) throw new Error("Configured model discovery requires a baseUrl.");
+	const raw = baseUrl;
 	try {
 		const parsed = new URL(raw);
 		parsed.search = "";

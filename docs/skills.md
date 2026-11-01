@@ -6,6 +6,8 @@ Skills are file-backed capability packs discovered at startup and exposed to the
 - on-demand content via the `read` tool against `skill://...`
 - optional interactive `/skill:<name>` commands
 
+Registry installation, update, uninstall, search, info, and local skill discovery remain available through `omp skill`. Skill publication, archive upload/import, and remote package/token management are not available in this fork.
+
 This document covers current runtime behavior in `packages/coding-agent/src/extensibility/skills.ts`, `packages/coding-agent/src/discovery/builtin.ts`, `packages/coding-agent/src/internal-urls/skill-protocol.ts`, and `packages/coding-agent/src/discovery/agents-md.ts`.
 
 ## What a skill is in this codebase

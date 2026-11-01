@@ -1,15 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { Api, Model } from "@oh-my-pi/pi-ai";
 import * as ai from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { getTestModel } from "./helpers/model-fixtures";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { generateTaskLabel, labelEchoesHandle } from "@oh-my-pi/pi-coding-agent/task/label";
-
-function getModelOrThrow(id: string): Model<Api> {
-	const model = getBundledModel("anthropic", id);
-	if (!model) throw new Error(`Expected model ${id}`);
-	return model;
-}
 
 function createSettings(model: Model<Api>) {
 	return Settings.isolated({
@@ -31,7 +25,7 @@ afterEach(() => {
 
 describe("task label generation", () => {
 	it("settles when its executor cancellation signal aborts an in-flight title request", async () => {
-		const model = getModelOrThrow("claude-sonnet-4-5");
+		const model = getTestModel("github-copilot");
 		const controller = new AbortController();
 		const started = Promise.withResolvers<void>();
 		const response = Promise.withResolvers<ai.AssistantMessage>();
@@ -62,7 +56,7 @@ describe("task label generation", () => {
 	});
 
 	it("rejects a generated label that only echoes the spawn handle", async () => {
-		const model = getModelOrThrow("claude-sonnet-4-5");
+		const model = getTestModel("github-copilot");
 		vi.spyOn(ai, "completeSimple").mockResolvedValue({
 			stopReason: "stop",
 			content: [{ type: "text", text: "<title>AuthLoader</title>" }],

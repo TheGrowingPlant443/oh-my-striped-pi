@@ -177,9 +177,8 @@ const OMP_STATUS_LINE_RE = /^\s*in:\s+\d+\s+out:\s+\d+(?:\s+cache\s+\S+)?\s+t:\s
 /**
  * Slash commands that also run from a focused subagent view, keyed by canonical name to
  * a check on their arguments: viewer-scoped reads, plus the model and effort controls,
- * which act on the focused agent's session. Every other command (and mutating forms such
- * as `/usage reset`, which spends a saved rate-limit reset, or `/jobs kill`, which cancels
- * a running job) still needs the main session.
+ * which act on the focused agent's session. Every other command (including `/jobs kill`,
+ * which cancels a running job) still needs the main session.
  */
 const FOCUSED_VIEW_COMMANDS: Record<string, (args: string) => boolean> = {
 	btw: () => true,
@@ -752,9 +751,6 @@ export class InputController {
 		}
 		for (const key of this.ctx.keybindings.getKeys("app.stt.toggle")) {
 			this.ctx.editor.setCustomKeyHandler(key, () => void this.ctx.handleSTTToggle());
-		}
-		for (const key of this.ctx.keybindings.getKeys("app.live.toggle")) {
-			this.ctx.editor.setCustomKeyHandler(key, () => void this.ctx.handleLiveCommand());
 		}
 		// Push-to-talk uses its own binding, separate from the STT toggle.
 		this.ctx.editor.spaceHold.keys = this.ctx.keybindings.getKeys("app.stt.pushToTalk");

@@ -23,7 +23,7 @@ import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { effectiveReserveTokens, prepareCompaction, resolveThresholdTokens } from "@oh-my-pi/pi-agent-core/compaction";
 import { base64ImageSize } from "@oh-my-pi/pi-agent-core/image-tokens";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { toModelSpec } from "@oh-my-pi/pi-catalog/provider-models/bundled-references";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -36,6 +36,27 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { cfgSnapcompactShape } from "@oh-my-pi/pi-coding-agent/session/context-settings";
 import * as snapcompact from "@oh-my-pi/snapcompact";
 
+function companyModel(provider: string, id: string) {
+	const spec: ModelSpec = {
+		id,
+		name: "Company frame budget fixture",
+		provider,
+		api:
+			provider === "company-anthropic"
+				? "anthropic-messages"
+				: provider === "company-gemini"
+					? "google-generative-ai"
+					: "openai-responses",
+		baseUrl: "https://models.company.invalid/v1",
+		reasoning: true,
+		input: ["text", "image"],
+		imageCountBudget: 100,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 64_000,
+	};
+	return buildModel(spec);
+}
 describe("AgentSession snapcompact frame-budget sizing", () => {
 	let session: AgentSession;
 	let sessionManager: SessionManager;
@@ -44,19 +65,23 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-anthropic", "test-key");
+		// Auto-compaction only runs when the registry lists a usable model.
 		modelRegistry = new ModelRegistry(authStorage);
+		const registered = companyModel("company-anthropic", "claude-sonnet-4-5");
+		modelRegistry.registerProvider(registered.provider, {
+			api: registered.api,
+			apiKey: "test-key",
+			baseUrl: registered.baseUrl,
+			models: [{ ...registered, contextWindow: 200_000, maxTokens: 64_000 }],
+		});
 	});
 
 	beforeEach(() => {
 		sessionManager = SessionManager.inMemory();
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected bundled claude-sonnet-4-5 model");
-		// Pin the window and output reservation: this contract defends the
-		// sub-1M/200k Sonnet failure mode, so catalog regeneration must not change
-		// the compaction budget math under test.
-		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
+		// Pin the historical 200k failure mode independently of the generated catalog.
+		const model = companyModel("company-anthropic", "claude-sonnet-4-5");
 		expect(model.input).toContain("image");
 
 		const agent = new Agent({
@@ -76,9 +101,9 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 			sessionManager.appendMessage({
 				role: "assistant",
 				content: [{ type: "text", text: `reply ${i}: ${filler}` }],
-				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				api: model.api,
+				provider: model.provider,
+				model: model.id,
 				stopReason: "stop",
 				usage: {
 					input: 1000,
@@ -116,7 +141,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 		authStorage.close();
 	});
 
-	/** Appends a 4.8 MB three-frame archive: over the 3 MB default, inside half of Anthropic's 24 MB inline-image budget. */
+	/** Appends a 4.8 MB three-frame archive: over the 3 MB default frame payload budget. */
 	function appendFrameArchive(): string {
 		const firstKeptEntryId = sessionManager.getBranch().at(-1)?.id;
 		if (!firstKeptEntryId) throw new Error("Expected branch entry with id");
@@ -276,9 +301,9 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	it("applies the frame byte cap when the model context window is unknown", async () => {
 		const model = session.model;
 		if (!model) throw new Error("Expected model");
-		// A rerouted baseUrl has no catalog inline-image budget, so the default byte cap binds.
+		// The private deployment has no declared inline-image byte budget, so the default cap binds.
 		session.agent.setModel({
-			...buildModel({ ...toModelSpec(model), baseUrl: "https://anthropic-proxy.example" }),
+			...buildModel({ ...toModelSpec(model), baseUrl: "https://rerouted.company.invalid/v1" }),
 			contextWindow: 0,
 		});
 
@@ -313,7 +338,12 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	it("caps maxFrames at the provider image budget so unknown gateways do not archive frames the send path will drop", async () => {
 		const model = session.model;
 		if (!model) throw new Error("Expected model");
-		session.agent.setModel({ ...model, provider: "ramp", contextWindow: 500_000 });
+		session.agent.setModel({
+			...model,
+			provider: "company-unknown",
+			imageCountBudget: undefined,
+			contextWindow: 500_000,
+		});
 
 		const branchEntries = sessionManager.getBranch();
 		const lastEntry = branchEntries[branchEntries.length - 1];
@@ -336,8 +366,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	});
 
 	it.each([
-		["the official endpoint attaches every frame", "https://api.anthropic.com", 3],
-		["a rerouted baseUrl attaches the newest frames within the default", "https://anthropic-proxy.example", 1],
+		["a rerouted baseUrl attaches the newest frames within the default", "https://rerouted.company.invalid/v1", 1],
 	] as const)("rebuilds the archive at the active model's frame byte budget: %s", (_, baseUrl, frames) => {
 		const model = session.model;
 		if (!model) throw new Error("Expected model");
@@ -348,8 +377,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	});
 
 	it.each([
-		["the official endpoint attaches every frame", "https://api.anthropic.com", 3],
-		["a rerouted baseUrl attaches the newest frames within the default", "https://anthropic-proxy.example", 1],
+		["a rerouted baseUrl attaches the newest frames within the default", "https://rerouted.company.invalid/v1", 1],
 	] as const)(
 		"tree navigation with a session_tree handler installs and returns the archive at the active model's frame byte budget: %s",
 		async (_, baseUrl, frames) => {
@@ -398,9 +426,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	it("sizes a forced 2576px shape on OpenAI by the price the tokenizer will charge each frame", async () => {
 		// `5x8-bw` forces 2576px frames; OpenAI bills them 81² × 1.2 = 7,874 each,
 		// above the 5,024 ceiling the cap otherwise divides by.
-		const bundled = getBundledModel("openai-codex", "gpt-6.1-sol");
-		if (!bundled) throw new Error("Expected bundled openai-codex/gpt-6.1-sol");
-		const model = { ...bundled, contextWindow: 400_000, maxTokens: 32_000 };
+		const model = { ...companyModel("company-responses", "gpt-6.1-sol"), contextWindow: 400_000, maxTokens: 32_000 };
 		session.agent.setModel(model);
 		cfgSnapcompactShape.set(session.settings, "5x8-bw");
 		const shape = snapcompact.resolveShape(model, "5x8-bw");
@@ -497,7 +523,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 		const branchEntries = sessionManager.getBranch();
 		const lastEntry = branchEntries[branchEntries.length - 1];
 		if (!lastEntry?.id) throw new Error("Expected branch entry with id");
-		const frame = { data: "A".repeat(4_000_000), mimeType: "image/png", cols: 10, rows: 10, chars: 10 };
+		const frame = { data: "A".repeat(1_000_000), mimeType: "image/png", cols: 10, rows: 10, chars: 10 };
 		const archiveResult = (frames: number) => ({
 			summary: "stubbed snapcompact",
 			shortSummary: "stub",
@@ -512,7 +538,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 				},
 			},
 		});
-		// 4 frames of 4 MB overshoot the 12 MB frame budget official Anthropic gets; the re-render fits.
+		// 4 frames of 1 MB overshoot the 3 MB default frame budget; the re-render fits.
 		const compactSpy = vi
 			.spyOn(snapcompact, "compact")
 			.mockResolvedValueOnce(archiveResult(4))
@@ -521,7 +547,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 		await session.compact(undefined, { mode: "snapcompact" });
 
 		expect(compactSpy).toHaveBeenCalledTimes(2);
-		// 4 frames × 12 MB budget / 16 MB rendered = 3 frames.
+		// 4 frames × 3 MB budget / 4 MB rendered = 3 frames.
 		expect(compactSpy.mock.calls[1]?.[1]).toEqual({ ...compactSpy.mock.calls[0]?.[1], maxFrames: 3 });
 		const entry = sessionManager.getBranch().findLast(e => e.type === "compaction");
 		if (entry?.type !== "compaction") throw new Error("Expected the re-rendered archive to be committed");
@@ -567,11 +593,17 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 
 	it.each([
 		// Gemini 3 bills a fixed 1,120 per image at any size.
-		{ name: "Gemini", provider: "google", id: "gemini-3.1-pro-preview", frameSize: 2048, frameTokens: () => 1120 },
+		{
+			name: "Gemini",
+			provider: "company-gemini",
+			id: "gemini-3.1-pro-preview",
+			frameSize: 2048,
+			frameTokens: () => 1120,
+		},
 		// GPT bills 32px patches × 1.2 over the frame's real height (the last frame hugs its rows).
 		{
 			name: "Codex",
-			provider: "openai-codex",
+			provider: "company-responses",
 			id: "gpt-6.1-sol",
 			frameSize: 1568,
 			frameTokens: (height: number) => Math.ceil(49 * Math.ceil(height / 32) * 1.2),
@@ -579,9 +611,7 @@ describe("AgentSession snapcompact frame-budget sizing", () => {
 	] as const)(
 		"persists the trigger's post-commit count as tokensAfter for a real $name archive",
 		async ({ provider, id, frameSize, frameTokens }) => {
-			const bundled = getBundledModel(provider, id);
-			if (!bundled) throw new Error(`Expected bundled ${provider}/${id}`);
-			const model = { ...bundled, contextWindow: 400_000, maxTokens: 32_000 };
+			const model = { ...companyModel(provider, id), contextWindow: 400_000, maxTokens: 32_000 };
 			expect(snapcompact.resolveShape(model).frameSize).toBe(frameSize);
 			session.agent.setModel(model);
 

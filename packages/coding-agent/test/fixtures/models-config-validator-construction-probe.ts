@@ -3,6 +3,7 @@ import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { ModelsConfigFile } from "@oh-my-pi/pi-coding-agent/config/models-config";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { YAML } from "bun";
+import { getTestModel } from "../helpers/model-fixtures";
 
 interface HeapSnapshot {
 	nodes: number[];
@@ -38,7 +39,8 @@ async function measureMissing(): Promise<ProbeResult> {
 		const authStorage = await AuthStorage.create(":memory:");
 		try {
 			const registry = new ModelRegistry(authStorage, path.join(root, "missing", "models.yml"));
-			const found = registry.find("anthropic", "claude-sonnet-4-5");
+			const bundled = getTestModel("github-copilot");
+			const found = registry.find(bundled.provider, bundled.id);
 			model = found && {
 				provider: found.provider,
 				id: found.id,

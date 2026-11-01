@@ -28,15 +28,15 @@ describe("auth-gateway stdio transport", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-stdio-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
-		const mock = createMockModel({ provider: "openrouter", id: "mock/stdio-model" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ provider: "local", id: "local/stdio-model" });
 		const router = createAuthGatewayRouter({ storage, resolveModel: () => mock.model });
 		try {
 			mock.push({ content: ["hello"] });
 			const request = {
 				id: "a",
 				path: "/v1/chat/completions",
-				body: { model: "mock/stdio-model", messages: [{ role: "user", content: "hi" }] },
+				body: { model: "local/stdio-model", messages: [{ role: "user", content: "hi" }] },
 			};
 			const output = await serve([JSON.stringify(request)], req => router.route(req, "test"));
 			expect(output[0]).toEqual({ ready: true, version: "test" });

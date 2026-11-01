@@ -7,7 +7,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import type { AssistantMessage, ToolCall } from "@oh-my-pi/pi-ai";
-import { type CursorExecResolvedCarrier, kCursorExecResolved } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
@@ -903,16 +902,15 @@ describe("runSubprocess result acceptance", () => {
 		expect(body).toBe("Answer.");
 	});
 
-	it("does not relay narration that preceded a woken agent's last Cursor-resolved call", async () => {
+	it("does not relay narration that preceded a woken agent's last tool call", async () => {
 		const body = await peerWakeRelay(harness => {
-			const resolvedCall: ToolCall & CursorExecResolvedCarrier = {
+			const call: ToolCall = {
 				type: "toolCall",
 				id: "exec-1",
 				name: "bash",
 				arguments: { command: "bun test" },
 			};
-			resolvedCall[kCursorExecResolved] = true;
-			harness.emitAssistantContent([{ type: "text", text: "Running the tests." }, resolvedCall]);
+			harness.emitAssistantContent([{ type: "text", text: "Running the tests." }, call]);
 		});
 		expect(body).not.toContain("Running the tests.");
 		expect(body).toContain("produced no output");

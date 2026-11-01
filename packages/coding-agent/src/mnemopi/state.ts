@@ -12,8 +12,8 @@ import {
 	prepareUserRetentionTranscript,
 	stripRetentionProtocolMarkers,
 	truncateRecallQuery,
-} from "../hindsight/content";
-import { countUserTurns, extractMessages } from "../hindsight/transcript";
+} from "../memory-backend/content";
+import { countUserTurns, extractMessages } from "../memory-backend/transcript";
 import {
 	findPersistedRecall,
 	type MemoryRecallChangesDetails,

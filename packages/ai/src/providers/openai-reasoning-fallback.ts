@@ -66,7 +66,7 @@ export function rememberOpenAIReasoningEffortFallback(
 
 /** @internal */
 export function createOpenAIReasoningEffortFallbackKey(
-	endpoint: "chat-completions" | "responses" | "azure-responses",
+	endpoint: "chat-completions" | "responses",
 	baseUrl: string | undefined,
 	wireModelId: string | undefined,
 ): string {

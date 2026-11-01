@@ -36,7 +36,7 @@ describe("advisor watchdog prompt discovery", () => {
 		const authStorage = createInMemoryAuthStorage();
 		let session: AgentSession | undefined;
 		try {
-			authStorage.keys.setRuntime("openai", "test-key");
+			authStorage.keys.setRuntime("github-copilot", "test-key");
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 			const sessionManager = SessionManager.inMemory(cwd);
 			const result = await createAgentSession({
@@ -50,10 +50,10 @@ describe("advisor watchdog prompt discovery", () => {
 						"async.enabled": false,
 						"advisor.enabled": true,
 					});
-					s.setModelRole("advisor", "openai/gpt-4o-mini");
+					s.setModelRole("advisor", "github-copilot/gpt-5.4");
 					return s;
 				})(),
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getBundledModel("github-copilot", "gpt-5.4"),
 				disableExtensionDiscovery: true,
 				skills: [],
 				contextFiles: [],

@@ -5,12 +5,14 @@ import { Writable } from "node:stream";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { RpcFrameDecoder, RpcFrameEncoder } from "../src/modes/rpc/rpc-frame";
 import { RpcOutputWriter } from "../src/modes/rpc/rpc-output";
+import { getTestModel } from "./helpers/model-fixtures";
 
 afterEach(() => {
 	mock.restore();
 });
 
 it("drains RPC command responses after stdin EOF while the real stdout pipe is backpressured", async () => {
+	const model = getTestModel("github-copilot");
 	const child = Bun.spawn(
 		[
 			process.execPath,
@@ -22,9 +24,9 @@ it("drains RPC command responses after stdin EOF while the real stdout pipe is b
 			"--no-tools",
 			"--no-session",
 			"--provider",
-			"anthropic",
+			model.provider,
 			"--model",
-			"claude-sonnet-4-5",
+			model.id,
 		],
 		{
 			cwd: import.meta.dir,

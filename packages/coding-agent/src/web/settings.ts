@@ -4,31 +4,6 @@
  */
 import { register } from "../config/registry";
 
-// Exa
-export const cfgExaEnabled = register({
-	id: "exa.enabled",
-	type: "boolean",
-	default: true,
-	ui: {
-		tab: "providers",
-		group: "Services",
-		label: "Exa",
-		description: "Enable the Exa web search provider",
-	},
-});
-
-export const cfgExaSearchDelayMs = register({
-	id: "exa.searchDelayMs",
-	type: "number",
-	default: 1_000,
-	ui: {
-		tab: "providers",
-		group: "Services",
-		label: "Exa Search Delay",
-		description: "Minimum delay between Exa web search requests in milliseconds; set 0 to disable pacing",
-	},
-});
-
 // SearXNG
 export const cfgSearxngEndpoint = register({
 	id: "searxng.endpoint",

@@ -23,7 +23,6 @@ function makeState(sessionId = "session-a", events: BeamEvent[] = []): BeamMemor
 		authorId: "author-a",
 		authorType: "user",
 		channelId: "channel-a",
-		useCloud: false,
 		eventEmitter: event => {
 			events.push(event);
 		},
@@ -44,7 +43,6 @@ function makeState(sessionId = "session-a", events: BeamEvent[] = []): BeamMemor
 			vecWeight: 0.5,
 			ftsWeight: 0.3,
 			importanceWeight: 0.2,
-			useCloud: false,
 			localLlmEnabled: false,
 			maxEpisodeChars: 100_000,
 		},

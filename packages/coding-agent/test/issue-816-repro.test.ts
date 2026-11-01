@@ -29,10 +29,10 @@ describe("issue #816 — plan mode pendingModelSwitch leak", () => {
 		tempDir = TempDir.createSync("@pi-issue-816-");
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const defaultModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!defaultModel) throw new Error("Expected claude-sonnet-4-5 in registry");
+		const defaultModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!defaultModel) throw new Error("Expected claude-sonnet-4.5 in registry");
 
 		session = new AgentSession({
 			agent: new Agent({
@@ -61,8 +61,8 @@ describe("issue #816 — plan mode pendingModelSwitch leak", () => {
 	});
 
 	it("does not switch to the plan-role model after exit when the entry switch was deferred by streaming", async () => {
-		const planModel = modelRegistry.find("anthropic", "claude-haiku-4-5");
-		if (!planModel) throw new Error("Expected claude-haiku-4-5 in registry");
+		const planModel = modelRegistry.find("github-copilot", "claude-haiku-4.5");
+		if (!planModel) throw new Error("Expected claude-haiku-4.5 in registry");
 
 		// Stream is active throughout entry: #applyPlanModeModel snapshots the
 		// previous (default) model and queues a pending switch to the plan model
@@ -101,8 +101,8 @@ describe("issue #816 — plan mode pendingModelSwitch leak", () => {
 		await mode.init({ suppressWelcomeIntro: true });
 		await mode.handlePlanModeCommand();
 		const activePlanModel = session.model;
-		const haiku = modelRegistry.find("anthropic", "claude-haiku-4-5");
-		const opus = modelRegistry.find("anthropic", "claude-opus-4-5");
+		const haiku = modelRegistry.find("github-copilot", "claude-haiku-4.5");
+		const opus = modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!activePlanModel || !haiku || !opus) throw new Error("Expected plan models");
 		const replacementPlanModel =
 			activePlanModel.provider === haiku.provider && activePlanModel.id === haiku.id ? opus : haiku;
@@ -125,8 +125,8 @@ describe("issue #816 — plan mode pendingModelSwitch leak", () => {
 		await mode.init({ suppressWelcomeIntro: true });
 		await mode.handlePlanModeCommand();
 		const activePlanModel = session.model;
-		const haiku = modelRegistry.find("anthropic", "claude-haiku-4-5");
-		const opus = modelRegistry.find("anthropic", "claude-opus-4-5");
+		const haiku = modelRegistry.find("github-copilot", "claude-haiku-4.5");
+		const opus = modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!activePlanModel || !haiku || !opus) throw new Error("Expected plan models");
 		const replacementPlanModel =
 			activePlanModel.provider === haiku.provider && activePlanModel.id === haiku.id ? opus : haiku;
@@ -139,8 +139,8 @@ describe("issue #816 — plan mode pendingModelSwitch leak", () => {
 	});
 
 	it("keeps plan state coherent when restoring the previous model fails", async () => {
-		const planModel = modelRegistry.find("anthropic", "claude-haiku-4-5");
-		if (!planModel) throw new Error("Expected claude-haiku-4-5 in registry");
+		const planModel = modelRegistry.find("github-copilot", "claude-haiku-4.5");
+		if (!planModel) throw new Error("Expected claude-haiku-4.5 in registry");
 
 		vi.spyOn(session, "resolveRoleModelWithThinking").mockReturnValue({
 			model: planModel,

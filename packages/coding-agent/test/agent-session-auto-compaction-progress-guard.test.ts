@@ -15,7 +15,6 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import type { CompactionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { INCOMPLETE_RECOVERY_MAX_RETRIES } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
-import * as telemetryExport from "../src/telemetry-export";
 
 import {
 	cfgCompactionAsyncEnabled,
@@ -80,7 +79,7 @@ describe("AgentSession auto-compaction progress guard", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -114,9 +113,9 @@ describe("AgentSession auto-compaction progress guard", () => {
 			emitBeforeAgentStart: async () => undefined,
 		};
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!bundled) {
-			throw new Error("Expected built-in anthropic model to exist");
+			throw new Error("Expected bundled Copilot model");
 		}
 		// Pin the window and output reservation: every usage figure below is tuned
 		// to a 200k/64k threshold, so catalog regeneration must not shift the
@@ -174,8 +173,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "Done." }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 190000,
@@ -212,8 +211,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content,
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "error" as const,
 			errorMessage: "prompt is too long: 250000 tokens > 200000 maximum",
 			usage: {
@@ -592,8 +591,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "stale in-flight response" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: {
 				input: 360000,
@@ -631,8 +630,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 				role: "assistant",
 				content: [{ type: "text", text: bigText }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				stopReason: "stop",
 				usage: {
 					input: 1000,
@@ -915,8 +914,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "completed seed" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: {
 				input: 1,
@@ -944,8 +943,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "unfinished" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "length" as const,
 			usage: {
 				input: 10_000,
@@ -992,8 +991,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant",
 			content,
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "length",
 			usage: {
 				input: 10_000,
@@ -1155,8 +1154,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant",
 			content: [],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "length",
 			usage: {
 				input: 0,
@@ -1205,7 +1204,6 @@ describe("AgentSession auto-compaction progress guard", () => {
 		// The capped path appends no successor after dropping the failed turn. Reopen
 		// the journal to prove the durable branch marker, rather than the discarded
 		// physical leaf, selects the active branch after a process restart.
-		vi.spyOn(telemetryExport, "flushTelemetryExport").mockResolvedValue();
 		// Print mode reads a turn's stop reason only after admitting a model turn; with
 		// `agent.prompt` mocked, that turn adds nothing and the capped failure stays last.
 		const printModeExitCode = await runPrintMode(session, { mode: "json", initialMessage: "continue" });
@@ -1240,8 +1238,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "working" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 143_000,
@@ -1264,8 +1262,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "finished" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 143_000,
@@ -1292,8 +1290,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "thinking" as const, thinking: "unfinished reasoning" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "length" as const,
 			usage: {
 				input: 150_000,
@@ -1356,8 +1354,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "working" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 143_000,
@@ -1380,8 +1378,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "thinking" as const, thinking: "unfinished reasoning" }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "length" as const,
 			usage: {
 				input: 150_000,
@@ -1420,8 +1418,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 				role: "assistant",
 				content: [{ type: "text", text: smallText }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				stopReason: "stop",
 				usage: {
 					input: 100,
@@ -1475,8 +1473,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 				role: "assistant",
 				content: [{ type: "text", text: smallText }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				stopReason: "stop",
 				usage: {
 					input: 100,
@@ -1598,8 +1596,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: bigCallId, name: "grep", arguments: { pattern: "TODO" } }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "toolUse",
 			usage: {
 				input: 0,
@@ -1627,8 +1625,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 				role: "assistant",
 				content: [{ type: "toolCall", id: smallId, name: "read", arguments: { path: `note-${i}.md` } }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				stopReason: "toolUse",
 				usage: {
 					input: 0,
@@ -1691,8 +1689,8 @@ describe("AgentSession auto-compaction progress guard", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "continuing." }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 5000,

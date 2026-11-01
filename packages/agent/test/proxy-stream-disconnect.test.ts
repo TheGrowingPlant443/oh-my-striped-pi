@@ -16,8 +16,8 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 const mockModel: Model = buildModel({
 	id: "test-model",
 	name: "Test Model",
-	api: "openai",
-	provider: "test",
+	api: "local-inference",
+	provider: "local",
 	baseUrl: "http://localhost:0",
 	reasoning: false,
 	input: ["text"],

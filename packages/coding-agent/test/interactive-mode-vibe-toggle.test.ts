@@ -157,10 +157,10 @@ describe("InteractiveMode vibe mode toggle", () => {
 		resetSettingsForTest();
 		VibeSessionRegistry.resetGlobalForTests();
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		// prompt() preflights credentials via modelRegistry.getApiKey; the
-		// in-memory auth storage has no anthropic key, so stub it.
+		// in-memory auth storage has no test credential, so stub it.
 		vi.spyOn(modelRegistry, "getApiKey").mockResolvedValue("test-key");
 
 		const registryTools = [stubTool("read"), stubTool("todo")];

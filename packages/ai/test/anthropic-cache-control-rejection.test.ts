@@ -49,8 +49,8 @@ const MODEL: Model<"anthropic-messages"> = buildModel({
 	id: "claude-sonnet-4-6",
 	name: "Claude Sonnet 4.6",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -229,7 +229,7 @@ function runPriorityTurn(
 	client: AnthropicMessagesClientLike,
 	states: Map<string, ProviderSessionState>,
 ): Promise<AssistantMessage> {
-	return streamAnthropic(MODEL, CONTEXT, {
+	return streamAnthropic(buildModel({ ...MODEL, compat: { fastMode: true } }), CONTEXT, {
 		client,
 		serviceTier: "priority",
 		providerSessionState: states,
@@ -256,12 +256,12 @@ function runTurn(
 }
 
 /**
- * The same turn asking for 1h retention, which is the only API-key path that
- * puts `ttl` on a breakpoint and the extended-cache-ttl beta on the header. A
- * refusal here gets the retention rung before the field rung.
+ * Explicit long-cache overrides ask for 1h retention and its beta.
+ * A refusal here gets the retention rung before the field rung.
  */
 function runLongTurn(fetchImpl: FetchImpl, states: Map<string, ProviderSessionState>): Promise<AssistantMessage> {
-	return streamAnthropic(MODEL, CONTEXT, {
+	const model = buildModel({ ...MODEL, compat: { supportsLongCacheRetention: true, extendedCacheTtlBeta: true } });
+	return streamAnthropic(model, CONTEXT, {
 		apiKey: "sk-ant-api-test",
 		cacheRetention: "long",
 		providerSessionState: states,
@@ -271,7 +271,7 @@ function runLongTurn(fetchImpl: FetchImpl, states: Map<string, ProviderSessionSt
 
 /** The real transport, pointed at an arbitrary endpoint over the capturing fetch. */
 function transportAt(baseURL: string, fetchImpl: FetchImpl): AnthropicMessagesClient {
-	return new AnthropicMessagesClient({ apiKey: "sk-ant-api-test", baseURL, fetch: fetchImpl });
+	return new AnthropicMessagesClient({ model: MODEL, apiKey: "sk-ant-api-test", baseURL, fetch: fetchImpl });
 }
 
 /**
@@ -282,15 +282,11 @@ function createOpaqueClient(baseURL: string, fetchImpl: FetchImpl): AnthropicMes
 	return { messages: transportAt(baseURL, fetchImpl).messages };
 }
 
-/**
- * OAuth against a non-official endpoint whose compat opts into fingerprint
- * header overrides — the one shape where a caller's own `anthropic-beta` value
- * reaches the wire verbatim instead of being dropped as an enforced key.
- */
+/** A caller's own beta headers must be filtered when cache controls are dropped. */
 function overrideModel(headers: Record<string, string> = {}): Model<"anthropic-messages"> {
 	return buildModel({
 		...MODEL,
-		provider: "custom-anthropic",
+		provider: "github-copilot",
 		baseUrl: "https://override-proxy.example/anthropic",
 		headers,
 		compat: { allowAnthropicHeaderOverrides: true },
@@ -304,7 +300,6 @@ function runOverrideTurn(
 ): Promise<AssistantMessage> {
 	return streamAnthropic(model, CONTEXT, {
 		apiKey: "sk-ant-oat-test",
-		isOAuth: true,
 		headers,
 		providerSessionState: new Map<string, ProviderSessionState>(),
 		fetch: createFetch(capture, ["reject", "ok"]),
@@ -781,37 +776,6 @@ describe("Anthropic cache_control rejection fallback", () => {
 		expect(countBreakpoints(capture.bodies[2])).toBeGreaterThan(0);
 	});
 
-	it("strips the OAuth identity block's default breakpoint on the replay", async () => {
-		const capture: Capture = { bodies: [], betaHeaders: [] };
-		const states = new Map<string, ProviderSessionState>();
-
-		// OAuth injects the Claude Code identity system block, whose breakpoint
-		// defaults to `ephemeral` when no lifetime is passed — an undefined
-		// lifetime alone does not remove it.
-		const message = await streamAnthropic(MODEL, CONTEXT, {
-			apiKey: "sk-ant-oat-test",
-			isOAuth: true,
-			providerSessionState: states,
-			fetch: createBreakpointRejectingFetch(capture),
-		}).result();
-
-		expect(message.stopReason).toBe("stop");
-		expect(message.errorMessage).toBeUndefined();
-		// Three rungs, because OAuth on an official endpoint defaults to 1h
-		// retention: the request carried `ttl`, so the retention rung goes first
-		// and the identity block survives it. Only the rung below it drops the
-		// breakpoint the block defaults to.
-		expect(capture.bodies).toHaveLength(3);
-		expect(breakpointTtls(capture.bodies[0])).toEqual(["1h"]);
-		expect(countBreakpoints(capture.bodies[1])).toBeGreaterThan(0);
-		expect(countBreakpoints(capture.bodies[2])).toBe(0);
-		// The OAuth defaults advertise prompt-caching-scope unconditionally; that
-		// beta governs `scope`, so neither rung may keep claiming it.
-		expect(capture.betaHeaders[0]).toContain(PROMPT_CACHING_SCOPE_BETA);
-		expect(capture.betaHeaders[1]).not.toContain(PROMPT_CACHING_SCOPE_BETA);
-		expect(capture.betaHeaders[2]).not.toContain(PROMPT_CACHING_SCOPE_BETA);
-	});
-
 	it("drops a cache beta supplied through model.headers from the replay", async () => {
 		const capture: Capture = { bodies: [], betaHeaders: [] };
 
@@ -865,6 +829,7 @@ describe("Anthropic cache_control rejection fallback", () => {
 		// override replaces them wholesale, which is exactly why the provider may
 		// never emit a blanket `anthropic-beta` it did not derive from the caller.
 		const client = new AnthropicMessagesClient({
+			model: MODEL,
 			apiKey: "sk-ant-api-test",
 			baseURL: "https://injected.example/v1",
 			fetch: fetchImpl,
@@ -888,6 +853,7 @@ describe("Anthropic cache_control rejection fallback", () => {
 		// No control or effort beta: the legacy compaction edit is the first beta
 		// the override adds, so it alone decides which caller header seeds it.
 		const client = new AnthropicMessagesClient({
+			model: MODEL,
 			apiKey: "sk-ant-api-test",
 			baseURL: "https://injected.example/v1",
 			fetch: fetchImpl,
@@ -919,6 +885,7 @@ describe("Anthropic cache_control rejection fallback", () => {
 		// only beta source. Their value is unreadable from here, so the cache beta
 		// survives the replay: dropping it is the owning caller's job.
 		const client = new AnthropicMessagesClient({
+			model: MODEL,
 			apiKey: "sk-ant-api-test",
 			baseURL: "https://injected-defaults.example/v1",
 			fetch: fetchImpl,

@@ -215,7 +215,7 @@ export class Tokenizer {
 	readonly #reasoningReader: ReasoningReplayReader | undefined;
 	readonly #dropsOllamaThinking: boolean;
 	readonly #dropsCompletionsThinking: boolean;
-	/** Claude's own API and prefix-bound hosts keep another model's signature from their deployment. */
+	/** Prefix-bound hosts can replay another model's signature from their deployment. */
 	readonly #readsDeploymentSignatures: boolean;
 	readonly reasoningReplayKey: string;
 	/** How the reader bills replayed signed thinking (catalog `thinking-replay-tokens`). */
@@ -254,11 +254,7 @@ export class Tokenizer {
 		this.#reasoningReader = reasoningReplayReader(model);
 		this.#dropsOllamaThinking = ollamaChatDropsOwnThinking(model);
 		this.#dropsCompletionsThinking = completionsDropsOwnThinking(model);
-		const compat = model?.compat;
-		this.#readsDeploymentSignatures =
-			model?.api === "anthropic-messages" &&
-			((compat !== undefined && "officialEndpoint" in compat && compat.officialEndpoint) ||
-				model.thinking?.prefixBinding === true);
+		this.#readsDeploymentSignatures = model?.api === "anthropic-messages" && model.thinking?.prefixBinding === true;
 		this.reasoningReplayKey = reasoningReplayKey(model);
 		this.thinkingReplayTokens = resolveThinkingReplayTokens(model ?? {});
 		this.nativeHistoryReplay = options?.nativeHistoryReplay ?? true;
@@ -321,13 +317,8 @@ export class Tokenizer {
 	}
 
 	/**
-	 * {@link countMessage} for the transcript's latest surviving assistant turn
-	 * (`isSurvivingAssistant`), which an Anthropic Messages replay keeps
-	 * byte-for-byte (`transformMessages`): a turn whose tool calls ended without
-	 * a tool-use stop keeps its signatures then, so its reasoning is charged. A
-	 * count of one message cannot see its position; a caller walking back from
-	 * the end of the transcript counts that turn here. Not memoized: it differs
-	 * from {@link countMessage} only for that one turn.
+	 * Count the latest surviving assistant turn, whose signed reasoning remains
+	 * intact on Anthropic Messages replay even without a tool-use stop.
 	 */
 	countLatestTurn(message: AgentMessage, options?: MessageCountOptions): number {
 		return this.#measureMessage(message, options?.excludeEncryptedReasoning === true, true);
@@ -349,11 +340,8 @@ export class Tokenizer {
 	}
 
 	/**
-	 * Whether `message`'s signed reasoning reaches this reader natively: from
-	 * the same model, host and wire, or from another Claude model on the same
-	 * Anthropic deployment, which keeps the signature (`transformMessages`).
-	 * Claude bills that reasoning when the reader can read it and drops the
-	 * block otherwise, so such a turn counts high rather than low.
+	 * Whether `message`'s signed reasoning reaches the same model, provider and
+	 * wire natively.
 	 */
 	#replaysReasoningNatively(message: AssistantMessage): boolean {
 		const reader = this.#reasoningReader;
@@ -432,15 +420,8 @@ export class Tokenizer {
 					completionsReader !== undefined && isSameModelTurn(message, completionsReader);
 				if (typeof replayedReasoning === "number") extra += replayedReasoning;
 				const signaturesPriced = this.thinkingReplayTokens === "signature";
-				// The replay's signature rule (`transformMessages`): an aborted or
-				// errored turn's final block can hold a partial signature, and a turn
-				// whose tool calls ended without a tool-use stop is abandoned, so all
-				// its signatures are stripped. Every other block completed. On the
-				// Anthropic Messages API the latest assistant turn keeps an abandoned
-				// turn's signatures byte-for-byte (Bedrock's Converse replay strips
-				// them too); a per-message count cannot see position, so it follows
-				// the rule for older turns unless the caller says it is the latest
-				// (`countLatestTurn`).
+				// Aborted or errored turns can hold a partial final signature; tool
+				// calls ending without a tool-use stop abandon their signatures.
 				const content = message.content;
 				const invalidStop = message.stopReason === "aborted" || message.stopReason === "error";
 				const keepsLatestSignatures = latestTurn && message.api === "anthropic-messages";
@@ -456,8 +437,6 @@ export class Tokenizer {
 					if (block.type === "text") {
 						fragments.push(block.text);
 					} else if (block.type === "thinking") {
-						// `transformMessages` drops another model's empty thinking and demotes the
-						// rest to visible text; only the reader's own thinking stays native.
 						if (ollamaReader && !ownOllamaTurn) {
 							if (block.thinking.trim()) fragments.push(renderDemotedThinking(ollamaReader.id, block.thinking));
 							continue;

@@ -144,7 +144,6 @@ export function oauthUsageRequest(
 /** Store-backed usage report cache: keys, epoch, force-refresh markers, invalidation; used by AuthStorage. */
 export class UsageCache {
 	#epoch = 0;
-	#recoveryEpochs: Map<Provider, number> = new Map();
 	#refreshEpochs: Map<Provider, number> = new Map();
 	#allRefreshEpoch = 0;
 	#usageReportCacheKeysByProvider: Map<Provider, Set<string>> = new Map();
@@ -175,11 +174,6 @@ export class UsageCache {
 
 	bumpEpoch(): void {
 		this.#epoch += 1;
-	}
-
-	/** Identifies confirmed recoveries that supersede an in-flight failed probe. */
-	recoveryEpoch(provider: Provider): number {
-		return this.#recoveryEpochs.get(provider) ?? 0;
 	}
 
 	/**
@@ -315,40 +309,16 @@ export class UsageCache {
 		return `reports:${Bun.hash(snapshot).toString(16)}`;
 	}
 
-	/**
-	 * Force the next usage fetch for `provider` to bypass the 5-min cache, so
-	 * `/usage` reflects a freshly-redeemed reset instead of stale numbers.
-	 * `resetSpentCredentialId` also forgets that credential's cached saved-reset
-	 * block, so a failed follow-up reset probe cannot carry the pre-spend
-	 * inventory forward.
-	 */
-	invalidate(provider: string, baseUrl?: string, options?: { resetSpentCredentialId?: number }): void {
+	/** Force the next usage fetch for `provider` to bypass the cached snapshot. */
+	invalidate(provider: string, baseUrl?: string): void {
 		this.#epoch += 1;
 		const expired = Date.now() - 1;
 		for (const entry of this.#pool.entries(provider)) {
 			if (entry.credential.type !== "oauth") continue;
 			const cacheKey = this.reportKey(oauthUsageRequest(provider, entry.credential, baseUrl));
-			let value = this.getStale<UsageReport | null>(cacheKey)?.value ?? null;
-			if (value?.resetCredits && entry.id === options?.resetSpentCredentialId) {
-				const { resetCredits: _spent, ...rest } = value;
-				value = rest;
-			}
+			const value = this.getStale<UsageReport | null>(cacheKey)?.value ?? null;
 			this.set(cacheKey, { value, expiresAt: expired });
 		}
-	}
-
-	/** A confirmed reset permits one fresh probe even during a pre-reset failure cooldown. */
-	invalidateAfterReset(provider: Provider, baseUrl?: string, options?: { resetSpentCredentialId?: number }): void {
-		this.#recoveryEpochs.set(provider, this.recoveryEpoch(provider) + 1);
-		this.#bumpRefreshEpoch(provider);
-		if (!this.deletePrefix(`failure:report:${this.#usageCacheProviderKey(provider)}:`)) {
-			const keys = new Set(this.#usageReportCacheKeysByProvider.get(provider));
-			for (const entry of this.#pool.entries(provider)) {
-				keys.add(this.reportKey(usageRequest(provider, buildUsageCredential(entry.credential), baseUrl)));
-			}
-			for (const key of keys) this.set(this.failureKey(key), { value: null, expiresAt: 0 });
-		}
-		this.invalidate(provider, baseUrl, options);
 	}
 
 	/**

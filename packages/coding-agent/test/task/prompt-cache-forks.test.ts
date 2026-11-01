@@ -1,7 +1,7 @@
-import { afterEach, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import type { Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildTransformedCodexRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
@@ -20,8 +20,16 @@ import * as settingsStream from "@oh-my-pi/pi-coding-agent/session/settings-stre
 import type { TerminalLaunchRequest } from "@oh-my-pi/pi-coding-agent/subprocess/terminal-launch";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
-const muse = getBundledModel("muse-code", "muse-spark-1.3-contributor");
-const luna = getBundledModel("openai-codex", "gpt-6-luna");
+const eligibleModel = getBundledModel("github-copilot", "gpt-5.4");
+const ineligibleModel = getBundledModel("github-copilot", "gpt-5.5");
+
+beforeEach(() => {
+	const resolve = catalogPolicy.resolveCatalogPolicy;
+	vi.spyOn(catalogPolicy, "resolveCatalogPolicy").mockImplementation(model => ({
+		...resolve(model),
+		sharedPromptCache: model.provider === eligibleModel.provider && model.id === eligibleModel.id,
+	}));
+});
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -32,8 +40,7 @@ afterEach(() => {
 async function fixture() {
 	const dir = TempDir.createSync("@omp-task-cache-forks-");
 	const auth = await AuthStorage.create(dir.join("auth.db"));
-	auth.keys.setRuntime("muse-code", "test-key");
-	auth.keys.setRuntime("openai-codex", "test-key");
+	auth.keys.setRuntime("github-copilot", "test-key");
 	const sessions: AgentSession[] = [];
 	const requests: Array<{
 		key: unknown;
@@ -43,32 +50,21 @@ async function fixture() {
 	const mock = createMockModel({ handler: { content: [{ type: "text", text: "Review complete." }] } });
 	const realStreamFactory = settingsStream.createSettingsAwareStreamFn;
 	vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
-	vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slow) =>
-		realStreamFactory(
-			settings,
-			async (model, context, options) => {
-				const cacheOptions = {
-					sessionId: options?.sessionId,
-					promptCacheKey: options?.promptCacheKey,
-					providerSessionState: options?.providerSessionState,
-				};
-				const body =
-					model.api === "openai-codex-responses"
-						? await buildTransformedCodexRequestBody(
-								model as Model<"openai-codex-responses">,
-								context,
-								cacheOptions,
-							)
-						: buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
-				requests.push({
-					key: body.prompt_cache_key,
-					sessionId: options?.sessionId,
-					state: options?.providerSessionState,
-				});
-				return mock.stream(model, context, options);
-			},
-			slow,
-		),
+	vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+		realStreamFactory(settings, async (model, context, options) => {
+			const cacheOptions = {
+				sessionId: options?.sessionId,
+				promptCacheKey: options?.promptCacheKey,
+				providerSessionState: options?.providerSessionState,
+			};
+			const body = buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
+			requests.push({
+				key: body.prompt_cache_key,
+				sessionId: options?.sessionId,
+				state: options?.providerSessionState,
+			});
+			return mock.stream(model, context, options);
+		}),
 	);
 	const settings = Settings.isolated({
 		"async.enabled": true,
@@ -80,7 +76,7 @@ async function fixture() {
 		cwd: dir.path(),
 		agentDir: dir.path(),
 		authStorage: auth,
-		model: muse,
+		model: eligibleModel,
 		settings,
 		systemPrompt: ["Review the supplied code."],
 		toolNames: [],
@@ -152,7 +148,7 @@ it.each([false, true])(
 			taskPromptCacheKey: "parent:task",
 			providerPromptCacheKey: explicit ? "explicit-cache" : undefined,
 		});
-		await h.request(parent, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(parent, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		const before = h.requests.at(-1)!;
 		const launches: TerminalLaunchRequest[] = [];
 		const controller = new CommandController(h.context(parent), {
@@ -179,16 +175,16 @@ it.each([false, true])(
 			sessionManager: childManager,
 			providerPromptCacheKey: parsed.providerPromptCacheKey,
 		});
-		await h.request(child, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(child, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		expect(h.requests.at(-1)?.sessionId).not.toBe(before.sessionId);
 		expect(h.requests.at(-1)?.state).not.toBe(before.state);
-		await h.request(child, luna, explicit ? "explicit-cache" : undefined);
-		await h.request(child, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(child, ineligibleModel, explicit ? "explicit-cache" : undefined);
+		await h.request(child, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		expect(await parent.fork(undefined, { requireIdle: true })).toBe(true);
-		await h.request(parent, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(parent, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		expect(h.requests.at(-1)?.sessionId).not.toBe(before.sessionId);
-		await h.request(parent, luna, explicit ? "explicit-cache" : undefined);
-		await h.request(parent, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(parent, ineligibleModel, explicit ? "explicit-cache" : undefined);
+		await h.request(parent, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		for (const current of [manager, childManager]) {
 			const header = await persistedHeader(current);
 			expect(header.taskPromptCacheKey).toBe("parent:task");
@@ -204,17 +200,17 @@ it.each([false, true])("keeps tan's copied candidate model-gated (explicit=%s)",
 		taskPromptCacheKey: "parent:task",
 		providerPromptCacheKey: explicit ? "explicit-cache" : undefined,
 	});
-	await h.request(parent, muse, explicit ? "explicit-cache" : "parent:task");
+	await h.request(parent, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 	const parentRequest = h.requests.at(-1)!;
 	const realCreate = sdk.createAgentSession;
 	vi.spyOn(sdk, "createAgentSession").mockImplementation(async options => {
 		const created = await realCreate(options);
 		h.sessions.push(created.session);
-		await h.request(created.session, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(created.session, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		expect(h.requests.at(-1)?.sessionId).not.toBe(parentRequest.sessionId);
 		expect(h.requests.at(-1)?.state).not.toBe(parentRequest.state);
-		await h.request(created.session, luna, explicit ? "explicit-cache" : undefined);
-		await h.request(created.session, muse, explicit ? "explicit-cache" : "parent:task");
+		await h.request(created.session, ineligibleModel, explicit ? "explicit-cache" : undefined);
+		await h.request(created.session, eligibleModel, explicit ? "explicit-cache" : "parent:task");
 		return created;
 	});
 	const manager = parent.asyncJobManager;
@@ -240,7 +236,7 @@ it("restores automatic affinity from disk without promoting a legacy fork fallba
 	await using h = await fixture();
 	const manager = SessionManager.create(h.dir.path(), h.dir.join("parent"));
 	const seed = await h.create({ sessionManager: manager });
-	await h.request(seed, muse, undefined);
+	await h.request(seed, eligibleModel, undefined);
 	await seed.fork();
 	const inherited = manager.getHeader()?.providerPromptCacheKey;
 	expect(inherited).toBeDefined();
@@ -252,22 +248,22 @@ it("restores automatic affinity from disk without promoting a legacy fork fallba
 		providerPromptCacheKey: inherited,
 		providerPromptCacheKeySource: "fork",
 	});
-	await h.request(seeded, muse, "restored:task");
+	await h.request(seeded, eligibleModel, "restored:task");
 	expect((await persistedHeader(reopened)).providerPromptCacheKey).toBeUndefined();
 	await seeded.dispose();
 	const restored = await h.create({
 		sessionManager: await SessionManager.open(reopened.getSessionFile()!, h.dir.path()),
 	});
-	await h.request(restored, muse, "restored:task");
-	await h.request(restored, luna, undefined);
-	await h.request(restored, muse, "restored:task");
+	await h.request(restored, eligibleModel, "restored:task");
+	await h.request(restored, ineligibleModel, undefined);
+	await h.request(restored, eligibleModel, "restored:task");
 	await restored.dispose();
 	const overridden = await h.create({
 		sessionManager: await SessionManager.open(reopened.getSessionFile()!, h.dir.path()),
 		providerPromptCacheKey: "caller-override",
 	});
-	await h.request(overridden, muse, "caller-override");
-	await h.request(overridden, luna, "caller-override");
+	await h.request(overridden, eligibleModel, "caller-override");
+	await h.request(overridden, ineligibleModel, "caller-override");
 });
 
 it("clears automatic affinity on new and partial sessions and restores the destination on switch", async () => {
@@ -276,15 +272,15 @@ it("clears automatic affinity on new and partial sessions and restores the desti
 		sessionManager: SessionManager.create(h.dir.path(), h.dir.join("parent")),
 		taskPromptCacheKey: "parent:task",
 	});
-	await h.request(session, muse, "parent:task");
+	await h.request(session, eligibleModel, "parent:task");
 	const originalFile = session.sessionManager.getSessionFile()!;
 	expect(await session.newSession()).toBe(true);
-	await h.request(session, muse, undefined);
+	await h.request(session, eligibleModel, undefined);
 	expect(await session.switchSession(originalFile)).toBe(true);
-	await h.request(session, muse, "parent:task");
+	await h.request(session, eligibleModel, "parent:task");
 	const leaf = session.sessionManager.getBranch().find(entry => entry.type === "message");
 	if (!leaf) throw new Error("Missing message to fork");
 	expect(await session.fork(leaf.id)).toBe(true);
-	await h.request(session, muse, undefined);
+	await h.request(session, eligibleModel, undefined);
 	expect((await persistedHeader(session.sessionManager)).taskPromptCacheKey).toBeUndefined();
 });

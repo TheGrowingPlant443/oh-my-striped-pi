@@ -21,7 +21,7 @@ describe("AgentSession before_agent_start attribution fallback", () => {
 
 	beforeEach(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -49,8 +49,7 @@ describe("AgentSession before_agent_start attribution fallback", () => {
 			emit: vi.fn().mockResolvedValue(undefined),
 		} as unknown as ExtensionRunner;
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 		const agent = new Agent({
 			getApiKey: () => "test-key",

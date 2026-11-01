@@ -12,7 +12,7 @@ function parseEnvInteger(raw: string): number | undefined {
 	return Number.isFinite(value) ? value : undefined;
 }
 
-// Hindsight (https://hindsight.vectorize.io)
+// Explicitly configured self-hosted Hindsight server.
 export const cfgHindsightApiUrl = register({
 	id: "hindsight.apiUrl",
 	env: "HINDSIGHT_API_URL",
@@ -22,7 +22,7 @@ export const cfgHindsightApiUrl = register({
 		tab: "memory",
 		group: "Hindsight",
 		label: "Hindsight API URL",
-		description: "Hindsight server URL (Cloud or self-hosted)",
+		description: "Private Hindsight server URL (default: local server on port 8888)",
 		condition: "hindsightActive",
 	},
 });

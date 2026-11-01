@@ -30,7 +30,6 @@ import {
 	createCustomMessage,
 } from "@oh-my-pi/pi-agent-core/compaction/messages";
 import { type AuthCredential, SqliteAuthCredentialStore, type TSchema } from "@oh-my-pi/pi-ai";
-import { piEscapeRegexLiteral, piJoinPath } from "@oh-my-pi/pi-ai/providers/cursor-pi-args";
 import { getKeybindings, type Keybinding, Text } from "@oh-my-pi/pi-tui";
 import {
 	escapeXmlText,
@@ -595,7 +594,7 @@ export function createGrepToolDefinition(cwd: string, options?: GrepToolOptions)
 		renderResult: legacyRenderResult,
 		execute: async (toolCallId, params, signal, onUpdate) => {
 			const rawPattern = stringField(params, "pattern") ?? "";
-			const pattern = booleanField(params, "literal") ? piEscapeRegexLiteral(rawPattern) : rawPattern;
+			const pattern = booleanField(params, "literal") ? RegExp.escape(rawPattern) : rawPattern;
 			const searchPath = stringField(params, "path") ?? ".";
 			const glob = stringField(params, "glob");
 			let isFile = false;
@@ -620,7 +619,12 @@ export function createGrepToolDefinition(cwd: string, options?: GrepToolOptions)
 				toolCallId,
 				{
 					pattern,
-					path: glob && !isFile ? piJoinPath(searchPath, glob) : searchPath,
+					path:
+						glob && !isFile
+							? !searchPath || searchPath === "." || path.isAbsolute(glob)
+								? glob
+								: path.join(searchPath, glob)
+							: searchPath,
 					case: booleanField(params, "ignoreCase") ? false : undefined,
 				},
 				signal,
@@ -644,10 +648,14 @@ export function createFindToolDefinition(cwd: string, options?: FindToolOptions)
 		description: "Find files by glob pattern.",
 		parameters: legacyFindSchema,
 		approval: "read",
-		approvalCacheTargets: params =>
-			tool.approvalCacheTargets?.({
-				path: piJoinPath(stringField(params, "path") ?? ".", stringField(params, "pattern") ?? "*"),
-			}),
+		approvalCacheTargets: params => {
+			const pattern = stringField(params, "pattern") ?? "*";
+			const searchPath = stringField(params, "path") ?? ".";
+			return tool.approvalCacheTargets?.({
+				path:
+					!searchPath || searchPath === "." || path.isAbsolute(pattern) ? pattern : path.join(searchPath, pattern),
+			});
+		},
 		renderCall: (params, optionsArg, themeArg) => {
 			const theme = renderTheme(optionsArg, themeArg);
 			const pattern = stringField(params, "pattern") ?? "";
@@ -682,7 +690,15 @@ export function createFindToolDefinition(cwd: string, options?: FindToolOptions)
 			}
 			return tool.execute(
 				toolCallId,
-				{ path: piJoinPath(searchPath, pattern), hidden: true, gitignore: true, limit },
+				{
+					path:
+						!searchPath || searchPath === "." || path.isAbsolute(pattern)
+							? pattern
+							: path.join(searchPath, pattern),
+					hidden: true,
+					gitignore: true,
+					limit,
+				},
 				signal,
 				onUpdate,
 			);

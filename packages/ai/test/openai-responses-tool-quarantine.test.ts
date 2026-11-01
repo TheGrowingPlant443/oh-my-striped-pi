@@ -5,19 +5,20 @@ import type { Context, Model, ModelSpec, Tool } from "@oh-my-pi/pi-ai/types";
 import { findStrictToolSchemaViolation } from "@oh-my-pi/pi-ai/utils/schema";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
-function makeModel(provider: "openai" | "xai-oauth" = "openai"): Model<"openai-responses"> {
-	return buildModel({
-		id: provider === "xai-oauth" ? "grok-4" : "gpt-5",
-		name: provider === "xai-oauth" ? "Grok 4" : "GPT-5",
+function makeModel(rejectRootObjectUnion = false): Model<"openai-responses"> {
+	const model = buildModel({
+		id: "gpt-5",
+		name: "GPT-5",
 		api: "openai-responses",
-		provider,
-		baseUrl: provider === "xai-oauth" ? "https://api.x.ai/v1" : "https://api.openai.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 400000,
 		maxTokens: 128000,
 	} as ModelSpec<"openai-responses">);
+	return { ...model, compat: { ...model.compat, rejectRootObjectUnion } };
 }
 
 describe("findStrictToolSchemaViolation (#2652)", () => {
@@ -116,8 +117,8 @@ describe("convertTools quarantine (#2652)", () => {
 		expect(out).toHaveLength(1);
 	});
 
-	test("flattens an exclusive-required MCP tool on xAI Responses", () => {
-		const out = convertTools([coverageTool, goodTool], true, makeModel("xai-oauth")) as Array<{
+	test("flattens an exclusive-required MCP tool when the endpoint rejects root unions", () => {
+		const out = convertTools([coverageTool, goodTool], true, makeModel(true)) as Array<{
 			name: string;
 			parameters: { anyOf?: unknown };
 		}>;
@@ -155,7 +156,7 @@ describe("convertTools quarantine (#2652)", () => {
 		expect(out[0]?.parameters.anyOf).toHaveLength(2);
 	});
 
-	test("quarantines a leftover object-root union on xAI Responses only", () => {
+	test("quarantines a leftover object-root union only when the endpoint rejects it", () => {
 		const leftoverTool: Tool = {
 			name: "mcp__leftover_union",
 			description: "union",
@@ -168,7 +169,7 @@ describe("convertTools quarantine (#2652)", () => {
 				],
 			} as unknown as Tool["parameters"],
 		};
-		const out = convertTools([leftoverTool, goodTool], true, makeModel("xai-oauth")) as Array<{ name: string }>;
+		const out = convertTools([leftoverTool, goodTool], true, makeModel(true)) as Array<{ name: string }>;
 		expect(out.map(t => t.name)).toEqual(["read_file"]);
 	});
 	test("reports the hidden tool name and the offending schema path", () => {

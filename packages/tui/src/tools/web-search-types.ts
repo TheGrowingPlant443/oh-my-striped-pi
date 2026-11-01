@@ -5,38 +5,13 @@
  */
 
 /**
- * Display label for every search implementation: `web/*` engines and the
- * chat-model groundings. Keys are the ids providers report in
+ * Display label for every independent `web/*` search engine.
+ * Keys are the ids providers report in
  * {@link SearchResponse.provider} and search errors.
  */
 export const SEARCH_PROVIDER_LABELS = {
-	parallel: "Parallel",
-	perplexity: "Perplexity",
-	gemini: "Gemini",
-	anthropic: "Anthropic",
-	codex: "OpenAI Codex",
-	openai: "OpenAI API",
-	xai: "xAI",
-	openrouter: "OpenRouter",
-	zai: "Z.AI",
-	exa: "Exa",
-	tinyfish: "TinyFish",
-	jina: "Jina",
-	kagi: "Kagi",
-	tavily: "Tavily",
-	firecrawl: "Firecrawl",
-	brave: "Brave",
-	deepseek: "DeepSeek",
-	kimi: "Kimi",
-	synthetic: "Synthetic",
-	ollama: "Ollama",
 	searxng: "SearXNG",
-	startpage: "Startpage",
-	duckduckgo: "DuckDuckGo",
-	ecosia: "Ecosia",
-	google: "Google",
-	mojeek: "Mojeek",
-	public: "Public Web",
+	firecrawl: "Firecrawl",
 } as const;
 
 /** Id of a search implementation; see {@link SEARCH_PROVIDER_LABELS}. */

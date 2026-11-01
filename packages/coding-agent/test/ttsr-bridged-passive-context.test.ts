@@ -1,16 +1,9 @@
 import { afterAll, describe, expect, it } from "bun:test";
-import {
-	Agent,
-	type AgentTool,
-	type AgentToolContext,
-	TOOL_RESULT_ADDITIONAL_CONTEXT,
-	type ToolResultWithAdditionalContext,
-} from "@oh-my-pi/pi-agent-core";
+import { Agent, type AgentTool, type AgentToolContext } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { CursorExecHandlers } from "@oh-my-pi/pi-coding-agent/cursor";
 import { TtsrManager } from "@oh-my-pi/pi-coding-agent/export/ttsr";
 import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
 import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
@@ -19,7 +12,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { Tool, ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
 import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
@@ -246,31 +239,6 @@ describe("TTSR reminders on bridged tool calls", () => {
 		expect(leading).toContain(RULE.content);
 		expect(rest).toHaveLength(control.content.length);
 		expect(rest.join("\n")).not.toContain("system-reminder");
-		expect(injectedRules()).toEqual([RULE.name]);
-		await session.dispose();
-	});
-
-	it("reaches a Cursor exec write as passive context, not tool output", async () => {
-		using dir = TempDir.createSync("@pi-ttsr-bridged-cursor-");
-		const { session, settings, wrappedWrite, injectedRules } = await createBridgedHarness(dir.path());
-		const handlers = new CursorExecHandlers({
-			cwd: dir.path(),
-			tools: new Map<string, Tool>([["write", wrappedWrite as unknown as Tool]]),
-			getToolContext: () => ({ settings, autoApprove: true }) as unknown as AgentToolContext,
-		});
-		const target = `${dir.path()}/probe.ts`;
-
-		const message = (await handlers.piWrite({
-			toolCallId: "cursor-write",
-			args: { path: target, content: "FORBIDDEN_TOKEN\n" },
-		} as never)) as ToolResultWithAdditionalContext;
-
-		expect(message.isError).toBe(false);
-		expect(await Bun.file(target).exists()).toBe(true);
-		expect(JSON.stringify(message.content)).not.toContain("system-reminder");
-		const carried = message[TOOL_RESULT_ADDITIONAL_CONTEXT];
-		expect(carried).toContain(`<system-reminder reason="rule_violation" rule="${RULE.name}"`);
-		expect(carried).toContain(RULE.content);
 		expect(injectedRules()).toEqual([RULE.name]);
 		await session.dispose();
 	});

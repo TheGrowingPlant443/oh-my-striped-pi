@@ -1,10 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Agent, AgentBusyError } from "@oh-my-pi/pi-agent-core";
-import type { ApiKey, AssistantMessage, AssistantRetryRecovery, Model, Usage } from "@oh-my-pi/pi-ai";
+import {
+	type ApiKey,
+	type AssistantMessage,
+	type AssistantRetryRecovery,
+	Effort,
+	type Model,
+	type Usage,
+} from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
 import * as envApiKey from "@oh-my-pi/pi-ai/env-api-key";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { resolveAssistantErrorPresentation } from "@oh-my-pi/pi-tui/chat/transcript-render-helpers";
@@ -15,6 +24,22 @@ import type { SessionMessageEntry } from "@oh-my-pi/pi-coding-agent/session/sess
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
+
+const recoverySpec: ModelSpec<"anthropic-messages"> = {
+	id: "company-recovery",
+	name: "Company recovery",
+	provider: "company-recovery",
+	api: "anthropic-messages",
+	baseUrl: "https://recovery.company.invalid",
+	reasoning: true,
+	thinking: { mode: "budget", efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High, Effort.XHigh] },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+};
+const recoveryModel = buildModel(recoverySpec);
 
 type AutoRetryEndEvent = Extract<AgentSessionEvent, { type: "auto_retry_end" }>;
 
@@ -30,8 +55,6 @@ const RATE_LIMIT_ERROR =
 const SOCKET_CLOSE_MID_STREAM =
 	"The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()";
 const RETRIABLE_SERVER_ERROR = "503 service unavailable: overloaded_error";
-const CODEX_STEER_REJECTION =
-	"Codex error event: The experimental native turn lane cannot accept stateful WebSocket messages while a native turn is running. Start a new independent response.create turn instead. (code=unsupported_native_inflight_message)";
 
 function emptyUsage(): Usage {
 	return {
@@ -55,8 +78,8 @@ function assistantMessage(overrides: Partial<AssistantMessage>): AssistantMessag
 		role: "assistant",
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-5",
+		provider: recoveryModel.provider,
+		model: recoveryModel.id,
 		usage: emptyUsage(),
 		stopReason: "stop",
 		timestamp: 1,
@@ -133,13 +156,20 @@ describe("AgentSession retry recovery", () => {
 		fixtureDir = TempDir.createSync("@pi-retry-recovery-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "testauth.db"));
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir.path(), "models.yml"));
+		modelRegistry.registerProvider(recoverySpec.provider, {
+			api: recoverySpec.api,
+			baseUrl: recoverySpec.baseUrl,
+			// Keys come from runtime/stored credentials per test; a config apiKey would shadow credential rotation.
+			auth: "none",
+			models: [toProviderModelConfig(recoverySpec)],
+		});
 	});
 
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-retry-recovery-");
 		vi.spyOn(envApiKey, "getEnvApiKey").mockReturnValue(undefined);
-		await authStorage.credentials.remove("anthropic");
-		authStorage.keys.removeRuntime("anthropic");
+		await authStorage.credentials.remove(recoverySpec.provider);
+		authStorage.keys.removeRuntime(recoverySpec.provider);
 		modelRegistry.clearSuppressedSelectors();
 		sessions = [];
 		managers = [];
@@ -162,15 +192,11 @@ describe("AgentSession retry recovery", () => {
 	});
 
 	async function runCredentialRecovery(): Promise<RecoveryRun> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
-		}
-
-		authStorage.keys.removeRuntime("anthropic");
-		await authStorage.credentials.set("anthropic", [
-			{ type: "api_key", key: "anthropic-key-1" },
-			{ type: "api_key", key: "anthropic-key-2" },
+		const model = recoveryModel;
+		authStorage.keys.removeRuntime(model.provider);
+		await authStorage.credentials.set(model.provider, [
+			{ type: "api_key", key: "company-key-1" },
+			{ type: "api_key", key: "company-key-2" },
 		]);
 
 		const mock = createMockModel();
@@ -226,9 +252,8 @@ describe("AgentSession retry recovery", () => {
 	}
 
 	it("waitForIdle waits for retry recovery event delivery", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled Anthropic test model to exist");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = recoveryModel;
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const mock = createMockModel({
 			responses: [{ throw: RETRIABLE_SERVER_ERROR }, { content: ["Recovered after retry."], stopReason: "stop" }],
 		});
@@ -299,7 +324,7 @@ describe("AgentSession retry recovery", () => {
 	it("marks a recovered retry error, emits it, persists it, and excludes only model-context replay", async () => {
 		const { sessionManager, retryEndEvents, requestedKeys } = await runCredentialRecovery();
 
-		expect(new Set(requestedKeys)).toEqual(new Set(["anthropic-key-1", "anthropic-key-2"]));
+		expect(new Set(requestedKeys)).toEqual(new Set(["company-key-1", "company-key-2"]));
 		expect(retryEndEvents).toHaveLength(1);
 		expect(retryEndEvents[0]).toMatchObject({ success: true, attempt: 1 });
 		expect(retryEndEvents[0].retryErrors).toHaveLength(1);
@@ -353,11 +378,8 @@ describe("AgentSession retry recovery", () => {
 	});
 
 	it("waits through a local busy overlap before continuing an automatic retry", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
-		}
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		const model = recoveryModel;
+		authStorage.keys.setRuntime(model.provider, "company-test-key");
 
 		const mock = createMockModel({
 			responses: [
@@ -421,9 +443,8 @@ describe("AgentSession retry recovery", () => {
 	});
 
 	it("does not issue another provider request when a retry races session abort", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled Anthropic test model to exist");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = recoveryModel;
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const mock = createMockModel({
 			responses: [{ throw: RETRIABLE_SERVER_ERROR }, { content: ["resumed on request"], stopReason: "stop" }],
 		});
@@ -470,11 +491,8 @@ describe("AgentSession retry recovery", () => {
 	});
 
 	it("collapses exhausted retries into one terminal error naming the spent budget", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
-		}
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		const model = recoveryModel;
+		authStorage.keys.setRuntime(model.provider, "company-test-key");
 
 		const mock = createMockModel({
 			responses: [{ throw: RETRIABLE_SERVER_ERROR }, { throw: RETRIABLE_SERVER_ERROR }],
@@ -559,8 +577,8 @@ describe("AgentSession retry recovery", () => {
 		responses: MockResponse[],
 		maxRetries = 2,
 		models: { primary: Model; fallback: Model } = {
-			primary: getBundledModel("anthropic", "claude-sonnet-4-5"),
-			fallback: getBundledModel("openai", "gpt-5.5"),
+			primary: recoveryModel,
+			fallback: getBundledModel("github-copilot", "gpt-5.5"),
 		},
 	): Promise<{
 		primary: string;
@@ -676,46 +694,6 @@ describe("AgentSession retry recovery", () => {
 		const errors = assistantEntries(sessionManager).filter(candidate => candidate.message.stopReason === "error");
 		expect(errors).toHaveLength(1);
 		expect(errors[0].message.retryRecovery).toMatchObject({ recovery: "model" });
-	});
-
-	const codexModels = {
-		primary: getBundledModel("openai-codex", "gpt-6-astra"),
-		fallback: getBundledModel("openai-codex", "gpt-6.1-sol"),
-	};
-	const steerRejectedAfterThinking: MockResponse = {
-		content: [{ type: "thinking", thinking: "planning the next tool call" }],
-		stopReason: "error",
-		errorMessage: CODEX_STEER_REJECTION,
-	};
-
-	it("retries a Codex steering rejection on the same model instead of consulting the fallback chain", async () => {
-		// Codex dropped the response because omp steered it mid-stream, after
-		// reasoning had streamed. The provider already stopped steering the
-		// session, so the primary replays cleanly; switching models fixes nothing.
-		const { primary, requestedModels, fallbackEvents, sessionManager } = await runFallbackChainRecovery(
-			[steerRejectedAfterThinking, { content: ["recovered on the same model"], stopReason: "stop" }],
-			2,
-			codexModels,
-		);
-
-		expect(requestedModels).toEqual([primary, primary]);
-		expect(fallbackEvents).toEqual([]);
-		successfulAssistantEntry(sessionManager, "recovered on the same model");
-		const errors = assistantEntries(sessionManager).filter(candidate => candidate.message.stopReason === "error");
-		expect(errors).toHaveLength(1);
-		expect(errors[0].message.retryRecovery).toMatchObject({ recovery: "plain" });
-	});
-
-	it("still consults the fallback chain for a Codex steering rejection when no same-model retry is left", async () => {
-		// With `retry.maxRetries: 0` the chain is the only recovery left.
-		const { primary, fallback, requestedModels, fallbackEvents } = await runFallbackChainRecovery(
-			[steerRejectedAfterThinking, { content: ["recovered on fallback"], stopReason: "stop" }],
-			0,
-			codexModels,
-		);
-
-		expect(requestedModels).toEqual([primary, fallback]);
-		expect(fallbackEvents).toHaveLength(1);
 	});
 
 	it("maps assistant error presentation for recovered, unrecovered, and silent abort turns", () => {

@@ -1,24 +1,5 @@
-/**
- * TypeSafe and OpenRouter use the `{ model, state, questions }` body. Images
- * join `state` without replacing it (see {@link stateWithImages}): TypeSafe as
- * references to a top-level `assets` map, OpenRouter as `image_url` data URL
- * parts. Cloudflare optionally accepts image data URLs in its envelope.
- *
- * - `typesafe`: `POST {baseUrl}/v1/systemone` — TypeSafe and every System One
- *   server (OpenJEV, Kev, self-hosted Clef, OpenCode Zen, Command Code).
- * - `openrouter-decisions`: `POST {baseUrl}/decisions` under OpenRouter's
- *   `/api/alpha`; usage adds the billed `cost` in USD.
- * - `workers-ai-systemone`: Cloudflare Workers AI's `POST {baseUrl}/{model}`
- *   (`/client/v4/accounts/<account>/ai/run/@cf/cloudflare/clef`). The body
- *   names the model by its last path segment (`clef`), adds a top-level array
- *   of base64 data URLs when images are supplied, and returns Cloudflare's
- *   `{ result, success, errors }` envelope. The credential is a Cloudflare
- *   API token plus the account id the URL needs.
- */
-import { parseCloudflareCredential } from "@oh-my-pi/pi-catalog/wire/cloudflare";
-import { $env, isRecord } from "@oh-my-pi/pi-utils";
-import * as AIError from "../error";
-import { embeddedImageDataUrl } from "../images/shared";
+/** System One protocol, supported by OpenJEV, Kev and self-hosted Clef. */
+import { isRecord } from "@oh-my-pi/pi-utils";
 import type { ImageContent } from "../types";
 import {
 	type BoxQuestion,
@@ -153,55 +134,4 @@ export const typesafeWire: JudgmentWire = {
 			assets,
 		};
 	},
-};
-
-/** OpenRouter Decisions: System One body under `/api/alpha`, with image parts preserved in state. */
-export const openrouterDecisionsWire: JudgmentWire = {
-	...systemOneWire("/decisions"),
-	images: {},
-	imagesRequireOptIn: true,
-	boxes: true,
-	encode(request, model) {
-		const imageParts: JsonValue[] = (request.images ?? []).map(image => ({
-			type: "image_url",
-			image_url: {
-				url: embeddedImageDataUrl(image),
-				...(image.detail !== undefined ? { detail: image.detail === "original" ? "auto" : image.detail } : {}),
-			},
-		}));
-		return {
-			state: imageParts.length ? stateWithImages(request.state, imageParts) : request.state,
-			model,
-			questions: wireQuestions(request.questions),
-		};
-	},
-};
-
-/** Cloudflare Workers AI decision models (Clef) through the account-scoped `ai/run` route. */
-export const workersAiWire: JudgmentWire = {
-	// Clef's `images` extension: https://developers.cloudflare.com/workers-ai/models/clef/
-	images: {
-		mimeTypes: ["image/png", "image/jpeg", "image/webp"],
-		maxCount: 4,
-		maxBytes: 4 * 1024 * 1024,
-		maxTotalBytes: 8 * 1024 * 1024,
-		maxPixels: 16_000_000,
-	},
-	target(baseUrl, model, key) {
-		const credential = parseCloudflareCredential(key);
-		const accountId = credential?.accountId ?? $env.CLOUDFLARE_ACCOUNT_ID?.trim();
-		if (!accountId) {
-			throw new AIError.ConfigurationError(
-				"Cloudflare account ID is required: log in to Cloudflare Workers AI again or set CLOUDFLARE_ACCOUNT_ID",
-			);
-		}
-		return { url: `${baseUrl.replace("<account>", accountId)}/${model}`, token: credential?.token ?? key };
-	},
-	encode: (request, model) => ({
-		state: request.state,
-		model: model.slice(model.lastIndexOf("/") + 1),
-		questions: request.questions,
-		...(request.images?.length ? { images: request.images.map(embeddedImageDataUrl) } : {}),
-	}),
-	decode: payload => (isRecord(payload) ? decodeSystemOne(payload.result) : undefined),
 };

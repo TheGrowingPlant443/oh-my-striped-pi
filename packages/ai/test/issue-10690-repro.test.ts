@@ -8,7 +8,6 @@ import { createOpenAIResponsesHistoryPayload } from "@oh-my-pi/pi-ai/utils";
 import type { AssistantMessage, Context, Model } from "@oh-my-pi/pi-ai/types";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 // Issue #10690: follow-up to #8248. The Responses reasoning synthesizer replays a
 // reasoning item for each assistant turn a DeepSeek-family target requires. When
@@ -63,7 +62,25 @@ function reasoningTextOf(item: ResponsesInputItem): string {
 		.join("");
 }
 
-const deepseek = getBundledModel("opencode-go", "deepseek-v4-flash") as Model<"openai-responses">;
+const deepseek = buildModel({
+	id: "deepseek-v4-flash",
+	name: "Reasoning Replay",
+	api: "openai-responses",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: [Effort.Low, Effort.High], defaultLevel: Effort.High },
+	compat: {
+		requiresReasoningContentForAllAssistantTurns: true,
+		requiresReasoningContentForToolCalls: true,
+		replayReasoningContent: true,
+		supportsReasoningEffort: true,
+	},
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 16_000,
+});
 
 const usage = {
 	input: 0,
@@ -80,7 +97,7 @@ describe("issue #10690: DeepSeek Responses replay must never synthesize empty re
 		const prior: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "opencode-go",
+			provider: "github-copilot",
 			model: "deepseek-v4-flash",
 			stopReason: "stop",
 			usage,
@@ -112,7 +129,7 @@ describe("issue #10690: DeepSeek Responses replay must never synthesize empty re
 		const prior: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "opencode-go",
+			provider: "github-copilot",
 			model: "deepseek-v4-flash",
 			stopReason: "stop",
 			usage,
@@ -148,7 +165,7 @@ describe("issue #10690: DeepSeek Responses replay must never synthesize empty re
 		const prior: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "opencode-go",
+			provider: "github-copilot",
 			model: "deepseek-v4-flash",
 			stopReason: "stop",
 			usage,
@@ -177,10 +194,16 @@ describe("issue #10690: DeepSeek Responses replay must never synthesize empty re
 			id: "deepseek-flash",
 			name: "DeepSeek Flash",
 			api: "openai-responses",
-			provider: "custom-deepseek",
-			baseUrl: "https://api.deepseek.com",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
 			thinking: { mode: "effort", efforts: [Effort.Low, Effort.High], defaultLevel: Effort.High },
+			compat: {
+				requiresReasoningContentForAllAssistantTurns: true,
+				requiresReasoningContentForToolCalls: true,
+				replayReasoningContent: true,
+				supportsReasoningEffort: true,
+			},
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 			contextWindow: 128_000,

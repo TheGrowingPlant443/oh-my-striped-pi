@@ -122,9 +122,6 @@ describe("ModelRegistry", () => {
 					custom: {
 						compat: {
 							supportsStore: false,
-							promptCacheMode: "explicit",
-							openRouterRouting: { only: ["example"], onyl: ["example"] },
-							vercelGatewayRouting: { order: ["example"], oder: [] },
 							reasoningEffortMap: { high: "high", hgh: "high" },
 							whenThinking: {
 								supportsStroe: false,
@@ -144,8 +141,6 @@ describe("ModelRegistry", () => {
 		const listing = await listModels();
 		expect(listing.stderr.trim().split("\n")).toEqual(
 			[
-				"openRouterRouting.onyl",
-				"vercelGatewayRouting.oder",
 				"reasoningEffortMap.hgh",
 				"whenThinking.supportsStroe",
 				"whenThinking.whenThinking",
@@ -166,7 +161,6 @@ describe("ModelRegistry", () => {
 					custom: {
 						compat: {
 							supportsStore: false,
-							promptCacheMode: "explicit",
 							extraBody: { custom: { nested: true } },
 							supportsSamplingParams: false,
 							streamFirstEventTimeoutMs: 0,

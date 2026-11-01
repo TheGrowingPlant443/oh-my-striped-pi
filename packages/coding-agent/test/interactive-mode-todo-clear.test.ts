@@ -33,8 +33,8 @@ describe("InteractiveMode todo HUD persistence", () => {
 			mode.stop();
 			await session.dispose();
 		}
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		eventBus = new EventBus();
 		session = new AgentSession({
 			agent: new Agent({
@@ -157,8 +157,8 @@ describe("InteractiveMode todo HUD persistence", () => {
 	it("reloads the visible HUD from the explicitly attached session", async () => {
 		setTodoClearDelay(-1);
 		const focusedDir = TempDir.createSync("@pi-focused-todo-");
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		const focusedSession = new AgentSession({
 			agent: new Agent({
 				initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
@@ -254,8 +254,8 @@ describe("InteractiveMode todo HUD persistence", () => {
 		await mode.init();
 
 		const focusedDir = TempDir.createSync("@pi-focused-reconcile-");
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		const focusedSession = new AgentSession({
 			agent: new Agent({
 				initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
@@ -333,8 +333,8 @@ describe("InteractiveMode todo HUD persistence", () => {
 		await mode.init();
 
 		const workerDir = TempDir.createSync("@pi-owner-reconcile-");
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		const workerSession = new AgentSession({
 			agent: new Agent({
 				initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
@@ -596,8 +596,8 @@ describe("InteractiveMode todo HUD anchor", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		session = new AgentSession({
 			agent: new Agent({
 				initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },

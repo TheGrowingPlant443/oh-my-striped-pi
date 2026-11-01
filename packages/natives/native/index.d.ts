@@ -378,30 +378,6 @@ export declare class LineMatcher {
   matchLines(text: string): LineMatches
 }
 
-/** WebRTC peer that accepts 16 kHz mono PCM and renders remote Opus audio. */
-export declare class LiveWebRtcPeer {
-  /**
-   * Create an idle peer and register its event, output-level, and failure
-   * callbacks.
-   */
-  constructor(onEvent: (error: Error | null, payload: string) => void, onLevel: (error: Error | null, level: number) => void, onFailure: (error: Error | null, message: string) => void)
-  /** Start the native media peer and return its SDP offer. */
-  createOffer(): Promise<string>
-  /** Apply the remote SDP answer returned by Codex signaling. */
-  acceptAnswer(sdp: string): Promise<void>
-  /** Wait until the `oai-events` data channel is open. */
-  waitForOpen(timeoutMs?: number | undefined | null): Promise<void>
-  /** Queue 16 kHz mono floating-point PCM for Opus transmission. */
-  pushAudio(samples: Float32Array): void
-  /**
-   * Enable or disable microphone transmission, discarding partial muted
-   * frames.
-   */
-  setMuted(muted: boolean): void
-  /** Close media, the data channel, the peer connection, and speaker playback. */
-  close(): Promise<void>
-}
-
 /**
  * Long-lived macOS appearance observer.
  *

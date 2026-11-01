@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Settings } from "../../src/config/settings";
 import { AgentSession } from "../../src/session/agent-session";
@@ -12,12 +13,27 @@ import type { Skill } from "../../src/extensibility/skills";
 import { computeSessionContextBreakdown } from "../../src/session/context-usage-runtime";
 import type { ContextViewData } from "@oh-my-pi/pi-tui/chrome/context-view-model";
 
-const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+const model = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 const sessions: AgentSession[] = [];
 afterEach(async () => {
 	for (const session of sessions.splice(0)) await session.dispose();
 	vi.restoreAllMocks();
 });
+
+function responsesModel(id: string) {
+	return buildModel({
+		id,
+		name: id,
+		provider: "company-responses",
+		api: "openai-responses",
+		baseUrl: "https://inference.company.example/v1",
+		reasoning: true,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128000,
+		maxTokens: 8192,
+	});
+}
 
 function tool(name: string): AgentTool {
 	return {
@@ -280,7 +296,7 @@ describe("context snapshot assistant reasoning", () => {
 		{ name: "payload-only reasoning", explicitThinking: false },
 		{ name: "payload with an explicit thinking block", explicitThinking: true },
 	])("counts one reasoning budget without exposing its payload: $name", ({ explicitThinking }) => {
-		const reader = getBundledModel<"openai-codex-responses">("openai-codex", "gpt-6.1-sol")!;
+		const reader = responsesModel("gpt-6.1-sol");
 		const message = payloadReply(reader, explicitThinking);
 		const session = sessionWith({ model: reader, prompt: [], messages: [message] });
 		const before = structuredClone(session.messages);
@@ -296,7 +312,7 @@ describe("context snapshot assistant reasoning", () => {
 	});
 
 	it("keeps the tokenizer's thinking budget at message scope without assigning it to individual blocks", () => {
-		const reader = getBundledModel<"openai-codex-responses">("openai-codex", "gpt-6.1-sol")!;
+		const reader = responsesModel("gpt-6.1-sol");
 		const summary = "A visible summary of the second reasoning item.";
 		const message: AssistantMessage = {
 			...reply([
@@ -336,7 +352,7 @@ describe("context snapshot assistant reasoning", () => {
 		expect(totalTokens(data)).toBe(messageTokens);
 		expect(JSON.stringify(data)).not.toMatch(/private-first|private-second|rs_first|rs_second/);
 
-		session.agent.setModel(getBundledModel("openai-codex", "gpt-6-sol")!);
+		session.agent.setModel(responsesModel("gpt-6-sol"));
 		const demoted = buildSessionContextView(session);
 		expect(category(demoted, "assistant-thinking").tokens).toBe(session.agent.tokenizer.countTokens(summary));
 	});

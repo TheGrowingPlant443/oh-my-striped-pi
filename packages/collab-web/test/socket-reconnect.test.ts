@@ -3,7 +3,7 @@ import { GuestClient } from "../src/lib/client";
 import { encodeBase64Url } from "../src/lib/link";
 
 const NativeWebSocket = globalThis.WebSocket;
-const LINK = `transient-network-room#${encodeBase64Url(new Uint8Array(32))}`;
+const LINK = `ws://localhost:7466/r/transient-network-room#${encodeBase64Url(new Uint8Array(32))}`;
 
 class ScriptedWebSocket {
 	static readonly CONNECTING = 0;

@@ -41,7 +41,6 @@ import {
 	cfgRatchetEnabled,
 } from "../tools/settings";
 import { cfgSkillful } from "../session/settings";
-import { formatSlowModeResetClock } from "../session/anthropic-slow-mode";
 import { cfgExtendedContext } from "../session/context-settings";
 import { cfgGoalEnabled } from "../goals/settings";
 import { cfgPlanEnabled } from "../plan-mode/settings";
@@ -108,36 +107,19 @@ function runFastCommand(arg: string, session: AgentSession): string | undefined 
 	}
 }
 
-const SLOW_UNSUPPORTED =
-	"The current model has no slow mode: /slow uses the flex tier on OpenAI/Google models and low priority on Anthropic subscriptions.";
+const SLOW_UNSUPPORTED = "Slow mode is unavailable for the current model.";
 
-/**
- * `/slow [on|off|status]` for the active model: the `flex` service tier on
- * OpenAI/Google, subscription low priority (`providers.anthropic.slowMode`
- * `auto`/`off`) on Anthropic. Bare invocation toggles. Returns the user-facing
- * reply, or `undefined` for an unknown argument.
- */
+/** Toggle the active model's flex service tier. */
 function runSlowCommand(arg: string, session: AgentSession): string | undefined {
 	if (arg !== "" && arg !== "toggle" && arg !== "on" && arg !== "off" && arg !== "status") return undefined;
-	const anthropic = session.model?.provider === "anthropic";
 	if (arg === "status") {
-		const label = anthropic ? session.getAnthropicSlowModeLabel() : undefined;
-		if (!session.isSlowModeEnabled()) return label ? `Slow mode is off (${label}).` : "Slow mode is off.";
-		if (!anthropic) return "Slow mode is on (flex tier).";
-		return label ? `Slow mode is on (${label}).` : "Slow mode is on (low priority at the Claude session limit).";
+		return session.isSlowModeEnabled() ? "Slow mode is on (flex tier)." : "Slow mode is off.";
 	}
 	const enabled = arg === "on" || (arg !== "off" && !session.isSlowModeEnabled());
 	if (!session.setSlowMode(enabled)) return SLOW_UNSUPPORTED;
-	if (!session.isSlowModeEnabled()) {
-		return anthropic
-			? "Slow mode off: at your Claude usage limit, requests may get a short wrap-up allowance, then wait for the limit to reset."
-			: "Slow mode off.";
-	}
-	if (!anthropic) return "Slow mode on: requests use the flex tier (lower cost, higher latency).";
-	const resetsAtSec = session.getAnthropicSlowModeLane()?.activeResetsAtSec();
-	return resetsAtSec !== undefined
-		? `Slow mode on: continuing at low priority until your limit resets at ${formatSlowModeResetClock(resetsAtSec)}. Your weekly limit still applies, and responses may pause while waiting for spare capacity.`
-		: "Slow mode on: when your Claude subscription hits its session limit and Anthropic offers low priority, requests switch to it after any wrap-up allowance.";
+	return session.isSlowModeEnabled()
+		? "Slow mode on: requests use the flex tier (lower cost, higher latency)."
+		: "Slow mode off.";
 }
 
 /** `/extended-context status` label for the premium long-context window setting. */
@@ -535,13 +517,12 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "slow",
 		icon: "fast",
-		description:
-			"Toggle slow mode: flex tier on OpenAI/Google; on Anthropic, continue at low priority after the Claude session limit",
+		description: "Toggle slow mode: use the flex service tier",
 		acpDescription: "Toggle slow mode",
 		acpInputHint: "[on|off|status]",
 		subcommands: [
-			{ name: "on", description: "Flex tier, or Anthropic low priority at the session limit (auto)" },
-			{ name: "off", description: "Standard service; stop Anthropic low priority" },
+			{ name: "on", description: "Use the flex tier" },
+			{ name: "off", description: "Use standard service" },
 			{ name: "status", description: "Show slow mode status" },
 		],
 		allowArgs: true,

@@ -140,17 +140,6 @@ export const commands: CommandEntry[] = [
 		help: commandHelp.gitHelp,
 	},
 	{
-		name: "grievances",
-		load: () => import("./commands/grievances").then(m => m.default),
-		help: commandHelp.grievancesHelp,
-	},
-	{
-		name: "images",
-		load: () => import("./commands/images").then(m => m.default),
-		aliases: ["img"],
-		help: commandHelp.imagesHelp,
-	},
-	{
 		name: "if-bench",
 		load: () => import("./commands/if-bench").then(m => m.default),
 		help: commandHelp.ifBenchHelp,
@@ -197,19 +186,9 @@ export const commands: CommandEntry[] = [
 		help: commandHelp.sayHelp,
 	},
 	{
-		name: "clip",
-		load: () => import("./commands/clip").then(m => m.default),
-		help: commandHelp.clipHelp,
-	},
-	{
 		name: "play",
 		load: () => import("./commands/play").then(m => m.default),
 		help: commandHelp.playHelp,
-	},
-	{
-		name: "share",
-		load: () => import("./commands/share").then(m => m.default),
-		help: commandHelp.shareHelp,
 	},
 	{
 		name: "session",
@@ -251,11 +230,6 @@ export const commands: CommandEntry[] = [
 		name: "stats",
 		load: () => import("./commands/stats").then(m => m.default),
 		help: commandHelp.statsHelp,
-	},
-	{
-		name: "stream",
-		load: () => import("./commands/stream").then(m => m.default),
-		help: commandHelp.streamHelp,
 	},
 	{
 		name: "update",

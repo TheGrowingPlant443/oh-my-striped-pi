@@ -13,10 +13,10 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
 const model: Model<"anthropic-messages"> = buildModel({
 	api: "anthropic-messages",
-	provider: "anthropic",
-	id: "claude-sonnet-4-5",
+	provider: "github-copilot",
+	id: "claude-sonnet-4.5",
 	name: "Claude Sonnet 4.5",
-	baseUrl: "https://api.anthropic.com",
+	baseUrl: "https://api.githubcopilot.com",
 	input: ["text"],
 	cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
 	maxTokens: 8192,
@@ -24,25 +24,12 @@ const model: Model<"anthropic-messages"> = buildModel({
 	reasoning: true,
 });
 
-const googleModel: Model<"google-generative-ai"> = buildModel({
-	api: "google-generative-ai",
-	provider: "google",
-	id: "gemini-2.5-pro",
-	name: "Gemini 2.5 Pro",
-	baseUrl: "https://generativelanguage.googleapis.com",
-	input: ["text"],
-	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	maxTokens: 8192,
-	contextWindow: 200000,
-	reasoning: false,
-});
-
-const googleCliModel: Model<"google-gemini-cli"> = buildModel({
-	api: "google-gemini-cli",
-	provider: "google-gemini-cli",
-	id: "gemini-2.5-pro",
-	name: "Gemini 2.5 Pro",
-	baseUrl: "https://cloudcode-pa.googleapis.com",
+const completionsModel: Model<"openai-completions"> = buildModel({
+	api: "openai-completions",
+	provider: "github-copilot",
+	id: "gpt-4o",
+	name: "GPT-4o",
+	baseUrl: "https://api.githubcopilot.com",
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	maxTokens: 8192,
@@ -55,8 +42,8 @@ function assistant(content: AssistantMessage["content"], timestamp: number): Ass
 		role: "assistant",
 		content,
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot",
+		model: "claude-sonnet-4.5",
 		usage: {
 			input: 0,
 			output: 0,
@@ -250,9 +237,7 @@ describe("transformMessages drops malformed (empty-name) tool calls", () => {
 		]);
 	});
 
-	// Regression for #15839: models invent tool names from internal URL schemes
-	// (`proc://*`) while polling background work. Strict targets reject replayed
-	// names with `.` or `:`, while Google accepts them.
+	// Regression for #15839: invented URL-scheme names must not poison replay.
 	it("drops invalid tool names and results for the target's charset", () => {
 		const messages: Message[] = [
 			{ role: "user", content: "wait for the background job", timestamp: 1 },
@@ -274,12 +259,6 @@ describe("transformMessages drops malformed (empty-name) tool calls", () => {
 			{ role: "user", content: "continue", timestamp: 7 },
 		];
 
-		const googleHistory = transformMessages(messages, googleModel);
-		expect(getToolCalls(googleHistory).map(call => call.id)).toEqual(["call_google"]);
-		expect(googleHistory.flatMap(message => (message.role === "toolResult" ? [message.toolCallId] : []))).toEqual([
-			"call_google",
-		]);
-
 		const strictHistory = transformMessages(messages, model);
 		expect(getToolCalls(strictHistory).map(call => call.id)).toEqual(["call_digit"]);
 		expect(strictHistory.flatMap(message => (message.role === "toolResult" ? [message.toolCallId] : []))).toEqual([
@@ -287,7 +266,7 @@ describe("transformMessages drops malformed (empty-name) tool calls", () => {
 		]);
 	});
 
-	it("keeps function names only within the selected Google endpoint's length limit", () => {
+	it("keeps function names within the Copilot completions length limit", () => {
 		const messages: Message[] = [
 			{ role: "user", content: "inspect the file", timestamp: 1 },
 			assistant(
@@ -303,11 +282,7 @@ describe("transformMessages drops malformed (empty-name) tool calls", () => {
 			toolResult("call_129", "Tool not found", 5),
 		];
 
-		expect(getToolCalls(transformMessages(messages, googleModel)).map(call => call.id)).toEqual([
-			"call_64",
-			"call_65",
-		]);
-		const cliHistory = transformMessages(messages, googleCliModel);
+		const cliHistory = transformMessages(messages, completionsModel);
 		expect(getToolCalls(cliHistory).map(call => call.id)).toEqual(["call_64"]);
 		expect(cliHistory.flatMap(message => (message.role === "toolResult" ? [message.toolCallId] : []))).toEqual([
 			"call_64",

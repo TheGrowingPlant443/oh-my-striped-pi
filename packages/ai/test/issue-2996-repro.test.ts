@@ -46,11 +46,11 @@ function baseContext(): Context {
 
 /** A custom openai-completions provider model (e.g. yunwu/glm-5.2) with reasoning enabled. */
 function customReasoningModel(id = "glm-5.2"): Model<"openai-completions"> {
-	const base = getBundledModel("openai", "gpt-4o-mini");
+	const base = getBundledModel("github-copilot", "gpt-4o");
 	return buildModel({
 		...base,
 		api: "openai-completions",
-		provider: "yunwu",
+		provider: "github-copilot",
 		baseUrl: "https://yunwu.ai/v1",
 		id,
 		reasoning: true,

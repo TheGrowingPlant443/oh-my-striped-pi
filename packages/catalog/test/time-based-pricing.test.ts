@@ -8,23 +8,19 @@ import {
 	calculateCost,
 	calculateUncachedInputCost,
 	calculateUsageCost,
-	getBundledModel,
-	getEffectiveTokenCost,
-	getBundledModels,
 	getNextTimeBasedPricingTransition,
 	getTimeBasedPricingPeriod,
 } from "@oh-my-pi/pi-catalog/models";
 import type { ModelCost, ModelSpec, Usage } from "@oh-my-pi/pi-catalog/types";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import { isTimeBasedCost, materializeTimeBasedCost } from "../src/pricing";
 
-function spec(id = "deepseek-v4-flash", provider = "deepseek"): ModelSpec<"openai-completions"> {
+function spec(id = "scheduled-test", provider = "pricing-test"): ModelSpec<"openai-completions"> {
 	return {
 		id,
 		provider,
 		name: id,
 		api: "openai-completions",
-		baseUrl: "https://api.deepseek.com",
+		baseUrl: "https://pricing.example/v1",
 		reasoning: true,
 		input: ["text"],
 		contextWindow: 1_000_000,
@@ -44,13 +40,32 @@ function usage(input = 1_000_000, output = 1_000_000, cacheRead = 1_000_000, cac
 	};
 }
 
+function scheduledModel() {
+	return buildModel({
+		...spec(),
+		cost: {
+			input: 0.3,
+			output: 1.2,
+			cacheRead: 0.006,
+			cacheWrite: 0,
+			timeBased: {
+				offPeakMultiplier: 0.5,
+				peakWindows: [
+					{ weekdays: [1, 2, 3, 4, 5], startMinute: 60, endMinute: 240 },
+					{ weekdays: [1, 2, 3, 4, 5], startMinute: 360, endMinute: 600 },
+				],
+			},
+		},
+	});
+}
+
 const monday = Date.parse("2026-09-07T00:00:00Z");
 const peak = Date.parse("2026-09-10T02:00:00Z");
 const offPeak = Date.parse("2026-09-10T05:00:00Z");
 
 describe("time-based token pricing", () => {
 	it("uses half-open intervals at every UTC window edge", () => {
-		const model = buildModel(spec());
+		const model = scheduledModel();
 		for (const [minute, before, at] of [
 			[60, 0.15, 0.3],
 			[240, 0.3, 0.15],
@@ -64,7 +79,7 @@ describe("time-based token pricing", () => {
 	});
 
 	it("charges peak on every weekday and off-peak all weekend, independent of local date", () => {
-		const model = buildModel(spec());
+		const model = scheduledModel();
 		for (let day = 0; day < 7; day++) {
 			for (const minute of [120, 420]) {
 				expect(
@@ -79,7 +94,7 @@ describe("time-based token pricing", () => {
 	});
 
 	it("prices mixed uncached, cached, and output tokens at each request's frozen timestamp", () => {
-		const model = buildModel(spec());
+		const model = scheduledModel();
 		const first = usage();
 		const second = usage();
 		calculateCost(model, first, peak);
@@ -95,40 +110,6 @@ describe("time-based token pricing", () => {
 			expect(second.cost[field as keyof Usage["cost"]]).toBeCloseTo(expected * 0.5, 12);
 		}
 		expect(first.cost.total + second.cost.total).toBeCloseTo(2.259, 12);
-	});
-
-	it("keeps Pro billing distinct from Flash after the canceled September transition", () => {
-		const cutoff = Date.parse("2026-09-14T04:00:00Z");
-		const nextPeak = Date.parse("2026-09-14T06:00:00Z");
-		const proCard = { input: 1.32, output: 3.96, cacheRead: 0.044, cacheWrite: 0 };
-		const flashCard = { input: 0.3, output: 1.2, cacheRead: 0.006, cacheWrite: 0 };
-		for (const pro of [buildModel(spec("deepseek-v4-pro")), getBundledModel("deepseek", "deepseek-v4-pro")]) {
-			expect(getEffectiveTokenCost(pro.cost, cutoff)).toMatchObject(proCard);
-			expect(getEffectiveTokenCost(pro.cost, nextPeak)).toMatchObject(proCard);
-			expect(calculateCost(pro, usage(), cutoff - 1).total).toBeCloseTo(5.324, 12);
-			expect(calculateCost(pro, usage(), cutoff).total).toBeCloseTo(2.662, 12);
-			expect(calculateCost(pro, usage(), nextPeak).total).toBeCloseTo(5.324, 12);
-		}
-		expect(getEffectiveTokenCost(buildModel(spec("deepseek-flash")).cost, nextPeak)).toMatchObject(flashCard);
-	});
-
-	it("applies first-party policies to documented aliases but not reseller or expiring products", () => {
-		for (const id of ["deepseek-flash", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"]) {
-			expect(calculateCost(buildModel(spec(id)), usage(), offPeak).total).toBeCloseTo(0.753, 12);
-		}
-		for (const candidate of [
-			spec("deepseek-v4-flash", "openrouter"),
-			spec("deepseek/deepseek-v4-pro", "together"),
-			spec("deepseek-v4.1-flash-expires-on-0910"),
-		]) {
-			const model = buildModel(candidate);
-			expect(calculateCost(model, usage(), offPeak).total).toBeCloseTo(30, 12);
-		}
-		// Bundled rows must carry the same materialized pricing as discovery-built rows.
-		expect(calculateCost(getBundledModel("deepseek", "deepseek-v4-flash"), usage(), offPeak).total).toBeCloseTo(
-			0.753,
-			12,
-		);
 	});
 
 	it("selects effective rates before context tiers and discounts all billable token dimensions", () => {
@@ -183,7 +164,7 @@ describe("time-based token pricing", () => {
 			expect(calculateUsageCost(flat, usage()).total).toBeCloseTo(30, 12);
 			expect(calculateUncachedInputCost(flat, 1_000_000)).toBeCloseTo(9, 12);
 			expect(clock).not.toHaveBeenCalled();
-			const scheduled = buildModel(spec()).cost;
+			const scheduled = scheduledModel().cost;
 			expect(calculateUsageCost(scheduled, usage()).total).toBeCloseTo(0.753, 12);
 		} finally {
 			clock.mockRestore();
@@ -391,53 +372,5 @@ describe("pricing discovery and cache", () => {
 		} finally {
 			await fs.rm(tempDir, { recursive: true, force: true });
 		}
-	});
-});
-
-describe("deepseek provider metadata corrections", () => {
-	// The bundled bare alias predates the discovery metadata that carries its
-	// limits, and the agent sizes its context budget from the resolved model:
-	// with a null window it skips over-context compaction entirely. The manager
-	// takes spec-shaped rows and re-builds them, so the bundled row is cast here
-	// exactly as the other catalog tests do.
-	it("gives the bare Flash alias its documented limits through provider resolution", async () => {
-		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-catalog-bare-alias-limits-"));
-		const bundled = getBundledModels("deepseek").find(model => model.id === "deepseek-flash");
-		if (!bundled) throw new Error("Expected a bundled deepseek-flash row");
-		const staticSpec = bundled as ModelSpec<"openai-completions">;
-		try {
-			const { models } = await resolveProviderModels<"openai-completions">(
-				{ providerId: "deepseek", staticModels: [staticSpec], cacheDbPath: path.join(tempDir, "models.db") },
-				"offline",
-			);
-			const resolved = models.find(model => model.id === "deepseek-flash");
-			expect(resolved?.contextWindow).toBe(1_000_000);
-			expect(resolved?.maxTokens).toBe(384_000);
-		} finally {
-			await fs.rm(tempDir, { recursive: true, force: true });
-		}
-	});
-	it("resolves the V4.1 thinking ladder for the bare Flash alias", () => {
-		const bundled = getBundledModels("deepseek").find(model => model.id === "deepseek-flash");
-		if (!bundled) throw new Error("Expected a bundled deepseek-flash row");
-		const resolved = buildModel(bundled as ModelSpec<"openai-completions">);
-		expect(resolved.reasoning).toBe(true);
-		expect(resolved.thinking).toEqual({ mode: "effort", efforts: [Effort.Low, Effort.High, Effort.Max] });
-	});
-	it("upgrades a stale non-reasoning Flash alias spec to the V4.1 ladder", () => {
-		const resolved = buildModel({ ...spec("deepseek-flash"), reasoning: false });
-		expect(resolved.reasoning).toBe(true);
-		expect(resolved.thinking?.efforts).toEqual([Effort.Low, Effort.High, Effort.Max]);
-	});
-	it("resolves the V4.1 tool-call replay contract for the bare Flash alias", () => {
-		const bundled = getBundledModels("deepseek").find(model => model.id === "deepseek-flash");
-		if (!bundled) throw new Error("Expected a bundled deepseek-flash row");
-		const resolved = buildModel(bundled as ModelSpec<"openai-completions">);
-		expect(resolved.compat.supportsToolChoice).toBe(false);
-		expect(resolved.compat.maxTokensField).toBe("max_tokens");
-		expect(resolved.compat.reasoningContentField).toBe("reasoning_content");
-		expect(resolved.compat.requiresReasoningContentForToolCalls).toBe(true);
-		expect(resolved.compat.requiresAssistantContentForToolCalls).toBe(true);
-		expect(resolved.compat.allowsSyntheticReasoningContentForToolCalls).toBe(false);
 	});
 });

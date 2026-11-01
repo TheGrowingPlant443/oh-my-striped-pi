@@ -111,7 +111,7 @@ function todoFailure(text: string): Extract<AgentSessionEvent, { type: "tool_exe
 	} as Extract<AgentSessionEvent, { type: "tool_execution_end" }>;
 }
 
-describe("EventController + Cursor todo bridge", () => {
+describe("EventController tool completion ordering", () => {
 	it("sanitizes provider error text before it reaches the status line", async () => {
 		// The bridge forwards the server's error string verbatim, so this text is
 		// untrusted terminal input. Raw tabs punch holes in the single-line status
@@ -149,11 +149,7 @@ describe("EventController + Cursor todo bridge", () => {
 	});
 
 	it("settles a card whose completion arrived before the streamed block created it", async () => {
-		// The Cursor bridge's `tool_execution_end` is a synchronous callback fired
-		// mid-parse, while the `toolcall_start` for the same call is queued on
-		// `AssistantMessageEventStream` and delivered a microtask later. When the
-		// server packs start and completion into one HTTP/2 chunk, the controller
-		// sees the completion FIRST — with nothing in `pendingTools` to settle.
+		// Completion and streamed argument notifications can arrive out of order.
 		// Dropping it stranded the card the streamed block creates moments later,
 		// animating for the rest of the session.
 		const f = createFixture();
@@ -289,75 +285,5 @@ describe("EventController + Cursor todo bridge", () => {
 		expect(f.blocks).toHaveLength(1);
 		expect(f.ctx.pendingTools.size).toBe(0);
 		expect(f.ctx.setTodos).toHaveBeenCalledWith(phases);
-	});
-
-	it("restores buffered results as held completions after transcript reset", async () => {
-		const pending = {
-			role: "toolResult" as const,
-			toolCallId: "grep-restore-1",
-			toolName: "grep",
-			content: [{ type: "text" as const, text: "RESTORE_MATCH_LINE" }],
-			isError: false,
-			timestamp: 1,
-		};
-		const ctx = createInteractiveModeContext({
-			streamingComponent: new AssistantMessageComponent(),
-			session: {
-				agent: {
-					getPendingToolResults: () => [pending],
-				},
-			},
-		});
-		const blocks: Component[] = [];
-		const addChild = ctx.chatContainer.addChild.bind(ctx.chatContainer);
-		vi.spyOn(ctx.chatContainer, "addChild").mockImplementation(block => {
-			blocks.push(block);
-			addChild(block);
-		});
-		const controller = new EventController(ctx);
-		const showWarning = vi.spyOn(ctx, "showWarning");
-
-		controller.resetTranscriptAnchors();
-		await controller.handleEvent(streamedToolBlock("grep-restore-1", "grep", { pattern: "restore" }));
-		await controller.handleEvent(streamedToolBlock("grep-restore-1", "grep", { pattern: "restore" }));
-
-		expect(blocks).toHaveLength(1);
-		expect(ctx.pendingTools.size).toBe(0);
-		expect(Bun.stripANSI(blocks[0]!.render(120).join("\n"))).toContain("RESTORE_MATCH_LINE");
-		expect(showWarning).not.toHaveBeenCalled();
-	});
-
-	it("reseeds held completions from buffered results at agent_start", async () => {
-		const pending = {
-			role: "toolResult" as const,
-			toolCallId: "grep-restore-2",
-			toolName: "grep",
-			content: [{ type: "text" as const, text: "AGENT_START_MATCH" }],
-			isError: false,
-			timestamp: 1,
-		};
-		const ctx = createInteractiveModeContext({
-			streamingComponent: new AssistantMessageComponent(),
-			session: {
-				agent: {
-					getPendingToolResults: () => [pending],
-				},
-			},
-		});
-		const blocks: Component[] = [];
-		const addChild = ctx.chatContainer.addChild.bind(ctx.chatContainer);
-		vi.spyOn(ctx.chatContainer, "addChild").mockImplementation(block => {
-			blocks.push(block);
-			addChild(block);
-		});
-		const controller = new EventController(ctx);
-
-		await controller.handleEvent({ type: "agent_start" } as Extract<AgentSessionEvent, { type: "agent_start" }>);
-		await controller.handleEvent(streamedToolBlock("grep-restore-2", "grep", { pattern: "start" }));
-		await controller.handleEvent(streamedToolBlock("grep-restore-2", "grep", { pattern: "start" }));
-
-		expect(blocks).toHaveLength(1);
-		expect(ctx.pendingTools.size).toBe(0);
-		expect(Bun.stripANSI(blocks[0]!.render(120).join("\n"))).toContain("AGENT_START_MATCH");
 	});
 });

@@ -1,7 +1,7 @@
-import { untilAborted } from "@oh-my-pi/pi-utils";
 import * as AIError from "../error";
-import { getProviderDefinition, PASTE_CODE_LOGIN_PROVIDERS } from "../registry";
+import { getProviderDefinition } from "../registry";
 import { getOAuthProvider } from "../registry/oauth";
+import { assertSupportedOAuthCredentialProvider } from "./provider-policy";
 import type { OAuthProviderId } from "../registry/oauth/types";
 import { providerTypeKey } from "./blocks";
 import type { SessionAffinity } from "./affinity";
@@ -58,23 +58,7 @@ export class OAuthAccounts implements OAuthApi {
 	 * login registered.
 	 */
 	async login(provider: OAuthProviderId, ctrl: OAuthLoginController): Promise<OAuthLoginIdentity | undefined> {
-		// Only paste-code providers (fixed non-loopback redirect, e.g. GitLab Duo
-		// Agent's vscode:// URI) get a default manual-code prompt. For loopback OAuth
-		// providers an eager paste prompt adds noise to a flow that normally completes
-		// through HTTP. Synthesizing the default only for paste-code providers is the
-		// authoritative gate (it covers every caller, not
-		// just the CLI); an explicit caller-supplied `onManualCodeInput` is still
-		// honored for any provider as an escape hatch.
-		const manualCodeInput = PASTE_CODE_LOGIN_PROVIDERS.has(provider)
-			? (signal?: AbortSignal) =>
-					untilAborted(signal, () =>
-						ctrl.onPrompt({
-							message: "Paste the authorization code (or full redirect URL):",
-						}),
-					)
-			: undefined;
-		// Built-in registry first, then runtime-registered extension providers.
-		const def = getProviderDefinition(provider) ?? getOAuthProvider(provider);
+		const def = getOAuthProvider(provider) ?? getProviderDefinition(provider);
 		if (!def?.login) {
 			throw new AIError.ConfigurationError(`Unknown OAuth provider: ${provider}`);
 		}
@@ -82,7 +66,7 @@ export class OAuthAccounts implements OAuthApi {
 			onAuth: ctrl.onAuth,
 			onProgress: ctrl.onProgress,
 			onPrompt: ctrl.onPrompt,
-			onManualCodeInput: ctrl.onManualCodeInput ?? manualCodeInput,
+			onManualCodeInput: ctrl.onManualCodeInput,
 			onBrowserSession: ctrl.onBrowserSession,
 			signal: ctrl.signal,
 			fetch: ctrl.fetch,
@@ -373,6 +357,7 @@ export class OAuthAccounts implements OAuthApi {
 		provider: string,
 		options: StoredOAuthRefreshOptions<T>,
 	): Promise<StoredOAuthRefreshResult<T>> {
+		assertSupportedOAuthCredentialProvider(provider);
 		return this.#deps.refresher.refreshStored(provider, options);
 	}
 }

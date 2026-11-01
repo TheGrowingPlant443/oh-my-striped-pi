@@ -4,17 +4,9 @@
 
 import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
 import * as AIError from "../../error";
-import { jwtExpiryMs, NEVER_EXPIRES } from "../engine/common";
 import { getProviderDefinition, PROVIDER_REGISTRY } from "../registry";
-import type {
-	OAuthCredentials,
-	OAuthProvider,
-	OAuthProviderId,
-	OAuthProviderInfo,
-	OAuthProviderInterface,
-} from "./types";
+import type { OAuthCredentials, OAuthProviderId, OAuthProviderInfo, OAuthProviderInterface } from "./types";
 
-export * from "./anthropic";
 export * from "./device-code";
 export type * from "./types";
 
@@ -29,35 +21,26 @@ const builtInOAuthProviders: OAuthProviderInfo[] = PROVIDER_REGISTRY.filter(
 
 const customOAuthProviders = new Map<string, OAuthProviderInterface>();
 
-/**
- * Register a custom OAuth provider.
- */
+/** Register an operator/extension-owned OAuth implementation. */
 export function registerOAuthProvider(provider: OAuthProviderInterface): void {
+	if (!provider.id.trim() || provider.id.includes("\0")) {
+		throw new AIError.ConfigurationError("OAuth provider id must be a nonempty name without NUL characters");
+	}
 	customOAuthProviders.set(provider.id, provider);
 }
 
-/**
- * Remove a custom OAuth provider by ID.
- */
 export function unregisterOAuthProvider(id: string): void {
 	customOAuthProviders.delete(id);
 }
 
-/**
- * Get a custom OAuth provider by ID.
- */
 export function getOAuthProvider(id: OAuthProviderId): OAuthProviderInterface | undefined {
 	return customOAuthProviders.get(id);
 }
 
-/**
- * Remove all custom OAuth providers registered by a source.
- */
+/** Remove only the registrations belonging to the unloading extension. */
 export function unregisterOAuthProviders(sourceId: string): void {
-	for (const [id, provider] of customOAuthProviders.entries()) {
-		if (provider.sourceId === sourceId) {
-			customOAuthProviders.delete(id);
-		}
+	for (const [id, provider] of customOAuthProviders) {
+		if (provider.sourceId === sourceId) customOAuthProviders.delete(id);
 	}
 }
 
@@ -65,7 +48,7 @@ export function unregisterOAuthProviders(sourceId: string): void {
  * Refresh a built-in OAuth grant, cancelling provider work when refresh ownership ends.
  */
 export async function refreshOAuthToken(
-	provider: OAuthProvider,
+	provider: OAuthProviderId,
 	credentials: OAuthCredentials,
 	signal?: AbortSignal,
 ): Promise<OAuthCredentials> {
@@ -75,7 +58,7 @@ export async function refreshOAuthToken(
 			provider,
 		});
 	}
-	const def = getProviderDefinition(provider);
+	const def = getOAuthProvider(provider) ?? getProviderDefinition(provider);
 	if (!def?.login) {
 		throw new AIError.OAuthError(`Unknown OAuth provider: ${provider}`, {
 			kind: "validation",
@@ -85,20 +68,6 @@ export async function refreshOAuthToken(
 	// Providers without a real refresher (static bearer tokens / API keys that
 	// don't expire) return the credentials unchanged.
 	return def.refreshToken ? def.refreshToken(credentials, signal) : credentials;
-}
-const JWT_EXPIRY_SKEW_MS = 5 * 60_000;
-export function normalizeOAuthCredentialExpiry<T extends OAuthCredentials>(provider: string, credentials: T): T {
-	if (authPolicyFor(provider)?.expiry !== "jwt-or-never") return credentials;
-
-	// Trust a JWT expiry claim when present; otherwise treat providers with
-	// non-expiring sessions as such rather than honoring stale stored expiry
-	// timestamps written by older login implementations.
-	const normalizedExpires =
-		credentials.expires > 0 && credentials.expires < 10_000_000_000
-			? credentials.expires * 1000
-			: credentials.expires;
-	const expires = jwtExpiryMs(credentials.access, JWT_EXPIRY_SKEW_MS) ?? Math.max(normalizedExpires, NEVER_EXPIRES);
-	return expires === credentials.expires ? credentials : ({ ...credentials, expires } as T);
 }
 /**
  * Build API-key bytes for a provider from an already-fresh OAuth credential.
@@ -113,16 +82,15 @@ export function normalizeOAuthCredentialExpiry<T extends OAuthCredentials>(provi
  * @throws Error if the credential is expired and must be refreshed upstream
  */
 export async function getOAuthApiKey(
-	provider: OAuthProvider,
+	provider: OAuthProviderId,
 	credentials: Record<string, OAuthCredentials>,
 ): Promise<{ newCredentials: OAuthCredentials; apiKey: string } | null> {
-	let creds = credentials[provider];
+	const creds = credentials[provider];
 	if (!creds) {
 		return null;
 	}
 
 	const policy = authPolicyFor(provider);
-	creds = normalizeOAuthCredentialExpiry(provider, creds);
 	// Refresh is the sole responsibility of `AuthStorage` (which calls
 	// `refreshOAuthToken` directly with broker-aware single-flighting). If we
 	// reach here with an expired credential, the outer pipeline failed to
@@ -138,8 +106,10 @@ export async function getOAuthApiKey(
 	}
 	// Providers declaring `api-key-format "structured"` need request-time
 	// credential metadata, so the API key is the JSON-encoded credential.
-	const apiKey =
-		policy?.apiKeyFormat === "structured"
+	const custom = getOAuthProvider(provider);
+	const apiKey = custom?.getApiKey
+		? custom.getApiKey(creds)
+		: policy?.apiKeyFormat === "structured"
 			? JSON.stringify({
 					apiEndpoint: creds.apiEndpoint,
 					token: creds.access,
@@ -158,16 +128,16 @@ export async function getOAuthApiKey(
  * Get list of OAuth providers.
  */
 export function getOAuthProviders(): OAuthProviderInfo[] {
-	const customProviders = Array.from(customOAuthProviders.values(), provider => ({
+	const custom = Array.from(customOAuthProviders.values(), provider => ({
 		id: provider.id,
 		name: provider.name,
 		available: true,
 		storeCredentialsAs: provider.storeCredentialsAs,
 	}));
-	return [...builtInOAuthProviders, ...customProviders];
+	return [...builtInOAuthProviders.filter(provider => !customOAuthProviders.has(provider.id)), ...custom];
 }
 
-/** Provider id that stores `providerId`'s credentials: login aliases (`openai-codex-device`) map to their target (`openai-codex`). */
+/** Login aliases store under their declared target identity. */
 export function getOAuthCredentialProvider(providerId: string): string {
 	return getOAuthProviders().find(provider => provider.id === providerId)?.storeCredentialsAs ?? providerId;
 }

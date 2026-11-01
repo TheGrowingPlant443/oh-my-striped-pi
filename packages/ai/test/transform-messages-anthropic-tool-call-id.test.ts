@@ -13,7 +13,7 @@ const GEMINI_ID = `call_abc123/thoughtSignature=CiQBxY9z${"a".repeat(80)}==`;
 function makeModel(): Model<"anthropic-messages"> {
 	return buildModel({
 		api: "anthropic-messages",
-		provider: "custom-gemini",
+		provider: "github-copilot",
 		id: "gemini-3-pro",
 		name: "Gemini via anthropic-messages proxy",
 		baseUrl: "https://proxy.example.com/anthropic",
@@ -30,7 +30,7 @@ function assistantWithCall(id: string, source: Partial<AssistantMessage>): Assis
 		role: "assistant",
 		content: [{ type: "toolCall", id, name: "get_weather", arguments: { location: "Paris" } }],
 		api: "anthropic-messages",
-		provider: "custom-gemini",
+		provider: "github-copilot",
 		model: "gemini-3-pro",
 		usage: {
 			input: 0,
@@ -75,7 +75,7 @@ describe("anthropic-messages tool-call id normalization", () => {
 		const model = makeModel();
 		const messages: Message[] = [
 			{ role: "user", content: "weather?", timestamp: 0 },
-			assistantWithCall(GEMINI_ID, { provider: "custom-gemini", model: "gemini-3-pro" }),
+			assistantWithCall(GEMINI_ID, { provider: "github-copilot", model: "gemini-3-pro" }),
 			toolResult(GEMINI_ID),
 		];
 
@@ -90,7 +90,7 @@ describe("anthropic-messages tool-call id normalization", () => {
 		const messages: Message[] = [
 			{ role: "user", content: "weather?", timestamp: 0 },
 			// Foreign IDs must satisfy the target's wire contract.
-			assistantWithCall(GEMINI_ID, { provider: "openai", model: "gpt-4", api: "anthropic-messages" }),
+			assistantWithCall(GEMINI_ID, { provider: "github-copilot", model: "gpt-4", api: "anthropic-messages" }),
 			toolResult(GEMINI_ID),
 		];
 

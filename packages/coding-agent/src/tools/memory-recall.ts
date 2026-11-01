@@ -2,7 +2,7 @@ import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import { logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
 import { isHindsightConfigured, loadHindsightConfig } from "../hindsight/config";
-import { formatCurrentTime, formatMemories } from "../hindsight/content";
+import { formatCurrentTime, formatMemories } from "../memory-backend/content";
 import recallDescription from "../prompts/tools/recall.md" with { type: "text" };
 import { sessionMemoryToolRefs } from "../memory-backend/tool-names";
 import type { ToolSession } from ".";
@@ -33,7 +33,7 @@ export class MemoryRecallTool implements AgentTool<typeof memoryRecallSchema> {
 
 	static createIf(session: ToolSession): MemoryRecallTool | null {
 		const backend = cfgMemoryBackend.get(session.settings);
-		if (backend !== "hindsight" && backend !== "mnemopi") return null;
+		if (backend !== "mnemopi" && backend !== "hindsight") return null;
 		if (backend === "hindsight" && !isHindsightConfigured(loadHindsightConfig(session.settings))) return null;
 		return new MemoryRecallTool(session);
 	}
@@ -71,11 +71,9 @@ export class MemoryRecallTool implements AgentTool<typeof memoryRecallSchema> {
 				}
 			}
 
+			if (backend !== "hindsight") throw new Error("No searchable memory backend is active for this session.");
 			const state = this.session.getHindsightSessionState?.();
-			if (!state) {
-				throw new Error("Hindsight backend is not initialised for this session.");
-			}
-
+			if (!state) throw new Error("Hindsight backend is not initialised for this session.");
 			try {
 				const response = await state.client.recall(state.bankId, params.query, {
 					budget: state.config.recallBudget,
@@ -83,21 +81,17 @@ export class MemoryRecallTool implements AgentTool<typeof memoryRecallSchema> {
 					types: state.config.recallTypes.length > 0 ? state.config.recallTypes : undefined,
 					tags: state.recallTags,
 					tagsMatch: state.recallTagsMatch,
+					signal,
 				});
 				const results = response.results ?? [];
 				if (results.length === 0) {
-					return {
-						content: [{ type: "text", text: "No relevant memories found." }],
-						details: {},
-						useless: true,
-					};
+					return { content: [{ type: "text", text: "No relevant memories found." }], details: {}, useless: true };
 				}
-				const formatted = formatMemories(results);
 				return {
 					content: [
 						{
 							type: "text",
-							text: `Found ${results.length} relevant ${results.length === 1 ? "memory" : "memories"} (as of ${formatCurrentTime()} UTC):\n\n${formatted}`,
+							text: `Found ${results.length} relevant ${results.length === 1 ? "memory" : "memories"} (as of ${formatCurrentTime()} UTC):\n\n${formatMemories(results)}`,
 						},
 					],
 					details: {},

@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, describe, expect, it } from "bun:test";
 import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
 
@@ -19,16 +23,16 @@ describe("AuthStorage keys.peek", () => {
 		const storage = await AuthStorage.create(":memory:");
 		storages.push(storage);
 		const now = Date.now();
-		await storage.credentials.set("cursor", [
+		await storage.credentials.set("local", [
 			{ type: "oauth", access: "expired-a", refresh: "refresh-a", expires: now - 60_000 },
 			{ type: "oauth", access: "live-b", refresh: "refresh-b", expires: now + 3_600_000 },
 			{ type: "oauth", access: "live-c", refresh: "refresh-c", expires: now + 3_600_000 },
 		]);
 
 		const peeks = [
-			await storage.keys.peek("cursor"),
-			await storage.keys.peek("cursor"),
-			await storage.keys.peek("cursor"),
+			await storage.keys.peek("local"),
+			await storage.keys.peek("local"),
+			await storage.keys.peek("local"),
 		];
 
 		expect(peeks).toEqual(["live-b", "live-b", "live-b"]);

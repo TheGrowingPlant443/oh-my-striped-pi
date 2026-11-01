@@ -1,7 +1,8 @@
 import { scheduler } from "node:timers/promises";
 import { isSqliteBusyError, logger, postmortem } from "@oh-my-pi/pi-utils";
 import * as AIError from "../error";
-import { getOAuthProvider, normalizeOAuthCredentialExpiry, refreshOAuthToken } from "../registry/oauth";
+import { refreshOAuthToken } from "../registry/oauth";
+import { assertSupportedOAuthCredentialProvider } from "./provider-policy";
 import type { OAuthCredentials, OAuthProvider } from "../registry/oauth/types";
 import type { Provider } from "../types";
 import { raceSignal } from "./abort";
@@ -355,6 +356,7 @@ export class OAuthRefresher {
 		provider: string,
 		options: StoredOAuthRefreshOptions<T>,
 	): Promise<StoredOAuthRefreshResult<T>> {
+		assertSupportedOAuthCredentialProvider(provider);
 		if (this.#shuttingDown) return Promise.reject(new AIError.AbortError("OAuth refresh stopped during shutdown"));
 		return this.#track(this.#refreshStored(provider, options));
 	}
@@ -892,6 +894,7 @@ export class OAuthRefresher {
 		reason?: OAuthRefreshReason,
 		rejectedAccess?: string,
 	): Promise<OAuthCredentials> {
+		assertSupportedOAuthCredentialProvider(provider);
 		const authRecovery = reason === "auth-recovery";
 		if (authRecovery && credentialId !== undefined && !this.#oauthCredentialRefreshInFlight.has(credentialId)) {
 			const recent = this.#recentMint(credentialId);
@@ -910,7 +913,7 @@ export class OAuthRefresher {
 		reason?: OAuthRefreshReason,
 		rejectedAccess?: string,
 	): Promise<OAuthCredentials> {
-		credential = normalizeOAuthCredentialExpiry(provider, credential);
+		assertSupportedOAuthCredentialProvider(provider);
 		if (credentialId !== undefined) {
 			const existing = this.#oauthCredentialRefreshInFlight.get(credentialId);
 			if (existing) {
@@ -1030,18 +1033,7 @@ export class OAuthRefresher {
 		if (overrideRefresh && credentialId !== undefined) {
 			refreshPromise = overrideRefresh(provider, credentialId, credential, signal, reason);
 		} else {
-			const customProvider = getOAuthProvider(provider);
-			if (customProvider) {
-				if (!customProvider.refreshToken) {
-					throw new AIError.OAuthError(`OAuth provider "${provider}" does not support token refresh`, {
-						kind: "configuration",
-						provider,
-					});
-				}
-				refreshPromise = customProvider.refreshToken(credential, signal);
-			} else {
-				refreshPromise = refreshOAuthToken(provider as OAuthProvider, credential, signal);
-			}
+			refreshPromise = refreshOAuthToken(provider as OAuthProvider, credential, signal);
 		}
 		// Stop awaiting after `timeoutMs` or on `signal`. Leased exchanges pass no
 		// timeout: `refreshStored` stops its caller waiting without dropping the
@@ -1088,6 +1080,8 @@ export class OAuthRefresher {
 		signal?: AbortSignal,
 		options?: OAuthRefreshByIdOptions,
 	): Promise<AuthCredentialSnapshotEntry> {
+		const target = this.#deps.pool.list().find(entry => entry.id === id);
+		if (target) assertSupportedOAuthCredentialProvider(target.provider);
 		const existing = this.#oauthRefreshInFlight.get(id);
 		if (existing) {
 			const joined = await raceSignal(existing, signal, "credential refresh aborted");
@@ -1136,6 +1130,7 @@ export class OAuthRefresher {
 			const entries = this.#deps.pool.entries(provider);
 			const index = entries.findIndex(entry => entry.id === id);
 			if (index === -1) continue;
+			assertSupportedOAuthCredentialProvider(provider);
 			const target = entries[index];
 			if (target.credential.type !== "oauth") {
 				throw new AIError.ValidationError(

@@ -5,25 +5,22 @@
  * usage) can resolve env keys without importing the whole provider stack.
  */
 import { providerEntries } from "@oh-my-pi/pi-catalog/compat/providers";
+import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
+import { NO_AUTH_SENTINEL } from "./auth-retry";
 import { $env, $pickenv } from "@oh-my-pi/pi-utils";
 import { PROVIDER_REGISTRY } from "./registry";
 
 type KeyResolver = string | (() => string | undefined);
 
 const LEGACY_ENV_KEYS: Record<string, KeyResolver> = {
-	// Non-provider / search-tool keys and API-name keys not modeled as registry provider defs.
-	"azure-openai-responses": "AZURE_OPENAI_API_KEY",
-	jina: "JINA_API_KEY",
-	brave: "BRAVE_API_KEY",
-	tinyfish: "TINYFISH_API_KEY",
+	// Firecrawl requires an explicitly configured private endpoint in its caller.
 	firecrawl: "FIRECRAWL_API_KEY",
 };
 
 /**
  * Env fallbacks derived from the catalog provider entries (`env` in
  * `providers/<id>.kdl`) — the single source for plain provider env-var names.
- * Registry defs override with computed resolvers (Foundry/ADC/Bedrock
- * probes); legacy non-provider keys merge last.
+ * Legacy independent search-tool keys merge last.
  */
 const CATALOG_ENTRY_ENV_KEYS = Object.values(providerEntries()).flatMap(provider => {
 	const envVars = provider.envVars;
@@ -43,13 +40,13 @@ const serviceProviderMap: Record<string, KeyResolver> = {
 };
 
 /**
- * Get API key for provider from known environment variables, e.g. OPENAI_API_KEY.
+ * Get a retained model provider or independent search-tool key from the environment.
  *
  * Will not return API keys for providers that require OAuth tokens.
  * Checks Bun.env, then cwd/.env, then ~/.env.
  */
 export function getEnvApiKey(provider: string): string | undefined {
-	const resolver = serviceProviderMap[provider];
+	const resolver = Object.hasOwn(serviceProviderMap, provider) ? serviceProviderMap[provider] : undefined;
 	if (typeof resolver === "string") {
 		return $env[resolver];
 	}
@@ -64,7 +61,7 @@ export function getEnvApiKey(provider: string): string | undefined {
  * single variable name describes the source.
  */
 export function getEnvApiKeyName(provider: string): string | undefined {
-	const resolver = serviceProviderMap[provider];
+	const resolver = Object.hasOwn(serviceProviderMap, provider) ? serviceProviderMap[provider] : undefined;
 	return typeof resolver === "string" ? resolver : undefined;
 }
 
@@ -75,4 +72,11 @@ export function getEnvApiKeyName(provider: string): string | undefined {
  */
 export function listProvidersWithEnvKey(): string[] {
 	return Object.keys(serviceProviderMap);
+}
+
+/** Resolve provider-owned credentials without sending optional-login markers as bearer tokens. */
+export function resolveProviderApiKey(provider: string, apiKey?: string): string | undefined {
+	const key = apiKey || getEnvApiKey(provider);
+	const login = authPolicyFor(provider)?.login;
+	return login?.kind === "api-key" && login.emptyFallback && key === login.emptyFallback ? NO_AUTH_SENTINEL : key;
 }

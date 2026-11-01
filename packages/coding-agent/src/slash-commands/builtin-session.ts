@@ -1,6 +1,6 @@
 import { clearSubmittedText } from "./helpers/draft";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import { journalJudgmentUsage, resolveJudge, sharedJudgmentCache } from "../judgment";
+import { journalJudgmentUsage, resolveJudge } from "../judgment";
 import type { AgentSession } from "../session/agent-session";
 import type { SessionOAuthAccountList } from "../session/agent-session-types";
 import {
@@ -21,14 +21,6 @@ import { handleMcpAcp } from "./helpers/mcp";
 import { markdownFenceFor } from "../utils/markdown-fence";
 import { openLocalFileInEditor } from "../modes/local-file-editor";
 import { commandConsumed, errorMessage, parseSubcommand, usage } from "./helpers/parse";
-import {
-	describeRedeemOutcome,
-	formatResetUsageAccountLine,
-	oneLine,
-	resolveResetUsageTarget,
-	toResetUsageAccounts,
-} from "./helpers/reset-usage";
-import type { ResetUsageAccount } from "@oh-my-pi/pi-tui/overlays/reset-usage-selector";
 import { matchSessionPinAccounts, toSessionPinAccounts } from "./helpers/session-pin";
 import {
 	launchStatsDashboard,
@@ -40,37 +32,6 @@ import { StatsNotice } from "@oh-my-pi/pi-tui/overlays/stats-notice";
 import { handleTodoAcp } from "./helpers/todo";
 import { buildUsageReportText } from "./helpers/usage-report";
 import type { SlashCommandRuntime, SlashCommandSpec } from "./types";
-
-async function handleUsageResetCommand(
-	arg: string,
-	session: AgentSession,
-	output: SlashCommandRuntime["output"],
-): Promise<void> {
-	let accounts: ResetUsageAccount[];
-	try {
-		accounts = toResetUsageAccounts(await session.listResetCredits());
-	} catch (error) {
-		await output(`Could not load saved resets: ${oneLine(errorMessage(error))}`);
-		return;
-	}
-	if (accounts.length === 0) {
-		await output("No provider accounts found. Use /login to add one.");
-		return;
-	}
-	if (!arg.trim()) {
-		const lines = ["Saved rate-limit resets:", ...accounts.map(formatResetUsageAccountLine)];
-		lines.push("", "Spend one with `/usage reset <provider>/<credential id>` or `/usage reset <provider>/active`.");
-		await output(lines.join("\n"));
-		return;
-	}
-	const resolved = resolveResetUsageTarget(accounts, arg, "/usage reset");
-	if ("error" in resolved) {
-		await output(resolved.error);
-		return;
-	}
-	const outcome = await session.redeemResetCredit(resolved.account.target);
-	await output(oneLine(describeRedeemOutcome(outcome, resolved.account.label)));
-}
 
 /**
  * `/jobs kill <id>|all`: cancel one running background job this session owns,
@@ -198,7 +159,6 @@ function launchSessionStatsDashboard(
 		purpose: "stats_frustration",
 		onUsage: journalJudgmentUsage(owner.sessionManager),
 		telemetry: owner.session.agent.telemetry,
-		cache: sharedJudgmentCache(),
 	});
 	return launchStatsDashboard(args, async () => judge);
 }
@@ -395,15 +355,8 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 		icon: "gauge",
 		description: "Show provider usage and limits",
 		acpDescription: "Show token usage",
-		acpInputHint: "[show|reset [provider/credential-id|provider/active]]",
-		subcommands: [
-			{ name: "show", description: "Show provider usage and limits" },
-			{
-				name: "reset",
-				description: "Spend a saved provider rate-limit reset",
-				usage: "[provider/credential-id|provider/active]",
-			},
-		],
+		acpInputHint: "[show]",
+		subcommands: [{ name: "show", description: "Show provider usage and limits" }],
 		allowArgs: true,
 		handle: async (command, runtime) => {
 			const { verb, rest } = parseSubcommand(command.args);
@@ -411,11 +364,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				await runtime.output(await buildUsageReportText(runtime));
 				return commandConsumed();
 			}
-			if (verb === "reset") {
-				await handleUsageResetCommand(rest, runtime.session, runtime.output);
-				return commandConsumed();
-			}
-			return usage("Usage: /usage [show|reset [provider/credential-id|provider/active]]", runtime);
+			return usage("Usage: /usage [show]", runtime);
 		},
 		handleTui: async (command, runtime) => {
 			const { verb, rest } = parseSubcommand(command.args);
@@ -424,16 +373,7 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 				clearSubmittedText(runtime);
 				return;
 			}
-			if (verb === "reset") {
-				if (rest) {
-					await handleUsageResetCommand(rest, runtime.ctx.session, text => runtime.ctx.showStatus(text));
-				} else {
-					await runtime.ctx.showResetUsageSelector();
-				}
-				clearSubmittedText(runtime);
-				return;
-			}
-			runtime.ctx.showStatus("Usage: /usage [show|reset [provider/credential-id|provider/active]]");
+			runtime.ctx.showStatus("Usage: /usage [show]");
 			clearSubmittedText(runtime);
 		},
 	},
@@ -766,13 +706,6 @@ export const BUILTIN_SESSION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			{ name: "unauth", description: "Remove OAuth auth from a server", usage: "<name>" },
 			{ name: "enable", description: "Enable an MCP server", usage: "<name>" },
 			{ name: "disable", description: "Disable an MCP server", usage: "<name>" },
-			{
-				name: "smithery-search",
-				description: "Search Smithery registry and deploy an MCP server",
-				usage: "<keyword> [--scope project|user] [--limit <1-100>] [--semantic]",
-			},
-			{ name: "smithery-login", description: "Login to Smithery and cache API key" },
-			{ name: "smithery-logout", description: "Remove cached Smithery API key" },
 			{ name: "reconnect", description: "Reconnect to a specific MCP server", usage: "<name>" },
 			{ name: "reload", description: "Force reload MCP runtime tools" },
 			{ name: "resources", description: "List available resources from connected servers" },

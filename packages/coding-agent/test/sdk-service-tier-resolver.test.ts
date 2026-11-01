@@ -1,24 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import type { Model, ServiceTierByFamily } from "@oh-my-pi/pi-ai";
+import type { Model } from "@oh-my-pi/pi-ai";
 import { resolveAgentServiceTierOverride } from "@oh-my-pi/pi-coding-agent/config/service-tier";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession, type ExtensionFactory } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir, withTimeout } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
+const deferredModelPattern = "github-copilot/gpt-4o-sdk-deferred";
+
 const runtimeProviderExtension: ExtensionFactory = pi => {
-	pi.registerProvider("runtime-provider", {
-		baseUrl: "https://runtime.example.com/v1",
+	pi.registerProvider("github-copilot", {
+		baseUrl: "https://api.githubcopilot.com",
 		apiKey: "RUNTIME_KEY",
 		api: "openai-completions",
 		models: [
 			{
-				id: "runtime-model",
-				name: "Runtime Model",
+				id: "gpt-4o-sdk-deferred",
+				name: "Deferred Copilot Model",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -29,119 +31,45 @@ const runtimeProviderExtension: ExtensionFactory = pi => {
 	});
 };
 
-const deferredCodexProviderExtension: ExtensionFactory = pi => {
-	pi.registerProvider("openai-codex", {
-		baseUrl: "https://chatgpt.com/backend-api",
-		apiKey: "RUNTIME_CODEX_KEY",
-		api: "openai-codex-responses",
-		models: [
-			{
-				id: "deferred-model",
-				name: "Deferred Codex Model",
-				reasoning: true,
-				input: ["text"],
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				contextWindow: 128000,
-				maxTokens: 8192,
-			},
-		],
-	});
-};
-
 const originalNoTitle = Bun.env.PI_NO_TITLE;
-const originalWebSocket = globalThis.WebSocket;
 
-class CapturingWebSocket {
-	static readonly CONNECTING = 0;
-	static readonly OPEN = 1;
-	static readonly CLOSING = 2;
-	static readonly CLOSED = 3;
-	static instances: CapturingWebSocket[] = [];
-	static created?: PromiseWithResolvers<CapturingWebSocket>;
-
-	readonly headers: Record<string, string>;
-	readonly frames: Array<Record<string, unknown>> = [];
-	readyState = CapturingWebSocket.CONNECTING;
-	binaryType = "arraybuffer";
-	onopen: ((event: Event) => void) | null = null;
-	onerror: ((event: Event) => void) | null = null;
-	onclose: ((event: CloseEvent) => void) | null = null;
-	onmessage: ((event: MessageEvent) => void) | null = null;
-
-	constructor(
-		readonly url: string,
-		options?: { headers?: Record<string, string>; proxy?: string },
-	) {
-		this.headers = options?.headers ?? {};
-		CapturingWebSocket.instances.push(this);
-		CapturingWebSocket.created?.resolve(this);
-		queueMicrotask(() => {
-			if (this.readyState !== CapturingWebSocket.CONNECTING) return;
-			this.readyState = CapturingWebSocket.OPEN;
-			this.onopen?.(new Event("open"));
+function captureCopilotRequests() {
+	const payloads: unknown[] = [];
+	const extension: ExtensionFactory = pi => {
+		pi.on("before_provider_request", event => {
+			payloads.push(event.payload);
 		});
-	}
-
-	send(data: unknown): void {
-		if (typeof data !== "string") throw new Error("Expected a JSON WebSocket frame");
-		const frame = JSON.parse(data) as Record<string, unknown>;
-		this.frames.push(frame);
-		if (frame.type !== "response.create") return;
-		const responseId = `resp_sdk_${this.frames.filter(candidate => candidate.type === "response.create").length}`;
-		queueMicrotask(() => this.#emitTextResponse(responseId));
-	}
-
-	close(code = 1000, reason = "closed"): void {
-		if (this.readyState === CapturingWebSocket.CLOSED) return;
-		this.readyState = CapturingWebSocket.CLOSED;
-		this.onclose?.({ code, reason } as CloseEvent);
-	}
-
-	#emitTextResponse(responseId: string): void {
-		this.#sendJson({ type: "response.created", response: { id: responseId } });
-		this.#sendJson({
-			type: "response.output_item.added",
-			item: { type: "message", id: `msg_${responseId}`, role: "assistant", status: "in_progress", content: [] },
-		});
-		this.#sendJson({ type: "response.content_part.added", part: { type: "output_text", text: "" } });
-		this.#sendJson({ type: "response.output_text.delta", delta: "offline response" });
-		this.#sendJson({
-			type: "response.output_item.done",
-			item: {
-				type: "message",
-				id: `msg_${responseId}`,
-				role: "assistant",
-				status: "completed",
-				content: [{ type: "output_text", text: "offline response" }],
+	};
+	const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+		Object.assign(
+			async (input: string | URL | Request, init?: RequestInit) => {
+				const url = input instanceof Request ? input.url : String(input);
+				if (init?.method === "HEAD") return new Response(null, { status: 200 });
+				expect(url).toBe("https://api.githubcopilot.com/chat/completions");
+				const chunks = [
+					{
+						id: "sdk-tier-reply",
+						choices: [
+							{ index: 0, delta: { role: "assistant", content: "offline response" }, finish_reason: null },
+						],
+					},
+					{
+						id: "sdk-tier-reply",
+						choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+						usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+					},
+				];
+				return new Response(
+					`${chunks.map(chunk => `data: ${JSON.stringify(chunk)}\n\n`).join("")}data: [DONE]\n\n`,
+					{
+						headers: { "Content-Type": "text/event-stream" },
+					},
+				);
 			},
-		});
-		this.#sendJson({
-			type: "response.completed",
-			response: {
-				id: responseId,
-				status: "completed",
-				usage: { input_tokens: 5, output_tokens: 3, total_tokens: 8, input_tokens_details: { cached_tokens: 0 } },
-			},
-		});
-	}
-
-	#sendJson(payload: Record<string, unknown>): void {
-		this.onmessage?.({ data: JSON.stringify(payload) } as MessageEvent);
-	}
-}
-
-function installCapturingWebSocket(): void {
-	CapturingWebSocket.instances = [];
-	CapturingWebSocket.created = Promise.withResolvers<CapturingWebSocket>();
-	globalThis.WebSocket = CapturingWebSocket as unknown as typeof WebSocket;
-}
-
-async function waitForPrewarmSocket(): Promise<CapturingWebSocket> {
-	const socket = CapturingWebSocket.instances[0];
-	if (socket) return socket;
-	const created = CapturingWebSocket.created;
-	if (!created) throw new Error("Capturing WebSocket was not installed");
-	return await withTimeout(created.promise, 10_000, "Codex prewarm WebSocket did not open within 10 seconds");
+			{ preconnect: globalThis.fetch.preconnect },
+		),
+	);
+	return { payloads, extension, fetch };
 }
 
 describe.serial("createAgentSession resolveServiceTierByFamily", () => {
@@ -159,7 +87,6 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	const authStorages: AuthStorage[] = [];
 
 	afterEach(() => {
-		globalThis.WebSocket = originalWebSocket;
 		vi.restoreAllMocks();
 		for (const authStorage of authStorages) authStorage.close();
 		authStorages.length = 0;
@@ -195,120 +122,86 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 		};
 	}
 
-	it("routes prewarm and the first SDK turn from the final model and exact-agent tier override", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-prewarm-first-turn-");
-		const authStorage = openAuthStorage();
-		installCapturingWebSocket();
+	it("resolves an exact-agent tier override against the final Copilot model without sending unsupported tiers", async () => {
+		using tempDir = TempDir.createSync("@omp-service-tier-first-turn-");
+		const requests = captureCopilotRequests();
+		const resolvedModels: Array<Model | undefined> = [];
 		const { session } = await createAgentSession({
 			...sessionOptions(
 				tempDir.path(),
-				authStorage,
-				Settings.isolated({
-					"providers.openaiWebsockets": "on",
-					enabledModels: ["openai-codex/deferred-model"],
-					"tier.openai": "default",
-					"tier.anthropic": "priority",
-					"tier.google": "flex",
-				}),
+				openAuthStorage(),
+				Settings.isolated({ "tier.openai": "default", "tier.anthropic": "priority", "tier.google": "flex" }),
 				SessionManager.inMemory(),
 			),
-			extensions: [deferredCodexProviderExtension],
-			modelPattern: "openai-codex/deferred-model",
-			resolveServiceTierByFamily: model => resolveAgentServiceTierOverride("priority", model, {}),
+			extensions: [runtimeProviderExtension, requests.extension],
+			modelPattern: deferredModelPattern,
+			resolveServiceTierByFamily: model => {
+				resolvedModels.push(model);
+				return resolveAgentServiceTierOverride("priority", model, {});
+			},
 		});
 		try {
-			const socket = await waitForPrewarmSocket();
-			expect(session.model?.id).toBe("deferred-model");
-			expect(session.serviceTierByFamily).toEqual({ openai: "priority" });
-			expect(socket.headers["x-codex-routing-hint"]).toBe("model=deferred-model;tier=priority");
-
+			expect(resolvedModels.map(model => model && `${model.provider}/${model.id}`)).toEqual([deferredModelPattern]);
+			expect(session.serviceTierByFamily).toEqual({});
 			await session.prompt("first turn");
-			const firstFrame = socket.frames.find(frame => frame.type === "response.create");
-			expect(firstFrame).toMatchObject({ model: "deferred-model", service_tier: "priority" });
-			expect(CapturingWebSocket.instances).toHaveLength(1);
+			expect(requests.fetch).toHaveBeenCalled();
+			expect(requests.payloads).toHaveLength(1);
+			expect(requests.payloads[0]).toMatchObject({ model: "gpt-4o-sdk-deferred" });
+			expect(requests.payloads[0]).not.toHaveProperty("service_tier");
 		} finally {
 			await session.dispose();
 		}
 	});
 
-	it("keeps omitted and explicit default tiers distinct during Codex prewarm and the first turn", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-prewarm-default-");
-		const createDeferredSession = async (
-			resolveServiceTierByFamily?: (model: Model | undefined) => ServiceTierByFamily,
-		) =>
-			await createAgentSession({
+	it.each([undefined, { openai: "default" }] as const)(
+		"keeps the resolved tier map %j without putting unsupported service_tier on Copilot requests",
+		async tiers => {
+			using tempDir = TempDir.createSync("@omp-service-tier-default-");
+			const requests = captureCopilotRequests();
+			const resolveServiceTierByFamily = tiers ? () => tiers : undefined;
+			const { session } = await createAgentSession({
 				...sessionOptions(
 					tempDir.path(),
 					openAuthStorage(),
-					Settings.isolated({
-						"providers.openaiWebsockets": "on",
-						enabledModels: ["openai-codex/deferred-model"],
-						"tier.openai": "none",
-						"tier.anthropic": "none",
-						"tier.google": "none",
-					}),
+					Settings.isolated({ "tier.openai": "none", "tier.anthropic": "none", "tier.google": "none" }),
 					SessionManager.inMemory(),
 				),
-				extensions: [deferredCodexProviderExtension],
-				modelPattern: "openai-codex/deferred-model",
+				extensions: [runtimeProviderExtension, requests.extension],
+				modelPattern: deferredModelPattern,
 				...(resolveServiceTierByFamily ? { resolveServiceTierByFamily } : {}),
 			});
+			try {
+				expect(session.serviceTierByFamily).toEqual(tiers ?? {});
+				await session.prompt("default tier turn");
+				expect(requests.payloads).toHaveLength(1);
+				expect(requests.payloads[0]).toMatchObject({ model: "gpt-4o-sdk-deferred" });
+				expect(requests.payloads[0]).not.toHaveProperty("service_tier");
+			} finally {
+				await session.dispose();
+			}
+		},
+	);
 
-		installCapturingWebSocket();
-		const { session: omitted } = await createDeferredSession();
-		try {
-			const socket = await waitForPrewarmSocket();
-			expect(omitted.serviceTierByFamily).toEqual({});
-			expect(socket.headers["x-codex-routing-hint"]).toBe("model=deferred-model");
-			await omitted.prompt("omitted tier turn");
-			const firstFrame = socket.frames.find(frame => frame.type === "response.create");
-			expect(firstFrame).toMatchObject({ model: "deferred-model" });
-			expect(firstFrame).not.toHaveProperty("service_tier");
-		} finally {
-			await omitted.dispose();
-		}
-
-		installCapturingWebSocket();
-		const { session: explicitDefault } = await createDeferredSession(model =>
-			resolveAgentServiceTierOverride("default", model, {}),
-		);
-		try {
-			const socket = await waitForPrewarmSocket();
-			expect(explicitDefault.serviceTierByFamily).toEqual({ openai: "default" });
-			expect(socket.headers["x-codex-routing-hint"]).toBe("model=deferred-model;tier=default");
-			await explicitDefault.prompt("explicit default tier turn");
-			const firstFrame = socket.frames.find(frame => frame.type === "response.create");
-			expect(firstFrame).toMatchObject({ model: "deferred-model", service_tier: "default" });
-		} finally {
-			await explicitDefault.dispose();
-		}
-	});
-
-	it("evaluates the resolver against the model resolved from a deferred pattern and replaces the configured tiers", async () => {
+	it("evaluates the resolver against a deferred model and replaces configured tiers", async () => {
 		using tempDir = TempDir.createSync("@omp-service-tier-resolver-");
-		const authStorage = openAuthStorage();
 		const resolvedModels: Array<Model | undefined> = [];
 		const { session } = await createAgentSession({
 			...sessionOptions(
 				tempDir.path(),
-				authStorage,
+				openAuthStorage(),
 				Settings.isolated({ "tier.anthropic": "priority" }),
 				SessionManager.inMemory(),
 			),
 			extensions: [runtimeProviderExtension],
-			// Only the extension can resolve this pattern, so dispatch-time
-			// resolution would have seen no model at all.
-			modelPattern: "runtime-provider/runtime-model",
+			modelPattern: deferredModelPattern,
 			resolveServiceTierByFamily: model => {
 				resolvedModels.push(model);
 				return { openai: "scale" };
 			},
 		});
 		try {
-			expect(resolvedModels.map(model => model && `${model.provider}/${model.id}`)).toEqual([
-				"runtime-provider/runtime-model",
-			]);
-			expect(session.model?.id).toBe("runtime-model");
+			expect(resolvedModels.map(model => model && `${model.provider}/${model.id}`)).toEqual([deferredModelPattern]);
+			expect(session.model?.id).toBe("gpt-4o-sdk-deferred");
 			expect(session.serviceTierByFamily).toEqual({ openai: "scale" });
 		} finally {
 			await session.dispose();
@@ -319,10 +212,7 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 		using tempDir = TempDir.createSync("@omp-service-tier-resolver-reopen-");
 		const authStorage = openAuthStorage();
 		const sessionFile = path.join(tempDir.path(), "session.jsonl");
-		// The settings a cold revival rebuilds from say `priority`; the spawn's
-		// per-agent override resolved to no tier at all.
 		const settings = Settings.isolated({ "tier.openai": "priority" });
-
 		const { session: spawned } = await createAgentSession({
 			...sessionOptions(
 				tempDir.path(),
@@ -330,6 +220,8 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 				settings,
 				await SessionManager.open(sessionFile, tempDir.path()),
 			),
+			extensions: [runtimeProviderExtension],
+			modelPattern: deferredModelPattern,
 			resolveServiceTierByFamily: () => ({}),
 		});
 		try {
@@ -338,9 +230,15 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 			await spawned.dispose();
 		}
 
-		const { session: revived } = await createAgentSession(
-			sessionOptions(tempDir.path(), authStorage, settings, await SessionManager.open(sessionFile, tempDir.path())),
-		);
+		const { session: revived } = await createAgentSession({
+			...sessionOptions(
+				tempDir.path(),
+				authStorage,
+				settings,
+				await SessionManager.open(sessionFile, tempDir.path()),
+			),
+			extensions: [runtimeProviderExtension],
+		});
 		try {
 			expect(revived.serviceTierByFamily).toEqual({});
 		} finally {

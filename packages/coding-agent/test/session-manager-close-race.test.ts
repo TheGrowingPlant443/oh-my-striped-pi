@@ -24,7 +24,6 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import {
 	MemorySessionStorage,
@@ -33,6 +32,7 @@ import {
 	type WriteTextAtomicOptions,
 } from "@oh-my-pi/pi-coding-agent/session/session-storage";
 import type { SessionTitleUpdate } from "@oh-my-pi/pi-coding-agent/session/session-title-slot";
+import { getTestModel } from "./helpers/model-fixtures";
 
 class CloseHoldingStorage implements SessionStorage {
 	readonly #inner = new MemorySessionStorage();
@@ -151,8 +151,7 @@ describe("SessionManager close/appendMessage race", () => {
 	it("appendMessage during in-flight close() does not stash a persistError", async () => {
 		const storage = new CloseHoldingStorage();
 		const sm = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getTestModel("github-copilot");
 
 		// Seed an assistant message so persist activates (the `#ensuredOnDisk`
 		// guard gates the first write on the first assistant entry). This

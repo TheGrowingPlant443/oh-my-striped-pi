@@ -55,21 +55,15 @@ import {
 	type ShakeConfig,
 } from "@oh-my-pi/pi-agent-core/compaction";
 import type {
-	AnthropicFallbackCreditHandle,
 	AssistantMessage,
-	CodexCompactionContext,
 	Context,
 	ImageContent,
 	Judge,
 	Message,
 	MessageAttribution,
 	Model,
-	OAuthAccountIdentity,
 	ProviderResponseMetadata,
 	ProviderSessionState,
-	ResetCreditAccountStatus,
-	ResetCreditRedeemOutcome,
-	ResetCreditTarget,
 	ServiceTier,
 	ServiceTierByFamily,
 	ServiceTierFamily,
@@ -84,7 +78,6 @@ import type {
 import { type Effort, serviceTierFamily, streamSimple } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { prewarmModelConnection } from "@oh-my-pi/pi-ai/providers/connection-prewarm";
-import { resetOpenAICodexHistoryAfterCompaction } from "@oh-my-pi/pi-ai/providers/openai-codex-state";
 import { withCredentialRedaction } from "@oh-my-pi/pi-ai/providers/transform-messages";
 import { markPerCallContextMessage } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
@@ -97,7 +90,6 @@ import { type EditStore, type PowerAssertion, type PowerAssertionOptions } from 
 import {
 	$env,
 	escapeXmlText,
-	formatDuration,
 	getAgentDbPath,
 	isBunTestRuntime,
 	isInteractiveHost,
@@ -110,12 +102,11 @@ import {
 	toError,
 	untilAborted,
 	withTimeout,
-	withFileLock,
 } from "@oh-my-pi/pi-utils";
 import { writeArchive } from "@oh-my-pi/pi-utils/ar";
 import { frameDataBytesBudget, readerIncludesThinking } from "@oh-my-pi/snapcompact";
 import type { AdvisorConfig } from "@oh-my-pi/pi-tui/overlays/advisor-config";
-import { formatUsageResetWindow } from "@oh-my-pi/pi-tui/overlays/usage-display";
+import { parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
 import { loadAdvisorTranscriptCosts } from "../advisor";
 import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, type AsyncJob, AsyncJobManager } from "../async";
 import { classifyAutoPrewalk } from "../auto-prewalk/classifier";
@@ -190,6 +181,8 @@ import type { DaemonCompletionNotification } from "../launch/protocol";
 import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "../memory-backend/recall-entry";
 import { shutdownMnemopiEmbedClient } from "../mnemopi/embed-client";
 import { getMnemopiSessionState, type MnemopiSessionState, setMnemopiSessionState } from "../mnemopi/state";
+import { releaseSharpshooterSession } from "../sharpshooter/backend";
+import { flushSharpshooterExtraction } from "../sharpshooter/extract";
 import { MAGIC_KEYWORDS, type MagicKeywordContext, type MagicKeywordId } from "../modes/magic-keywords";
 import { containsMagicKeyword } from "@oh-my-pi/pi-tui/prompt/magic-keywords";
 import { theme } from "@oh-my-pi/pi-tui/theme";
@@ -201,7 +194,6 @@ import { loadOverallPlanReference } from "../plan-mode/plan-handoff";
 import type { PlanModeState } from "../plan-mode/state";
 import goalModeContextPrompt from "../prompts/goals/goal-mode-context.md" with { type: "text" };
 import goalTodoContextPrompt from "../prompts/goals/goal-todo-context.md" with { type: "text" };
-import anthropicUsageWrapUpPrompt from "../prompts/system/anthropic-usage-wrap-up.md" with { type: "text" };
 import autoContinuePrompt from "../prompts/system/auto-continue.md" with { type: "text" };
 import checkpointActiveNoticeTemplate from "../prompts/system/checkpoint-active-notice.md" with { type: "text" };
 import interruptedThinkingTemplate from "../prompts/system/interrupted-thinking.md" with { type: "text" };
@@ -225,8 +217,6 @@ import {
 import type { SecretObfuscator } from "../secrets/obfuscator";
 import { type AgentRef, AgentRegistry } from "../registry/agent-registry";
 import { cfgSecretsEnabled } from "../secrets/settings";
-import { releaseSharpshooterSession } from "../sharpshooter/backend";
-import { flushSharpshooterExtraction } from "../sharpshooter/extract";
 import { toolReadsSkillUris } from "../system-prompt";
 import {
 	AUTO_THINKING,
@@ -256,7 +246,6 @@ import {
 	resumeComputerUseForOwner,
 	revokeComputerControlForOwner,
 } from "../tools/computer/supervisor";
-import { isAutoQaEnabled } from "../tools/report-tool-issue";
 import {
 	buildResolveReminderMessage,
 	isPreviewResolutionToolCall,
@@ -341,31 +330,6 @@ import {
 	semanticToolResult,
 } from "./checkpoint-entries";
 import type { ClientBridge } from "./client-bridge";
-import {
-	type ClaudeResetAction,
-	type ClaudeResetPlan,
-	claudeResetStatusesFromReports,
-	planClaudeResetRedemptions,
-} from "./claude-auto-reset";
-import {
-	type CodexAutoRedeemCoordinator,
-	type CodexResetAction,
-	type CodexResetPlan,
-	type CodexResetTrigger,
-	type ResetRecoveryResult,
-	ATTEMPT_COOLDOWN_MS,
-	resetAccountLockKey,
-	defaultCodexAutoRedeemCoordinator,
-	headlessApprovedResetActions,
-	isTerminalRedeemOutcome,
-	overlayLiveResetCredits,
-	planCodexResetRedemptions,
-	REDEEM_RETRY_DEFER_MS,
-	resetPlanSettings,
-	SWEEP_MIN_INTERVAL_MS,
-	shouldEvaluateCodexAutoRedeem,
-	shouldPromptCodexAutoRedeem,
-} from "./codex-auto-reset";
 import { COST_GATE_NOTICE_SOURCE, type CostCapRefusal, CostGate } from "./cost-gate";
 import { recordCredentialPin, seedCredentialPins } from "./credential-pin";
 import { isDateCwdReminderControl } from "./date-cwd-reminder";
@@ -436,7 +400,6 @@ import {
 	queueChipText,
 	toRestoredQueuedMessage,
 } from "./queued-messages";
-import { checkCodexBalance, readResetMarker, resetLockPath, withResetFence } from "./reset-fence";
 import type { ServingModel } from "./retry-fallback-chains";
 import {
 	type AdvisorCatchupOptions,
@@ -459,12 +422,7 @@ import {
 import { collectSubSessions, type SubSession } from "./sub-sessions";
 import type { BranchSummaryEntry, NewSessionOptions } from "./session-entries";
 import { SessionHandoff, type SessionHandoffHost } from "./session-handoff";
-import {
-	COMPACTION_CHECK_NONE,
-	createCodexCompactionContext as createMaintenanceCodexCompactionContext,
-	SessionMaintenance,
-	type SessionMaintenanceHost,
-} from "./session-maintenance";
+import { COMPACTION_CHECK_NONE, SessionMaintenance, type SessionMaintenanceHost } from "./session-maintenance";
 import {
 	cleanupEmptyMoveSession,
 	copySessionArtifacts,
@@ -477,7 +435,6 @@ import { buildSessionMetadata } from "./session-metadata";
 import { SessionProviderBoundary, type SessionProviderBoundaryHost } from "./session-provider-boundary";
 import { SessionStatsTracker, type SessionStatsTrackerHost } from "./session-stats";
 import { SessionTools, type SessionToolsHost } from "./session-tools";
-import { resolveOpenAIWebsocketPreference } from "./settings-stream-fn";
 import type { ShakeMode, ShakeResult } from "./shake-types";
 import { ToolChoiceQueue } from "./tool-choice-queue";
 import { planTurnPersistence, sameMessageContent, sessionMessagePersistenceKey } from "./turn-persistence";
@@ -516,10 +473,6 @@ import { TtsrCoordinator, type TtsrCoordinatorHost } from "./ttsr-coordinator";
 import { cfgAdvisorEnabled, cfgAdvisorMaxNotesPerUpdate } from "../advisor/settings";
 import { cfgBrowserEnabled, cfgBrowserFreezeOnTurnEnd, cfgBrowserIdleCloseSec } from "../tools/browser/settings";
 import {
-	cfgClaudeResets,
-	cfgClaudeResetsAutoRedeem,
-	cfgCodexResets,
-	cfgCodexResetsAutoRedeem,
 	cfgDefaultThinkingLevel,
 	cfgExternalThinking,
 	cfgPowerSleepPrevention,
@@ -528,7 +481,6 @@ import {
 	cfgProviderAppendOnlyContext,
 	cfgProvidersCacheWarming,
 	cfgProvidersCacheRetention,
-	cfgProvidersAntigravityEndpoint,
 	cfgRetryModelFallback,
 	cfgRetryUsageAwareFallback,
 	cfgSampling,
@@ -537,11 +489,7 @@ import {
 	cfgTierAnthropic,
 	cfgTierGoogle,
 	cfgTierOpenai,
-	cfgProvidersAnthropicSlowMode,
-	type ResetAutoRedeemMode,
 } from "./settings";
-import { type AnthropicSlowModeController, anthropicSlowModeLanes, formatUsageLimitLabel } from "./anthropic-slow-mode";
-import type { UsageLimitState } from "./usage-limit";
 import { cfgInterruptMode } from "../modes/settings";
 import { cfgFollowUpMode } from "../modes/settings";
 import { cfgSteeringMode } from "../modes/settings";
@@ -568,8 +516,6 @@ import {
 	cfgArchiveEnabled,
 	cfgComputerEnabled,
 	cfgRatchetEnabled,
-	cfgDevAutoqa,
-	cfgDevAutoqaConsent,
 	cfgTodoEnabled,
 	cfgToolsApproval,
 } from "../tools/settings";
@@ -580,12 +526,6 @@ const cfgAdvisorRuntimeInputs = combine({
 	enabled: cfgAdvisorEnabled,
 	maxNotesPerUpdate: cfgAdvisorMaxNotesPerUpdate,
 	tier: cfgTierAdvisor,
-});
-/** Settings behind the session's extra workspace roots and the auto-QA prompt note. */
-const cfgWorkspacePromptInputs = combine({
-	additionalDirectories: cfgWorkspaceAdditionalDirectories,
-	autoqa: cfgDevAutoqa,
-	autoqaConsent: cfgDevAutoqaConsent,
 });
 
 const PLAN_MODE_REMINDER_MAX = 3;
@@ -973,8 +913,6 @@ export class AgentSession implements SettingsScope {
 	#exitRecorded = false;
 	/** Last observed `workspace.additionalDirectories`, diffed on change to add/remove only settings-seeded roots. */
 	#settingsWorkspaceDirectories: readonly string[] = [];
-	/** Last observed auto-QA gate; the system prompt advertises `xd://report_issue` only while it holds. */
-	#autoQaEnabled = false;
 	/** Teardowns registered via {@link addDisposer} (including settings listeners bound to this session); drained on dispose. */
 	#disposers: Array<() => void> = [];
 	/** Idle recap and idle compaction, once the owner opts in via {@link enableIdleMaintenance}. */
@@ -1109,10 +1047,6 @@ export class AgentSession implements SettingsScope {
 	#autolearnCaptureTask: Promise<void> | undefined;
 	#isDisposed = false;
 	#modelDiscoveryAbortController = new AbortController();
-	/** Process-wide by default (double-spend safety across sessions); injectable for tests. */
-	#resetCoordinator: CodexAutoRedeemCoordinator;
-	/** Each turn stream may adopt a peer's confirmed reset once, not retry on it indefinitely. */
-	#adoptedResetMarkers = new Map<string, number>();
 	// Extension system
 	#extensionRunner: ExtensionRunner | undefined = undefined;
 	#getEvalPreludes: (() => readonly EvalPreludeDefinition[]) | undefined;
@@ -1141,8 +1075,6 @@ export class AgentSession implements SettingsScope {
 	#modelRegistry: ModelRegistry;
 	/** Creation-time permission for switchSession to keep the current model when a target's saved model is unrestorable. */
 	readonly #allowSessionModelFallback: boolean;
-	/** Creation-time: false when the extension UI context cannot reach a human (ACP without form elicitation). */
-	readonly #interactivePrompts: boolean;
 	/** Newest usage reports, cached by fetchUsageReports. */
 	#usageReports: UsageReport[] | undefined;
 	#usageFallbackConfirmer: UsageFallbackConfirmer | undefined;
@@ -1155,21 +1087,10 @@ export class AgentSession implements SettingsScope {
 	#usagePreflightReadyModel: Model | undefined;
 	#detachUsageBeforeQueueDequeue: (() => void) | undefined;
 	#detachUsageBeforeModelCall: (() => void) | undefined;
-	/** Claude account lane (`cred:<id>`/`key:<hash>`) that served the latest Anthropic request. */
-	#anthropicSlowModeLane: string | undefined;
-	/** `<lane>#<window>` of the wrap-up window this session already told the model about. */
-	#anthropicWrapUpHinted: string | undefined;
 
 	#transformContext: (messages: AgentMessage[], signal?: AbortSignal) => AgentMessage[] | Promise<AgentMessage[]>;
 	#onPayload: SimpleStreamOptions["onPayload"] | undefined;
 	#onResponse: SimpleStreamOptions["onResponse"] | undefined;
-	/**
-	 * Providers/models (`${provider}/${id}`) whose runtime context window has
-	 * already been re-probed after their first successful inference this session,
-	 * so a lazy-load local model (LM Studio JIT, llama.cpp cold start) is
-	 * refreshed exactly once rather than on every response (#9001).
-	 */
-	#lazyContextRefreshed = new Set<string>();
 	#onSseEvent: SimpleStreamOptions["onSseEvent"] | undefined;
 	#sideStreamFn: StreamFn;
 	#convertToLlm: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
@@ -1248,7 +1169,7 @@ export class AgentSession implements SettingsScope {
 	// Internal extension hooks and post-emit work (auto-retry, auto-compaction, todo
 	// checks in #handleAgentEvent) still fire on the original schedule — only the
 	// `#emit(event)` that reaches external subscribers (rpc-mode stdout, ACP bridge,
-	// Cursor exec, TUI listeners) is held back. Without this, a client that resumes
+	// TUI listeners) is held back. Without this, a client that resumes
 	// on `agent_end` can fire its next `prompt` before #promptWithMessage's finally
 	#promptGeneration = 0;
 	// abort() can finish in a message_end listener before queued settle work runs.
@@ -1308,7 +1229,8 @@ export class AgentSession implements SettingsScope {
 	#synchronouslyTerminatedYieldToolCallIds = new Set<string>();
 	#providerSessionState = new Map<string, ProviderSessionState>();
 	readonly #cacheWarmer: CacheWarmer | undefined;
-	#hindsightSessionState: HindsightSessionState | undefined = undefined;
+	#lazyContextRefreshed: Set<string> | undefined;
+	#hindsightSessionState: HindsightSessionState | undefined;
 	readonly #memory: SessionMemory;
 	readonly rawSseDebugBuffer: RawSseDebugBuffer;
 
@@ -1941,7 +1863,6 @@ export class AgentSession implements SettingsScope {
 		this.memoryEnabled = config.memoryEnabled ?? true;
 		this.#modelRegistry = config.modelRegistry;
 		this.#allowSessionModelFallback = config.allowSessionModelFallback === true;
-		this.#interactivePrompts = config.interactivePrompts !== false;
 		this.#extensionRoots =
 			config.extensionRoots ??
 			(() => ({
@@ -1952,7 +1873,6 @@ export class AgentSession implements SettingsScope {
 			}));
 		this.#preparedExtensions = config.preparedExtensions;
 		this.#extensionPaths = config.extensionPaths;
-		this.#resetCoordinator = config.codexResetCoordinator ?? defaultCodexAutoRedeemCoordinator;
 		const bashHost: BashRunnerHost = {
 			agent: this.agent,
 			sessionManager: this.sessionManager,
@@ -2153,7 +2073,6 @@ export class AgentSession implements SettingsScope {
 			syncAfterModelChange: (previousEditMode, options) =>
 				this.#tools.syncAfterModelChange(previousEditMode, options),
 			resetCurrentResponsesProviderSession: reason => this.#resetCurrentResponsesProviderSession(reason),
-			maybeAutoRedeemReset: activeBlockUnblockAtMs => this.#maybeAutoRedeemReset(activeBlockUnblockAtMs),
 			runAutoCompaction: (reason, willRetry, options) =>
 				this.#maintenance.runAutoCompaction(reason, willRetry, options),
 			shakeForRequestBodyReadTimeout: generation => this.#maintenance.shakeForRequestBodyReadTimeout(generation),
@@ -2226,9 +2145,7 @@ export class AgentSession implements SettingsScope {
 			memoryTaskDepth: config.memoryTaskDepth,
 			createMemoryTools: config.createMemoryTools,
 		});
-		// Resolve the wire service-tier per request so the Fireworks Priority
-		// toggle scopes priority to Fireworks alone, without mutating the shared
-		// session `serviceTier` that drives `/fast` and OpenAI/Anthropic priority.
+		// Resolve each request's effective service tier without mutating the shared session tier.
 		this.agent.serviceTierResolver = model => this.#models.effectiveServiceTier(model);
 		this.#titleSystemPrompt = config.titleSystemPrompt;
 		this.#autoTitle = config.autoTitle === true;
@@ -2251,8 +2168,6 @@ export class AgentSession implements SettingsScope {
 			: (response, model) => {
 					this.rawSseDebugBuffer.recordResponse(response, model);
 					this.#stats.ingestProviderUsageHeaders(response, model);
-					// Returns void (no allocation) unless a one-time lazy-model
-					// refresh is actually due, preserving the sync fast path.
 					return this.#maybeRefreshLazyLocalContext(response, model);
 				};
 		const configuredOnSseEvent = config.onSseEvent;
@@ -2275,7 +2190,6 @@ export class AgentSession implements SettingsScope {
 			}
 			this.#loopGuards.recordTurn(messages, context);
 			await this.#prewalk.advanceAtTurnEnd(messages, context);
-			if (context?.willContinue) this.#steerAnthropicWrapUp();
 			await this.#advisors.onPrimaryTurnEnd(messages, context?.willContinue, signal);
 			await this.#maintenance.maintainContextMidRun(messages, signal, context);
 		});
@@ -2601,7 +2515,6 @@ export class AgentSession implements SettingsScope {
 			yieldQueue: this.yieldQueue,
 			obfuscator: () => this.#obfuscator,
 			providerSessionState: this.#providerSessionState,
-			preferWebsockets: () => this.preferWebsockets,
 			onPayload: this.#onPayload,
 			onResponse: this.#onResponse,
 			onSseEvent: this.#onSseEvent,
@@ -2634,7 +2547,6 @@ export class AgentSession implements SettingsScope {
 			isRetryFallbackSelectorSuppressed: selector => this.#recovery.isRetryFallbackSelectorSuppressed(selector),
 			noteRetryFallbackCooldown: (selector, retryAfterMs, errorMessage) =>
 				this.#recovery.noteRetryFallbackCooldown(selector, retryAfterMs, errorMessage),
-			createCodexCompactionContext: createMaintenanceCodexCompactionContext,
 			sessionId: () => this.sessionId,
 			restrictOAuthAccounts: providerSessionId => this.#accountPoolScope?.restrict(providerSessionId),
 			agentKind: () => this.#agentKind,
@@ -2643,10 +2555,6 @@ export class AgentSession implements SettingsScope {
 		this.#advisors = new SessionAdvisors(advisorsHost, {
 			enabled: cfgAdvisorEnabled.get(this.settings),
 			tools: config.advisorTools,
-			createGrepTool: config.advisorCreateGrepTool,
-			createEditTool: config.advisorCreateEditTool,
-			getToolContext: config.advisorGetToolContext,
-			mcpResources: config.advisorMcpResources,
 			watchdogPrompt: config.advisorWatchdogPrompt,
 			sharedInstructions: config.advisorSharedInstructions,
 			sharedMaxNotesPerUpdate: config.advisorSharedMaxNotesPerUpdate,
@@ -2668,7 +2576,6 @@ export class AgentSession implements SettingsScope {
 			extensionRunner: this.#extensionRunner,
 			sideStreamFn: this.#sideStreamFn,
 			providerSessionState: this.#providerSessionState,
-			preferWebsockets: () => this.preferWebsockets,
 			model: () => this.model,
 			thinkingLevel: () => this.thinkingLevel,
 			isDisposed: () => this.#isDisposed,
@@ -2724,9 +2631,7 @@ export class AgentSession implements SettingsScope {
 			},
 			convertToLlmForSideRequest: messages => this.#convertToLlmForSideRequest(messages),
 			buildLiveProviderContext: async (summarized, retained, signal, model) => {
-				// compact() rebuilds the previous summary message; send the live
-				// agent's own one. Conversion caches key on message identity, so a
-				// copy would re-render the bytes the live turns already sent.
+				// Keep the live summary's identity so conversion caches reuse its bytes.
 				const liveSummary = this.agent.state.messages[0];
 				const first = summarized[0];
 				const history =
@@ -2735,16 +2640,11 @@ export class AgentSession implements SettingsScope {
 					liveSummary.timestamp === first.timestamp
 						? [liveSummary, ...summarized.slice(1)]
 						: summarized;
-				// Transform the whole history as the live turn does, then cut it:
-				// provider transforms (inline imaging, image budgets) decide per
-				// request, so a separately transformed prefix can differ.
+				// Transform the whole history before cutting the summarized prefix.
 				const prefixLength = (await this.convertMessagesToLlm(history, signal, model)).length;
 				const live = await this.agent.buildSideRequestContext(
 					await this.convertMessagesToLlm([...history, ...retained], signal, model),
 				);
-				// Date/cwd reminder controls are the only messages the transforms
-				// insert: count past them, and leave out any at the cut, so the kept
-				// turns follow the summarized range directly.
 				let cut = 0;
 				for (let counted = 0; cut < live.messages.length && counted < prefixLength; cut++) {
 					if (!isDateCwdReminderControl(live.messages[cut]!)) counted++;
@@ -2754,8 +2654,6 @@ export class AgentSession implements SettingsScope {
 			obfuscateTextForProvider: text => this.#obfuscateTextForProvider(text),
 			obfuscatePreparationForProvider: preparation => this.#obfuscatePreparationForProvider(preparation),
 			getPromptCacheKeyForModel: model => this.getPromptCacheKeyForModel(model),
-			closeCodexProviderSessionsForHistoryRewrite: () => this.#closeCodexProviderSessionsForHistoryRewrite(),
-			resetCodexProviderAfterCompaction: compaction => this.#resetCodexProviderAfterCompaction(compaction),
 			resetPlanReference: () => {
 				this.#planReferenceSent = false;
 			},
@@ -3032,10 +2930,9 @@ export class AgentSession implements SettingsScope {
 		cfgSkillful.listen(this, skillful => this.#applySkillful(skillful));
 	}
 
-	/** Keeps workspace roots, the auto-QA prompt note, and the held power assertion in step with live settings. */
+	/** Keeps workspace roots and the held power assertion in step with live settings. */
 	#watchWorkspaceAndPowerSettings(): void {
 		this.#settingsWorkspaceDirectories = cfgWorkspaceAdditionalDirectories.get(this.settings);
-		this.#autoQaEnabled = isAutoQaEnabled(this.settings);
 		cfgPowerSleepPrevention.listen(this, () => {
 			// Swap the held assertion for the new mode mid-prompt; idle sessions
 			// pick the mode up when the next prompt begins.
@@ -3043,12 +2940,9 @@ export class AgentSession implements SettingsScope {
 			this.#releasePowerAssertion();
 			this.#acquirePowerAssertion();
 		});
-		cfgWorkspacePromptInputs.listen(this, async () => {
+		cfgWorkspaceAdditionalDirectories.listen(this, async () => {
 			const rootsChanged = await this.#syncSettingsWorkspaceDirectories();
-			const autoQaEnabled = isAutoQaEnabled(this.settings);
-			const autoQaChanged = autoQaEnabled !== this.#autoQaEnabled;
-			this.#autoQaEnabled = autoQaEnabled;
-			if ((rootsChanged || autoQaChanged) && !this.#isDisposed) await this.refreshBaseSystemPrompt();
+			if (rootsChanged && !this.#isDisposed) await this.refreshBaseSystemPrompt();
 		});
 	}
 
@@ -3223,11 +3117,6 @@ export class AgentSession implements SettingsScope {
 		return this.#providerSessionState;
 	}
 
-	/** Hint forwarded to provider calls that support websocket transport; read live from `providers.openaiWebsockets`. */
-	get preferWebsockets(): boolean | undefined {
-		return resolveOpenAIWebsocketPreference(this.settings);
-	}
-
 	getHindsightSessionState(): HindsightSessionState | undefined {
 		return this.#hindsightSessionState;
 	}
@@ -3247,7 +3136,7 @@ export class AgentSession implements SettingsScope {
 		return this.#ttsr.manager;
 	}
 
-	/** Secret obfuscator, when secrets are configured; /share redaction reuses it. */
+	/** Secret obfuscator, when secrets are configured. */
 	get obfuscator(): SecretObfuscator | undefined {
 		return this.#obfuscator;
 	}
@@ -3594,9 +3483,9 @@ export class AgentSession implements SettingsScope {
 
 	/**
 	 * Judge for TTSR `question` rules per `ttsr.judge`, used by live judging and
-	 * `/omfg` validation. `auto` requires the judge role to resolve to a native
-	 * System One model, since every completed output may cost a request. Rebuilt
-	 * per call so model, credential, and session switches apply.
+	 * `/omfg` validation. `auto` requires a configured native judgment backend,
+	 * since every completed output may cost a request. Rebuilt per call so
+	 * model, credential, and session switches apply.
 	 */
 	ruleJudge(): Judge | undefined {
 		const mode = cfgTtsrJudge.get(this.settings);
@@ -5059,16 +4948,6 @@ export class AgentSession implements SettingsScope {
 				return;
 			}
 			const requestBodyTimeoutTerminal = requestBodyTimeoutRecovery === "handled-terminal";
-			// Fireworks Fast variants degrade to their base model on a failed turn —
-			// including hard router errors the generic retry classifier rejects — so
-			// run this gate before the standard retryability check.
-			if (!requestBodyTimeoutTerminal && this.#recovery.isFireworksFastFallbackEligible(msg)) {
-				const didRetry = await this.#recovery.handleRetryableError(msg, { fireworksFastFallback: true });
-				if (didRetry) {
-					await emitAgentEndNotification({ willContinue: true });
-					return;
-				}
-			}
 			const resumeResolvedStreamStall = resolvedInterruptedToolTurn === "stream-stall";
 			if (!requestBodyTimeoutTerminal && (resumeResolvedStreamStall || this.#recovery.isRetryableError(msg))) {
 				const didRetry = await this.#recovery.handleRetryableError(
@@ -6050,17 +5929,7 @@ export class AgentSession implements SettingsScope {
 		}
 	}
 
-	/**
-	 * Set agent.sessionId from the session manager and install a dynamic
-	 * metadata resolver so every Anthropic API request carries
-	 * `metadata.user_id` shaped like real Claude Code's `getAPIMetadata` output:
-	 * `{ session_id, account_uuid, device_id }`. `account_uuid` is included only
-	 * when an Anthropic OAuth credential with a known account UUID is loaded;
-	 * `device_id` is derived from both the persistent omp install id and that
-	 * account UUID. Resolving live keeps the value in sync with auth-state changes
-	 * (login/logout, token refresh that surfaces a new account UUID) without
-	 * needing to re-call `#syncAgentSessionId()` on every such event.
-	 */
+	/** Set the provider session id and session-only request metadata. */
 	#syncAgentSessionId(sessionId?: string, notifyChange = true): void {
 		const currentSessionId = this.sessionManager.getSessionId();
 		if (this.#observedSessionId === undefined) {
@@ -6071,9 +5940,7 @@ export class AgentSession implements SettingsScope {
 		}
 		const sid = this.#activeProviderSessionId(sessionId);
 		this.agent.sessionId = sid;
-		this.agent.setMetadataResolver((provider: string) =>
-			buildSessionMetadata(sid, provider, this.#modelRegistry.authStorage),
-		);
+		this.agent.setMetadataResolver(() => buildSessionMetadata(sid));
 		// A fresh or reset id becomes the pool scope's primary id, restricted
 		// before restored pins are seeded so they cannot leave the pool.
 		this.#accountPoolScope?.adopt(sid);
@@ -6371,8 +6238,6 @@ export class AgentSession implements SettingsScope {
 
 		const hindsightState = this.getHindsightSessionState();
 		const mnemopiState = setMnemopiSessionState(this, undefined);
-		// Bound the wait for a just-fired sharpshooter extraction before dropping
-		// its subscriptions, so print-mode exits don't cut queued-delta writes.
 		const sharpshooterFlushed = flushSharpshooterExtraction(this, options.mnemopiConsolidateTimeoutMs);
 		try {
 			releaseSharpshooterSession(this);
@@ -6388,8 +6253,8 @@ export class AgentSession implements SettingsScope {
 			this.#releaseOwnedComputerSessions(this.#eval.getKernelOwnerId()),
 			this.#disconnectOwnedMcp(),
 			advisorRecorderClosed,
-			hindsightState?.flushRetainQueue() ?? Promise.resolve(),
 			this.#disposeMnemopi(mnemopiState, options.mnemopiConsolidateTimeoutMs),
+			hindsightState?.flushRetainQueue() ?? Promise.resolve(),
 			sharpshooterFlushed,
 		]);
 		for (const result of results) {
@@ -6656,52 +6521,6 @@ export class AgentSession implements SettingsScope {
 	/** Current model (may be undefined if not yet selected) */
 	get model(): Model | undefined {
 		return this.agent.state.model;
-	}
-
-	/**
-	 * On the first successful response from a lazy-load local model, re-probe its
-	 * runtime context window and fold the result into the live session model.
-	 *
-	 * Discovery snapshots a not-yet-loaded LM Studio model with its architectural
-	 * `max_context_length`; the runtime `loaded_context_length` only exists once
-	 * the model JIT-loads on the first inference (llama.cpp has the same cold-start
-	 * gap for `meta.n_ctx`). A 2xx here means the load completed, so the probe now
-	 * returns the window the backend actually serves. Compaction and the context
-	 * bar read `agent.state.model` every turn, so `agent.setModel` propagates it
-	 * immediately without a provider-session reset (#9001).
-	 *
-	 * Returns `void` synchronously when nothing is due — the common case — so the
-	 * no-callback `#onResponse` fast path stays allocation-free.
-	 */
-	#maybeRefreshLazyLocalContext(response: ProviderResponseMetadata, model: Model | undefined): void | Promise<void> {
-		if (!model || response.status < 200 || response.status >= 300) return;
-		const key = `${model.provider}/${model.id}`;
-		if (this.#lazyContextRefreshed.has(key)) return;
-		if (!this.#modelRegistry.hasLazyRuntimeMetadata(model.provider)) return;
-		this.#lazyContextRefreshed.add(key);
-		return this.#refreshLazyLocalContext(model);
-	}
-
-	async #refreshLazyLocalContext(model: Model): Promise<void> {
-		try {
-			const refreshed = this.#modelRegistry.fitContextWindow(
-				await this.#modelRegistry.refreshSelectedModelMetadata(model),
-				this.settings,
-			);
-			const current = this.model;
-			// Skip if the user switched models mid-stream, or the runtime window
-			// matches what the session already holds.
-			if (!current || !modelsAreEqual(current, refreshed) || refreshed.contextWindow === current.contextWindow) {
-				return;
-			}
-			this.agent.setModel(refreshed);
-		} catch (error) {
-			logger.debug("Lazy local model context refresh failed", {
-				provider: model.provider,
-				model: model.id,
-				error,
-			});
-		}
 	}
 
 	/**
@@ -7585,7 +7404,6 @@ export class AgentSession implements SettingsScope {
 
 		if (!historyChanged) return;
 		this.#advisors.resetAllRuntimes("vibe-mode-exit");
-		this.#closeCodexProviderSessionsForHistoryRewrite();
 	}
 
 	#assertVibeSessionTransitionAllowed(action: string): void {
@@ -8443,9 +8261,8 @@ export class AgentSession implements SettingsScope {
 			onPromptQueued?: PromptOptions["onPromptQueued"];
 		},
 	): Promise<boolean> {
-		// Same barrier/claim protocol as prompt(): skill invocations, collab peer
-		// prompts and the CLI initial message must not start during idle/manual
-		// compaction or before a handoff commits its history.
+		// Same barrier/claim protocol as prompt(): skill invocations and the CLI
+		// initial message must not start during compaction or before a handoff commits.
 		const release = await this.#maintenance.waitForMaintenanceCleanup();
 		const outcome: PromptDispatchOutcome = { sessionClaimed: false };
 		if (!release) return this.#dispatchCustomPrompt(message, options, outcome);
@@ -9464,7 +9281,7 @@ export class AgentSession implements SettingsScope {
 		// description was in flight and drop a record that would otherwise land in a
 		// different session's queue.
 		const sessionGeneration = this.#sessionGeneration;
-		// A queued user message (RPC/SDK/collab steer or follow-up, or a typed message
+		// A queued user message (RPC/SDK steer or follow-up, or a typed message
 		// while streaming) is a deliberate resume; re-enable advisor auto-resume that
 		// a user interrupt suppressed. An aside is non-interrupting by design — it must
 		// not re-enable auto-resume a user interrupt deliberately suppressed, so it stays
@@ -10502,9 +10319,8 @@ export class AgentSession implements SettingsScope {
 
 		const promoted = followUp.slice(this.#queuedUserGroupStart(followUp, index), index + 1);
 		const message = promoted[promoted.length - 1];
-		// Plain user turns opt into model-side emphasis. Collab prompts are already
-		// recognized by customType in wrapSteeringForModel; other custom types keep
-		// their existing rendering semantics. Queue membership controls interruption.
+		// Only ordinary user turns opt into model-side steering emphasis.
+		// Custom types keep their rendering semantics; queue membership controls interruption.
 		if (message.role === "user") message.steering = true;
 		// One agent-core mutation edits the follow-up queue and appends to steering, so a
 		// live steering claim is left alone, queue listeners (and `queue_update`) see a
@@ -11012,7 +10828,7 @@ export class AgentSession implements SettingsScope {
 				this.settings,
 				sessionId,
 				this.model,
-				provider => buildSessionMetadata(sessionId, provider, this.#modelRegistry.authStorage),
+				() => buildSessionMetadata(sessionId),
 				customSystemPrompt ?? this.#titleSystemPrompt,
 				titleSignal,
 				parentSessionId,
@@ -11160,8 +10976,7 @@ export class AgentSession implements SettingsScope {
 			for (const controller of this.#imageDescriptionAbortControllers) controller.abort(options?.reason);
 			this.abortRetry();
 			this.#promptGeneration++;
-			// Cancel any awaited pre-dispatch setup (e.g. Hindsight auto-recall) so the
-			// admitted submission unwinds now instead of at the recall timeout (#12668).
+			// Cancel awaited pre-dispatch setup so the admitted submission unwinds now.
 			this.#promptSetupAbortController?.abort(options?.reason);
 			this.#scheduledHiddenNextTurnGeneration = undefined;
 			// Abort the handoff first so generic compaction cancellation cannot replace
@@ -11644,68 +11459,6 @@ export class AgentSession implements SettingsScope {
 		return this.#models.effectiveServiceTier(model);
 	}
 
-	/** Record the Claude account lane that served this session's latest Anthropic request. */
-	noteAnthropicSlowModeLane(lane: string): void {
-		this.#anthropicSlowModeLane = lane;
-	}
-
-	/**
-	 * Slow-mode lane of the Claude account this session last used, or
-	 * undefined before its first Anthropic subscription request.
-	 */
-	getAnthropicSlowModeLane(): AnthropicSlowModeController | undefined {
-		const lane = this.#anthropicSlowModeLane;
-		return lane === undefined ? undefined : anthropicSlowModeLanes.lane(lane);
-	}
-
-	/**
-	 * Status-line label for the Claude account's usage-limit stage, e.g.
-	 * `limit reached · wrapping up · resets 14:30` or (with `/slow on`)
-	 * `low priority until 14:30 · 62% left`; undefined outside both stages or
-	 * off an Anthropic model.
-	 */
-	getAnthropicSlowModeLabel(): string | undefined {
-		return formatUsageLimitLabel(this.getUsageLimitState());
-	}
-
-	/**
-	 * Usage-limit stage of the active model's account (wrap-up allowance or
-	 * low-priority lane); undefined outside both stages. Claude subscriptions
-	 * are the only producer today.
-	 */
-	getUsageLimitState(): UsageLimitState | undefined {
-		if (this.model?.provider !== "anthropic") return undefined;
-		return this.getAnthropicSlowModeLane()?.status(
-			undefined,
-			cfgProvidersAnthropicSlowMode.get(this.settings) === "auto",
-		);
-	}
-
-	/**
-	 * Mid-run, once per wrap-up window: tell the model to checkpoint when its
-	 * Claude account runs on the wrap-up allowance and nothing (low priority,
-	 * extra usage) will carry the work past it.
-	 */
-	#steerAnthropicWrapUp(): void {
-		const lane = this.#anthropicSlowModeLane;
-		if (lane === undefined || this.model?.provider !== "anthropic") return;
-		const window = anthropicSlowModeLanes
-			.lane(lane)
-			.wrapUpHintKey(cfgProvidersAnthropicSlowMode.get(this.settings) === "auto");
-		if (window === undefined) return;
-		const key = `${lane}#${window}`;
-		if (this.#anthropicWrapUpHinted === key) return;
-		this.#anthropicWrapUpHinted = key;
-		this.agent.steer({
-			role: "custom",
-			customType: "anthropic-usage-wrap-up",
-			content: anthropicUsageWrapUpPrompt,
-			attribution: "agent",
-			display: false,
-			timestamp: Date.now(),
-		});
-	}
-
 	/** Sets or clears one model family's live service tier. */
 	setServiceTierFamily(family: ServiceTierFamily, tier: ServiceTier | undefined): void {
 		this.#models.setServiceTierFamily(family, tier);
@@ -11731,67 +11484,39 @@ export class AgentSession implements SettingsScope {
 		return this.#models.setUltrafastMode(enabled);
 	}
 
-	/**
-	 * What `/slow` controls for the active model: the `flex` service tier on the
-	 * OpenAI/Google families, or subscription slow mode on direct Anthropic.
-	 */
-	#slowModeTarget(): { kind: "flex"; family: ServiceTierFamily } | { kind: "anthropic" } | undefined {
+	/** The flex service tier controlled by `/slow` for the active model family. */
+	#slowModeTarget(): { kind: "flex"; family: ServiceTierFamily } | undefined {
 		const model = this.model;
 		if (!model) return undefined;
-		if (model.provider === "anthropic") return { kind: "anthropic" };
 		const family = serviceTierFamily(model);
 		return family && isServiceTierForFamily(family, "flex") ? { kind: "flex", family } : undefined;
 	}
 
-	/** Whether `/slow` applies to the active model (flex tier or Claude low priority). */
+	/** Whether `/slow` applies to the active model's flex tier. */
 	isSlowModeSupported(): boolean {
 		return this.#slowModeTarget() !== undefined;
 	}
 
-	/**
-	 * Where `/slow` for the active model is stored: `global` for the persisted
-	 * config every session shares (`providers.anthropic.slowMode`), `session`
-	 * for this session's flex service tier; undefined without a slow mode.
-	 */
-	getSlowModeScope(): "session" | "global" | undefined {
-		const target = this.#slowModeTarget();
-		if (!target) return undefined;
-		return target.kind === "anthropic" ? "global" : "session";
+	/** Flex service tiers apply to this session only. */
+	getSlowModeScope(): "session" | undefined {
+		return this.#slowModeTarget() ? "session" : undefined;
 	}
 
-	/**
-	 * Reports whether `/slow` is on for the active model. `false` when the
-	 * active model has no slow mode, even while another provider's persisted
-	 * setting (`providers.anthropic.slowMode`) stays on.
-	 */
+	/** Whether the active model family's flex tier is enabled. */
 	isSlowModeEnabled(): boolean {
 		const target = this.#slowModeTarget();
 		if (!target) return false;
-		if (target.kind === "anthropic") return cfgProvidersAnthropicSlowMode.get(this.settings) === "auto";
 		return this.serviceTierByFamily[target.family] === "flex";
 	}
 
-	/**
-	 * `/slow on|off` for the active model. OpenAI/Google: sets or clears this
-	 * session's `flex` tier. Anthropic: sets `providers.anthropic.slowMode` to
-	 * `auto`/`off`; on also enters an already-offered (or user-stopped) slow
-	 * window right away, off stops the active one. Returns false when the model
-	 * has no slow mode.
-	 */
+	/** Sets or clears the active model family's session-only flex tier. */
 	setSlowMode(enabled: boolean): boolean {
 		const target = this.#slowModeTarget();
 		if (!target) return false;
-		if (target.kind === "flex") {
-			if (enabled) this.setServiceTierFamily(target.family, "flex");
-			else if (this.serviceTierByFamily[target.family] === "flex") {
-				this.setServiceTierFamily(target.family, undefined);
-			}
-			return true;
+		if (enabled) this.setServiceTierFamily(target.family, "flex");
+		else if (this.serviceTierByFamily[target.family] === "flex") {
+			this.setServiceTierFamily(target.family, undefined);
 		}
-		cfgProvidersAnthropicSlowMode.set(this.settings, enabled ? "auto" : "off");
-		const lane = this.getAnthropicSlowModeLane();
-		if (enabled) lane?.accept();
-		else lane?.stop("user");
 		return true;
 	}
 
@@ -12088,7 +11813,6 @@ export class AgentSession implements SettingsScope {
 		this.#advisors.resetSessionState({ preserveCost: true });
 		this.#todo.syncFromBranch();
 		this.#modelMentions.syncFromBranch();
-		this.#closeCodexProviderSessionsForHistoryRewrite();
 		this.#checkpointState = undefined;
 		this.#pendingRewindReport = undefined;
 	}
@@ -12239,20 +11963,6 @@ export class AgentSession implements SettingsScope {
 		}
 	}
 
-	#closeCodexProviderSessionsForHistoryRewrite(): void {
-		const currentModel = this.model;
-		if (currentModel?.api !== "openai-codex-responses") return;
-		this.#closeProviderSessionsForModelSwitch(currentModel, currentModel);
-	}
-
-	#resetCodexProviderAfterCompaction(compaction: CodexCompactionContext): void {
-		resetOpenAICodexHistoryAfterCompaction({
-			providerSessionState: this.#providerSessionState,
-			sessionId: this.sessionId,
-			compaction,
-		});
-	}
-
 	#resetCurrentResponsesProviderSession(reason: string): void {
 		const currentModel = this.model;
 		if (currentModel?.api === "openai-responses") {
@@ -12260,8 +11970,6 @@ export class AgentSession implements SettingsScope {
 			// the next success, while a fresh one on a host without connection
 			// binding would resend the native items the server just refused.
 			this.#providerSessionState.get(`openai-responses:${currentModel.provider}`)?.close();
-		} else if (currentModel?.api === "openai-codex-responses") {
-			this.#closeProviderSessionsForModelSwitch(currentModel, currentModel);
 		} else {
 			return;
 		}
@@ -12299,9 +12007,6 @@ export class AgentSession implements SettingsScope {
 
 	#closeProviderSessionsForModelSwitch(currentModel: Model, nextModel: Model): void {
 		const providerKeys = new Set<string>();
-		if (currentModel.api === "openai-codex-responses" || nextModel.api === "openai-codex-responses") {
-			providerKeys.add("openai-codex-responses");
-		}
 		if (currentModel.api === "openai-responses") {
 			providerKeys.add(`openai-responses:${currentModel.provider}`);
 		}
@@ -12730,7 +12435,6 @@ export class AgentSession implements SettingsScope {
 				// conversation's, so the side request keeps its cached prefix.
 				parentSessionId: cacheSessionId,
 				promptCacheKey: this.getPromptCacheKeyForModel(model) ?? this.agent.sessionId,
-				preferWebsockets: this.preferWebsockets,
 				providerSessionState: this.#providerSessionState,
 				reasoning: toReasoningEffort(this.thinkingLevel),
 				minimizeEffort: args.minimizeEffort,
@@ -12948,14 +12652,14 @@ export class AgentSession implements SettingsScope {
 		sessionPath: string,
 		options?: {
 			onCwdChange?: (newCwd: string, previousCwd: string) => Promise<boolean>;
-			/** Collab snapshot adoption keeps the guest's process cwd and marks the replica runtime-only. */
+			/** Replica adoption keeps the guest cwd and marks the snapshot runtime-only. */
 			preserveLocalCwd?: boolean;
 			/**
 			 * Use this model instead of the target's saved one, like an explicit
 			 * `--model` at startup, and record it in the session when it differs.
 			 */
 			model?: Model;
-			/** Keep the current model without restoring the target's (collab replicas mirror the host's model). */
+			/** Keep the mirrored host model instead of restoring the snapshot's model. */
 			keepModel?: boolean;
 			/**
 			 * Receives the model fallback warning after the switch commits, instead of a
@@ -13170,10 +12874,11 @@ export class AgentSession implements SettingsScope {
 				} else {
 					this.agent.setModel(targetModel);
 				}
-				// Saved selectors may carry a thinking suffix; compare resolved models.
+				// Only resolve a saved selector that could equal the explicit target.
+				const savedSelector = targetModelStrings[0];
 				const savedModel =
-					targetModelStrings.length > 0
-						? resolveSessionModelSelector(this.#modelRegistry, targetModelStrings[0])?.model
+					explicitModel && savedSelector && parseModelString(savedSelector)?.provider === explicitModel.provider
+						? resolveSessionModelSelector(this.#modelRegistry, savedSelector)?.model
 						: undefined;
 				if (explicitModel && !(savedModel && modelsAreEqual(savedModel, targetModel))) {
 					this.sessionManager.appendModelChange(`${targetModel.provider}/${targetModel.id}`);
@@ -13516,7 +13221,6 @@ export class AgentSession implements SettingsScope {
 			if (!skipConversationRestore) {
 				this.agent.replaceMessages(sessionContext.messages);
 				this.#advisors.resetSessionState();
-				this.#closeCodexProviderSessionsForHistoryRewrite();
 			}
 
 			this.#advisors.reattachRecorderFeeds();
@@ -13643,7 +13347,6 @@ export class AgentSession implements SettingsScope {
 
 			this.agent.replaceMessages(sessionContext.messages);
 			this.#advisors.resetSessionState();
-			this.#closeCodexProviderSessionsForHistoryRewrite();
 			advisorRecordersDetached = false;
 			await this.#reconcileModeAfterTransition();
 
@@ -13868,7 +13571,7 @@ export class AgentSession implements SettingsScope {
 		let isAskReanswerCompletion = false;
 
 		if (isTranscriptEntry(targetEntry) && isUserRequestEntry(targetEntry)) {
-			// User request (plain prompt, or a user-invoked skill/collab prompt): leaf = parent
+			// User request (plain prompt or user-invoked skill): leaf = parent
 			// (null if root), the draft the user typed goes back to the editor with its images.
 			newLeafId = targetEntry.parentId;
 			editorText = userTurnDraft(targetEntry);
@@ -13958,7 +13661,6 @@ export class AgentSession implements SettingsScope {
 		this.#advisors.resetSessionState({ preserveCost: true });
 		this.#todo.syncFromBranch();
 		this.#modelMentions.syncFromBranch();
-		this.#closeCodexProviderSessionsForHistoryRewrite();
 
 		this.#branchSummaryAbortController = undefined;
 
@@ -14163,24 +13865,11 @@ export class AgentSession implements SettingsScope {
 		const authStorage = this.#modelRegistry.authStorage;
 		if (!authStorage.usage.reports) return null;
 		const reports = await authStorage.usage.reports({
-			baseUrlResolver: provider => {
-				if (provider === "google-antigravity") {
-					const mode = cfgProvidersAntigravityEndpoint.get(this.settings);
-					if (mode === "sandbox") {
-						return "https://daily-cloudcode-pa.sandbox.googleapis.com";
-					} else if (mode === "production") {
-						return "https://daily-cloudcode-pa.googleapis.com";
-					}
-				}
-				return this.#modelRegistry.getProviderBaseUrl?.(provider);
-			},
+			baseUrlResolver: provider => this.#modelRegistry.getProviderBaseUrl?.(provider),
 			signal,
 		});
-		// Every fresh usage snapshot doubles as the salvage-sweep heartbeat: the
-		// status line calls this every 5 minutes while the TUI is open.
 		if (reports) {
 			this.#usageReports = reports;
-			this.#maybeScheduleResetSweep(reports);
 		}
 		return reports;
 	}
@@ -14230,537 +13919,6 @@ export class AgentSession implements SettingsScope {
 		const provider = this.model?.provider;
 		if (!provider || this.isStreaming) return false;
 		return this.#modelRegistry.authStorage.sessions.pin(provider, this.sessionId, credentialId);
-	}
-
-	/**
-	 * Redeem one provider-selected saved rate-limit reset for an exact stored
-	 * credential. Never throws for business outcomes — inspect `code`.
-	 */
-	async redeemResetCredit(target: ResetCreditTarget, signal?: AbortSignal): Promise<ResetCreditRedeemOutcome> {
-		return this.#modelRegistry.authStorage.resets.redeem({
-			target,
-			baseUrlResolver: provider => this.#modelRegistry.getProviderBaseUrl?.(provider),
-			signal,
-		});
-	}
-
-	/**
-	 * List live saved-reset eligibility. An explicit provider lists only that
-	 * provider; the public default aggregates Codex and Claude independently.
-	 */
-	async listResetCredits(signal?: AbortSignal, provider?: string): Promise<ResetCreditAccountStatus[]> {
-		const options = {
-			sessionId: this.sessionId,
-			baseUrlResolver: (candidate: string) => this.#modelRegistry.getProviderBaseUrl?.(candidate),
-			signal,
-		};
-		if (provider) {
-			return this.#modelRegistry.authStorage.resets.list({ ...options, provider });
-		}
-		const [codex, claude] = await Promise.all([
-			this.#modelRegistry.authStorage.resets.list({ ...options, provider: "openai-codex" }),
-			this.#modelRegistry.authStorage.resets.list({ ...options, provider: "anthropic" }),
-		]);
-		return [...codex, ...claude];
-	}
-	/**
-	 * Ask before a provider's first automatic spend and return the approved
-	 * actions. Consent is persisted in that provider's independent settings
-	 * group; a host that cannot prompt (no extension UI, or one whose prompts
-	 * cannot reach a human) spends only credits about to expire and gets a
-	 * one-shot notice for the rest while the mode is unset.
-	 */
-	async #confirmAutoRedeem(
-		provider: "openai-codex" | "anthropic",
-		actions: (CodexResetAction | ClaudeResetAction)[],
-		coordinator: CodexAutoRedeemCoordinator,
-	): Promise<readonly (CodexResetAction | ClaudeResetAction)[]> {
-		if (actions.length === 0) return [];
-		const providerLabel = provider === "anthropic" ? "Claude" : "Codex";
-		const settingsKey = provider === "anthropic" ? "claudeResets.autoRedeem" : "codexResets.autoRedeem";
-		const source = provider === "anthropic" ? "claude-auto-reset" : "codex-auto-reset";
-		const runner = this.#extensionRunner;
-		if (!runner?.hasUI() || !this.#interactivePrompts) {
-			const approved = headlessApprovedResetActions(actions);
-			const waiting = actions.find(action => !approved.some(spend => spend.attemptKey === action.attemptKey));
-			if (waiting && !coordinator.notifiedKeys.has(waiting.attemptKey)) {
-				coordinator.notifiedKeys.add(waiting.attemptKey);
-				this.emitNotice(
-					"warning",
-					`Saved ${providerLabel} resets are eligible to spend, but auto-redeem is unset and no prompt UI is available. Run \`/usage reset\` or set ${settingsKey}.`,
-					source,
-				);
-			}
-			for (const action of approved) {
-				this.emitNotice(
-					"info",
-					`Spending a saved ${providerLabel} reset for ${action.label} before it expires in ${formatDuration(action.expiresInMs ?? 0)}; auto-redeem is unset and no prompt UI is available. Set ${settingsKey} to no to let resets expire instead.`,
-					source,
-				);
-			}
-			return approved;
-		}
-
-		const lines = actions.map(action => {
-			if (!("program" in action)) {
-				const codex = action;
-				return codex.reason === "blocked-account"
-					? `${codex.label} is blocked by the Codex ${(codex.blockedWindows ?? []).join(" + ") || "usage"} limit for about ${formatDuration(codex.remainingMs ?? 0)}.`
-					: `${codex.label}: a saved reset expires in ${formatDuration(codex.expiresInMs ?? 0)} (${codex.salvageWindow ?? "weekly"} window ${Math.round((codex.salvageUsedFraction ?? codex.weeklyUsedFraction ?? 0) * 100)}% used).`;
-			}
-			const claude = action;
-			const grant = claude.program === "juniper_tide" ? "5h session-only reset" : (claude.title ?? "saved reset");
-			const early = claude.requiresLimit
-				? ""
-				: " This grant permits early use before the covered window is fully blocked.";
-			return claude.reason === "blocked-account"
-				? `${claude.label}: ${grant} covers ${(claude.blockedWindows ?? []).map(formatUsageResetWindow).join(" + ")} with about ${formatDuration(claude.remainingMs ?? 0)} left.${early}`
-				: `${claude.label}: ${grant} expires in ${formatDuration(claude.expiresInMs ?? 0)}; ${formatUsageResetWindow(claude.salvageWindow ?? "")} is ${Math.round((claude.salvageUsedFraction ?? 0) * 100)}% used.${early}`;
-		});
-		const question =
-			actions.length === 1
-				? `Spend a saved ${providerLabel} rate-limit reset?\n${lines[0]}`
-				: `Spend ${actions.length} saved ${providerLabel} rate-limit resets?\n${lines.join("\n")}`;
-		try {
-			const choice = await runner.getUIContext().select(question, [
-				{
-					label: "Yes",
-					description: `Redeem now and remember yes for future eligible ${providerLabel} resets.`,
-				},
-				{
-					label: "No",
-					description: `Do not auto-redeem saved ${providerLabel} resets.`,
-				},
-			]);
-			if (choice === "Yes") {
-				if (provider === "anthropic") cfgClaudeResetsAutoRedeem.set(this.settings, "yes");
-				else cfgCodexResetsAutoRedeem.set(this.settings, "yes");
-				return actions;
-			}
-			if (choice === "No") {
-				if (provider === "anthropic") cfgClaudeResetsAutoRedeem.set(this.settings, "no");
-				else cfgCodexResetsAutoRedeem.set(this.settings, "no");
-			}
-		} catch (error) {
-			logger.warn(`${source} prompt failed`, { error: String(error) });
-		}
-		return [];
-	}
-
-	/** Spend every planned action under `yes`, and only the confirmed ones under `unset`. */
-	async #redeemConsentedResets(
-		provider: "openai-codex" | "anthropic",
-		mode: ResetAutoRedeemMode,
-		actions: (CodexResetAction | ClaudeResetAction)[],
-		coordinator: CodexAutoRedeemCoordinator,
-	): Promise<{ restoredCredentialIds: number[]; poolLimited: boolean }> {
-		const approved = shouldPromptCodexAutoRedeem(mode)
-			? await this.#confirmAutoRedeem(provider, actions, coordinator)
-			: actions;
-		return this.#executeResetActions(provider, approved, coordinator);
-	}
-
-	#planCodexResets(
-		trigger: CodexResetTrigger,
-		reports: UsageReport[] | null,
-		identity: OAuthAccountIdentity | undefined,
-		coordinator: CodexAutoRedeemCoordinator,
-		activeBlockUnblockAtMs?: number,
-	): CodexResetPlan {
-		const cfg = cfgCodexResets.get(this.settings);
-		const model = this.model;
-		const plan = planCodexResetRedemptions({
-			nowMs: Date.now(),
-			trigger,
-			provider: model?.provider ?? "",
-			modelId: model?.id ?? "",
-			settings: resetPlanSettings(cfg),
-			identity,
-			permitsCredential: credentialId =>
-				this.#modelRegistry.authStorage.sessions.permits("openai-codex", this.sessionId, credentialId),
-			reports,
-			attemptedKeys: coordinator.attemptedKeys,
-			deferredUntilByKey: coordinator.deferredUntilByKey,
-			lastAttemptAtByAccount: coordinator.lastAttemptAtByAccount,
-			activeBlockUnblockAtMs,
-		});
-		if (plan.skipped.length > 0) {
-			logger.debug("codex-auto-reset: plan", { trigger, actions: plan.actions.length, skipped: plan.skipped });
-		}
-		return plan;
-	}
-
-	#planClaudeResets(
-		trigger: CodexResetTrigger,
-		reports: UsageReport[] | null,
-		statuses: readonly ResetCreditAccountStatus[],
-		coordinator: CodexAutoRedeemCoordinator,
-		activeBlockUnblockAtMs?: number,
-	): ClaudeResetPlan {
-		const cfg = cfgClaudeResets.get(this.settings);
-		const model = this.model;
-		const plan = planClaudeResetRedemptions({
-			nowMs: Date.now(),
-			trigger,
-			provider: model?.provider ?? "",
-			modelId: model?.provider === "anthropic" ? model.id : "",
-			settings: resetPlanSettings(cfg),
-			reports,
-			statuses,
-			permitsCredential: credentialId =>
-				this.#modelRegistry.authStorage.sessions.permits("anthropic", this.sessionId, credentialId),
-			attemptedKeys: coordinator.attemptedKeys,
-			deferredUntilByKey: coordinator.deferredUntilByKey,
-			lastAttemptAtByAccount: coordinator.lastAttemptAtByAccount,
-			activeBlockUnblockAtMs,
-		});
-		if (plan.skipped.length > 0) {
-			logger.debug("claude-auto-reset: plan", { trigger, actions: plan.actions.length, skipped: plan.skipped });
-		}
-		return plan;
-	}
-
-	#adoptResetMarker(lockKey: string, marker: { state: string; atMs: number }): boolean {
-		if (
-			marker.state !== "reset" ||
-			!Number.isFinite(marker.atMs) ||
-			Date.now() - marker.atMs >= ATTEMPT_COOLDOWN_MS ||
-			marker.atMs <= (this.#adoptedResetMarkers.get(lockKey) ?? 0)
-		) {
-			return false;
-		}
-		this.#adoptedResetMarkers.set(lockKey, marker.atMs);
-		return true;
-	}
-
-	async #adoptRecentReset(
-		statuses: readonly ResetCreditAccountStatus[],
-		coordinator: CodexAutoRedeemCoordinator,
-	): Promise<number | undefined> {
-		for (const status of statuses) {
-			if (status.provider !== this.model?.provider) continue;
-			// A peer's reset of an account outside the session's pool cannot serve its retry.
-			if (!this.#modelRegistry.authStorage.sessions.permits(status.provider, this.sessionId, status.credentialId)) {
-				continue;
-			}
-			const lockKey = resetAccountLockKey(status);
-			if (!lockKey) continue;
-			const lockPath = resetLockPath(lockKey, coordinator.resetLockPath);
-			await fs.promises.mkdir(path.dirname(lockPath), { recursive: true });
-			const adopted = await withFileLock(
-				lockPath,
-				async () => this.#adoptResetMarker(lockKey, await readResetMarker(lockPath)),
-				{ retries: 300, retryDelayMs: 100 },
-			);
-			if (adopted) {
-				await this.#modelRegistry.authStorage.credentials.revalidate();
-				return status.credentialId;
-			}
-		}
-		return undefined;
-	}
-
-	/**
-	 * Shared consume executor for Codex and Claude plans. Attempt keys enter the
-	 * process-wide set before mutation, while nonterminal outcomes release and
-	 * defer the episode so a still-banked grant is not buried permanently.
-	 * Returns the credentials whose reset was spent or adopted from a peer, and
-	 * whether the session's account pool dropped a planned restore.
-	 */
-	async #executeResetActions(
-		provider: "openai-codex" | "anthropic",
-		actions: readonly (CodexResetAction | ClaudeResetAction)[],
-		coordinator: CodexAutoRedeemCoordinator,
-	): Promise<{ restoredCredentialIds: number[]; poolLimited: boolean }> {
-		const authStorage = this.#modelRegistry.authStorage;
-		const providerLabel = provider === "anthropic" ? "Claude" : "Codex";
-		const source = provider === "anthropic" ? "claude-auto-reset" : "codex-auto-reset";
-		// Consent, earlier actions, the fence and the live listing all wait after
-		// planning: a restore the session's account pool no longer allows is dropped.
-		// Checked with no await before the redeem call.
-		const outsidePool = (action: CodexResetAction | ClaudeResetAction): boolean =>
-			action.reason === "blocked-account" &&
-			!authStorage.sessions.permits(provider, this.sessionId, action.target.credentialId);
-		const restored: number[] = [];
-		let poolLimited = false;
-		for (const action of actions) {
-			if (coordinator.attemptedKeys.has(action.attemptKey)) continue;
-			const previousAttemptAt = coordinator.lastAttemptAtByAccount.get(action.accountKey);
-			coordinator.attemptedKeys.add(action.attemptKey);
-			coordinator.lastAttemptAtByAccount.set(action.accountKey, Date.now());
-			let outcome: ResetCreditRedeemOutcome | undefined;
-			let sharedReset = false;
-			let leftPool = false;
-			try {
-				const redeemOptions = {
-					target: action.target,
-					baseUrlResolver: (candidate: string) => this.#modelRegistry.getProviderBaseUrl?.(candidate),
-					// Caller cancellation must not leave an ambiguous consume in flight.
-					signal: AbortSignal.timeout(15_000),
-				};
-				const lockKey = resetAccountLockKey(action.target);
-				if (!lockKey) {
-					// An account without an upstream identity cannot share a cross-process fence.
-					leftPool = outsidePool(action);
-					if (!leftPool) outcome = await authStorage.resets.redeem(redeemOptions);
-				} else {
-					// The coordinator is process-local. Fence concurrent processes and
-					// remember a recent attempt so a late 429 cannot spend again.
-					outcome = await withResetFence<ResetCreditRedeemOutcome | undefined>(
-						resetLockPath(lockKey, coordinator.resetLockPath),
-						async marker => {
-							sharedReset = this.#adoptResetMarker(lockKey, marker);
-							if (sharedReset) await authStorage.credentials.revalidate();
-							return undefined;
-						},
-						async markedRedeem => {
-							// Claude's redeem revalidates its exact offer. Codex needs its
-							// balance rechecked after acquiring the cross-process fence.
-							if (provider === "openai-codex") {
-								const statuses = await this.listResetCredits(AbortSignal.timeout(10_000), provider);
-								const balance = checkCodexBalance(statuses, action.target.credentialId, action.availableCount);
-								if (balance === "spent") return undefined;
-								if (balance) return { ok: false, code: balance, provider } satisfies ResetCreditRedeemOutcome;
-							}
-							const { outcome: result, attemptedAt } = await markedRedeem(async () => {
-								// Checked after the pending marker is written, with no await before
-								// the redeem. A restore the pool no longer allows is never sent:
-								// report a no-op so the fence clears its marker, and drop it below.
-								leftPool = outsidePool(action);
-								if (leftPool) return { ok: false, code: "nothing_to_reset", provider };
-								return authStorage.resets.redeem(redeemOptions);
-							});
-							if (leftPool) return undefined;
-							if (result.code === "reset") this.#adoptedResetMarkers.set(lockKey, attemptedAt);
-							return result;
-						},
-					);
-				}
-			} catch (error) {
-				coordinator.attemptedKeys.delete(action.attemptKey);
-				coordinator.deferredUntilByKey.set(action.attemptKey, Date.now() + REDEEM_RETRY_DEFER_MS);
-				logger.warn(`${source}: redeem threw, deferred`, {
-					account: action.accountKey,
-					error: String(error),
-				});
-				continue;
-			}
-			if (!outcome) {
-				if (sharedReset) restored.push(action.target.credentialId);
-				if (leftPool) {
-					// Never attempted: the episode and cooldown stay free if the pool allows it again.
-					poolLimited = true;
-					coordinator.attemptedKeys.delete(action.attemptKey);
-					if (previousAttemptAt === undefined) coordinator.lastAttemptAtByAccount.delete(action.accountKey);
-					else coordinator.lastAttemptAtByAccount.set(action.accountKey, previousAttemptAt);
-					logger.debug(`${source}: restore dropped, account left the session's pool`, {
-						account: action.accountKey,
-					});
-				}
-				continue;
-			}
-			if (!isTerminalRedeemOutcome(outcome.code)) {
-				coordinator.attemptedKeys.delete(action.attemptKey);
-				coordinator.deferredUntilByKey.set(action.attemptKey, Date.now() + REDEEM_RETRY_DEFER_MS);
-			}
-			switch (outcome.code) {
-				case "reset": {
-					restored.push(action.target.credentialId);
-					const left =
-						action.availableCount === undefined ? undefined : ` (${Math.max(0, action.availableCount - 1)} left)`;
-					const detail =
-						action.reason === "expiring-credit"
-							? `it was set to expire in ${formatDuration(action.expiresInMs ?? 0)}`
-							: outcome.cleared?.length
-								? `cleared ${outcome.cleared.map(formatUsageResetWindow).join(" + ")}; retrying now`
-								: "retrying now";
-					this.emitNotice(
-						"info",
-						`Auto-redeemed a saved ${providerLabel} rate-limit reset for ${action.label}${left ?? ""}; ${detail}.`,
-						source,
-					);
-					break;
-				}
-				case "already_redeemed":
-					this.emitNotice(
-						"warning",
-						`A saved ${providerLabel} reset for ${action.label} was already redeemed elsewhere.`,
-						source,
-					);
-					break;
-				case "no_credit":
-					logger.debug(`${source}: no_credit (snapshot/live mismatch)`, { account: action.accountKey });
-					break;
-				case "nothing_to_reset":
-					if (action.reason === "blocked-account") {
-						this.emitNotice(
-							"warning",
-							`${providerLabel} reset for ${action.label} reported nothing to reset; will retry later.`,
-							source,
-						);
-					} else {
-						logger.debug(`${source}: nothing_to_reset deferred`, { account: action.accountKey });
-					}
-					break;
-				default:
-					if (action.reason === "blocked-account") {
-						this.emitNotice(
-							"warning",
-							`${providerLabel} auto-redeem for ${action.label} failed (${outcome.code}); will retry later.`,
-							source,
-						);
-					} else {
-						logger.warn(`${source}: consume failed, deferred`, {
-							account: action.accountKey,
-							code: outcome.code,
-						});
-					}
-					break;
-			}
-		}
-		if (restored.length > 0) void this.fetchUsageReports();
-		return { restoredCredentialIds: restored, poolLimited };
-	}
-
-	async #maybeAutoRedeemReset(activeBlockUnblockAtMs?: number): Promise<ResetRecoveryResult> {
-		const provider = this.model?.provider;
-		if (provider !== "anthropic" && provider !== "openai-codex") return { restored: false };
-		const cfg = (provider === "anthropic" ? cfgClaudeResets : cfgCodexResets).get(this.settings);
-		if (!shouldEvaluateCodexAutoRedeem(cfg.autoRedeem)) return { restored: false };
-		const coordinator = this.#resetCoordinator;
-		const authStorage = this.#modelRegistry.authStorage;
-		const identity = authStorage.oauth.identity(provider, this.sessionId);
-		const identityValue = (identity?.accountId ?? identity?.email ?? identity?.orgId)?.trim().toLowerCase();
-		if (!identityValue) return { restored: false };
-		const accountKey = `${provider}|${identity?.orgId?.trim().toLowerCase() ?? "-"}|${identityValue}`;
-		// A pass plans within its own session's account pool. A session joining it
-		// keeps its outcome only if the pass restored an account this session may
-		// use, or restored nothing without its pool excluding a candidate.
-		let existing = coordinator.inFlightByAccount.get(accountKey);
-		while (existing) {
-			const shared = await existing;
-			const serves = shared.restored
-				? shared.restoredCredentialIds?.some(id => authStorage.sessions.permits(provider, this.sessionId, id))
-				: !shared.poolLimited;
-			if (serves) return shared;
-			existing = coordinator.inFlightByAccount.get(accountKey);
-		}
-
-		const run = (async (): Promise<ResetRecoveryResult> => {
-			let reports: UsageReport[] | null = null;
-			if (provider === "openai-codex") {
-				await authStorage.usage.invalidate(provider);
-				reports = await this.fetchUsageReports();
-			}
-			// Claude's live reset listing includes the same response's quota
-			// windows; a second broker usage poll adds no evidence and can 429.
-			const statuses = await this.listResetCredits(AbortSignal.timeout(10_000), provider);
-			const plan =
-				provider === "anthropic"
-					? this.#planClaudeResets("blocked", reports, statuses, coordinator, activeBlockUnblockAtMs)
-					: this.#planCodexResets(
-							"blocked",
-							overlayLiveResetCredits(reports, statuses, { synthesizeActive: true, nowMs: Date.now() }),
-							identity,
-							coordinator,
-							activeBlockUnblockAtMs,
-						);
-			const poolLimited = plan.skipped.some(skip => skip.reason === "outside-account-pool");
-			if (plan.actions.length === 0) {
-				const adoptedId = await this.#adoptRecentReset(statuses, coordinator);
-				if (adoptedId !== undefined) return { restored: true, restoredCredentialIds: [adoptedId] };
-				let retryAfterMs: number | undefined;
-				if (provider === "anthropic" && cfg.autoRedeem === "yes") {
-					for (const status of statuses) {
-						if (!status.error || status.retryAfterMs === undefined || !Number.isFinite(status.retryAfterMs))
-							continue;
-						const delay = Math.max(0, status.retryAfterMs);
-						retryAfterMs = retryAfterMs === undefined ? delay : Math.min(retryAfterMs, delay);
-					}
-				}
-				return { restored: false, retryAfterMs, poolLimited };
-			}
-			const executed = await this.#redeemConsentedResets(provider, cfg.autoRedeem, plan.actions, coordinator);
-			return {
-				restored: executed.restoredCredentialIds.length > 0,
-				restoredCredentialIds: executed.restoredCredentialIds,
-				poolLimited: poolLimited || executed.poolLimited,
-			};
-		})()
-			.catch((error): ResetRecoveryResult => {
-				logger.warn("auto-reset: blocked pass failed", { provider, account: accountKey, error: String(error) });
-				return { restored: false };
-			})
-			.finally(() => coordinator.inFlightByAccount.delete(accountKey));
-		coordinator.inFlightByAccount.set(accountKey, run);
-		return run;
-	}
-
-	/**
-	 * One process-wide salvage sweep handles both providers, but plans and asks
-	 * consent independently. Last-chance expiry checks remain active even with
-	 * the broader salvage horizon disabled. Every candidate is refreshed through
-	 * its live listing before spend; a failed listing cannot fall back to stale usage.
-	 * Claude finds its candidates in the usage reports' reset inventory first, so a
-	 * sweep with nothing to salvage lists no Claude account.
-	 */
-	#maybeScheduleResetSweep(reports: UsageReport[]): void {
-		const coordinator = this.#resetCoordinator;
-		const codexCfg = cfgCodexResets.get(this.settings);
-		const claudeCfg = cfgClaudeResets.get(this.settings);
-		const codexEnabled =
-			shouldEvaluateCodexAutoRedeem(codexCfg.autoRedeem) &&
-			reports.some(report => report.provider === "openai-codex");
-		const claudeEnabled =
-			shouldEvaluateCodexAutoRedeem(claudeCfg.autoRedeem) && reports.some(report => report.provider === "anthropic");
-		if (!codexEnabled && !claudeEnabled) return;
-		if (coordinator.sweepInFlight || coordinator.inFlightByAccount.size > 0) return;
-		const now = Date.now();
-		if (now - coordinator.lastSweepAt < SWEEP_MIN_INTERVAL_MS) return;
-		coordinator.sweepInFlight = true;
-		coordinator.lastSweepAt = now;
-		coordinator.sweepPromise = (async () => {
-			if (codexEnabled) {
-				try {
-					const statuses = await this.listResetCredits(AbortSignal.timeout(10_000), "openai-codex");
-					const effectiveReports = overlayLiveResetCredits(reports, statuses);
-					const identity = this.#modelRegistry.authStorage.oauth.identity("openai-codex", this.sessionId);
-					const plan = this.#planCodexResets("sweep", effectiveReports, identity, coordinator);
-					await this.#redeemConsentedResets("openai-codex", codexCfg.autoRedeem, plan.actions, coordinator);
-				} catch (error) {
-					logger.warn("codex-auto-reset: salvage listing failed", { error: String(error) });
-				}
-			}
-			if (claudeEnabled) {
-				try {
-					const accounts = this.#modelRegistry.authStorage.oauth.accounts("anthropic", this.sessionId);
-					const candidates = this.#planClaudeResets(
-						"sweep",
-						reports,
-						claudeResetStatusesFromReports(accounts, reports),
-						coordinator,
-					);
-					const plan =
-						candidates.actions.length > 0
-							? this.#planClaudeResets(
-									"sweep",
-									reports,
-									await this.listResetCredits(AbortSignal.timeout(10_000), "anthropic"),
-									coordinator,
-								)
-							: candidates;
-					if (plan.actions.length > 0) {
-						await this.#redeemConsentedResets("anthropic", claudeCfg.autoRedeem, plan.actions, coordinator);
-					}
-				} catch (error) {
-					logger.warn("claude-auto-reset: salvage listing failed", { error: String(error) });
-				}
-			}
-		})()
-			.catch(error => logger.warn("reset salvage sweep failed", { error: String(error) }))
-			.finally(() => {
-				coordinator.sweepInFlight = false;
-			});
 	}
 
 	/**
@@ -15062,6 +14220,36 @@ export class AgentSession implements SettingsScope {
 		}
 	}
 
+	#maybeRefreshLazyLocalContext(response: ProviderResponseMetadata, model: Model | undefined): void | Promise<void> {
+		if (
+			!model ||
+			response.status < 200 ||
+			response.status >= 300 ||
+			!this.#modelRegistry.hasLazyRuntimeMetadata(model.provider)
+		)
+			return;
+		const key = `${model.provider}/${model.id}`;
+		if (this.#lazyContextRefreshed?.has(key)) return;
+		(this.#lazyContextRefreshed ??= new Set<string>()).add(key);
+		return this.#refreshLazyLocalContext(model);
+	}
+
+	async #refreshLazyLocalContext(model: Model): Promise<void> {
+		try {
+			const refreshed = this.#modelRegistry.fitContextWindow(
+				await this.#modelRegistry.refreshSelectedModelMetadata(model),
+				this.settings,
+			);
+			const current = this.model;
+			if (!current || !modelsAreEqual(current, refreshed) || refreshed.contextWindow === current.contextWindow) {
+				return;
+			}
+			this.agent.setModel(refreshed);
+		} catch (error) {
+			logger.debug("Lazy local model context refresh failed", { provider: model.provider, model: model.id, error });
+		}
+	}
+
 	/**
 	 * Move registry warnings produced by the initial background discovery into
 	 * {@link configWarnings} so the interactive header shows them. Startup drains
@@ -15310,12 +14498,5 @@ export class AgentSession implements SettingsScope {
 	 */
 	get extensionRunner(): ExtensionRunner | undefined {
 		return this.#extensionRunner;
-	}
-
-	/**
-	 * Consume any pending Anthropic fallback credit handle for the next retry turn.
-	 */
-	consumeActiveFallbackCreditRedemption(targetModel?: Model): AnthropicFallbackCreditHandle | undefined {
-		return this.#recovery.consumeActiveFallbackCreditRedemption(targetModel);
 	}
 }

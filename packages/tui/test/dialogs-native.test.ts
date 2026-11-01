@@ -626,10 +626,10 @@ describe("dialogs under a native surface", () => {
 		expect(onPick).toHaveBeenCalledWith("Refine");
 	});
 
-	it("login: Cancel runs Esc's path and Continue submits the pasted code", async () => {
+	it("login: Cancel runs Esc's path and Continue submits a prompt", async () => {
 		const tui = { requestRender() {}, setFocus() {} } as unknown as TUI;
 		const onComplete = vi.fn();
-		const dialog = new LoginDialogComponent(tui, "openai-codex", onComplete, () => {});
+		const dialog = new LoginDialogComponent(tui, "github-copilot", onComplete, () => {});
 		dialog.showAuth("https://auth.example.com/authorize?x=1", "Enter code: ABCD-1234");
 		const waiting = dialog.describe();
 		// The device code copies itself; with nothing to answer, opening the page is the primary action.
@@ -643,7 +643,7 @@ describe("dialogs under a native surface", () => {
 		});
 		expect(find(waiting, node => node.p?.actions?.click === "submit")).toBeUndefined();
 
-		const pending = dialog.showManualInput("Paste the authorization code:");
+		const pending = dialog.showPrompt({ message: "Authorization code" });
 		const described = dialog.describe();
 		// A field waiting for an answer takes the primary action; Open stays as a plain button.
 		expect(find(described, node => node.p?.actions?.click === "submit")?.node.p).toMatchObject({ tone: "accent" });
@@ -652,7 +652,7 @@ describe("dialogs under a native surface", () => {
 		dialog.handleNativeEvent({ type: "action", key: "x", act: "submit", mods: [] });
 		expect(await pending).toBe("code-123");
 
-		const cancelled = dialog.showManualInput("Paste the authorization code:");
+		const cancelled = dialog.showPrompt({ message: "Authorization code" });
 		dialog.handleNativeEvent({ type: "action", key: "x", act: "cancel", mods: [] });
 		await expect(cancelled).rejects.toThrow("Login cancelled");
 		expect(onComplete).toHaveBeenCalledWith(false, "Login cancelled");

@@ -69,6 +69,18 @@ describe("Transcript Markdown", () => {
 		expect(html).toContain('href="#anchor"');
 	});
 
+	it("keeps remote image destinations as links without fetching them on open", () => {
+		const html = renderMarkdown("![diagram](https://example.test/image.png)");
+		expect(html).toContain('href="https://example.test/image.png"');
+		expect(html).toContain(">diagram</a>");
+		expect(html).not.toContain("<img");
+	});
+
+	it("preserves embedded image data without a network dependency", () => {
+		const html = renderMarkdown("![embedded](data:image/png;base64,aGVsbG8=)");
+		expect(html).toContain('<img src="data:image/png;base64,aGVsbG8=" alt="embedded">');
+	});
+
 	it("typesets every delimiter form and marks display math", () => {
 		const inline = renderMarkdown("energy $E=mc^2$ and \\(x^2\\) here");
 		expect(inline).toContain('encoding="application/x-tex">E=mc^2</annotation>');

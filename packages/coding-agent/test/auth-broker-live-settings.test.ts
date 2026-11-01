@@ -10,7 +10,7 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 
 import { cfgAuthBrokerUrl } from "@oh-my-pi/pi-coding-agent/config/model-settings";
 
-const PROVIDER = "live-broker-test";
+const PROVIDER = "github-copilot";
 const TOKEN = "live-broker-bearer";
 const BROKER_ENV = ["OMP_AUTH_BROKER_URL", "OMP_AUTH_BROKER_TOKEN", "OMP_AUTH_BROKER_SNAPSHOT_TTL_MS"] as const;
 

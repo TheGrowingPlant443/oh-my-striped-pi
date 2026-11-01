@@ -32,8 +32,8 @@ function makeAbortedAssistantMessage(text = "partial draft"): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot",
+		model: "claude-sonnet-4.5",
 		stopReason: "aborted",
 		usage: {
 			input: 0,
@@ -62,8 +62,8 @@ async function createSessionWithObfuscator(
 	modelRegistry: ModelRegistry,
 	obfuscator?: SecretObfuscator,
 ): Promise<SessionFixture> {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic model to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected built-in Copilot model to exist");
 
 	const agent = new Agent({
 		initialState: {
@@ -94,7 +94,7 @@ describe("AgentSession silent-abort marker stamping", () => {
 	beforeAll(async () => {
 		fixtureDir = TempDir.createSync("@pi-silent-abort-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 	afterEach(async () => {

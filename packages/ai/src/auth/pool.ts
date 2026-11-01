@@ -1,4 +1,9 @@
 import { logger } from "@oh-my-pi/pi-utils";
+import {
+	assertSupportedAuthCredential,
+	assertSupportedCredentialProvider,
+	assertSupportedOAuthCredentialProvider,
+} from "./provider-policy";
 import { resolveCredentialIdentityKey, serializeCredential } from "./sqlite-credential-store";
 import type { BlockStoreHealth } from "./blocks";
 import type { AccountPolicies } from "./policy";
@@ -323,6 +328,7 @@ export class CredentialPool implements CredentialsApi {
 	 * @returns Array of stored credentials, empty if none exist
 	 */
 	entries(provider: string): StoredCredential[] {
+		assertSupportedCredentialProvider(provider);
 		return this.#data.get(provider) ?? [];
 	}
 
@@ -567,6 +573,10 @@ export class CredentialPool implements CredentialsApi {
 	 * Set credential for a provider.
 	 */
 	async set(provider: string, credential: AuthCredentialEntry): Promise<void> {
+		assertSupportedCredentialProvider(provider);
+		for (const entry of Array.isArray(credential) ? credential : [credential]) {
+			assertSupportedAuthCredential(provider, entry.type);
+		}
 		const normalized = Array.isArray(credential) ? credential : [credential];
 		const deduped = this.dedupe(provider, normalized);
 		this.#options.policies.validateFor(provider, deduped);
@@ -608,6 +618,7 @@ export class CredentialPool implements CredentialsApi {
 	}
 
 	async upsertOAuth(provider: string, credential: OAuthCredential): Promise<void> {
+		assertSupportedOAuthCredentialProvider(provider);
 		const prospectiveCredentials = this.dedupe(provider, [
 			...this.#store.listAuthCredentials(provider).map(entry => entry.credential),
 			credential,
@@ -769,6 +780,7 @@ export class CredentialPool implements CredentialsApi {
 	 * the existing row instead of inserting a duplicate.
 	 */
 	async upsert(provider: string, credential: AuthCredential): Promise<AuthCredentialSnapshotEntry[]> {
+		assertSupportedAuthCredential(provider, credential.type);
 		const stored = await this.#store.upsertAuthCredential(provider, credential);
 		this.replace(
 			provider,

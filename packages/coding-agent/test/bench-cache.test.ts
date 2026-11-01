@@ -29,14 +29,6 @@ const piNativeModel = {
 	transport: "pi-native",
 } as unknown as Model<Api>;
 
-const codexModel = {
-	...model,
-	provider: "openai-codex",
-	id: "gpt-cache-codex-test",
-	name: "gpt-cache-codex-test",
-	api: "openai-codex-responses",
-} as unknown as Model<Api>;
-
 const registry: BenchModelRegistry = {
 	getAll: () => [model],
 	getAvailable: () => [model],
@@ -185,34 +177,6 @@ describe("bench cache mode", () => {
 		expect(pair?.warm.requestIdObserved).toBe(true);
 		expect(pair?.cold.observations).toEqual(["no_provider_proof"]);
 		expect(pair?.warm.observations).toEqual(["no_provider_proof"]);
-	});
-
-	it("rejects Codex Responses cache mode before credentials or requests can imply independent pairs", async () => {
-		let credentialLookups = 0;
-		await expect(
-			runBenchCommand(
-				{ models: ["openai-codex/gpt-cache-codex-test"], flags: { cache: true } },
-				{
-					createRuntime: async () => ({
-						modelRegistry: {
-							...registry,
-							getAll: () => [codexModel],
-							getApiKey: async () => {
-								credentialLookups++;
-								return "sk-test";
-							},
-						},
-						close: () => {},
-					}),
-					streamSimple: () => {
-						throw new Error("Codex cache mode must reject before issuing a request");
-					},
-				},
-			),
-		).rejects.toThrow(
-			"--cache is not supported for openai-codex-responses because Codex WebSocket chaining cannot produce independent prompt-cache pairs",
-		);
-		expect(credentialLookups).toBe(0);
 	});
 
 	it("gives every pair a private stable namespace and flags a prewarmed cold request", async () => {

@@ -85,18 +85,6 @@ function selectOAuthAccount(
 	return undefined;
 }
 
-/** Selects one exact OAuth row for native or Codex Security cloud scans. */
-export function selectSecurityOAuthAccount(
-	authStorage: AuthStorage,
-	provider: string,
-	requestedCredentialId?: number,
-	sessionId?: string,
-): SecurityAccountRef {
-	const account = selectOAuthAccount(authStorage, provider, requestedCredentialId, sessionId);
-	if (!account) throw new Error(`Security scans require a stored OAuth account for ${provider}`);
-	return account;
-}
-
 /** Selects either one exact OAuth row or an explicitly supported provider-owned auth route. */
 export function selectSecurityAuth(
 	authStorage: AuthStorage,

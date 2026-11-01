@@ -41,8 +41,8 @@ async function createMagicKeywordSession(
 	session: AgentSession;
 	settings: Settings;
 }> {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected bundled Claude Sonnet model");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected retained Copilot test model");
 	const agent = new Agent({
 		initialState: {
 			model,
@@ -71,7 +71,7 @@ describe("AgentSession magic keyword settings", () => {
 	beforeAll(async () => {
 		authRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-magic-keywords-auth-"));
 		authStorage = await AuthStorage.create(path.join(authRoot, "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(authRoot, "models.yml"));
 	});
 

@@ -10,24 +10,13 @@ import {
 } from "@oh-my-pi/pi-ai";
 import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
 import { fetchWithRetry } from "@oh-my-pi/pi-utils";
-import { type CompleteOptions, callHostLlm, getHostLlmBackend } from "./llm-backends";
+import { callHostLlm, getHostLlmBackend } from "./llm-backends";
 import {
 	getMnemopiRuntimeOptions,
 	isPiAiModel,
 	type MnemopiLlmCompleteOptions,
 	type MnemopiLlmCompletion,
 } from "./runtime-options";
-
-const ENV_MODEL_REPO = process.env.MNEMOPI_LLM_REPO ?? "";
-export interface RemoteLlmOptions {
-	fetch?: FetchImpl;
-}
-
-const ENV_MODEL_FILE = process.env.MNEMOPI_LLM_FILE ?? "";
-export const DEFAULT_MODEL_REPO =
-	ENV_MODEL_REPO !== "" && ENV_MODEL_FILE !== "" ? ENV_MODEL_REPO : "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF";
-export const DEFAULT_MODEL_FILE =
-	ENV_MODEL_REPO !== "" && ENV_MODEL_FILE !== "" ? ENV_MODEL_FILE : "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf";
 
 const TRUE_VALUES: Record<string, true> = { "1": true, true: true, yes: true, on: true };
 
@@ -48,6 +37,18 @@ function activePiAiModel(): Model<Api> | undefined {
 	return isPiAiModel(model) ? model : undefined;
 }
 
+function llmBaseUrl(): string {
+	return (activeLlmOptions()?.baseUrl ?? env("MNEMOPI_LLM_BASE_URL")).trim().replace(/\/+$/, "");
+}
+
+function llmModelName(): string {
+	const model = activeLlmOptions()?.model;
+	return typeof model === "string" ? model : env("MNEMOPI_LLM_MODEL");
+}
+
+function llmApiKey(): ApiKey {
+	return activeLlmOptions()?.apiKey ?? env("MNEMOPI_LLM_API_KEY");
+}
 function envBool(name: string, defaultValue: boolean): boolean {
 	const value = env(name).trim().toLowerCase();
 	return value === "" ? defaultValue : TRUE_VALUES[value] === true;
@@ -56,14 +57,6 @@ function envBool(name: string, defaultValue: boolean): boolean {
 function envInt(name: string, defaultValue: number): number {
 	const parsed = Number.parseInt(env(name), 10);
 	return Number.isFinite(parsed) ? parsed : defaultValue;
-}
-
-function stripTrailingSlash(value: string): string {
-	let end = value.length;
-	while (end > 0 && value.charCodeAt(end - 1) === 47) {
-		end -= 1;
-	}
-	return end === value.length ? value : value.slice(0, end);
 }
 
 function llmEnabled(): boolean {
@@ -93,39 +86,11 @@ function hostLlmEnabled(): boolean {
 	if (activeCustomCompletion() !== undefined || activePiAiModel() !== undefined) {
 		return false;
 	}
-	const active = activeLlmOptions();
-	if (active?.baseUrl !== undefined || (typeof active?.model === "string" && active.model !== "")) {
-		return false;
-	}
 	return envBool("MNEMOPI_HOST_LLM_ENABLED", false);
 }
 
 function hostLlmContextTokens(): number {
 	return envInt("MNEMOPI_HOST_LLM_N_CTX", 32000);
-}
-
-function llmBaseUrl(): string {
-	const active = activeLlmOptions();
-	if (active?.baseUrl !== undefined) {
-		return stripTrailingSlash(active.baseUrl);
-	}
-	return stripTrailingSlash(env("MNEMOPI_LLM_BASE_URL"));
-}
-
-function llmModelName(): string {
-	const model = activeLlmOptions()?.model;
-	if (typeof model === "string") {
-		return model;
-	}
-	return env("MNEMOPI_LLM_MODEL") || "local";
-}
-
-function llmApiKey(): ApiKey {
-	const active = activeLlmOptions();
-	if (active?.apiKey !== undefined) {
-		return active.apiKey;
-	}
-	return env("MNEMOPI_LLM_API_KEY");
 }
 
 function sleepPrompt(): string {
@@ -153,20 +118,6 @@ function formatSleepPrompt(memories: readonly string[], source = ""): string | n
 	return rendered;
 }
 
-export function buildPrompt(memories: readonly string[], source = ""): string {
-	const custom = formatSleepPrompt(memories, source);
-	if (custom !== null) {
-		return custom;
-	}
-
-	let header =
-		"Summarize the following memories into 1-3 concise sentences. Preserve facts, names, preferences, and decisions. Discard fluff.";
-	if (source !== "") {
-		header += ` Source: ${source}.`;
-	}
-	return `/no_think\n${header}\n\n${memoryLines(memories)}\n\nSummary:`;
-}
-
 export async function callConfiguredCompletion(
 	prompt: string,
 	temperature: number,
@@ -186,7 +137,7 @@ export async function callConfiguredCompletion(
 	}
 	const model = activePiAiModel();
 	if (model === undefined) {
-		return null;
+		return callRemoteLlm(prompt, temperature, opts);
 	}
 	try {
 		const message = await retryTransientCompletion(
@@ -236,7 +187,9 @@ function hostBackendWillHandleCall(): boolean {
 }
 
 export function configuredLlmWillHandleCall(): boolean {
-	return llmEnabled() && (activeCustomCompletion() !== undefined || activePiAiModel() !== undefined);
+	return (
+		llmEnabled() && (activeCustomCompletion() !== undefined || activePiAiModel() !== undefined || llmBaseUrl() !== "")
+	);
 }
 
 async function tryHostLlm(prompt: string, maxTokens: number, temperature: number): Promise<[boolean, string | null]> {
@@ -265,7 +218,6 @@ export function cleanOutput(text: string): string {
 		.replace(/^(Summarize the following memories.*?[.!?:]\s*)/is, "")
 		.replace(/^(Preserve facts.*?[.!?:]\s*)/is, "")
 		.replace(/^Source:.*?\n/im, "")
-		.replace(/^\s*[-*]\s.*\n/gm, "")
 		.trim();
 }
 
@@ -321,13 +273,13 @@ export function chunkMemoriesByBudget(memories: readonly string[], source = ""):
 }
 
 export function llmAvailable(): boolean {
-	if (configuredLlmWillHandleCall()) {
-		return true;
-	}
-	if (hostBackendWillHandleCall()) {
-		return true;
-	}
-	return llmEnabled() && llmBaseUrl() !== "";
+	return configuredLlmWillHandleCall() || hostBackendWillHandleCall();
+}
+
+export interface RemoteLlmOptions {
+	fetch?: FetchImpl;
+	maxTokens?: number;
+	timeout?: number;
 }
 
 export async function callRemoteLlm(
@@ -336,45 +288,35 @@ export async function callRemoteLlm(
 	options: RemoteLlmOptions = {},
 ): Promise<string | null> {
 	const baseUrl = llmBaseUrl();
-	if (baseUrl === "") {
-		return null;
-	}
-
+	const model = llmModelName();
+	if (!llmEnabled() || !baseUrl || !model) return null;
 	const body = JSON.stringify({
-		model: llmModelName(),
+		model,
 		messages: [{ role: "user", content: prompt }],
-		max_tokens: llmMaxTokens(),
+		max_tokens: options.maxTokens ?? llmMaxTokens(),
 		temperature,
 		stop: ["</s>", "<|user|>"],
 	});
-	const fetchImpl = options.fetch ?? fetch;
 	try {
-		// withAuth re-resolves the key on 401 (force-refresh, then sibling
-		// rotation) when the configured key is a resolver. An empty static key
-		// attempts without an Authorization header (local/proxy setups).
+		const url = new URL(baseUrl);
+		if (url.protocol !== "http:" && url.protocol !== "https:")
+			throw new Error("Mnemopi LLM endpoint must use HTTP(S).");
 		const response = await withAuth(llmApiKey(), async key => {
 			const headers: Record<string, string> = { "Content-Type": "application/json" };
-			if (key !== "") {
-				headers.Authorization = `Bearer ${key}`;
-			}
+			if (key !== "") headers.Authorization = `Bearer ${key}`;
 			const res = await fetchWithRetry(`${baseUrl}/chat/completions`, {
 				method: "POST",
 				headers,
 				body,
-				signal: AbortSignal.timeout(60000),
-				fetch: fetchImpl,
+				signal: AbortSignal.timeout(options.timeout ?? 60000),
+				fetch: options.fetch ?? fetch,
 			});
-			if (res.status === 401) {
-				throw new ProviderHttpError("mnemopi remote LLM request unauthorized (401)", 401, { headers: res.headers });
-			}
+			if (res.status === 401)
+				throw new ProviderHttpError("mnemopi LLM request unauthorized (401)", 401, { headers: res.headers });
 			return res;
 		});
-		if (!response.ok) {
-			return null;
-		}
-		const data = (await response.json()) as {
-			choices?: Array<{ message?: { content?: unknown } }>;
-		};
+		if (!response.ok) return null;
+		const data = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
 		const content = data.choices?.[0]?.message?.content;
 		return typeof content === "string" ? content : null;
 	} catch {
@@ -382,63 +324,17 @@ export async function callRemoteLlm(
 	}
 }
 
-export function localGgufAvailable(): false {
-	return false;
-}
-
-export async function callLocalLlm(_prompt: string): Promise<string | null> {
-	return null;
-}
-
-async function summarizeChunk(
-	memories: readonly string[],
-	source = "",
-	options: RemoteLlmOptions = {},
-): Promise<string | null> {
+async function summarizeChunk(memories: readonly string[], source = ""): Promise<string | null> {
 	const hostPrompt = buildHostPrompt(memories, source);
-	const prompt = buildPrompt(memories, source);
 	if (configuredLlmWillHandleCall()) {
 		const raw = await callConfiguredCompletion(hostPrompt, 0.3, { maxTokens: llmMaxTokens() });
-		if (raw === null) {
-			return null;
-		}
-		const cleaned = cleanOutput(raw);
-		return cleaned === "" ? null : cleaned;
+		return raw === null ? null : cleanOutput(raw) || null;
 	}
-	const [attempted, hostText] = await tryHostLlm(hostPrompt, llmMaxTokens(), 0.3);
-	if (attempted) {
-		if (hostText !== null) {
-			return hostText;
-		}
-		const raw = await callLocalLlm(prompt);
-		if (raw !== null) {
-			const cleaned = cleanOutput(raw);
-			return cleaned === "" ? null : cleaned;
-		}
-		return null;
-	}
-
-	if (llmEnabled() && llmBaseUrl() !== "" && !envBool("MNEMOPI_FORCE_LOCAL", false)) {
-		const raw = await callRemoteLlm(prompt, 0.3, options);
-		if (raw !== null) {
-			const cleaned = cleanOutput(raw);
-			return cleaned === "" ? null : cleaned;
-		}
-	}
-
-	const raw = await callLocalLlm(prompt);
-	if (raw !== null) {
-		const cleaned = cleanOutput(raw);
-		return cleaned === "" ? null : cleaned;
-	}
-	return null;
+	const [, hostText] = await tryHostLlm(hostPrompt, llmMaxTokens(), 0.3);
+	return hostText;
 }
 
-export async function summarizeMemories(
-	memories: readonly string[],
-	source = "",
-	options: RemoteLlmOptions = {},
-): Promise<string | null> {
+export async function summarizeMemories(memories: readonly string[], source = ""): Promise<string | null> {
 	if (memories.length === 0) {
 		return null;
 	}
@@ -446,7 +342,7 @@ export async function summarizeMemories(
 	const chunks = chunkMemoriesByBudget(memories, source);
 	const chunkSummaries: string[] = [];
 	for (const chunk of chunks) {
-		const summary = await summarizeChunk(chunk, source, options);
+		const summary = await summarizeChunk(chunk, source);
 		if (summary !== null) {
 			chunkSummaries.push(summary);
 		}
@@ -456,28 +352,17 @@ export async function summarizeMemories(
 		return null;
 	}
 	if (chunkSummaries.length > 1) {
-		const final = await summarizeChunk(chunkSummaries, `${source} [chunked ${chunks.length} parts]`, options);
+		const final = await summarizeChunk(chunkSummaries, `${source} [chunked ${chunks.length} parts]`);
 		return final ?? chunkSummaries[0] ?? null;
 	}
 	return chunkSummaries[0] ?? null;
 }
 
-export async function complete(
-	prompt: string,
-	temperature = 0.3,
-	options: CompleteOptions = {},
-): Promise<string | null> {
+export async function complete(prompt: string, temperature = 0.3): Promise<string | null> {
 	if (configuredLlmWillHandleCall()) {
 		const raw = await callConfiguredCompletion(prompt, temperature, { maxTokens: llmMaxTokens() });
 		return raw === null ? null : cleanOutput(raw) || null;
 	}
-	const [attempted, hostText] = await tryHostLlm(prompt, llmMaxTokens(), temperature);
-	if (attempted) {
-		return hostText;
-	}
-	if (llmEnabled() && llmBaseUrl() !== "" && !envBool("MNEMOPI_FORCE_LOCAL", false)) {
-		const remote = await callRemoteLlm(prompt, temperature, options);
-		return remote === null ? null : cleanOutput(remote) || null;
-	}
-	return callLocalLlm(prompt);
+	const [, hostText] = await tryHostLlm(prompt, llmMaxTokens(), temperature);
+	return hostText;
 }

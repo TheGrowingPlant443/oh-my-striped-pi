@@ -22,9 +22,9 @@ function msg(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
 	return {
 		role: "assistant",
 		content: [],
-		api: "mock",
-		provider: "mock",
-		model: "mock",
+		api: "openai-completions",
+		provider: "github-copilot",
+		model: "kimi-k3",
 		usage: {
 			input: 0,
 			output: 0,
@@ -988,11 +988,11 @@ describe("leaked thinking healing through stream()", () => {
 
 	function anthropicModel(overrides: Partial<Model<"anthropic-messages">> = {}): Model<"anthropic-messages"> {
 		return buildModel({
-			id: "claude-sonnet-4-5",
+			id: "claude-sonnet-4.5",
 			name: "Claude Sonnet 4.5",
 			api: "anthropic-messages",
-			provider: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1012,7 +1012,7 @@ describe("leaked thinking healing through stream()", () => {
 				id: "chatcmpl-prefill",
 				object: "chat.completion.chunk",
 				created: 0,
-				model: "qwen3-thinking",
+				model: "kimi-k3",
 				choices: [{ index: 0, delta, finish_reason: finish }],
 			})}\n\n`;
 		const body = [
@@ -1026,16 +1026,13 @@ describe("leaked thinking healing through stream()", () => {
 		return Object.assign(fn, { preconnect: fetch.preconnect });
 	}
 
-	// A local host serving a template that prefills `<think>` (DeepSeek-R1,
-	// Qwen3-Thinking) without splitting reasoning into a field streams the chain
-	// of thought inline, terminated only by `</think>`. Issue #10571's shape.
-	it("recovers template-prefilled reasoning from a local openai-completions host", async () => {
+	it("recovers prefilled reasoning from Copilot completions", async () => {
 		const model = buildModel({
-			id: "qwen3-thinking",
-			name: "Qwen3 Thinking",
+			id: "kimi-k3",
+			name: "Kimi K3",
 			api: "openai-completions",
-			provider: "localai",
-			baseUrl: "http://localhost:8080/v1",
+			provider: "github-copilot",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -1052,30 +1049,11 @@ describe("leaked thinking healing through stream()", () => {
 		expect(texts(result).join("").trim()).toBe("The answer is 4.");
 	});
 
-	it("leaves a leaked fence intact for the official Anthropic API", async () => {
-		// Official first-party endpoints return structured thinking and are exempt
-		// from the central healer, so a leaked fence must stay verbatim visible text.
+	it("splits a leaked fence on the Copilot Anthropic adapter", async () => {
 		const result = await stream(anthropicModel(), context, {
 			apiKey: "test",
 			fetch: anthropicLeakFetch(leaked),
 		}).result();
-
-		expect(result.content.map(b => b.type)).toEqual(["text"]);
-		expect(thinks(result)).toHaveLength(0);
-		expect(texts(result).join("")).toBe(leaked);
-	});
-
-	it("splits a leaked fence for a non-official anthropic-messages endpoint", async () => {
-		// A third-party gateway reusing the anthropic-messages wire format may leak,
-		// so the central wrapper still heals when the endpoint is not official.
-		const result = await stream(
-			anthropicModel({ provider: "zai", baseUrl: "https://api.z.ai/api/anthropic" }),
-			context,
-			{
-				apiKey: "test",
-				fetch: anthropicLeakFetch(leaked),
-			},
-		).result();
 
 		expect(result.content.map(b => b.type)).toEqual(["thinking", "text"]);
 		const thinking = thinks(result)
@@ -1085,15 +1063,11 @@ describe("leaked thinking healing through stream()", () => {
 		expect(texts(result).join("").trim()).toBe("Final answer.");
 	});
 
-	it("preserves thinking bytes from content_block_start through a non-official endpoint", async () => {
-		const result = await stream(
-			anthropicModel({ provider: "zai", baseUrl: "https://api.z.ai/api/anthropic" }),
-			context,
-			{
-				apiKey: "test",
-				fetch: anthropicThinkingFetch(),
-			},
-		).result();
+	it("preserves thinking bytes from content_block_start on the Copilot Anthropic adapter", async () => {
+		const result = await stream(anthropicModel(), context, {
+			apiKey: "test",
+			fetch: anthropicThinkingFetch(),
+		}).result();
 
 		expect(thinks(result)).toEqual([
 			{
@@ -1244,7 +1218,7 @@ describe("leaked thinking healing through stream()", () => {
 			{ preconnect: fetch.preconnect },
 		);
 		const customModel = anthropicModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			baseUrl: "https://anthropic-proxy.example.test/v1",
 		});
 		const first = await stream(customModel, context, { apiKey: "test", fetch: customFetch }).result();
@@ -1299,72 +1273,5 @@ describe("leaked thinking healing through stream()", () => {
 				typeof block === "object" && block !== null && "type" in block ? block.type : undefined,
 			),
 		).toEqual(["thinking", "server_tool_use", "web_search_tool_result", "thinking", "text", "tool_use"]);
-	});
-
-	it("replays a chunked Gemini reply with its trailing signature and its own summary as a thought", async () => {
-		// Gemini signs a reply with an empty part after its last text chunk. That
-		// frame is held until the reply's last delta has left the wrapper, so the
-		// wrapper has projected the whole reply before the signature exists.
-		const parts = (finishReason: string | undefined, ...partList: Array<Record<string, unknown>>) => ({
-			candidates: [{ content: { role: "model", parts: partList }, ...(finishReason && { finishReason }) }],
-		});
-		const frames = [
-			parts(undefined, { text: "Checking divisors up to 88.", thought: true }),
-			parts(undefined, { text: "7919 is" }),
-			parts(undefined, { text: " prime." }),
-			parts("STOP", { text: "", thoughtSignature: "cmVwbHktc2ln" }),
-		];
-		const signatureFrame = Promise.withResolvers<void>();
-		const requests: Array<{ contents: unknown[] }> = [];
-		const geminiFetch = Object.assign(
-			async (_input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-				if (typeof init?.body !== "string") throw new Error("Expected JSON request body");
-				requests.push(JSON.parse(init.body));
-				let next = 0;
-				const body = new ReadableStream<Uint8Array>({
-					async pull(controller) {
-						if (next === frames.length - 1) await signatureFrame.promise;
-						if (next === frames.length) return controller.close();
-						controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(frames[next++])}\n\n`));
-					},
-				});
-				return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
-			},
-			{ preconnect: fetch.preconnect },
-		);
-		const model = buildModel({
-			id: "gemini-3-flash",
-			name: "Gemini 3 Flash",
-			api: "google-generative-ai",
-			provider: "google",
-			baseUrl: "",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 200_000,
-			maxTokens: 32_000,
-		});
-
-		const firstStream = stream(model, context, { apiKey: "test", fetch: geminiFetch });
-		for await (const event of firstStream) {
-			if (event.type === "text_delta" && event.delta.endsWith("prime.")) signatureFrame.resolve();
-		}
-		const first = await firstStream.result();
-		expect(first.content).toMatchObject([
-			{ type: "thinking", thinking: "Checking divisors up to 88." },
-			{ type: "text", text: "7919 is prime.", textSignature: "cmVwbHktc2ln" },
-		]);
-
-		const next: Context = {
-			messages: [...context.messages, first, { role: "user", content: "And 7921?", timestamp: 2 }],
-		};
-		await stream(model, next, { apiKey: "test", fetch: geminiFetch }).result();
-		expect(requests[1]?.contents[1]).toEqual({
-			role: "model",
-			parts: [
-				{ thought: true, text: "Checking divisors up to 88." },
-				{ text: "7919 is prime.", thoughtSignature: "cmVwbHktc2ln" },
-			],
-		});
 	});
 });

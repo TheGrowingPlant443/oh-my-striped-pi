@@ -20,8 +20,8 @@ function makeProxyModel(id: string, compat?: ModelSpec["compat"]): Model<Api> {
 		id,
 		name: id,
 		api: "openai-completions",
-		provider: "myproxy",
-		baseUrl: "https://proxy.example.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: false,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -59,14 +59,14 @@ describe("buildImageDescriptionNotice wire truth (#9697)", () => {
 
 	it("falls back for a wire-stripped model that declares image input, not for an opted-out one", async () => {
 		const image: ImageContent = { type: "image", data: TINY_PNG_BASE64, mimeType: "image/png" };
-		const stripped = makeProxyModel("deepseek-v4-flash", { stripImageInput: true });
+		const stripped = makeProxyModel("wire-stripped", { stripImageInput: true });
 		const notice = await new SessionProviderBoundary(makeHost(stripped, testDir)).buildImageDescriptionNotice([
 			image,
 		]);
 		expect(notice).toBeDefined();
 		expect(JSON.stringify(notice)).toContain("No vision-capable model");
 
-		const optedOut = makeProxyModel("deepseek-v4-flash", { stripImageInput: false });
+		const optedOut = makeProxyModel("wire-stripped", { stripImageInput: false });
 		const silent = await new SessionProviderBoundary(makeHost(optedOut, testDir)).buildImageDescriptionNotice([
 			image,
 		]);

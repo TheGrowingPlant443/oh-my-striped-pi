@@ -1,9 +1,8 @@
 /**
  * Credential-shaped token redaction for memory writes, shared by every backend.
  *
- * `recall` puts stored memories back into the prompt, so a stored credential reaches
- * every provider on every later turn. The `local` and `sharpshooter` backends each
- * carried a private copy of this pattern list. `mnemopi` carried none.
+ * `recall` puts stored memories back into the prompt, so credentials must be
+ * redacted before any local memory backend persists them.
  */
 
 // Fixed-prefix provider tokens. Each is anchored on a literal, so it matches in one

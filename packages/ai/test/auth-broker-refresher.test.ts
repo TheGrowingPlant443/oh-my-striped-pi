@@ -7,8 +7,8 @@ import { AuthBrokerRefresher } from "@oh-my-pi/pi-ai/auth-broker";
 import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
 import { removeWithRetries } from "../../utils/src/temp";
 
-const ANTHROPIC_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN"] as const;
-const savedEnv: Partial<Record<(typeof ANTHROPIC_ENV)[number], string | undefined>> = {};
+const COPILOT_ENV = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN"] as const;
+const savedEnv: Partial<Record<(typeof COPILOT_ENV)[number], string | undefined>> = {};
 
 describe("AuthBrokerRefresher", () => {
 	let tempDir = "";
@@ -16,7 +16,7 @@ describe("AuthBrokerRefresher", () => {
 	let storage: AuthStorage | undefined;
 
 	beforeEach(async () => {
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			savedEnv[key] = process.env[key];
 			delete process.env[key];
 		}
@@ -29,7 +29,7 @@ describe("AuthBrokerRefresher", () => {
 		storage?.close();
 		store?.close();
 		await removeWithRetries(tempDir);
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			if (savedEnv[key] === undefined) delete process.env[key];
 			else process.env[key] = savedEnv[key];
 		}
@@ -39,7 +39,7 @@ describe("AuthBrokerRefresher", () => {
 		const now = 1_700_000_000_000;
 		const skew = 5 * 60_000;
 		// Credential expires in 1 minute — well within the 5-min skew → must refresh.
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "old",
 			refresh: "old-refresh",
 			expires: now + 60_000,
@@ -62,7 +62,7 @@ describe("AuthBrokerRefresher", () => {
 		await refresher.tick();
 
 		expect(refreshSpy).toHaveBeenCalledTimes(1);
-		const persisted = store!.getOAuth("anthropic");
+		const persisted = store!.getOAuth("github-copilot");
 		expect(persisted?.access).toBe("fresh");
 		expect(persisted?.refresh).toBe("fresh-refresh");
 	});
@@ -70,7 +70,7 @@ describe("AuthBrokerRefresher", () => {
 	test("does not refresh credentials safely outside the skew window", async () => {
 		const now = 1_700_000_000_000;
 		const skew = 5 * 60_000;
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "ok",
 			refresh: "ok-refresh",
 			expires: now + 60 * 60_000, // 1 hour out
@@ -96,7 +96,7 @@ describe("AuthBrokerRefresher", () => {
 
 	test("disables credentials on definitive failure (invalid_grant)", async () => {
 		const now = 1_700_000_000_000;
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "old",
 			refresh: "old-refresh",
 			expires: now + 60_000,
@@ -125,7 +125,7 @@ describe("AuthBrokerRefresher", () => {
 
 	test("keeps credentials on transient failures (timeout/network)", async () => {
 		const now = 1_700_000_000_000;
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "old",
 			refresh: "old-refresh",
 			expires: now + 60_000,
@@ -152,7 +152,7 @@ describe("AuthBrokerRefresher", () => {
 
 	test("does not disable a credential a peer rotated during the refresh (CAS)", async () => {
 		const now = 1_700_000_000_000;
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "stale",
 			refresh: "stale-refresh",
 			expires: now + 60_000,
@@ -164,7 +164,7 @@ describe("AuthBrokerRefresher", () => {
 			disableEvents.push(event.disabledCause);
 		});
 		await storage.credentials.reload();
-		const id = store!.listAuthCredentials("anthropic")[0]!.id;
+		const id = store!.listAuthCredentials("github-copilot")[0]!.id;
 
 		// Our refresh fails with a dead-grant error, but a peer (another process /
 		// a fresh login) rotates the persisted row to a new token first. The
@@ -189,7 +189,7 @@ describe("AuthBrokerRefresher", () => {
 		await refresher.tick();
 
 		expect(disableEvents).toHaveLength(0);
-		const rows = store!.listAuthCredentials("anthropic");
+		const rows = store!.listAuthCredentials("github-copilot");
 		expect(rows).toHaveLength(1);
 		expect(rows[0]?.credential.type).toBe("oauth");
 		if (rows[0]?.credential.type === "oauth") {
@@ -199,7 +199,7 @@ describe("AuthBrokerRefresher", () => {
 
 	test("a sweep whose credential reload fails resolves and the next sweep retries", async () => {
 		const now = 1_700_000_000_000;
-		await store!.saveOAuth("anthropic", {
+		await store!.saveOAuth("github-copilot", {
 			access: "old",
 			refresh: "old-refresh",
 			expires: now + 60_000,
@@ -228,6 +228,6 @@ describe("AuthBrokerRefresher", () => {
 
 		await refresher.tick();
 		expect(refreshSpy).toHaveBeenCalledTimes(1);
-		expect(store!.getOAuth("anthropic")?.access).toBe("fresh");
+		expect(store!.getOAuth("github-copilot")?.access).toBe("fresh");
 	});
 });

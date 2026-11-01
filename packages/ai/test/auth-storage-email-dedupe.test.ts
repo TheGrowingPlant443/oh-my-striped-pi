@@ -1,11 +1,14 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, type FetchImpl, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
+import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
 import { removeWithRetries } from "../../utils/src/temp";
-import { registerOAuthProvider, unregisterOAuthProviders } from "../src/registry/oauth";
 
 const LEGACY_TIMESTAMP = 1_700_000_000;
 
@@ -18,33 +21,6 @@ function createCredential(args: { suffix: string; accountId: string; email: stri
 		accountId: args.accountId,
 		email: args.email,
 	};
-}
-
-function createCodexToken(args: { accountId: string; email: string }): string {
-	const payload = {
-		"https://api.openai.com/auth": { chatgpt_account_id: args.accountId },
-		"https://api.openai.com/profile": { email: args.email },
-	};
-	const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
-	const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-	return `${header}.${body}.sig`;
-}
-
-function createJwtOnlyCredential(args: { suffix: string; accountId: string; email: string }): OAuthCredential {
-	return {
-		type: "oauth",
-		access: createCodexToken({ accountId: args.accountId, email: args.email }),
-		refresh: `refresh-${args.suffix}`,
-		expires: Date.now() + 60_000,
-		accountId: args.accountId,
-	};
-}
-
-function countCredentialRows(db: Database, provider: string): number {
-	const row = db.query("SELECT COUNT(*) AS count FROM auth_credentials WHERE provider = ?").get(provider) as
-		| { count?: number }
-		| undefined;
-	return row?.count ?? 0;
 }
 
 function readDisabledCauses(db: Database, provider: string): string[] {
@@ -89,7 +65,7 @@ async function withTempDir(prefix: string, fn: (dir: string) => Promise<void>): 
 	}
 }
 
-describe("AuthStorage openai-codex email dedupe", () => {
+describe("AuthStorage credential persistence and schema migrations", () => {
 	let db: Database | null = null;
 	let store: SqliteAuthCredentialStore | null = null;
 	let authStorage: AuthStorage | null = null;
@@ -107,93 +83,6 @@ describe("AuthStorage openai-codex email dedupe", () => {
 		db = null;
 	});
 
-	it("keeps both openai-codex credentials when accountId matches but emails differ", async () => {
-		if (!authStorage || !store || !db) throw new Error("test setup failed");
-
-		await authStorage.credentials.set("openai-codex", [
-			createCredential({ suffix: "first", accountId: "shared-team", email: "first.user@example.com" }),
-			createCredential({ suffix: "second", accountId: "shared-team", email: "second.user@example.com" }),
-		]);
-
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(2);
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([]);
-	});
-
-	it("dedupes openai-codex credentials when email matches but accountId differs", async () => {
-		if (!authStorage || !store) throw new Error("test setup failed");
-
-		await authStorage.credentials.set("openai-codex", [
-			createCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-			createCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		]);
-
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		const [remaining] = credentials;
-		expect(remaining?.credential.type).toBe("oauth");
-		if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-		expect(remaining.credential.accountId).toBe("account-b");
-		expect(remaining.credential.email).toBe("shared.user@example.com");
-	});
-
-	it("dedupes openai-codex credentials when matching email exists only in JWT profile claim but accountId differs", async () => {
-		if (!authStorage || !store) throw new Error("test setup failed");
-
-		await authStorage.credentials.set("openai-codex", [
-			createJwtOnlyCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-			createJwtOnlyCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		]);
-
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		const [remaining] = credentials;
-		expect(remaining?.credential.type).toBe("oauth");
-		if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-		expect(remaining.credential.accountId).toBe("account-b");
-	});
-
-	it("updates in-place when a codex credential with matching email replaces another account", async () => {
-		if (!store || !db) throw new Error("test setup failed");
-
-		await store.replaceAuthCredentials("openai-codex", [
-			createJwtOnlyCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-		]);
-		await store.replaceAuthCredentials("openai-codex", [
-			createJwtOnlyCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		]);
-
-		// Same email identity key → existing row is updated, not disabled+reinserted
-		expect(countCredentialRows(db, "openai-codex")).toBe(1);
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([]);
-	});
-
-	it("updates in-place via AuthStorage.set when email matches across accounts", async () => {
-		if (!authStorage || !store || !db) throw new Error("test setup failed");
-
-		await authStorage.credentials.set(
-			"openai-codex",
-			createCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-		);
-		await authStorage.credentials.set(
-			"openai-codex",
-			createCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		);
-
-		// Same email identity key → updated in-place, no disabled rows
-		expect(countCredentialRows(db, "openai-codex")).toBe(1);
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		const [remaining] = credentials;
-		expect(remaining?.credential.type).toBe("oauth");
-		if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-		expect(remaining.credential.accountId).toBe("account-b");
-		expect(remaining.credential.email).toBe("shared.user@example.com");
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([]);
-	});
-
 	it("does not disable credentials for different accounts with different emails", async () => {
 		if (!authStorage || !store || !db) throw new Error("test setup failed");
 
@@ -202,35 +91,35 @@ describe("AuthStorage openai-codex email dedupe", () => {
 		const credC = createCredential({ suffix: "third", accountId: "account-c", email: "user-c@example.com" });
 
 		// Simulate login flow: each login merges existing + new
-		await authStorage.credentials.set("openai-codex", credA);
-		await authStorage.credentials.set("openai-codex", [credA, credB]);
-		await authStorage.credentials.set("openai-codex", [credA, credB, credC]);
+		await authStorage.credentials.set("github-copilot", credA);
+		await authStorage.credentials.set("github-copilot", [credA, credB]);
+		await authStorage.credentials.set("github-copilot", [credA, credB, credC]);
 
 		// All three accounts should remain active — no credential was replaced
-		const credentials = store.listAuthCredentials("openai-codex");
+		const credentials = store.listAuthCredentials("github-copilot");
 		expect(credentials).toHaveLength(3);
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([]);
+		expect(readDisabledCauses(db, "github-copilot")).toEqual([]);
 	});
 
-	it("saveOAuth preserves unrelated codex accounts across reauth", async () => {
+	it("saveOAuth preserves unrelated accounts across reauth", async () => {
 		if (!store || !db) throw new Error("test setup failed");
 
 		await store.saveOAuth(
-			"openai-codex",
+			"github-copilot",
 			createCredential({ suffix: "first", accountId: "account-a", email: "user-a@example.com" }),
 		);
 		await store.saveOAuth(
-			"openai-codex",
+			"github-copilot",
 			createCredential({ suffix: "second", accountId: "account-b", email: "user-b@example.com" }),
 		);
 		await store.saveOAuth(
-			"openai-codex",
+			"github-copilot",
 			createCredential({ suffix: "third", accountId: "account-c", email: "user-c@example.com" }),
 		);
 
-		const credentials = store.listAuthCredentials("openai-codex");
+		const credentials = store.listAuthCredentials("github-copilot");
 		expect(credentials).toHaveLength(3);
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([]);
+		expect(readDisabledCauses(db, "github-copilot")).toEqual([]);
 	});
 
 	it("saveOAuth does not delete accounts missing from stale AuthStorage cache", async () => {
@@ -242,27 +131,27 @@ describe("AuthStorage openai-codex email dedupe", () => {
 			const staleAuthStorage = new AuthStorage(staleStore);
 			try {
 				await staleStore.saveOAuth(
-					"openai-codex",
+					"github-copilot",
 					createCredential({ suffix: "first", accountId: "account-a", email: "user-a@example.com" }),
 				);
 				await staleAuthStorage.credentials.reload();
 
 				// Another writer adds a second account after staleAuthStorage has already cached provider state.
 				await freshStore.saveOAuth(
-					"openai-codex",
+					"github-copilot",
 					createCredential({ suffix: "second", accountId: "account-b", email: "user-b@example.com" }),
 				);
 
 				// Reauth from the stale process should update only account A, not disable account B.
 				await staleStore.saveOAuth(
-					"openai-codex",
+					"github-copilot",
 					createCredential({ suffix: "reauth", accountId: "account-a", email: "user-a@example.com" }),
 				);
 
-				expect(staleStore.listAuthCredentials("openai-codex")).toHaveLength(2);
+				expect(staleStore.listAuthCredentials("github-copilot")).toHaveLength(2);
 				const inspect = new Database(dbPath, { readonly: true });
 				try {
-					expect(readDisabledCauses(inspect, "openai-codex")).toEqual([]);
+					expect(readDisabledCauses(inspect, "github-copilot")).toEqual([]);
 				} finally {
 					inspect.close();
 				}
@@ -273,231 +162,21 @@ describe("AuthStorage openai-codex email dedupe", () => {
 		});
 	});
 
-	it("prunes existing JWT-only codex duplicates on reload when email matches", async () => {
-		if (!store) throw new Error("test setup failed");
-
-		await store.replaceAuthCredentials("openai-codex", [
-			createJwtOnlyCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-			createJwtOnlyCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		]);
-
-		const reloaded = new AuthStorage(store);
-		await reloaded.credentials.reload();
-
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		const [remaining] = credentials;
-		expect(remaining?.credential.type).toBe("oauth");
-		if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-		expect(remaining.credential.accountId).toBe("account-b");
-	});
-
-	it("dedupes openai-codex credentials after reload when email matches even if accountId differs", async () => {
-		if (!store) throw new Error("test setup failed");
-
-		await store.replaceAuthCredentials("openai-codex", [
-			createCredential({ suffix: "first", accountId: "account-a", email: "shared.user@example.com" }),
-			createCredential({ suffix: "second", accountId: "account-b", email: "shared.user@example.com" }),
-		]);
-
-		const reloaded = new AuthStorage(store);
-		await reloaded.credentials.reload();
-
-		const credentials = store.listAuthCredentials("openai-codex");
-		expect(credentials).toHaveLength(1);
-		const [remaining] = credentials;
-		expect(remaining?.credential.type).toBe("oauth");
-		if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-		expect(remaining.credential.accountId).toBe("account-b");
-		expect(remaining.credential.email).toBe("shared.user@example.com");
-	});
-
-	describe("AuthStorage anthropic email identity", () => {
-		it("keeps both anthropic credentials when accountId matches but emails differ", async () => {
-			if (!authStorage || !store || !db) throw new Error("test setup failed");
-
-			await authStorage.credentials.set("anthropic", [
-				createCredential({ suffix: "first", accountId: "shared-org", email: "first.user@example.com" }),
-				createCredential({ suffix: "second", accountId: "shared-org", email: "second.user@example.com" }),
-			]);
-
-			const credentials = store.listAuthCredentials("anthropic");
-			expect(credentials).toHaveLength(2);
-			expect(readDisabledCauses(db, "anthropic")).toEqual([]);
-		});
-
-		it("dedupes anthropic credentials when email matches but accountId differs", async () => {
-			if (!authStorage || !store) throw new Error("test setup failed");
-
-			await authStorage.credentials.set("anthropic", [
-				createCredential({ suffix: "first", accountId: "org-a", email: "shared.user@example.com" }),
-				createCredential({ suffix: "second", accountId: "org-b", email: "shared.user@example.com" }),
-			]);
-
-			const credentials = store.listAuthCredentials("anthropic");
-			expect(credentials).toHaveLength(1);
-			const [remaining] = credentials;
-			expect(remaining?.credential.type).toBe("oauth");
-			if (remaining?.credential.type !== "oauth") throw new Error("expected oauth credential");
-			expect(remaining.credential.accountId).toBe("org-b");
-			expect(remaining.credential.email).toBe("shared.user@example.com");
-		});
-
-		it("backfills anthropic identity_key from email when migrating v1 auth schema", async () => {
-			const legacyDb = new Database(":memory:");
-			legacyDb.run(`
-				CREATE TABLE auth_schema_version (
-					id INTEGER PRIMARY KEY CHECK (id = 1),
-					version INTEGER NOT NULL
-				);
-				INSERT INTO auth_schema_version(id, version) VALUES (1, 1);
-				CREATE TABLE auth_credentials (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					provider TEXT NOT NULL,
-					credential_type TEXT NOT NULL,
-					data TEXT NOT NULL,
-					disabled_cause TEXT DEFAULT NULL,
-					created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-					updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-				);
-			`);
-			legacyDb
-				.query(
-					"INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-				)
-				.run(
-					"anthropic",
-					"oauth",
-					JSON.stringify(
-						createCredential({
-							suffix: "legacy-v1-anthropic",
-							accountId: "legacy-org",
-							email: "legacy-anthropic@example.com",
-						}),
-					),
-					null,
-					LEGACY_TIMESTAMP,
-					LEGACY_TIMESTAMP,
-				);
-
-			const migratedStore = new SqliteAuthCredentialStore(legacyDb);
-			try {
-				expect(readStoredIdentityRows(legacyDb, "anthropic")).toEqual([
-					{ identity_key: "email:legacy-anthropic@example.com", disabled_cause: null },
-				]);
-			} finally {
-				migratedStore.close();
-			}
-		});
-	});
 	it("stores the disable cause when a credential is soft-disabled", async () => {
 		if (!store || !db) throw new Error("test setup failed");
 
-		await store.replaceAuthCredentials("openai-codex", [
+		await store.replaceAuthCredentials("github-copilot", [
 			createCredential({ suffix: "only", accountId: "account-a", email: "only@example.com" }),
 		]);
 
-		const [credential] = store.listAuthCredentials("openai-codex");
+		const [credential] = store.listAuthCredentials("github-copilot");
 		if (!credential) throw new Error("expected stored credential");
 
 		const disabledCause = "oauth refresh failed: invalid_grant";
 		await store.deleteAuthCredential(credential.id, disabledCause);
 
-		expect(store.listAuthCredentials("openai-codex")).toHaveLength(0);
-		expect(readDisabledCauses(db, "openai-codex")).toEqual([disabledCause]);
-	});
-
-	it("re-keys stored SingularityAPI credentials into the product that accepts them", async () => {
-		const legacyDb = new Database(":memory:");
-		legacyDb.run(`
-			CREATE TABLE auth_schema_version (
-				id INTEGER PRIMARY KEY CHECK (id = 1),
-				version INTEGER NOT NULL
-			);
-			INSERT INTO auth_schema_version(id, version) VALUES (1, 7);
-			CREATE TABLE auth_credentials (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
-				provider TEXT NOT NULL,
-				credential_type TEXT NOT NULL,
-				data TEXT NOT NULL,
-				disabled_cause TEXT DEFAULT NULL,
-				identity_key TEXT DEFAULT NULL,
-				created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-				updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-			);
-			CREATE TABLE auth_credential_blocks (
-				credential_id INTEGER NOT NULL,
-				provider_key TEXT NOT NULL,
-				block_scope TEXT NOT NULL DEFAULT '',
-				blocked_until_ms INTEGER NOT NULL,
-				updated_at INTEGER NOT NULL,
-				PRIMARY KEY (credential_id, provider_key, block_scope)
-			);
-		`);
-		const insertCredential = legacyDb.query(
-			"INSERT INTO auth_credentials (provider, credential_type, data, identity_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-		);
-		// One row per product, both stored under the retired shared id: the
-		// gateway key carries the `sk-sapi-` prefix, the lane key does not.
-		insertCredential.run(
-			"singularityapi",
-			"api_key",
-			JSON.stringify({ key: "sk-sapi-live-abc", source: "login" }),
-			null,
-			LEGACY_TIMESTAMP,
-			LEGACY_TIMESTAMP,
-		);
-		insertCredential.run(
-			"singularityapi",
-			"api_key",
-			JSON.stringify({ key: "sk-sing-lane-abc", source: "login" }),
-			null,
-			LEGACY_TIMESTAMP,
-			LEGACY_TIMESTAMP,
-		);
-		legacyDb
-			.query(
-				"INSERT INTO auth_credential_blocks (credential_id, provider_key, block_scope, blocked_until_ms, updated_at) VALUES (?, ?, ?, ?, ?)",
-			)
-			.run(2, "singularityapi:api_key", "shared", LEGACY_TIMESTAMP, LEGACY_TIMESTAMP);
-
-		const migratedStore = new SqliteAuthCredentialStore(legacyDb);
-		try {
-			expect(readAuthSchemaVersion(legacyDb)).toBe(8);
-			const readKeys = (provider: string): string[] => {
-				// Rows were inserted by this test above; the cast names their shape.
-				const rows = legacyDb
-					.query("SELECT data FROM auth_credentials WHERE provider = ? ORDER BY id ASC")
-					.all(provider) as Array<{ data: string }>;
-				return rows.map(row => {
-					const parsed: unknown = JSON.parse(row.data);
-					if (
-						typeof parsed !== "object" ||
-						parsed === null ||
-						!("key" in parsed) ||
-						typeof parsed.key !== "string"
-					) {
-						throw new Error("credential payload is missing a string key");
-					}
-					return parsed.key;
-				});
-			};
-			// Each key lands on the product that accepts it — a gateway key on the
-			// lanes would 401, and leaving either under the retired id would make
-			// it invisible to both providers.
-			expect(readKeys("singularityapi-dev")).toEqual(["sk-sapi-live-abc"]);
-			expect(readKeys("singularityapi-tech")).toEqual(["sk-sing-lane-abc"]);
-			expect(readKeys("singularityapi")).toEqual([]);
-			// Rate-limit state travels with the credential: a block recorded under
-			// the old provider key must not be dropped, nor outlive the rename.
-			// Rows were inserted by this test above; the cast names their shape.
-			const blockRows = legacyDb
-				.query("SELECT provider_key FROM auth_credential_blocks ORDER BY credential_id ASC")
-				.all() as Array<{ provider_key: string }>;
-			expect(blockRows.map(row => row.provider_key)).toEqual(["singularityapi-tech:api_key"]);
-		} finally {
-			migratedStore.close();
-		}
+		expect(store.listAuthCredentials("github-copilot")).toHaveLength(0);
+		expect(readDisabledCauses(db, "github-copilot")).toEqual([disabledCause]);
 	});
 
 	it("creates fresh auth schema without unixepoch defaults", async () => {
@@ -547,7 +226,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 			const first = await SqliteAuthCredentialStore.open(reopenDbPath);
 			// api_key rows never derive an identity_key, so this leaves a NULL row
 			// the boot-time backfill scan must skip without a no-op UPDATE.
-			await first.saveApiKey("openai", "sk-reopen-noop");
+			await first.saveApiKey("github-copilot", "sk-reopen-noop");
 			first.close();
 
 			// PRAGMA data_version, read from a second connection, increments whenever
@@ -559,7 +238,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 				const before = (observer.query("PRAGMA data_version").get() as { data_version: number }).data_version;
 				const reopened = await SqliteAuthCredentialStore.open(reopenDbPath);
 				try {
-					expect(reopened.listAuthCredentials("openai")).toHaveLength(1);
+					expect(reopened.listAuthCredentials("github-copilot")).toHaveLength(1);
 					expect(readAuthSchemaVersion(observer)).toBe(8);
 				} finally {
 					reopened.close();
@@ -596,7 +275,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 				"INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause, identity_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
 			)
 			.run(
-				"openai-codex",
+				"github-copilot",
 				"oauth",
 				JSON.stringify(
 					createCredential({
@@ -616,7 +295,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 			expect(readAuthSchemaVersion(legacyDb)).toBe(8);
 			expect(readTableSql(legacyDb, "auth_credentials")).not.toContain("unixepoch(");
 			expect(readTableSql(legacyDb, "auth_credentials")).toContain("strftime('%s','now')");
-			expect(readStoredIdentityRows(legacyDb, "openai-codex")).toEqual([
+			expect(readStoredIdentityRows(legacyDb, "github-copilot")).toEqual([
 				{ identity_key: "email:legacy-v3@example.com", disabled_cause: null },
 			]);
 		} finally {
@@ -647,7 +326,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 				"INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
 			)
 			.run(
-				"openai-codex",
+				"github-copilot",
 				"oauth",
 				JSON.stringify(
 					createCredential({
@@ -663,8 +342,8 @@ describe("AuthStorage openai-codex email dedupe", () => {
 
 		const migratedStore = new SqliteAuthCredentialStore(legacyDb);
 		try {
-			expect(readStoredIdentityRows(legacyDb, "openai-codex")).toEqual([
-				{ identity_key: "email:legacy-v1@example.com", disabled_cause: null },
+			expect(readStoredIdentityRows(legacyDb, "github-copilot")).toEqual([
+				{ identity_key: "account:legacy-v1-account", disabled_cause: null },
 			]);
 		} finally {
 			migratedStore.close();
@@ -689,7 +368,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 				"INSERT INTO auth_credentials (provider, credential_type, data, disabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
 			)
 			.run(
-				"openai-codex",
+				"github-copilot",
 				"oauth",
 				JSON.stringify(
 					createCredential({ suffix: "legacy", accountId: "legacy-account", email: "legacy@example.com" }),
@@ -701,9 +380,9 @@ describe("AuthStorage openai-codex email dedupe", () => {
 
 		const migratedStore = new SqliteAuthCredentialStore(legacyDb);
 		try {
-			expect(migratedStore.listAuthCredentials("openai-codex")).toHaveLength(0);
-			expect(readStoredIdentityRows(legacyDb, "openai-codex")).toEqual([
-				{ identity_key: "email:legacy@example.com", disabled_cause: "disabled" },
+			expect(migratedStore.listAuthCredentials("github-copilot")).toHaveLength(0);
+			expect(readStoredIdentityRows(legacyDb, "github-copilot")).toEqual([
+				{ identity_key: "account:legacy-account", disabled_cause: "disabled" },
 			]);
 		} finally {
 			migratedStore.close();
@@ -713,7 +392,7 @@ describe("AuthStorage openai-codex email dedupe", () => {
 
 describe("AuthStorage OAuth login upgrade and multi-account coexistence", () => {
 	afterEach(() => {
-		unregisterOAuthProviders("auth-storage-login-upgrade-test");
+		resetOAuthMocks("auth-storage-login-upgrade-test");
 	});
 
 	it("allows multiple OAuth accounts to coexist and replaces legacy api_key rows on OAuth login", async () => {
@@ -722,13 +401,13 @@ describe("AuthStorage OAuth login upgrade and multi-account coexistence", () => 
 
 		try {
 			// 1. Setup a legacy api_key credential
-			await authStorage.credentials.set("unit-login-upgrade", { type: "api_key", key: "sk-legacy-key" });
-			expect(await authStorage.keys.get("unit-login-upgrade")).toBe("sk-legacy-key");
+			await authStorage.credentials.set("github-copilot", { type: "api_key", key: "sk-legacy-key" });
+			expect(await authStorage.keys.get("github-copilot")).toBe("sk-legacy-key");
 
 			// 2. Register custom oauth provider
 			let loginReturns: (Omit<OAuthCredential, "type"> & { type?: string }) | null = null;
-			registerOAuthProvider({
-				id: "unit-login-upgrade",
+			mockOAuthProvider({
+				id: "github-copilot",
 				name: "Unit Login Upgrade",
 				sourceId: "auth-storage-login-upgrade-test",
 				login: async () => {
@@ -748,21 +427,21 @@ describe("AuthStorage OAuth login upgrade and multi-account coexistence", () => 
 				refresh: "refresh-token-1",
 				access: "access-token-1",
 				expires: Date.now() + 60_000,
-				projectId: "project-1",
+				accountId: "account-1",
 				email: "user-1@example.com",
 			};
-			await authStorage.oauth.login("unit-login-upgrade", {
+			await authStorage.oauth.login("github-copilot", {
 				onAuth: () => {},
 				onPrompt: async () => "",
 			});
 
 			// Legacy api_key should be gone/replaced, and first oauth account is active.
 			// getApiKey should now return the first OAuth access token (since the api_key is gone).
-			expect(await authStorage.keys.get("unit-login-upgrade")).toBe("access-token-1");
-			const firstRows = readStoredIdentityRows(db, "unit-login-upgrade");
+			expect(await authStorage.keys.get("github-copilot")).toBe("access-token-1");
+			const firstRows = readStoredIdentityRows(db, "github-copilot");
 			expect(firstRows).toEqual([
 				{ identity_key: null, disabled_cause: "replaced by oauth login" },
-				{ identity_key: "email:user-1@example.com", disabled_cause: null },
+				{ identity_key: "account:account-1", disabled_cause: null },
 			]);
 
 			// 4. Login second OAuth account
@@ -770,55 +449,21 @@ describe("AuthStorage OAuth login upgrade and multi-account coexistence", () => 
 				refresh: "refresh-token-2",
 				access: "access-token-2",
 				expires: Date.now() + 60_000,
-				projectId: "project-2",
+				accountId: "account-2",
 				email: "user-2@example.com",
 			};
-			await authStorage.oauth.login("unit-login-upgrade", {
+			await authStorage.oauth.login("github-copilot", {
 				onAuth: () => {},
 				onPrompt: async () => "",
 			});
 
 			// Both OAuth accounts should coexist! No accounts should be disabled
-			const secondRows = readStoredIdentityRows(db, "unit-login-upgrade");
+			const secondRows = readStoredIdentityRows(db, "github-copilot");
 			expect(secondRows).toEqual([
 				{ identity_key: null, disabled_cause: "replaced by oauth login" },
-				{ identity_key: "email:user-1@example.com", disabled_cause: null },
-				{ identity_key: "email:user-2@example.com", disabled_cause: null },
+				{ identity_key: "account:account-1", disabled_cause: null },
+				{ identity_key: "account:account-2", disabled_cause: null },
 			]);
-		} finally {
-			authStorage.close();
-		}
-	});
-
-	it("keeps existing NVIDIA API keys active when login adds another key", async () => {
-		const authStorage = await AuthStorage.create(":memory:");
-		const prompts = ["nvapi-first", "nvapi-second"];
-		const fetchMock: FetchImpl = async () =>
-			new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
-
-		try {
-			await authStorage.oauth.login("nvidia", {
-				onAuth: () => {},
-				onPrompt: async () => prompts.shift() ?? "",
-				fetch: fetchMock,
-			});
-			await authStorage.oauth.login("nvidia", {
-				onAuth: () => {},
-				onPrompt: async () => prompts.shift() ?? "",
-				fetch: fetchMock,
-			});
-
-			expect(authStorage.credentials.list("nvidia").map(entry => entry.credential)).toEqual([
-				{ type: "api_key", key: "nvapi-first", source: "login" },
-				{ type: "api_key", key: "nvapi-second", source: "login" },
-			]);
-
-			const selectedKeys = new Set<string>();
-			for (let index = 0; index < 64; index += 1) {
-				const key = await authStorage.keys.get("nvidia", `session-${index}`);
-				if (key) selectedKeys.add(key);
-			}
-			expect(selectedKeys).toEqual(new Set(["nvapi-first", "nvapi-second"]));
 		} finally {
 			authStorage.close();
 		}
@@ -859,15 +504,15 @@ describe("AuthStorage persistent session stickiness", () => {
 				projectId: "project-2",
 				email: "user-2@example.com",
 			};
-			await authStorage.credentials.set("unit-session-stickiness", [credential1, credential2]);
+			await authStorage.credentials.set("github-copilot", [credential1, credential2]);
 
 			// 2. Resolve initial key for session-1
-			const key1 = await authStorage.keys.get("unit-session-stickiness", "session-1");
+			const key1 = await authStorage.keys.get("github-copilot", "session-1");
 			expect(key1).toBe("access-token-2");
 
 			// 3. Rotate session-1's sticky credential to the sibling
-			await authStorage.limits.rotate("unit-session-stickiness", "session-1");
-			const key2 = await authStorage.keys.get("unit-session-stickiness", "session-1");
+			await authStorage.limits.rotate("github-copilot", "session-1");
+			const key2 = await authStorage.keys.get("github-copilot", "session-1");
 			expect(key2).toBe("access-token-1");
 
 			// 4. Close AuthStorage to simulate process restart
@@ -878,7 +523,7 @@ describe("AuthStorage persistent session stickiness", () => {
 			await authStorage.credentials.reload();
 
 			// 6. Retrieve the sticky key again for session-1 (should still be access-token-1)
-			const key3 = await authStorage.keys.get("unit-session-stickiness", "session-1");
+			const key3 = await authStorage.keys.get("github-copilot", "session-1");
 			expect(key3).toBe("access-token-1");
 
 			authStorage.close();
@@ -888,7 +533,7 @@ describe("AuthStorage persistent session stickiness", () => {
 	});
 
 	it("drops persisted session stickiness after a lower-index credential is removed", async () => {
-		const provider = "unit-sticky-invalidation";
+		const provider = "github-copilot";
 		const mk = (suffix: string): OAuthCredential => ({
 			type: "oauth",
 			refresh: `refresh-${suffix}`,

@@ -1,9 +1,12 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
 import { removeWithRetries } from "../../utils/src/temp";
 
 describe("AuthStorage OAuth refresh skew", () => {
@@ -18,7 +21,7 @@ describe("AuthStorage OAuth refresh skew", () => {
 	});
 
 	afterEach(async () => {
-		unregisterOAuthProviders("auth-storage-refresh-skew-test");
+		resetOAuthMocks("auth-storage-refresh-skew-test");
 		store?.close();
 		store = undefined;
 		authStorage = undefined;
@@ -33,8 +36,8 @@ describe("AuthStorage OAuth refresh skew", () => {
 
 		let refreshCalls = 0;
 		const refreshedExpires = Date.now() + 60 * 60_000;
-		registerOAuthProvider({
-			id: "unit-oauth-skew",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Skew",
 			sourceId: "auth-storage-refresh-skew-test",
 			async login() {
@@ -54,7 +57,7 @@ describe("AuthStorage OAuth refresh skew", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-skew", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-before-skew-refresh",
@@ -63,11 +66,11 @@ describe("AuthStorage OAuth refresh skew", () => {
 			},
 		]);
 
-		const apiKey = await authStorage.keys.get("unit-oauth-skew", "skew-session");
+		const apiKey = await authStorage.keys.get("github-copilot", "skew-session");
 
 		expect(apiKey).toBe("access-after-skew-refresh");
 		expect(refreshCalls).toBe(1);
-		const stored = store.listAuthCredentials("unit-oauth-skew");
+		const stored = store.listAuthCredentials("github-copilot");
 		expect(stored).toHaveLength(1);
 		expect(stored[0]?.credential.type).toBe("oauth");
 		if (stored[0]?.credential.type === "oauth") {
@@ -84,8 +87,8 @@ describe("AuthStorage OAuth refresh skew", () => {
 		const allowRefresh = Promise.withResolvers<void>();
 		let refreshCalls = 0;
 
-		registerOAuthProvider({
-			id: "unit-oauth-skew-mutex",
+		mockOAuthProvider({
+			id: "github-copilot",
 			name: "Unit OAuth Skew Mutex",
 			sourceId: "auth-storage-refresh-skew-test",
 			async login() {
@@ -107,7 +110,7 @@ describe("AuthStorage OAuth refresh skew", () => {
 			},
 		});
 
-		await authStorage.credentials.set("unit-oauth-skew-mutex", [
+		await authStorage.credentials.set("github-copilot", [
 			{
 				type: "oauth",
 				access: "access-before-shared-skew-refresh",
@@ -116,8 +119,8 @@ describe("AuthStorage OAuth refresh skew", () => {
 			},
 		]);
 
-		const first = authStorage.keys.get("unit-oauth-skew-mutex", "same-session");
-		const second = authStorage.keys.get("unit-oauth-skew-mutex", "same-session");
+		const first = authStorage.keys.get("github-copilot", "same-session");
+		const second = authStorage.keys.get("github-copilot", "same-session");
 
 		await refreshStarted.promise;
 		allowRefresh.resolve();

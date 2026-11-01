@@ -38,6 +38,9 @@ export async function handleRerank(bootOpts: AuthGatewayRouteOptions, req: Reque
 		return rerankWire.formatError(400, "invalid_request_error", `Model ${parsed.modelId} does not support reranking`);
 	}
 
+	if (!model.baseUrl?.trim())
+		return rerankWire.formatError(400, "invalid_request_error", "Model requires an explicit base URL");
+
 	const client = resolveClientIdentity(req.headers);
 	const sessionId = deterministicUuid(`rerank\u0000${model.provider}/${model.id}`);
 	const apiKey = await resolveGatewayApiKey(bootOpts, model, sessionId, controller.signal, peer);

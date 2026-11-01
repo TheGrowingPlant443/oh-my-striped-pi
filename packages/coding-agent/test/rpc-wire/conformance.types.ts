@@ -42,10 +42,6 @@ import type {
 	RpcHostUriRequest,
 	RpcHostUriResult,
 	RpcHostUriSchemeDefinition,
-	RpcLiveEndFrame,
-	RpcLiveLevelsFrame,
-	RpcLivePhaseFrame,
-	RpcLiveTranscriptFrame,
 	RpcOpenSessionResult,
 	RpcPromptError,
 	RpcPromptResultFrame,
@@ -63,7 +59,6 @@ import type * as Wire from "@oh-my-pi/pi-coding-agent/modes/rpc/wire/rpc-wire.ge
 import type { RestoredQueuedMessage } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
 import type { SessionStats } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import type { BtwHistoryTurn } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import type { UsageLimitState } from "@oh-my-pi/pi-coding-agent/session/usage-limit";
 import type { ContextUsage } from "@oh-my-pi/pi-tui/status-line/types";
 import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
 import type { Goal } from "@oh-my-pi/pi-tui/tools/goal";
@@ -210,10 +205,6 @@ export type Frames = Assert<
 		subagentProgressPayload: Outbound<RpcSubagentProgressFrame["payload"], Wire.SubagentProgressPayload>;
 		subagentEvent: Outbound<RpcSubagentEventFrame, Wire.SubagentEvent>;
 		subagentEventPayload: Outbound<RpcSubagentEventFrame["payload"], Wire.SubagentEventPayload>;
-		livePhase: Outbound<RpcLivePhaseFrame, Wire.LivePhaseEvent>;
-		liveLevels: Outbound<RpcLiveLevelsFrame, Wire.LiveLevelsEvent>;
-		liveTranscript: Outbound<RpcLiveTranscriptFrame, Wire.LiveTranscriptEvent>;
-		liveEnd: Outbound<RpcLiveEndFrame, Wire.LiveEndEvent>;
 		dictationState: Outbound<RpcDictationStateFrame, Wire.DictationStateEvent>;
 		dictationTranscript: Outbound<RpcDictationTranscriptFrame, Wire.DictationTranscriptEvent>;
 		dictationEnd: Outbound<RpcDictationEndFrame, Wire.DictationEndEvent>;
@@ -262,9 +253,6 @@ export type State = Assert<
 		goal: Outbound<Goal, Wire.Goal>;
 		goalModeState: Outbound<GoalModeState, Wire.GoalModeState>;
 		goalResult: Outbound<RpcGoalResult, Wire.GoalResult>;
-		usageLimitLowPriority: Outbound<Extract<UsageLimitState, { stage: "low_priority" }>, Wire.UsageLimitLowPriority>;
-		usageLimitWrapUp: Outbound<Extract<UsageLimitState, { stage: "wrap_up" }>, Wire.UsageLimitWrapUp>;
-		usageLimitStages: Same<UsageLimitState["stage"], Wire.UsageLimitState["stage"]>;
 		bashResult: Outbound<BashResult, Wire.BashResult>;
 		compactionResult: Outbound<CompactionResult, Wire.CompactionResult>;
 		sessionStats: Outbound<SessionStats, Wire.SessionStats>;

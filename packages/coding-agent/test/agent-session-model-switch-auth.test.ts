@@ -26,7 +26,7 @@ describe("AgentSession model switch auth pre-flight", () => {
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-model-switch-auth-");
 		authStorage = await AuthStorage.create(path.join(sharedDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		registry = new ModelRegistry(authStorage, path.join(sharedDir.path(), "models.yml"));
 	});
 
@@ -44,8 +44,8 @@ describe("AgentSession model switch auth pre-flight", () => {
 	});
 
 	function modelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
-		if (!model) throw new Error(`Expected anthropic model ${id} to exist`);
+		const model = getBundledModel("github-copilot", id);
+		if (!model) throw new Error(`Expected Copilot model ${id} to exist`);
 		return model;
 	}
 
@@ -73,8 +73,8 @@ describe("AgentSession model switch auth pre-flight", () => {
 	}
 
 	it("switches the active model via the synchronous auth check, not the resolver", async () => {
-		const from = modelOrThrow("claude-sonnet-4-5");
-		const to = modelOrThrow("claude-sonnet-4-6");
+		const from = modelOrThrow("claude-sonnet-4.5");
+		const to = modelOrThrow("claude-sonnet-4.6");
 		const s = makeSession(from);
 
 		const getApiKeySpy = spyOn(registry, "getApiKey");
@@ -89,8 +89,8 @@ describe("AgentSession model switch auth pre-flight", () => {
 	});
 
 	it("cycles role models without invoking the resolver", async () => {
-		const from = modelOrThrow("claude-sonnet-4-5");
-		const slow = modelOrThrow("claude-sonnet-4-6");
+		const from = modelOrThrow("claude-sonnet-4.5");
+		const slow = modelOrThrow("claude-sonnet-4.6");
 		const s = makeSession(from, {
 			default: `${from.provider}/${from.id}`,
 			slow: `${slow.provider}/${slow.id}`,
@@ -108,8 +108,8 @@ describe("AgentSession model switch auth pre-flight", () => {
 	});
 
 	it("temporary switch also avoids the resolver", async () => {
-		const from = modelOrThrow("claude-sonnet-4-5");
-		const to = modelOrThrow("claude-sonnet-4-6");
+		const from = modelOrThrow("claude-sonnet-4.5");
+		const to = modelOrThrow("claude-sonnet-4.6");
 		const s = makeSession(from);
 
 		const getApiKeySpy = spyOn(registry, "getApiKey");
@@ -122,8 +122,8 @@ describe("AgentSession model switch auth pre-flight", () => {
 	});
 
 	it("rejects the switch synchronously when no credential is configured, without calling the resolver", async () => {
-		const from = modelOrThrow("claude-sonnet-4-5");
-		const to = modelOrThrow("claude-sonnet-4-6");
+		const from = modelOrThrow("claude-sonnet-4.5");
+		const to = modelOrThrow("claude-sonnet-4.6");
 		const s = makeSession(from);
 
 		const getApiKeySpy = spyOn(registry, "getApiKey");

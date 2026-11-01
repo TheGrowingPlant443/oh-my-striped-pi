@@ -63,12 +63,7 @@ The first-turn recall is part of the transcript's history and is stored in the s
 | `mnemopi.noEmbeddings`        | `false`            | Pass `noEmbeddings` to `Mnemopi` and force FTS-only recall.                                                                                                                                                                                                                                                   |
 | `mnemopi.embeddingVariant`    | `en`               | Local embedding model variant: `en` = `BAAI/bge-base-en-v1.5` (768d), `multilingual` = `intfloat/multilingual-e5-large` (1024d). `mnemopi.embeddingModel`/`MNEMOPI_EMBEDDING_MODEL` override it; changing it rebuilds stored embeddings on the next writable start.                                           |
 | `mnemopi.embeddingModel`      | variant default    | Explicit embedding model id; overrides `mnemopi.embeddingVariant`. Precedence: this setting > `MNEMOPI_EMBEDDING_MODEL` env > variant default; a blank or `null` setting counts as unset.                                                                                                                     |
-| `mnemopi.embeddingApiUrl`     | env/default        | OpenAI-compatible embedding endpoint passed to `Mnemopi`.                                                                                                                                                                                                                                                     |
-| `mnemopi.embeddingApiKey`     | env/default        | Embedding API key passed to `Mnemopi`.                                                                                                                                                                                                                                                                        |
-| `mnemopi.llmMode`             | `smol`             | `smol` resolves the `memory` model role and its retry chain; `remote` uses the settings below; `none` disables LLM calls.                                                                                                                                                                                     |
-| `mnemopi.llmBaseUrl`          | env/default        | OpenAI-compatible LLM endpoint for `llmMode: remote`.                                                                                                                                                                                                                                                         |
-| `mnemopi.llmApiKey`           | env/default        | LLM API key for `llmMode: remote`.                                                                                                                                                                                                                                                                            |
-| `mnemopi.llmModel`            | env/default        | LLM model id for `llmMode: remote`.                                                                                                                                                                                                                                                                           |
+| `mnemopi.llmMode`             | `smol`             | `smol` resolves the managed `memory` model role and its retry chain; `none` disables LLM calls. |
 
 ## Scoping
 
@@ -113,7 +108,7 @@ Memories labelled `true` or `likely_true` always weigh `1.0`, and `false` weighs
 
 ## LLM and embeddings
 
-FTS and embedding paths use the settings below. `llmMode: smol` resolves the `memory` role and its configured retry chain, fetching credentials at call time. When unset, the role reuses `tiny`, then the fast (`smol`) defaults. It supports both local-inference and online models. `llmMode: remote` uses the OpenAI-compatible endpoint settings; `llmMode: none` disables LLM calls. If no usable model or credential resolves, Mnemopi continues without LLM-backed work. The legacy `providers.memoryModel` setting is migrated into the `memory` role.
+FTS and local embedding paths use the settings below. `llmMode: smol` resolves the managed `memory` role and its configured retry chain, fetching credentials at call time. When unset, the role reuses `tiny`, then the fast (`smol`) defaults. It supports local inference and the retained managed providers. `llmMode: none` disables LLM calls. If no usable model or credential resolves, Mnemopi continues without LLM-backed work.
 
 FTS-only:
 
@@ -130,41 +125,6 @@ Equivalent constructor shape:
 new Mnemopi({ noEmbeddings: true });
 ```
 
-Remote embeddings:
-
-```yaml
-mnemopi:
-   embeddingModel: text-embedding-3-small
-   embeddingApiUrl: https://api.openai.com/v1
-   embeddingApiKey: ${OPENAI_API_KEY}
-```
-
-Equivalent constructor shape:
-
-```ts
-new Mnemopi({
-	embeddingModel: "text-embedding-3-small",
-	embeddingApiUrl: "https://api.openai.com/v1",
-	embeddingApiKey,
-});
-```
-
-Remote LLM:
-
-```yaml
-mnemopi:
-   llmMode: remote
-   llmBaseUrl: https://api.openai.com/v1
-   llmApiKey: ${OPENAI_API_KEY}
-   llmModel: gpt-4.1-mini
-```
-
-Equivalent constructor shapes:
-
-```ts
-new Mnemopi({ llm: { baseUrl, apiKey, model } });
-new Mnemopi({ llmBaseUrl: baseUrl, llmApiKey: apiKey, llmModel: model });
-```
 
 Dynamic function LLM for rotating OAuth tokens:
 

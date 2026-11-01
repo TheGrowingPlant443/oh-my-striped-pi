@@ -15,9 +15,9 @@ function createAssistantMessage(text: string): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -31,8 +31,8 @@ function createAssistantMessage(text: string): AssistantMessage {
 }
 
 function getModel(contextWindow: number): Model {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic/claude-sonnet-4-5 to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected bundled github-copilot/claude-sonnet-4.5 model");
 	return { ...model, contextWindow };
 }
 
@@ -193,20 +193,25 @@ function compactionEntry(id: string, preserveData?: Record<string, unknown>): Se
 describe("readable compaction boundary", () => {
 	const local = compactionEntry("local");
 	const remote = compactionEntry("remote", {
-		openaiRemoteCompaction: { provider: "openai-codex", replacementHistory: [] },
+		openaiRemoteCompaction: { provider: "github-copilot", replacementHistory: [] },
 	});
 	const entries = [local, remote];
 
-	test("skips a provider-native compaction another provider cannot replay", () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic/claude-sonnet-4-5 to exist");
+	test("skips a provider-native compaction an incompatible API cannot replay", () => {
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected bundled github-copilot/claude-sonnet-4.5 model");
 		expect(findReadableCompactionIndex(entries, DEFAULT_COMPACTION_SETTINGS, model)).toBe(0);
 	});
 
-	test("keeps a provider-native compaction the same provider can replay", () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!model) throw new Error("Expected built-in openai-codex/gpt-5.6-sol to exist");
-		expect(findReadableCompactionIndex(entries, DEFAULT_COMPACTION_SETTINGS, model)).toBe(1);
+	test("keeps a provider-native compaction with a configured compatible reader", () => {
+		const model = getBundledModel("github-copilot", "gpt-5.6-sol");
+		if (!model) throw new Error("Expected bundled github-copilot/gpt-5.6-sol model");
+		expect(
+			findReadableCompactionIndex(entries, DEFAULT_COMPACTION_SETTINGS, {
+				...model,
+				remoteCompaction: { enabled: true },
+			}),
+		).toBe(1);
 	});
 
 	test("without an active model the newest entry is the boundary", () => {

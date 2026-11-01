@@ -27,7 +27,7 @@ function embeddingModel(
 	provider: string,
 	id: string,
 	api: Api = "openai-embeddings",
-	baseUrl = provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1",
+	baseUrl = provider === "company-proxy" ? "https://proxy.company.example/v1" : "https://inference.company.example/v1",
 ): Model<Api> {
 	return buildModel({
 		id,
@@ -48,11 +48,11 @@ function embeddingModel(
 async function boot(trustProxyHeaders = false): Promise<Harness> {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-embeddings-"));
 	const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-	storage.keys.setRuntime("openai", "openai-secret");
-	storage.keys.setRuntime("openrouter", "openrouter-secret");
-	const direct = embeddingModel("openai", "text-embedding-3-small");
-	const routed = embeddingModel("openrouter", "qwen/qwen3-embedding-8b");
-	const wrongApi = embeddingModel("openai", "gpt-5.5", "openai-responses");
+	storage.keys.setRuntime("company", "openai-secret");
+	storage.keys.setRuntime("company-proxy", "openrouter-secret");
+	const direct = embeddingModel("company", "text-embedding-3-small");
+	const routed = embeddingModel("company-proxy", "qwen/qwen3-embedding-8b");
+	const wrongApi = embeddingModel("company", "gpt-5.5", "openai-responses");
 	const upstream: UpstreamRequest[] = [];
 	const fetchImpl: FetchImpl = async (input, init) => {
 		const body: unknown = JSON.parse(String(init?.body));
@@ -82,9 +82,9 @@ async function boot(trustProxyHeaders = false): Promise<Harness> {
 		trustProxyHeaders,
 		storage,
 		resolveModel: id => {
-			if (id === direct.id || id === `openai/${direct.id}`) return direct;
-			if (id === routed.id || id === `openrouter/${routed.id}`) return routed;
-			if (id === wrongApi.id || id === `openai/${wrongApi.id}`) return wrongApi;
+			if (id === direct.id || id === `company/${direct.id}`) return direct;
+			if (id === routed.id || id === `company-proxy/${routed.id}`) return routed;
+			if (id === wrongApi.id || id === `company/${wrongApi.id}`) return wrongApi;
 			return undefined;
 		},
 		version: "test",
@@ -110,7 +110,7 @@ describe("auth-gateway POST /v1/embeddings", () => {
 		harness = undefined;
 	});
 
-	it("forwards OpenAI float requests and records calculated usage", async () => {
+	it("forwards compatible float requests and records calculated usage", async () => {
 		harness = await boot();
 		const observed: Array<{ provider: string; model: string; costUsd?: number; client?: { app?: string } }> = [];
 		vi.spyOn(harness.storage.usage, "observe").mockImplementation(entry => observed.push(entry));
@@ -118,7 +118,7 @@ describe("auth-gateway POST /v1/embeddings", () => {
 			method: "POST",
 			headers: { ...HEADERS, "x-omp-app": "vector-client" },
 			body: JSON.stringify({
-				model: "openai/text-embedding-3-small",
+				model: "company/text-embedding-3-small",
 				input: "hello embeddings",
 				encoding_format: "float",
 				dimensions: 3,
@@ -130,12 +130,12 @@ describe("auth-gateway POST /v1/embeddings", () => {
 		expect(await response.json()).toEqual({
 			object: "list",
 			data: [{ object: "embedding", index: 0, embedding: [0.125, -0.25, 0.5] }],
-			model: "openai/text-embedding-3-small",
+			model: "company/text-embedding-3-small",
 			usage: { prompt_tokens: 5, total_tokens: 5 },
 		});
 		expect(harness.upstream).toEqual([
 			{
-				url: "https://api.openai.com/v1/embeddings",
+				url: "https://inference.company.example/v1/embeddings",
 				authorization: "Bearer openai-secret",
 				body: {
 					model: "text-embedding-3-small",
@@ -148,20 +148,20 @@ describe("auth-gateway POST /v1/embeddings", () => {
 		]);
 		expect(observed).toHaveLength(1);
 		expect(observed[0]).toMatchObject({
-			provider: "openai",
+			provider: "company",
 			model: "text-embedding-3-small",
 			costUsd: 0.0000001,
 			client: { app: "vector-client" },
 		});
 	});
 
-	it("passes OpenRouter base64 embeddings and provider-reported cost through", async () => {
+	it("passes company proxy base64 embeddings and provider-reported cost through", async () => {
 		harness = await boot();
 		const response = await fetch(`${harness.url}/v1/embeddings`, {
 			method: "POST",
 			headers: HEADERS,
 			body: JSON.stringify({
-				model: "openrouter/qwen/qwen3-embedding-8b",
+				model: "company-proxy/qwen/qwen3-embedding-8b",
 				input: [[101, 202, 303]],
 				encoding_format: "base64",
 			}),
@@ -171,12 +171,12 @@ describe("auth-gateway POST /v1/embeddings", () => {
 		expect(await response.json()).toEqual({
 			object: "list",
 			data: [{ object: "embedding", index: 0, embedding: "AACAPwAAAEA=" }],
-			model: "openrouter/qwen/qwen3-embedding-8b",
+			model: "company-proxy/qwen/qwen3-embedding-8b",
 			usage: { prompt_tokens: 4, total_tokens: 4, cost: 0.00000004 },
 		});
 		expect(harness.upstream).toEqual([
 			{
-				url: "https://openrouter.ai/api/v1/embeddings",
+				url: "https://proxy.company.example/v1/embeddings",
 				authorization: "Bearer openrouter-secret",
 				body: {
 					model: "qwen/qwen3-embedding-8b",
@@ -199,7 +199,7 @@ describe("auth-gateway POST /v1/embeddings", () => {
 		const wrongApi = await fetch(`${harness.url}/v1/embeddings`, {
 			method: "POST",
 			headers: HEADERS,
-			body: JSON.stringify({ model: "openai/gpt-5.5", input: "hello" }),
+			body: JSON.stringify({ model: "company/gpt-5.5", input: "hello" }),
 		});
 		expect(wrongApi.status).toBe(400);
 		expect(await wrongApi.json()).toMatchObject({ error: { code: 400, type: "invalid_request_error" } });
@@ -213,7 +213,7 @@ describe("auth-gateway POST /v1/embeddings", () => {
 			fetch(url, {
 				method: "POST",
 				headers,
-				body: JSON.stringify({ model: "openai/text-embedding-3-small", input: "hello" }),
+				body: JSON.stringify({ model: "company/text-embedding-3-small", input: "hello" }),
 			});
 
 		const inHeader = await request(`${harness.url}/v1/embeddings`, {
@@ -304,7 +304,7 @@ describe("auth-gateway POST /v1/embeddings", () => {
 			const authorized = await fetch(`${harness.url}/v1/embeddings`, {
 				method: "POST",
 				headers: { ...HEADERS, "x-forwarded-for": "203.0.113.42, 10.0.0.1" },
-				body: JSON.stringify({ model: "openai/text-embedding-3-small", input: "hello" }),
+				body: JSON.stringify({ model: "company/text-embedding-3-small", input: "hello" }),
 			});
 			expect(authorized.status).toBe(200);
 			expect(events.at(-1)?.context?.peer).toBe("203.0.113.42");

@@ -36,7 +36,7 @@ export async function runLoginCommand(provider: string | undefined): Promise<voi
 		const providerId = provider ?? (await pickOAuthProvider(rl, providers));
 		const info = providers.find(p => p.id === providerId);
 		if (!info) {
-			throw new Error(`Unknown OAuth provider '${providerId}'. Run \`${APP_NAME} login\` to pick one.`);
+			throw new Error(`Unknown login provider '${providerId}'. Run \`${APP_NAME} login\` to pick one.`);
 		}
 
 		const identity = await runTerminalOAuthLogin(rl, authStorage, info.id, { openBrowser: true });
@@ -50,7 +50,14 @@ export async function runLoginCommand(provider: string | undefined): Promise<voi
 		await modelRegistry.refreshProvider(info.storeCredentialsAs ?? info.id, "online");
 
 		const who = formatLoginIdentity(identity);
-		process.stdout.write(chalk.green(`\nLogged in to ${info.name}${who ? ` as ${who}` : ""}\n`));
+		const authenticated = authStorage.keys.source(info.storeCredentialsAs ?? info.id) !== undefined;
+		process.stdout.write(
+			chalk.green(
+				authenticated
+					? `\nLogged in to ${info.name}${who ? ` as ${who}` : ""}\n`
+					: `\nConfigured keyless access to ${info.name}.\n`,
+			),
+		);
 		const broker = await resolveAuthBrokerConfig();
 		process.stdout.write(
 			chalk.dim(

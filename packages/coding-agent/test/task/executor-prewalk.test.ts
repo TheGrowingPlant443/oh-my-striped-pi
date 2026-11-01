@@ -94,12 +94,6 @@ function createSessionResult(session: AgentSession): CreateAgentSessionResult {
 	};
 }
 
-function modelOrThrow(id: string): Model {
-	const model = getBundledModel("anthropic", id);
-	if (!model) throw new Error(`Expected bundled model ${id}`);
-	return model;
-}
-
 function createModelRegistry(models: Model[]): ModelRegistry {
 	return {
 		authStorage: {},
@@ -119,8 +113,8 @@ const baseAgent: AgentDefinition = {
 };
 
 describe("runSubprocess per-agent prewalk", () => {
-	const primary = modelOrThrow("claude-sonnet-4-5");
-	const target = modelOrThrow("claude-sonnet-4-6");
+	const primary = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	const target = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 	function baseOptions(id: string, settings: Settings) {
 		return {

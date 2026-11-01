@@ -21,7 +21,7 @@ import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { CompactionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import type { Message } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -37,13 +37,31 @@ describe("AgentSession snapcompact no-reduction guard", () => {
 
 	beforeEach(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-anthropic", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 		sessionManager = SessionManager.inMemory();
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected bundled claude-sonnet-4-5 model");
-		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
+		const model = buildModel({
+			id: "claude-sonnet-4-5",
+			name: "Company Claude",
+			provider: "company-anthropic",
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid/anthropic",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		});
+		modelRegistry.registerProvider(model.provider, {
+			apiKey: "test-key",
+			api: model.api,
+			baseUrl: model.baseUrl,
+			models: [
+				{ ...model, contextWindow: 200_000, maxTokens: 64_000 },
+				{ ...model, id: "claude-haiku-5-5", contextWindow: 100_000, maxTokens: 64_000 },
+			],
+		});
 		expect(model.input).toContain("image");
 
 		// A short conversation so the summarized region is tiny — the archive's
@@ -54,9 +72,9 @@ describe("AgentSession snapcompact no-reduction guard", () => {
 			{
 				role: "assistant",
 				content: [{ type: "text", text: "first answer" }],
-				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				api: model.api,
+				provider: model.provider,
+				model: model.id,
 				stopReason: "stop",
 				usage: {
 					input: 20,
@@ -72,9 +90,9 @@ describe("AgentSession snapcompact no-reduction guard", () => {
 			{
 				role: "assistant",
 				content: [{ type: "text", text: "second answer" }],
-				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				api: model.api,
+				provider: model.provider,
+				model: model.id,
 				stopReason: "stop",
 				usage: {
 					input: 20,
@@ -178,8 +196,8 @@ describe("AgentSession snapcompact no-reduction guard", () => {
 
 	it("rejects non-shrinking remote/soft auto-compactions instead of committing tokensAfter >= tokensBefore", async () => {
 		const customSessionManager = SessionManager.inMemory();
-		const model = modelRegistry.find("anthropic", "claude-haiku-5-5");
-		if (!model) throw new Error("Expected anthropic/claude-haiku-5-5 model in registry");
+		const model = modelRegistry.find("company-anthropic", "claude-haiku-5-5");
+		if (!model) throw new Error("Expected company-anthropic/claude-haiku-5-5 model in registry");
 		expect(model.contextWindow).toBe(100_000);
 
 		// Under testEnv byteEstimate (4 chars/token), 4 chars = 1 token.
@@ -289,8 +307,8 @@ describe("AgentSession snapcompact no-reduction guard", () => {
 
 	it("compacts a 100k-window session at its configured 40% trigger and lands the result in the recovery band", async () => {
 		const customSessionManager = SessionManager.inMemory();
-		const model = modelRegistry.find("anthropic", "claude-haiku-5-5");
-		if (!model) throw new Error("Expected anthropic/claude-haiku-5-5 model in registry");
+		const model = modelRegistry.find("company-anthropic", "claude-haiku-5-5");
+		if (!model) throw new Error("Expected company-anthropic/claude-haiku-5-5 model in registry");
 		expect(model.contextWindow).toBe(100_000);
 
 		const agent = new Agent({

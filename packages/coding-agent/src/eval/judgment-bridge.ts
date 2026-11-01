@@ -24,7 +24,7 @@ import type {
 	ScoreQuestion,
 } from "@oh-my-pi/pi-ai";
 import { isRecord } from "@oh-my-pi/pi-utils";
-import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/images/shared";
+import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/judgment";
 import type { LoadedImageInput } from "../utils/image-loading";
 import { loadImageAttachmentInput, loadImageInput, loadSvgImageInput } from "../utils/image-loading";
 import {
@@ -250,8 +250,8 @@ export function sessionJudge(
 		sessionId: session.getSessionId?.() ?? undefined,
 		purpose,
 		telemetry: session.getTelemetry?.(),
-		cache: sharedJudgmentCache(),
 		costGate: session.costGate,
+		cache: sharedJudgmentCache(),
 		onUsage:
 			onUsage && journal
 				? usage => {

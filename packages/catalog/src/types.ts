@@ -9,19 +9,8 @@ export type { KnownProvider } from "./provider-models/descriptors";
 export type KnownApi =
 	| "openai-completions"
 	| "openai-responses"
-	| "openrouter"
-	| "openai-codex-responses"
-	| "azure-openai-responses"
 	| "anthropic-messages"
-	| "bedrock-converse-stream"
-	| "google-generative-ai"
-	| "google-gemini-cli"
-	| "google-vertex"
 	| "ollama-chat"
-	| "cursor-agent"
-	| "factory-droid-agent"
-	| "gitlab-duo-agent"
-	| "devin-agent"
 	| "apple-foundation-models";
 export type Api = KnownApi | (string & {});
 
@@ -43,39 +32,24 @@ export type ModelKind = (typeof MODEL_KINDS)[number];
 /** Kinds a provider maps to a runner transport through `kind-apis` in its KDL; discovery drops rows of these kinds when the provider declares no API. */
 export const KIND_API_KINDS = ["image", "tts", "stt", "embedding", "rerank", "video"] as const;
 export type KindApiKind = (typeof KIND_API_KINDS)[number];
-/** Grounding transport available to chat models selected by the web role. */
-export type WebSearchGrounding = "gemini" | "anthropic" | "codex" | "xai" | "openrouter" | "openai";
-/** Non-chat runner protocols accepted by catalog seeds, outside the chat dispatch union. */
+/** Generic configured-endpoint protocols and on-device workers. */
 export const RUNNER_APIS = [
 	"local-inference",
-	"web-search",
 	"typesafe",
-	"openrouter-decisions",
 	"openai-decisions",
-	"workers-ai-systemone",
 	"openai-images",
-	"openrouter-images",
-	"xai-tts",
 	"openai-speech",
 	"openai-embeddings",
 	"openrouter-rerank",
-	"openrouter-video",
 	"openai-transcriptions",
 ] as const;
-/** Kind each single-purpose runner API serves; `local-inference` hosts several kinds. */
 export const RUNNER_API_KINDS: Record<Exclude<(typeof RUNNER_APIS)[number], "local-inference">, ModelKind> = {
-	"web-search": "search",
 	typesafe: "judge",
-	"openrouter-decisions": "judge",
 	"openai-decisions": "judge",
-	"workers-ai-systemone": "judge",
 	"openai-images": "image",
-	"openrouter-images": "image",
-	"xai-tts": "tts",
 	"openai-speech": "tts",
 	"openai-embeddings": "embedding",
 	"openrouter-rerank": "rerank",
-	"openrouter-video": "video",
 	"openai-transcriptions": "stt",
 };
 
@@ -86,32 +60,22 @@ export function runnerApiKind(api: Api): ModelKind | undefined {
 	return RUNNER_API_KIND_BY_API.get(api);
 }
 
-/** Catalog APIs `generate_image` runs through a pi-ai image client; the hosted Responses pair needs a carrier model. */
-export const IMAGE_GENERATION_APIS = [
-	"openai-images",
-	"openrouter-images",
-	"google-generative-ai",
-	"google-gemini-cli",
-	"openai-responses",
-	"openai-codex-responses",
-	"factory-droid-agent",
-] as const;
+/** Standalone image-generation protocol for explicitly configured endpoints. */
+export const IMAGE_GENERATION_APIS = ["openai-images"] as const;
 export type ImageGenerationApi = (typeof IMAGE_GENERATION_APIS)[number];
 
 const CHAT_TRANSPORT_KINDS: readonly ModelKind[] = ["chat", "tiny"];
-const IMAGE_CHAT_TRANSPORT_KINDS: readonly ModelKind[] = ["chat", "tiny", "image"];
 
 /**
- * Kinds a model on `api` may declare: a runner api serves its own kind; a chat
- * transport serves `chat` and `tiny`, plus `image` when `generate_image` runs it
- * (hosted Responses image tool, Gemini and Factory Droid image models). `undefined` for
- * `local-inference`, which hosts several kinds chosen by the model itself.
+ * Kinds a model on `api` may declare: a runner API serves its own kind;
+ * chat transports serve `chat` and `tiny`. `local-inference` hosts several
+ * kinds selected by the model itself.
  */
 export function servedKinds(api: Api): readonly ModelKind[] | undefined {
 	if (api === "local-inference") return undefined;
 	const runnerKind = runnerApiKind(api);
 	if (runnerKind !== undefined) return [runnerKind];
-	return (IMAGE_GENERATION_APIS as readonly Api[]).includes(api) ? IMAGE_CHAT_TRANSPORT_KINDS : CHAT_TRANSPORT_KINDS;
+	return CHAT_TRANSPORT_KINDS;
 }
 
 /** Whether a model of `kind` can run on `api`. */
@@ -287,15 +251,10 @@ export type OpenAIReasoningDisableMode =
 	| "omit"
 	| "lowest-effort"
 	| "none-effort"
-	| "openrouter-enabled-false"
-	| "cline-enabled-false"
-	| "venice-disable-thinking"
 	| "zai-thinking-disabled"
 	| "qwen-enable-thinking-false"
 	| "qwen-template-false"
 	| "chat-template-thinking-false";
-
-export type OpenAIStreamMarkupHealingPattern = "kimi" | "dsml" | "qwen" | "thinking";
 
 /**
  * Compatibility settings for openai-completions API.
@@ -453,18 +412,6 @@ export interface OpenAICompat {
 	 * Default: false.
 	 */
 	disableReasoningWithTools?: boolean;
-	/** OpenRouter-specific routing preferences. Only used when baseUrl points to OpenRouter. */
-	openRouterRouting?: OpenRouterRouting;
-	/** Vercel AI Gateway routing preferences. Only used when baseUrl points to Vercel AI Gateway. */
-	vercelGatewayRouting?: VercelGatewayRouting;
-	/**
-	 * Provider-specific wire model-id transform applied to the base id, overriding
-	 * the provider-detected default. Discovery layers set this per model when the
-	 * upstream roster declares the id's namespace (e.g. ClinePass free-tier models
-	 * arrive pre-namespaced and use `"raw"`), so wire form follows data rather
-	 * than id shape.
-	 */
-	wireModelIdMode?: "raw" | "cline-pass" | "firepass" | "fireworks" | "openrouter";
 	/** Extra fields to include in request body (e.g. gateway routing hints for OpenClaw-style proxies). */
 	extraBody?: Record<string, unknown>;
 	/** Request-session header that should mirror the normalized prompt-cache key. Default: unset. */
@@ -574,7 +521,7 @@ export interface OpenAICompat {
 	stripDeepseekSpecialTokens?: boolean;
 	/** Drop assistant thinking blocks from replayed chat-completions history. Default: false. */
 	stripThinkingHistory?: boolean;
-	/** Heal leaked chat-template/tool-call/thinking markup from visible content deltas. Default: auto-detected. */
+	/** Heal leaked chat-template/tool-call/thinking markup from streamed content. */
 	streamMarkupHealingPattern?: OpenAIStreamMarkupHealingPattern;
 	/** Whether this wire may revise already-streamed text (`stream-revision` axis). Unassigned: append-only. */
 	streamRevision?: "none" | "possible";
@@ -617,14 +564,6 @@ export interface AnthropicCompat {
 	 */
 	supportsServerCompaction?: boolean;
 	/**
-	 * Whether the model is served by the first-party Anthropic provider (its
-	 * default route is the official API). Rule-owned on the provider; the
-	 * compaction transport pairs it with a per-request effective-URL check
-	 * because reroutes leave it stale-true. Vertex is selected by its provider
-	 * contract instead. Default: false.
-	 */
-	firstPartyProvider?: boolean;
-	/**
 	 * Whether the provider honors Claude Code's `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS`
 	 * kill switch, which withholds pre-release fields (`context_management`, beta
 	 * tool fields, task budgets, structured-output format, `thinking.block_binding`,
@@ -652,15 +591,6 @@ export interface AnthropicCompat {
 	 * `tools.<n>.custom.strict: Extra inputs are not permitted`.
 	 */
 	disableStrictTools?: boolean;
-	/**
-	 * The endpoint is Amazon Bedrock's Anthropic Messages API (`/anthropic` on
-	 * bedrock-runtime or bedrock-mantle). Requests drop tool `strict`, fit
-	 * `metadata.user_id` to Bedrock's request-metadata pattern, and may use
-	 * on-demand compaction. Detected from the model `baseUrl`; set it in
-	 * models.yml `compat` for a route the URL check cannot see (a proxy, an
-	 * `ANTHROPIC_BASE_URL` reroute) or to `false` to opt out.
-	 */
-	bedrockMessagesApi?: boolean;
 	/**
 	 * Map adaptive thinking (`thinking: { type: "adaptive" }`) to
 	 * `{ type: "enabled", budget_tokens }`. Vertex AI rejects the `adaptive`
@@ -759,19 +689,7 @@ export interface AnthropicCompat {
 	 * blocks instead of normal `tool_use` calls.
 	 */
 	escapeBuiltinToolNames?: boolean;
-	/**
-	 * The configured endpoint enforces Anthropic's signature protocol on
-	 * replayed thinking blocks — either the official API itself or a proxy
-	 * that forwards to it (GitHub Copilot, ZenMux, Cloudflare AI Gateway's
-	 * `/anthropic` route, Google Vertex's `publishers/anthropic/…`).
-	 * Downstream transforms strip stale cross-model thinking signatures on
-	 * these endpoints so the signing proxy doesn't 400 with
-	 * `Invalid signature in thinking block` (#4297), and adaptive-thinking
-	 * models keep the interleaved-thinking beta on them (#6717). Known hosts
-	 * are auto-detected from provider id and baseUrl; set this to mark an
-	 * opaque signing proxy the URL list can't recognize. Superset of
-	 * {@link ResolvedAnthropicCompat.officialEndpoint}.
-	 */
+	/** The endpoint enforces Anthropic thinking signatures on replay, as Copilot does. */
 	signingEndpoint?: boolean;
 	/**
 	 * Inject the Claude Code identity instruction on OAuth requests. Haiku 3.5
@@ -825,119 +743,6 @@ export interface AnthropicCompat {
 	betweenToolsEffort?: "low" | "medium" | "high";
 	/** The model is a fast-mode SKU: send `speed: "fast"` with the fast-mode beta. Default: false. */
 	fastMode?: boolean;
-}
-
-/**
- * Compatibility settings for Bedrock Converse requests and native streaming
- * side-compaction. Cache pricing does not imply these capabilities.
- */
-export interface BedrockCompat {
-	/** Explicit disabled-thinking wire form; unset preserves the provider's existing behavior. */
-	disabledThinking?: AnthropicCompat["disabledThinking"];
-	/** Whether this endpoint accepts no checkpoints, automatic caching, or explicit cachePoint blocks. */
-	promptCacheMode?: "none" | "automatic" | "explicit";
-	/** Whether this wire may revise already-streamed text (`stream-revision` axis). Unassigned: append-only. */
-	streamRevision?: "none" | "possible";
-	/** Whether explicit cachePoint blocks accept `ttl: "1h"`; omitted TTL means Bedrock's 5-minute default. */
-	supportsLongPromptCacheRetention?: boolean;
-	/**
-	 * Bedrock-enforced minimum prompt-prefix tokens for an effective checkpoint.
-	 * Capability metadata only: emitters must not estimate local token counts.
-	 * Zero means no explicit checkpoints.
-	 */
-	promptCacheMinimumTokens?: number;
-	/**
-	 * Bedrock-enforced maximum explicit cache checkpoints per request.
-	 * Capability metadata only; zero means no explicit checkpoints.
-	 */
-	promptCacheMaximumCheckpoints?: number;
-	/**
-	 * Stream-watchdog idle-timeout fallback in ms; 0 disables the idle watchdog.
-	 * Undefined defers to `PI_STREAM_IDLE_TIMEOUT_MS`, then the legacy
-	 * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then the 300s default.
-	 */
-	streamIdleTimeoutMs?: number;
-	/**
-	 * Whether the served model accepts explicit sampling parameters
-	 * (`temperature`, `topP`, …). Class rules set `false` for model lines that
-	 * reject them on every host. Unassigned: accepted.
-	 */
-	supportsSamplingParams?: boolean;
-	/**
-	 * Whether the model accepts a forced `toolChoice` (`any` / `tool`). Claude
-	 * Opus/Sonnet 5.5 reject it outright; the request builder downgrades forced
-	 * choices to `auto` when this is false. Default: true.
-	 */
-	supportsForcedToolChoice?: boolean;
-	/**
-	 * Whether the endpoint accepts thinking-binding controls (`thinking.block_binding`,
-	 * the `thinking-binding-controls-2026-08-01` beta and the `/input_transformations`
-	 * response path) on prefix-bound models. Only consulted when
-	 * `thinking.prefixBinding` is set; `false` omits the controls while keeping the
-	 * local prefix-binding safeguards. Default: true.
-	 */
-	supportsThinkingBindingControls?: boolean;
-	/**
-	 * Whether the model supports a compaction-only Bedrock Runtime
-	 * InvokeModelWithResponseStream request. Ordinary turns still use Converse.
-	 */
-	supportsServerCompaction?: boolean;
-}
-
-/** Fully-resolved Bedrock Converse and side-compaction capabilities, materialized once by `buildModel`. */
-export interface ResolvedBedrockCompat {
-	/** See {@link BedrockCompat.disabledThinking}. */
-	disabledThinking?: BedrockCompat["disabledThinking"];
-	promptCacheMode: NonNullable<BedrockCompat["promptCacheMode"]>;
-	/** See {@link BedrockCompat.streamRevision}. */
-	streamRevision?: BedrockCompat["streamRevision"];
-	supportsLongPromptCacheRetention: boolean;
-	promptCacheMinimumTokens: number;
-	promptCacheMaximumCheckpoints: number;
-	/** See {@link BedrockCompat.supportsSamplingParams}. */
-	supportsSamplingParams?: boolean;
-	supportsForcedToolChoice: boolean;
-	/** See {@link BedrockCompat.supportsThinkingBindingControls}. */
-	supportsThinkingBindingControls: boolean;
-	/** See {@link BedrockCompat.supportsServerCompaction}; false unless the Bedrock model-card policy opts in. */
-	supportsServerCompaction: boolean;
-	/**
-	 * Stream-watchdog idle-timeout fallback in ms for hosts with no keepalive
-	 * events; 0 disables the idle watchdog. Undefined defers to
-	 * `PI_STREAM_IDLE_TIMEOUT_MS`, then the legacy
-	 * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then the 300s default.
-	 */
-	streamIdleTimeoutMs?: number;
-}
-
-/**
- * OpenRouter provider routing preferences.
- * Controls which upstream providers OpenRouter routes requests to.
- * @see https://openrouter.ai/docs/provider-routing
- */
-export interface OpenRouterRouting {
-	/** List of provider slugs to exclusively use for this request (e.g., ["amazon-bedrock", "anthropic"]). */
-	only?: string[];
-	/** List of provider slugs to try in order (e.g., ["anthropic", "openai"]). */
-	order?: string[];
-}
-
-/**
- * Vercel AI Gateway routing preferences.
- * Controls which upstream providers the gateway routes requests to.
- * @see https://vercel.com/docs/ai-gateway/models-and-providers/provider-options
- */
-export interface VercelGatewayRouting {
-	/** List of provider slugs to exclusively use for this request (e.g., ["bedrock", "anthropic"]). */
-	only?: string[];
-	/** List of provider slugs to try in order (e.g., ["anthropic", "openai"]). */
-	order?: string[];
-	/** Enables Vercel AI Gateway's provider-aware automatic prompt caching. */
-	caching?: "auto";
-	/** Stable Responses input-item prefix to anchor for automatic caching. */
-	cacheAnchorItems?: number;
-	/** Requested automatic-cache lifetime for the Responses API. */
-	cacheTtl?: "5m" | "1h";
 }
 
 type ResolvedToolStrictMode = NonNullable<OpenAICompat["toolStrictMode"]> | "mixed";
@@ -1002,15 +807,10 @@ export interface ResolvedOpenAISharedCompat {
 	supportsPromptCacheBreakpoints?: boolean;
 	/** Minimum cache lifetime supported by explicit OpenAI prompt-cache breakpoints. */
 	promptCacheBreakpointTtl?: "30m";
-	/** The model sits behind OpenRouter (routing prefs and max-token omission apply). */
-	isOpenRouterHost: boolean;
 	/** Whether this endpoint needs a max-token field even when caller did not set one. */
 	alwaysSendMaxTokens: boolean;
 	/** Clamp a requested output-token count to the model's advertised ceiling. */
 	clampOutputToModelMax: boolean;
-	openRouterRouting?: OpenAICompat["openRouterRouting"];
-	/** Provider-specific wire model-id transform applied to the base id. */
-	wireModelIdMode: "raw" | "cline-pass" | "firepass" | "fireworks" | "openrouter";
 	/** See {@link OpenAICompat.toolSchemaFlavor}. Read by both wire paths when converting tools. */
 	toolSchemaFlavor?: OpenAICompat["toolSchemaFlavor"];
 	/** Strip image inputs before encoding (text-only serving of a multimodal id). */
@@ -1078,14 +878,10 @@ export type ResolvedOpenAICompat = ResolvedOpenAISharedCompat &
 			| "sessionHeader"
 			| "supportsPromptCacheBreakpoints"
 			| "promptCacheBreakpointTtl"
-			| "openRouterRouting"
-			| "isOpenRouterHost"
 			| "supportsStrictMode"
 			| "supportsLongPromptCacheRetention"
 			| "alwaysSendMaxTokens"
 			| "clampOutputToModelMax"
-			| "wireModelIdMode"
-			| "vercelGatewayRouting"
 			| "extraBody"
 			| "toolStrictMode"
 			| "toolSchemaFlavor"
@@ -1103,17 +899,12 @@ export type ResolvedOpenAICompat = ResolvedOpenAISharedCompat &
 			| "whenThinking"
 		>
 	> & {
-		vercelGatewayRouting?: OpenAICompat["vercelGatewayRouting"];
 		extraBody?: OpenAICompat["extraBody"];
 		cacheControlFormat?: OpenAICompat["cacheControlFormat"];
 		thinkingKeep?: OpenAICompat["thinkingKeep"];
 		streamIdleTimeoutMs?: number;
 		stripThinkingHistory?: boolean;
-		/** The configured `baseUrl` is the official OpenAI API (provider `openai`); unset otherwise. */
-		officialEndpoint?: boolean;
 		toolStrictMode: ResolvedToolStrictMode;
-		/** The model sits behind Vercel AI Gateway. */
-		isVercelGatewayHost: boolean;
 		/** Send the normalized prompt-cache key as top-level `prompt_cache_key` on chat completions. */
 		supportsPromptCacheKey: boolean;
 		dropThinkingWhenReasoningEffort: boolean;
@@ -1153,7 +944,7 @@ export interface ResolvedOpenAIResponsesCompat extends ResolvedOpenAISharedCompa
 	 * filling `"auto"`.
 	 */
 	supportsReasoningSummary: boolean;
-	/** Optional chaining override; unset falls back to officialEndpoint at request time. */
+	/** Explicit server-side response chaining opt-in; unset defaults to false. */
 	statefulResponses?: boolean;
 	/**
 	 * Whether the host can store Responses results server-side (`store: true`).
@@ -1171,30 +962,11 @@ export interface ResolvedOpenAIResponsesCompat extends ResolvedOpenAISharedCompa
 	 */
 	connectionBoundNativeHistory: boolean;
 	streamIdleTimeoutMs?: number;
-	vercelGatewayRouting?: OpenAICompat["vercelGatewayRouting"];
-	/** The model sits behind Vercel AI Gateway's Responses endpoint. */
-	isVercelGatewayHost: boolean;
-	/**
-	 * The configured endpoint is first-party OpenAI (`provider === "openai"` on
-	 * an `api.openai.com` or unset baseUrl), or the Codex backend
-	 * (`openai-codex-responses` on the default Codex baseUrl). Gates platform
-	 * OpenAI's official-only Responses behavior (default-on stateful
-	 * `previous_response_id` chaining and the `text.verbosity` field; the Codex
-	 * adapter is not governed by either gate) and host request-size budgets.
-	 */
-	officialEndpoint: boolean;
 	/** Run Harmony-protocol leak detection/mitigation on streamed output. */
 	harmonyLeakMitigation: boolean;
 	/** Responses-surface prompt-cache marker dialect (OpenRouter-Anthropic `cache_control`). */
 	cacheControlFormat?: OpenAICompat["cacheControlFormat"];
 }
-
-/**
- * OpenRouter is a pseudo API: runtime dispatch can use either Responses
- * (default) or Chat Completions (`PI_OPENROUTER_RESPONSES=0`) with the same
- * model object, so its resolved compat must satisfy both handlers.
- */
-export type ResolvedOpenRouterCompat = ResolvedOpenAICompat & ResolvedOpenAIResponsesCompat;
 
 /** Fully-resolved anthropic-messages compat view (same contract as `ResolvedOpenAICompat`). */
 export type ResolvedAnthropicCompat = Required<
@@ -1202,7 +974,6 @@ export type ResolvedAnthropicCompat = Required<
 		AnthropicCompat,
 		| "streamIdleTimeoutMs"
 		| "thinkingLoopGuard"
-		| "bedrockMessagesApi"
 		| "effortBeta"
 		| "extendedCacheTtlBeta"
 		| "disabledThinking"
@@ -1239,133 +1010,14 @@ export type ResolvedAnthropicCompat = Required<
 	/** Thinking-loop watchdog guard family applied to streamed reasoning. */
 	thinkingLoopGuard?: AnthropicCompat["thinkingLoopGuard"];
 	/**
-	 * Bedrock's Anthropic Messages API (see {@link AnthropicCompat.bedrockMessagesApi}).
-	 * `true` when detected or configured; otherwise unset, so rows baked before
-	 * this field keep matching.
-	 */
-	bedrockMessagesApi?: boolean;
-	/**
 	 * Stream-watchdog idle-timeout fallback in ms for slow reasoning hosts; 0 disables the idle watchdog.
 	 * Undefined defers to `PI_STREAM_IDLE_TIMEOUT_MS`, then the legacy
 	 * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then 300s.
 	 */
 	streamIdleTimeoutMs?: number;
-	/**
-	 * The configured endpoint is the official first-party Anthropic API
-	 * (https + exact `api.anthropic.com` host; a missing baseUrl counts as
-	 * official because dispatch defaults there). Gates OAuth framing, custom
-	 * env headers, and cache-TTL shaping without per-request URL parsing.
-	 */
-	officialEndpoint: boolean;
-	/**
-	 * The model is served by the first-party Anthropic provider. Unlike
-	 * `officialEndpoint` (URL-derived per deployment), this is provider
-	 * identity for compaction gating, always paired with a per-request
-	 * effective-URL check.
-	 */
-	firstPartyProvider: boolean;
 };
 
-/**
- * Compatibility settings for the devin-agent (Codeium Cascade) API. Cascade
- * selects reasoning effort only by routing to a sibling model id (the
- * `thinking.effortRouting` baked by the compat collapse engine), never by a wire
- * reasoning/effort field, so the model-thinking deriver must not invent an
- * effort ladder from identity for these models.
- */
-export interface DevinCompat {
-	/**
-	 * Trust only explicit `thinking` metadata; never derive a thinking surface
-	 * from model identity. A reasoning model with no explicit routed thinking
-	 * resolves to `thinking: undefined` (`reasoning: true`, no controllable
-	 * effort) instead of a fabricated minimal/low/medium/high ladder.
-	 */
-	trustExplicitThinkingOnly?: boolean;
-	/**
-	 * Server-side router model. Providers must resolve the router through
-	 * `AssignModel` and send the returned assignment JWT with the chat request.
-	 */
-	modelRouter?: boolean;
-	/** Whether the upstream model supports native parallel tool calls. */
-	supportsParallelToolCalls?: boolean;
-	/** See {@link BedrockCompat.supportsSamplingParams}. */
-	supportsSamplingParams?: boolean;
-}
-
-/** Fully-resolved devin-agent compat view. */
-export type ResolvedDevinCompat = Required<Omit<DevinCompat, "supportsSamplingParams">> &
-	Pick<DevinCompat, "supportsSamplingParams">;
-/**
- * Compatibility settings for the Google API family (google-generative-ai,
- * google-vertex, google-gemini-cli). Class-driven defaults come from the
- * compat cascade; sparse overrides follow the same shape.
- */
-export interface GoogleCompat {
-	/** Whether functionCall/functionResponse parts carry the `id` field. */
-	supportsFunctionPartId?: boolean;
-	/** Add the bypass sentinel to every unsigned Gemini function call. */
-	requiresSkipThoughtSignature?: boolean;
-	/** Add the bypass sentinel when a Gemini turn's first function call is unsigned. */
-	requiresSkipThoughtSignatureOnFirstFunctionCall?: boolean;
-	/** Drop unsigned thinking blocks from replayed history (Antigravity Claude). */
-	dropUnsignedThinking?: boolean;
-	/** Cloud Code Assist legacy `parameters` schema field instead of `parametersJsonSchema`. */
-	ccaLegacyParametersSchema?: boolean;
-	/** Whether multimodal (non-text) functionResponse parts are accepted (Gemini 3+). */
-	multimodalFunctionResponse?: boolean;
-	/** Stream-watchdog first-event timeout in ms; 0 disables it. */
-	streamFirstEventTimeoutMs?: number;
-	/** Stream-watchdog idle-timeout floor in ms. */
-	streamIdleTimeoutMs?: number;
-	/** Work around the Flash streaming leak (duplicate first chunk) on gemini-cli. */
-	flashStreamLeakWorkaround?: boolean;
-	/** Send the Claude thinking beta header on Antigravity Claude requests. */
-	claudeThinkingBetaHeader?: boolean;
-	/** Antigravity Claude tool-mode request framing. */
-	antigravityClaudeToolMode?: boolean;
-	/** Usage-label bucket Antigravity reports this model under. */
-	antigravityUsageLabel?: string;
-	/** Strip image inputs before encoding (text-only serving of a multimodal id). */
-	stripImageInput?: boolean;
-	/**
-	 * Largest width or height a single image may carry for a Claude reader on
-	 * this host (see {@link AnthropicCompat.maxImageDimension}). Setting this or
-	 * {@link maxImagePayloadBytes} turns on Claude's image clamp, many-image
-	 * cap included; unset leaves images as sent.
-	 */
-	maxImageDimension?: number;
-	/**
-	 * Largest base64 payload a single image may carry, in bytes (see
-	 * {@link AnthropicCompat.maxImagePayloadBytes}).
-	 */
-	maxImagePayloadBytes?: number;
-	/** Thinking-loop watchdog guard family applied to streamed reasoning. */
-	thinkingLoopGuard?: "gemini" | "deepseek" | "xai";
-	/** See {@link BedrockCompat.supportsSamplingParams}. */
-	supportsSamplingParams?: boolean;
-}
-
-/** Fully-resolved google-API compat view, materialized once by `buildModel`. */
-export type ResolvedGoogleCompat = Required<
-	Omit<
-		GoogleCompat,
-		| "streamFirstEventTimeoutMs"
-		| "streamIdleTimeoutMs"
-		| "thinkingLoopGuard"
-		| "antigravityUsageLabel"
-		| "supportsSamplingParams"
-		| "maxImageDimension"
-		| "maxImagePayloadBytes"
-	>
-> & {
-	streamFirstEventTimeoutMs?: number;
-	streamIdleTimeoutMs?: number;
-	thinkingLoopGuard?: GoogleCompat["thinkingLoopGuard"];
-	antigravityUsageLabel?: string;
-	supportsSamplingParams?: boolean;
-	maxImageDimension?: number;
-	maxImagePayloadBytes?: number;
-};
+export type OpenAIStreamMarkupHealingPattern = "kimi" | "dsml" | "qwen" | "thinking";
 
 /** Ollama chat history compatibility resolved by the catalog. */
 export interface OllamaCompat {
@@ -1376,43 +1028,24 @@ export interface OllamaCompat {
 export type ResolvedOllamaCompat = Required<OllamaCompat>;
 
 /** Sparse, user-authored compat overrides for a given API (models.json / config vocabulary). */
-export type CompatConfigOf<TApi extends Api> = TApi extends
-	| "openai-completions"
-	| "openrouter"
-	| "openai-responses"
-	| "azure-openai-responses"
-	| "openai-codex-responses"
+export type CompatConfigOf<TApi extends Api> = TApi extends "openai-completions" | "openai-responses"
 	? OpenAICompat
 	: TApi extends "anthropic-messages"
 		? AnthropicCompat
-		: TApi extends "bedrock-converse-stream"
-			? BedrockCompat
-			: TApi extends "devin-agent"
-				? DevinCompat
-				: TApi extends "google-generative-ai" | "google-vertex" | "google-gemini-cli"
-					? GoogleCompat
-					: TApi extends "ollama-chat"
-						? OllamaCompat
-						: undefined;
+		: TApi extends "ollama-chat"
+			? OllamaCompat
+			: undefined;
 
 /** Resolved compat for a given API: complete record, materialized once by `buildModel`. */
-export type CompatOf<TApi extends Api> = TApi extends "openrouter"
-	? ResolvedOpenRouterCompat
-	: TApi extends "openai-completions"
-		? ResolvedOpenAICompat
-		: TApi extends "openai-responses" | "azure-openai-responses" | "openai-codex-responses"
-			? ResolvedOpenAIResponsesCompat
-			: TApi extends "anthropic-messages"
-				? ResolvedAnthropicCompat
-				: TApi extends "bedrock-converse-stream"
-					? ResolvedBedrockCompat
-					: TApi extends "devin-agent"
-						? ResolvedDevinCompat
-						: TApi extends "google-generative-ai" | "google-vertex" | "google-gemini-cli"
-							? ResolvedGoogleCompat
-							: TApi extends "ollama-chat"
-								? ResolvedOllamaCompat
-								: undefined;
+export type CompatOf<TApi extends Api> = TApi extends "openai-completions"
+	? ResolvedOpenAICompat
+	: TApi extends "openai-responses"
+		? ResolvedOpenAIResponsesCompat
+		: TApi extends "anthropic-messages"
+			? ResolvedAnthropicCompat
+			: TApi extends "ollama-chat"
+				? ResolvedOllamaCompat
+				: undefined;
 
 /** Provider-native compaction endpoint configuration for one model. */
 export interface RemoteCompactionConfig<TApi extends Api = Api> {
@@ -1507,50 +1140,6 @@ export type ModelTokenizer =
 	| "glm5"
 	| "o200k";
 
-/** One account's discovered entitlements on a model; see {@link Model.accountAccess}. */
-export interface ModelAccountAccess {
-	/**
-	 * Codex `available_access_programs.cyber`: cyber access programs this account
-	 * may request on the model (`standard`, `daybreak_blue`, `daybreak_red`).
-	 * Absent when the backend reported no program metadata.
-	 */
-	cyberPrograms?: readonly string[];
-	/**
-	 * Antigravity request constants this account's `fetchAvailableModels`
-	 * roster advertised, keyed by upstream SKU id. Takes precedence over
-	 * {@link Model.antigravityWireProfiles}, which keeps only the first
-	 * account's values when multi-account rosters are unioned.
-	 */
-	antigravityWireProfiles?: Readonly<Record<string, AntigravityModelWireProfile>>;
-}
-
-/** One Cursor `RequestedModel.parameters` entry recovered from rich discovery. */
-export interface CursorModelParameter {
-	id: string;
-	value: string;
-}
-
-/** Cursor wire target selected after local effort/variant routing. */
-export interface CursorModelRoute {
-	modelId: string;
-	parameters: readonly CursorModelParameter[];
-	maxMode?: boolean;
-}
-
-/**
- * Antigravity Cloud Code Assist request constants for one upstream SKU, as the
- * native client sends them; see {@link Model.antigravityWireProfiles}.
- */
-export interface AntigravityModelWireProfile {
-	/** Opaque `labels.model_enum` token (`fetchAvailableModels` `model`). */
-	modelEnum?: string;
-	/** Fixed `generationConfig.maxOutputTokens` the client always sends. */
-	maxOutputTokens?: number;
-	/** SKU thinking level; the native client sends it in preference to a budget. */
-	thinkingLevel?: "LOW" | "MEDIUM" | "HIGH";
-	/** SKU thinking budget (`-1` is dynamic), sent when no level is advertised. */
-	thinkingBudget?: number;
-}
 // Model interface for the unified model system
 export interface Model<TApi extends Api = Api> {
 	id: string;
@@ -1562,10 +1151,6 @@ export interface Model<TApi extends Api = Api> {
 	 * rebuild, so a configured runner keeps its role.
 	 */
 	kindConfig?: ModelKind;
-	/** Grounding transport supported by this chat model. */
-	webSearch?: WebSearchGrounding;
-	/** Cheaper same-provider model to run hosted web search in this model's place (model id or provider/id). */
-	webSearchModel?: string;
 	/** Whether this chat model can carry the Responses `image_generation` tool itself. */
 	hostedImage?: boolean;
 	/** Same-provider image model to generate images in this model's place (model id or provider/id). */
@@ -1651,59 +1236,6 @@ export interface Model<TApi extends Api = Api> {
 	supportsComputerUse?: boolean;
 	/** Verbatim explicit computer-use support from the spec; undefined when `buildModel` inferred the runtime value. */
 	supportsComputerUseConfig?: boolean;
-	/** GitLab Duo Workflow root namespace selected during catalog discovery. */
-	gitlabDuoWorkflowRootNamespaceId?: string;
-	/** Cursor `max_mode` request flag returned by `GetUsableModels` for premium models that require max mode. */
-	cursorMaxMode?: boolean;
-	/**
-	 * Per-wire-id `max_mode` markers for the members a collapsed Cursor row
-	 * routes to, recorded by `collapseVariants` from live `GetUsableModels`
-	 * rows. {@link cursorMaxMode} on a collapsed row is an OR across members,
-	 * so it cannot tell a `-low` route that needs no max mode from an Opus
-	 * `-fast` route that does; transports look the routed wire id up here
-	 * first. Absent on raw rows (their own `cursorMaxMode` already describes
-	 * their single wire id) and on bundled snapshots that predate discovery.
-	 */
-	cursorMaxModeRoutes?: Readonly<Record<string, boolean>>;
-	/**
-	 * Per-wire-id Antigravity request constants recorded from the account's
-	 * `fetchAvailableModels` roster, keyed by upstream SKU id. A collapsed row
-	 * carries one entry per member it routes to; a raw row carries its own.
-	 * Absent on bundled snapshots that predate discovery.
-	 */
-	antigravityWireProfiles?: Readonly<Record<string, AntigravityModelWireProfile>>;
-	/**
-	 * Per-account availability recorded by multi-account discovery: provider
-	 * account key (Codex: ChatGPT `chatgpt_account_id`; Antigravity: login
-	 * email) → that account's entitlements on this model. An account appears
-	 * only when its own catalog lists the model, so credential selection can
-	 * route account-gated models (e.g. `gpt-daybreak-blue-latest`, Antigravity
-	 * Claude 5.5) straight to eligible accounts. Absent on bundled/config rows.
-	 */
-	accountAccess?: Readonly<Record<string, ModelAccountAccess>>;
-	/** Cursor `RequestedModel.parameters` for this model's default variant. */
-	cursorModelParameters?: readonly CursorModelParameter[];
-	/**
-	 * Per-wire-id Cursor routes recovered from `AvailableModels`. Generic effort
-	 * collapse retains these while routing selects one key at request time.
-	 */
-	cursorModelRoutes?: Readonly<Record<string, CursorModelRoute>>;
-	/** Cursor's account-relative model price/multiplier; not a per-token USD rate. */
-	cursorPrice?: number;
-	/** Cursor requires data retention to invoke this model. */
-	cursorRequiresDataRetention?: boolean;
-	/** Cursor explicitly reports support for its Agent surface. */
-	cursorSupportsAgent?: boolean;
-	/** Cursor explicitly reports support for sandboxed execution. */
-	cursorSupportsSandboxing?: boolean;
-	/** Factory Droid: account-resolved upstream rotation (first entry is the default `x-api-provider`). */
-	factoryDroidApiProviders?: string[];
-	/** Factory Droid: `configured_order` when live routing chose the rotation; absent means registry order. */
-	factoryDroidRoutingSource?: "configured_order";
-	/** Factory Droid Standard Credits base rate (relative per-token weight, not dollars). */
-	factoryDroidCredits?: number;
-	/** Canonical organization resolved during Factory discovery. */
-	factoryDroidOrgId?: string;
 	cost: ModelCost;
 	/**
 	 * Prompt-cache entry lifetime per retention tier, in seconds. Populated only

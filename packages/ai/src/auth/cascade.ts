@@ -3,8 +3,10 @@ import { $env, $envExact, logger } from "@oh-my-pi/pi-utils";
 import { type ApiKeyResolver, createOAuthProvenance, markAfterSiblingWait, type ResolvedApiKey } from "../auth-retry";
 import { getEnvApiKey, getEnvApiKeyName } from "../env-api-key";
 import * as AIError from "../error";
+import { assertSupportedCredentialProvider, isSearchCredentialProvider } from "./provider-policy";
 import { isUsageLimitOutcome } from "../error/rate-limit";
 import { AUTHENTICATED_SENTINEL } from "../registry/types";
+import { getOAuthProvider } from "../registry/oauth";
 import type { SessionAffinity } from "./affinity";
 import type { CredentialPool } from "./pool";
 import type { CredentialSelector, OAuthResolutionResult } from "./select";
@@ -77,6 +79,7 @@ export class KeyOverrides {
 	 * Used for CLI --api-key flag.
 	 */
 	setRuntime(provider: string, apiKey: string): void {
+		assertSupportedCredentialProvider(provider);
 		this.#runtimeOverrides.set(provider, apiKey);
 	}
 
@@ -103,6 +106,7 @@ export class KeyOverrides {
 	 * resolves to its literal text) cannot shadow the key the user logged in with.
 	 */
 	setConfig(provider: string, apiKeyConfig: string, options?: { fallback?: boolean }): void {
+		assertSupportedCredentialProvider(provider);
 		if (options?.fallback) {
 			this.#configOverrides.delete(provider);
 			this.#configFallbacks.set(provider, apiKeyConfig);
@@ -215,11 +219,13 @@ export class KeyCascade implements KeysApi {
 	 * selects dedicated-only, alias-aware, or no environment fallback.
 	 */
 	source(provider: string, { env = "dedicated" }: AuthSourceOptions = {}): AuthSource | undefined {
+		assertSupportedCredentialProvider(provider);
 		if (this.#deps.overrides.runtimeKey(provider) !== undefined) return { kind: "runtime", concrete: true };
 		if (this.#deps.overrides.configKey(provider) !== undefined) return { kind: "config", concrete: true };
 		const bearing = this.#getAuthBearingCredentials(provider);
 		const concrete = bearing.length > 0 || this.#envConcrete(provider);
-		if (bearing.some(credential => credential.type === "oauth")) return { kind: "oauth", concrete: true };
+		if (!isSearchCredentialProvider(provider) && bearing.some(credential => credential.type === "oauth"))
+			return { kind: "oauth", concrete: true };
 		if (bearing.some(credential => credential.type === "api_key" && credential.source === "login")) {
 			return { kind: "api_key", concrete: true };
 		}
@@ -236,10 +242,6 @@ export class KeyCascade implements KeysApi {
 
 	/** Check if a provider has a concrete env token, excluding ambient sentinel auth. */
 	#envConcrete(provider: string): boolean {
-		// Bedrock's bearer is transport-specific rather than an auth-stratum OAuth token.
-		if ((provider === "amazon-bedrock" || provider === "bedrock-mantle") && $env.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
-			return true;
-		}
 		const oauthTokenEnv = authPolicyFor(provider)?.oauthTokenEnv;
 		if (oauthTokenEnv) return oauthTokenEnv.some(name => Boolean($env[name]?.trim()));
 		const envApiKey = getEnvApiKey(provider);
@@ -256,6 +258,7 @@ export class KeyCascade implements KeysApi {
 	 * one namespace.
 	 */
 	async peek(provider: string, options?: AuthPeekOptions): Promise<string | undefined> {
+		assertSupportedCredentialProvider(provider);
 		const runtimeKey = this.#deps.overrides.runtimeKey(provider);
 		if (runtimeKey) {
 			return runtimeKey;
@@ -273,15 +276,18 @@ export class KeyCascade implements KeysApi {
 		// Peek never refreshes, so only an unexpired OAuth access token is usable
 		// unless the caller only needs the account it names.
 		const now = Date.now();
-		const oauthSelection =
-			this.#deps.selector.selectByType(
-				provider,
-				"oauth",
-				undefined,
-				credential =>
-					credential.type === "oauth" && Number.isFinite(credential.expires) && credential.expires > now,
-			) ?? (options?.includeExpired ? this.#deps.selector.selectByType(provider, "oauth") : undefined);
+		const oauthSelection = isSearchCredentialProvider(provider)
+			? undefined
+			: (this.#deps.selector.selectByType(
+					provider,
+					"oauth",
+					undefined,
+					credential =>
+						credential.type === "oauth" && Number.isFinite(credential.expires) && credential.expires > now,
+				) ?? (options?.includeExpired ? this.#deps.selector.selectByType(provider, "oauth") : undefined));
 		if (oauthSelection) {
+			const custom = getOAuthProvider(provider);
+			if (custom?.getApiKey) return custom.getApiKey(oauthSelection.credential);
 			if (provider === "github-copilot") {
 				return JSON.stringify({
 					token: oauthSelection.credential.access,
@@ -360,6 +366,7 @@ export class KeyCascade implements KeysApi {
 	 * {@link KeyCascade.getWithCredential}, which surfaces it.
 	 */
 	async get(provider: string, sessionId?: string, options?: AuthApiKeyOptions): Promise<string | undefined> {
+		assertSupportedCredentialProvider(provider);
 		try {
 			return await this.#resolve(provider, sessionId, options);
 		} catch (error) {
@@ -412,7 +419,8 @@ export class KeyCascade implements KeysApi {
 		let oauthResolved: OAuthResolutionResult | undefined;
 		let oauthRefreshFailure: AIError.OAuthRefreshUnavailableError | undefined;
 		try {
-			oauthResolved = await this.#deps.selector.resolveOAuth(provider, sessionId, options);
+			if (!isSearchCredentialProvider(provider))
+				oauthResolved = await this.#deps.selector.resolveOAuth(provider, sessionId, options);
 		} catch (error) {
 			if (!(error instanceof AIError.OAuthRefreshUnavailableError)) throw error;
 			oauthRefreshFailure = error;
@@ -491,12 +499,22 @@ export class KeyCascade implements KeysApi {
 	 * directly (no ModelRegistry in scope).
 	 */
 	resolver(provider: string, options?: { sessionId?: string; baseUrl?: string; modelId?: string }): ApiKeyResolver {
+		assertSupportedCredentialProvider(provider);
 		const { sessionId, baseUrl, modelId } = options ?? {};
 		// One resolver serves many requests, and they fail out of order, so the
 		// token a 401 rejected is looked up from the bearer that request sent.
 		const provenance = createOAuthProvenance();
 		const resolve = async (extra: AuthApiKeyOptions): Promise<ResolvedApiKey | undefined> => {
-			const resolved = await this.getWithCredential(provider, sessionId, { baseUrl, modelId, ...extra });
+			let resolved: ResolvedApiKey | undefined;
+			if (isSearchCredentialProvider(provider)) {
+				let credentialId: number | undefined;
+				const apiKey = await this.#resolve(provider, sessionId, { baseUrl, modelId, ...extra }, id => {
+					credentialId = id;
+				});
+				resolved = apiKey === undefined ? undefined : { apiKey, credentialId };
+			} else {
+				resolved = await this.getWithCredential(provider, sessionId, { baseUrl, modelId, ...extra });
+			}
 			provenance.record(resolved);
 			return resolved;
 		};
@@ -546,6 +564,7 @@ export class KeyCascade implements KeysApi {
 	 * The string is purely informational; consumers must not parse it.
 	 */
 	describe(provider: string, sessionId?: string): string | undefined {
+		assertSupportedCredentialProvider(provider);
 		if (this.#deps.overrides.runtimeKey(provider) !== undefined) {
 			return "runtime override (--api-key)";
 		}

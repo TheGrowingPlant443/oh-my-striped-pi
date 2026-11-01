@@ -7,7 +7,7 @@ import * as registry from "@oh-my-pi/pi-coding-agent/collab/registry";
 import { CollabSocket } from "@oh-my-pi/pi-coding-agent/collab/relay-client";
 import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import * as pluginHelpers from "@oh-my-pi/pi-coding-agent/discovery/helpers";
 import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
@@ -40,7 +40,6 @@ import {
 	cfgSpellingAutocorrect,
 	cfgSpellingTypoDetection,
 	cfgStartupChangelogMode,
-	cfgStartupCheckUpdate,
 	cfgStartupQuiet,
 	cfgStartupSetupWizard,
 	cfgStartupShowSplash,
@@ -117,7 +116,6 @@ describe("outer startup collaboration gate", () => {
 		});
 		setProjectDir(testSession.tempDir);
 		const activeSettings = await Settings.init({ inMemory: true, cwd: testSession.tempDir });
-		cfgStartupCheckUpdate.override(activeSettings, false);
 		cfgStartupChangelogMode.override(activeSettings, "hidden");
 		cfgStartupSetupWizard.override(activeSettings, false);
 		cfgStartupShowSplash.override(activeSettings, false);
@@ -325,14 +323,25 @@ describe("Composer prepaint", () => {
 			const testSession = await createTestSession();
 			const cache = composerCache.ComposerCache.open(path.join(testSession.tempDir, "composer.db"));
 			vi.spyOn(composerCache, "sharedComposerCache").mockReturnValue(cache);
-			const anthropic = testSession.session.model;
-			const openai = getBundledModel("openai", "gpt-5.2");
-			if (!anthropic || !openai) throw new Error("Bundled test models missing");
-			testSession.session.settings.setModelRole("default", `${openai.provider}/${openai.id}`);
+			const initialModel = testSession.session.model;
+			if (!initialModel) throw new Error("Initial test model missing");
+			const companyModel = buildModel({
+				provider: "company",
+				id: "gpt-5.4",
+				name: "Company GPT",
+				api: "openai-completions",
+				baseUrl: "http://inference.company/v1",
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 32768,
+				maxTokens: 4096,
+			});
+			testSession.session.settings.setModelRole("default", `${companyModel.provider}/${companyModel.id}`);
 			vi.spyOn(testSession.session.modelRegistry, "hasConfiguredAuth").mockReturnValue(true);
-			vi.spyOn(testSession.session.modelRegistry, "getAvailable").mockReturnValue([openai, anthropic]);
+			vi.spyOn(testSession.session.modelRegistry, "getAvailable").mockReturnValue([companyModel, initialModel]);
 			cfgTierOpenai.set(testSession.session.settings, configured);
-			await testSession.session.setModel(openai);
+			await testSession.session.setModel(companyModel);
 			testSession.session.setFastMode(sessionFast);
 			expect(testSession.session.isFastModeActive()).toBe(sessionFast);
 			const composer = new Composer({ terminal: new VirtualTerminal() });
@@ -350,10 +359,10 @@ describe("Composer prepaint", () => {
 			vi.spyOn(mode.statusLine, "watchBranch").mockImplementation(() => {});
 			try {
 				await mode.init({ suppressWelcomeIntro: true });
-				await testSession.session.setModel(anthropic);
+				await testSession.session.setModel(initialModel);
 				mode.stop();
 				const status = cache.read(testSession.sessionManager.getCwd()).status?.statusLine;
-				expect(status?.model?.id).toBe(openai.id);
+				expect(status?.model?.id).toBe(companyModel.id);
 				expect(status?.fastMode).toBe(cachedFast);
 			} finally {
 				mode.stop();

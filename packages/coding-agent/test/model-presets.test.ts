@@ -10,8 +10,6 @@ import {
 	deleteModelPreset,
 	getModelPreset,
 	getModelPresetNames,
-	formatModelPresetSwitch,
-	modelPresetSavedMessage,
 	modelPresetShadowOwner,
 	saveModelPreset,
 } from "@oh-my-pi/pi-coding-agent/config/model-presets";
@@ -24,13 +22,13 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { cfgDefaultThinkingLevel } from "@oh-my-pi/pi-coding-agent/session/settings";
 import { TempDir } from "@oh-my-pi/pi-utils";
 
-const SONNET = "anthropic/claude-sonnet-4-5";
-const SONNET_46 = "anthropic/claude-sonnet-4-6";
-const OPUS = "anthropic/claude-opus-4-5";
+const SONNET = "github-copilot/claude-sonnet-4.5";
+const SONNET_46 = "github-copilot/claude-sonnet-4.6";
+const OPUS = "github-copilot/claude-opus-4.5";
 
 function bundled(selector: string) {
 	const [, id] = selector.split("/");
-	const model = getBundledModel("anthropic", id!);
+	const model = getBundledModel("github-copilot", id!);
 	if (!model) throw new Error(`missing bundled model ${selector}`);
 	return model;
 }
@@ -45,7 +43,7 @@ describe("model presets", () => {
 	beforeAll(async () => {
 		fixtureDir = TempDir.createSync("@pi-model-presets-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir.path(), "models.yml"));
 	});
 
@@ -108,7 +106,7 @@ describe("model presets", () => {
 
 		expect(result.kind).toBe("switched");
 		expect({ ...settings.getModelRoles() }).toEqual({ default: OPUS, plan: SONNET_46 });
-		expect(session.model?.id).toBe("claude-opus-4-5");
+		expect(session.model?.id).toBe("claude-opus-4.5");
 		// setModel alone keeps the previous `high`; the preset's `low` must win.
 		expect(session.thinkingLevel).toBe(Effort.Low);
 		expect(cfgDefaultThinkingLevel.get(settings)).toBe(Effort.Low);
@@ -141,7 +139,7 @@ describe("model presets", () => {
 		expect(result).toMatchObject({ kind: "switched", shadowed: [] });
 		expect({ ...settings.getModelRoles() }).toEqual({ default: OPUS });
 		expect(settings.getProjectModelRole("slow")).toBeUndefined();
-		expect(session.model?.id).toBe("claude-opus-4-5");
+		expect(session.model?.id).toBe("claude-opus-4.5");
 	});
 
 	it("replaces --model style runtime role overrides like a model hub edit", async () => {
@@ -172,7 +170,7 @@ describe("model presets", () => {
 			{ role: "slow", expected: undefined, actual: SONNET_46, source: "project" },
 		]);
 		// The live model follows the effective default, which the overlay still decides.
-		expect(session.model?.id).toBe("claude-sonnet-4-5");
+		expect(session.model?.id).toBe("claude-sonnet-4.5");
 		expect(settings.getGlobalModelRole("default")).toBe(OPUS);
 	});
 
@@ -211,7 +209,7 @@ describe("model presets", () => {
 
 		expect(result.kind).toBe("unavailable");
 		expect(settings.getModelRole("default")).toBe(SONNET);
-		expect(session.model?.id).toBe("claude-sonnet-4-5");
+		expect(session.model?.id).toBe("claude-sonnet-4.5");
 	});
 
 	it("reports a failed live switch instead of success", async () => {
@@ -255,7 +253,7 @@ describe("model presets", () => {
 
 		expect(result.kind).toBe("switched");
 		expect(settings.getModelRole("slow")).toBe(SONNET_46);
-		expect(session.model?.id).toBe("claude-sonnet-4-6");
+		expect(session.model?.id).toBe("claude-sonnet-4.6");
 	});
 
 	it("refuses an alias default the preset itself breaks, leaving settings untouched", async () => {
@@ -295,7 +293,7 @@ describe("model presets", () => {
 
 		expect(result.kind).toBe("switched");
 		expect(thinkingSpy).not.toHaveBeenCalled();
-		expect(session.model?.id).toBe("claude-opus-4-5");
+		expect(session.model?.id).toBe("claude-opus-4.5");
 	});
 
 	it("resolves a same-name preset whole from the project layer, never merged", async () => {
@@ -315,7 +313,7 @@ describe("model presets", () => {
 		// The project `deep` sets only `default`: the global `deep`'s `smol` must not leak in,
 		// and the stale `slow` role is cleared.
 		expect({ ...settings.getModelRoles() }).toEqual({ default: OPUS });
-		expect(session.model?.id).toBe("claude-opus-4-5");
+		expect(session.model?.id).toBe("claude-opus-4.5");
 	});
 
 	it("refuses a preset with no default and no authed model before writing", async () => {
@@ -330,7 +328,7 @@ describe("model presets", () => {
 
 		expect(result.kind).toBe("unavailable");
 		expect(settings.getModelRole("default")).toBe(SONNET);
-		expect(session.model?.id).toBe("claude-sonnet-4-5");
+		expect(session.model?.id).toBe("claude-sonnet-4.5");
 	});
 
 	it("reports when a higher layer still defines a just-saved preset name", async () => {
@@ -346,9 +344,6 @@ describe("model presets", () => {
 		expect(settings.getModelRole("default")).toBe(OPUS);
 		const lookup = getModelPreset(settings, "team");
 		expect(lookup).toMatchObject({ kind: "found", preset: { modelRoles: { default: SONNET } } });
-		expect(modelPresetSavedMessage(settings, "team")).toBe(
-			'Saved model preset "team" to the global config, but the project config still defines a preset of the same name, which takes precedence',
-		);
 	});
 
 	it("serializes concurrent default-role mutations in acquisition order", async () => {
@@ -385,9 +380,6 @@ describe("model presets", () => {
 		if (result.kind !== "switched") throw new Error(`expected switched, got ${result.kind}`);
 		expect(session.thinkingLevel).toBe(Effort.Low);
 		expect(result.shadowedThinking).toEqual({ expected: Effort.Low, actual: Effort.High, source: "project" });
-		expect(formatModelPresetSwitch("cheap", result)).toBe(
-			'Switched to preset "cheap" (anthropic/claude-opus-4-5 · low); still set elsewhere: defaultThinkingLevel: high from project config (preset: low)',
-		);
 	});
 
 	it("does not list a preset a --config overlay tombstones, but keeps one a project null falls through", async () => {
@@ -412,7 +404,7 @@ describe("model presets", () => {
 		// Promise-chaining mutex, no timers: drained microtasks prove the apply is parked.
 		for (let i = 0; i < 5; i++) await Promise.resolve();
 		expect(settings.getModelRole("default")).toBe(SONNET);
-		expect(session.model?.id).toBe("claude-sonnet-4-5");
+		expect(session.model?.id).toBe("claude-sonnet-4.5");
 
 		release();
 		expect((await applying).kind).toBe("switched");

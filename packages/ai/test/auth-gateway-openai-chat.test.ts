@@ -49,7 +49,7 @@ function emptyAssistant(): AssistantMessage {
 		role: "assistant",
 		content: [],
 		api: "openai-completions",
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-test",
 		usage: baseUsage,
 		stopReason: "stop",
@@ -59,50 +59,53 @@ function emptyAssistant(): AssistantMessage {
 
 describe("auth-gateway openai-chat: parseRequest", () => {
 	it("converts a full request into a Context", () => {
-		const parsed = parseRequest({
-			model: "gpt-5.2",
-			messages: [
-				{ role: "system", content: "you are X" },
-				{ role: "system", content: "also Y" },
-				{ role: "user", content: "hi" },
-				{
-					role: "assistant",
-					content: "hello",
-					tool_calls: [
-						{
-							id: "call_1",
-							type: "function",
-							function: { name: "lookup", arguments: '{"q":"a"}' },
-						},
-						{
-							id: "call_2",
-							type: "function",
-							function: { name: "broken", arguments: "not-json" },
-						},
-					],
-				},
-				{ role: "tool", tool_call_id: "call_1", content: "result-text" },
-			],
-			tools: [
-				{
-					type: "function",
-					function: {
-						name: "lookup",
-						description: "look something up",
-						parameters: { type: "object", properties: { q: { type: "string" } } },
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.2",
+				messages: [
+					{ role: "system", content: "you are X" },
+					{ role: "system", content: "also Y" },
+					{ role: "user", content: "hi" },
+					{
+						role: "assistant",
+						content: "hello",
+						tool_calls: [
+							{
+								id: "call_1",
+								type: "function",
+								function: { name: "lookup", arguments: '{"q":"a"}' },
+							},
+							{
+								id: "call_2",
+								type: "function",
+								function: { name: "broken", arguments: "not-json" },
+							},
+						],
 					},
-				},
-			],
-			stream: true,
-			max_tokens: 512,
-			max_completion_tokens: 1024,
-			temperature: 0.2,
-			top_p: 0.9,
-			stop: ["\n\n"],
-			tool_choice: { type: "function", function: { name: "lookup" } },
-			response_format: { type: "json_object" },
-			stream_options: { include_usage: true },
-		});
+					{ role: "tool", tool_call_id: "call_1", content: "result-text" },
+				],
+				tools: [
+					{
+						type: "function",
+						function: {
+							name: "lookup",
+							description: "look something up",
+							parameters: { type: "object", properties: { q: { type: "string" } } },
+						},
+					},
+				],
+				stream: true,
+				max_tokens: 512,
+				max_completion_tokens: 1024,
+				temperature: 0.2,
+				top_p: 0.9,
+				stop: ["\n\n"],
+				tool_choice: { type: "function", function: { name: "lookup" } },
+				response_format: { type: "json_object" },
+				stream_options: { include_usage: true },
+			},
+			{ provider: "github-copilot", id: "gpt-5.2" },
+		);
 
 		expect(parsed.modelId).toBe("gpt-5.2");
 		expect(parsed.stream).toBe(true);
@@ -114,7 +117,7 @@ describe("auth-gateway openai-chat: parseRequest", () => {
 		expect(assistant.role).toBe("assistant");
 		if (assistant.role !== "assistant") throw new Error("unreachable");
 		expect(assistant.api).toBe("openai-completions");
-		expect(assistant.provider).toBe("openai");
+		expect(assistant.provider).toBe("github-copilot");
 		expect(assistant.model).toBe("gpt-5.2");
 		expect(assistant.content[0]).toEqual({ type: "text", text: "hello" });
 		const call1 = assistant.content[1];
@@ -148,13 +151,16 @@ describe("auth-gateway openai-chat: parseRequest", () => {
 	});
 
 	it("coerces content:null to empty content for non-function roles (Codex #10956)", () => {
-		const parsed = parseRequest({
-			model: "gpt-5.2",
-			messages: [
-				{ role: "user", content: "hi" },
-				{ role: "user", content: null },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.2",
+				messages: [
+					{ role: "user", content: "hi" },
+					{ role: "user", content: null },
+				],
+			},
+			{ provider: "github-copilot", id: "gpt-5.2" },
+		);
 		expect(parsed.context.messages).toHaveLength(2);
 		const empty = parsed.context.messages[1];
 		expect(empty.role).toBe("user");
@@ -163,10 +169,10 @@ describe("auth-gateway openai-chat: parseRequest", () => {
 	});
 
 	it("leaves legacy function-role content:null on the string path (Codex #10956)", () => {
-		const parsed = parseRequest({
-			model: "gpt-5.2",
-			messages: [{ role: "function", name: "lookup", content: null }],
-		});
+		const parsed = parseRequest(
+			{ model: "gpt-5.2", messages: [{ role: "function", name: "lookup", content: null }] },
+			{ provider: "github-copilot", id: "gpt-5.2" },
+		);
 		expect(parsed.context.messages).toHaveLength(1);
 		const result = parsed.context.messages[0];
 		expect(result.role).toBe("toolResult");
@@ -177,49 +183,65 @@ describe("auth-gateway openai-chat: parseRequest", () => {
 
 	it("rejects raw explicit prompt-cache controls instead of silently dropping them", () => {
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6",
-				messages: [{ role: "user", content: "hi" }],
-				prompt_cache_options: { mode: "explicit", ttl: "30m" },
-			}),
+			parseRequest(
+				{
+					model: "gpt-5.6",
+					messages: [{ role: "user", content: "hi" }],
+					prompt_cache_options: { mode: "explicit", ttl: "30m" },
+				},
+				{ provider: "github-copilot", id: "gpt-5.6" },
+			),
 		).toThrow("prompt_cache_options and prompt_cache_breakpoint are unsupported");
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6",
-				messages: [
-					{
-						role: "user",
-						content: [{ type: "text", text: "hi", prompt_cache_breakpoint: { mode: "explicit" } }],
-					},
-				],
-			}),
+			parseRequest(
+				{
+					model: "gpt-5.6",
+					messages: [
+						{
+							role: "user",
+							content: [{ type: "text", text: "hi", prompt_cache_breakpoint: { mode: "explicit" } }],
+						},
+					],
+				},
+				{ provider: "github-copilot", id: "gpt-5.6" },
+			),
 		).toThrow("prompt_cache_options and prompt_cache_breakpoint are unsupported");
 	});
 
 	it("rejects missing required fields", () => {
-		expect(() => parseRequest({ messages: [] })).toThrow(/model/);
-		expect(() => parseRequest({ model: "x" })).toThrow(/messages/);
+		expect(() => parseRequest({ messages: [] }, { provider: "github-copilot", id: "validation-target" })).toThrow(
+			/model/,
+		);
+		expect(() => parseRequest({ model: "x" }, { provider: "github-copilot", id: "validation-target" })).toThrow(
+			/messages/,
+		);
 	});
 
 	it("falls back to max_tokens when max_completion_tokens is absent", () => {
-		const parsed = parseRequest({ model: "m", messages: [], max_tokens: 256 });
+		const parsed = parseRequest(
+			{ model: "m", messages: [], max_tokens: 256 },
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(parsed.options.maxOutputTokens).toBe(256);
 		expect(parsed.stream).toBe(false);
 	});
 
 	it("accepts assistant null content when replaying tool calls", () => {
-		const parsed = parseRequest({
-			model: "m",
-			messages: [
-				{ role: "user", content: "weather?" },
-				{
-					role: "assistant",
-					content: null,
-					tool_calls: [{ id: "call_1", type: "function", function: { name: "get_weather", arguments: "{}" } }],
-				},
-				{ role: "tool", tool_call_id: "call_1", content: "sunny" },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				messages: [
+					{ role: "user", content: "weather?" },
+					{
+						role: "assistant",
+						content: null,
+						tool_calls: [{ id: "call_1", type: "function", function: { name: "get_weather", arguments: "{}" } }],
+					},
+					{ role: "tool", tool_call_id: "call_1", content: "sunny" },
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 
 		const assistant = parsed.context.messages.find(m => m.role === "assistant");
 		if (assistant?.role !== "assistant") throw new Error("expected assistant");
@@ -238,59 +260,71 @@ describe("auth-gateway openai-chat: parseRequest", () => {
 	});
 
 	it("honours an explicit wire `name` on a tool message over back-resolution", () => {
-		const parsed = parseRequest({
-			model: "m",
-			messages: [
-				{ role: "user", content: "go" },
-				{
-					role: "assistant",
-					tool_calls: [{ id: "c1", type: "function", function: { name: "lookup", arguments: "{}" } }],
-				},
-				// SDK-supplied name; takes precedence over the map lookup.
-				{ role: "tool", tool_call_id: "c1", name: "submit_move", content: "ok" },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				messages: [
+					{ role: "user", content: "go" },
+					{
+						role: "assistant",
+						tool_calls: [{ id: "c1", type: "function", function: { name: "lookup", arguments: "{}" } }],
+					},
+					// SDK-supplied name; takes precedence over the map lookup.
+					{ role: "tool", tool_call_id: "c1", name: "submit_move", content: "ok" },
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		const tool = parsed.context.messages.find(m => m.role === "toolResult");
 		if (tool?.role !== "toolResult") throw new Error("expected toolResult");
 		expect(tool.toolName).toBe("submit_move");
 	});
 
 	it("treats an empty wire `name` as absent and falls back to map lookup", () => {
-		const parsed = parseRequest({
-			model: "m",
-			messages: [
-				{ role: "user", content: "go" },
-				{
-					role: "assistant",
-					tool_calls: [{ id: "c1", type: "function", function: { name: "submit_move", arguments: "{}" } }],
-				},
-				{ role: "tool", tool_call_id: "c1", name: "", content: "ok" },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				messages: [
+					{ role: "user", content: "go" },
+					{
+						role: "assistant",
+						tool_calls: [{ id: "c1", type: "function", function: { name: "submit_move", arguments: "{}" } }],
+					},
+					{ role: "tool", tool_call_id: "c1", name: "", content: "ok" },
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		const tool = parsed.context.messages.find(m => m.role === "toolResult");
 		if (tool?.role !== "toolResult") throw new Error("expected toolResult");
 		expect(tool.toolName).toBe("submit_move");
 	});
 
 	it('preserves reasoning_effort:"none" as an explicit reasoning-off request', () => {
-		const parsed = parseRequest({
-			model: "openai-codex/gpt-5.6-luna",
-			messages: [{ role: "user", content: "hello" }],
-			reasoning_effort: "none",
-		});
+		const parsed = parseRequest(
+			{
+				model: "github-copilot/gpt-5.6-luna",
+				messages: [{ role: "user", content: "hello" }],
+				reasoning_effort: "none",
+			},
+			{ provider: "github-copilot", id: "github-copilot/gpt-5.6-luna" },
+		);
 		expect(parsed.options.reasoning).toBeUndefined();
 		expect(parsed.options.forceReasoningOff).toBe(true);
 	});
 
 	it("leaves toolName empty when no matching tool_call_id and no wire name", () => {
-		const parsed = parseRequest({
-			model: "m",
-			messages: [
-				{ role: "user", content: "go" },
-				// orphan tool reply with no prior assistant tool_call
-				{ role: "tool", tool_call_id: "orphan", content: "ok" },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				messages: [
+					{ role: "user", content: "go" },
+					// orphan tool reply with no prior assistant tool_call
+					{ role: "tool", tool_call_id: "orphan", content: "ok" },
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		const tool = parsed.context.messages.find(m => m.role === "toolResult");
 		if (tool?.role !== "toolResult") throw new Error("expected toolResult");
 		expect(tool.toolName).toBe("");

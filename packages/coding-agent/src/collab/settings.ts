@@ -3,18 +3,17 @@
  * settings-panel order; `config/all-settings.ts` registers every domain.
  */
 import { register } from "../config/registry";
-import { DEFAULT_RELAY_URL } from "./protocol";
 
 // Collab
 export const cfgCollabRelayUrl = register({
 	id: "collab.relayUrl",
 	type: "string",
-	default: DEFAULT_RELAY_URL,
+	default: "",
 	ui: {
 		tab: "interaction",
 		group: "Collab",
 		label: "Relay URL",
-		description: "Relay used by /collab (wss://host[:port])",
+		description: "Explicit private relay used by /collab (wss://host[:port], or ws://localhost[:port])",
 	},
 });
 
@@ -53,19 +52,11 @@ export const cfgCollabAutoStart = register({
 		group: "Collab",
 		label: "Auto Start",
 		description:
-			"Host every interactive session via collab.relayUrl as it starts and publish it to the local registry (omp collab list); rooms rotate on session switch",
+			"Opt in to hosting interactive sessions through an explicitly configured collab.relayUrl; local discovery only",
 		options: [
-			{ value: "off", label: "Off", description: "Share only when /collab is run" },
-			{
-				value: "view",
-				label: "View",
-				description: "Auto-host; the registry hands out view-only links (omp collab link --view)",
-			},
-			{
-				value: "control",
-				label: "Control",
-				description: "Auto-host; the registry hands out control links that can prompt the session",
-			},
+			{ value: "off", label: "Off", description: "Host only when /collab is run" },
+			{ value: "view", label: "View", description: "Auto-host with read-only links in the local registry" },
+			{ value: "control", label: "Control", description: "Auto-host with writable links in the local registry" },
 		],
 	},
 });

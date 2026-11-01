@@ -2,22 +2,35 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage } from "@oh-my-pi/pi-ai";
+import { AuthStorage, type Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { removeWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 // `inlineToolDescriptors: auto` inlines descriptors (and strips them from the
 // provider schemas) only for Gemini. Switching away mid-session must restore
 // schema descriptions, or upstreams that require them reject the request (#14200).
 describe("inline tool descriptors across model switches", () => {
-	const gemini = getBundledModel("google", "gemini-3-pro-preview");
-	const glm = getBundledModel("opencode-go", "glm-5.3-flash");
+	const [gemini, glm] = ["gemini-3-pro-preview", "glm-5.3-flash"].map(id =>
+		buildModel({
+			id,
+			name: id,
+			provider: `company-${id.startsWith("gemini") ? "gemini" : "glm"}`,
+			api: "openai-completions",
+			baseUrl: "https://models.company.test/v1",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 16_384,
+		}),
+	) as [Model, Model];
 	let dir: string;
 	let authStorage: AuthStorage;
 	let modelRegistry: ModelRegistry;
@@ -27,9 +40,16 @@ describe("inline tool descriptors across model switches", () => {
 		dir = path.join(os.tmpdir(), `pi-inline-descriptors-switch-${Snowflake.next()}`);
 		await fs.mkdir(dir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(dir, "auth.db"));
-		authStorage.keys.setRuntime("google", "test-key");
-		authStorage.keys.setRuntime("opencode-go", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
+		for (const model of [gemini, glm]) {
+			authStorage.keys.setRuntime(model.provider, "test-key");
+			modelRegistry.registerProvider(model.provider, {
+				api: model.api,
+				apiKey: "test-key",
+				baseUrl: model.baseUrl,
+				models: [toProviderModelConfig(model)],
+			});
+		}
 	});
 
 	afterAll(async () => {

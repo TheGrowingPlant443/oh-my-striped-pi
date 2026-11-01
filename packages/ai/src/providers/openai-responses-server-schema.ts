@@ -35,14 +35,7 @@ const plainTextSchema = type({
 const inputImageBlockSchema = type({
 	type: "'input_image'",
 	"detail?": "'auto' | 'low' | 'high' | 'original' | null",
-	"image_url?": "string | null",
-	"file_id?": "string | null",
-}).narrow((v, ctx) => {
-	return (
-		(typeof v.image_url === "string" && v.image_url.length > 0) ||
-		(typeof v.file_id === "string" && v.file_id.length > 0) ||
-		ctx.mustBe("at least one of `image_url` or `file_id` for input_image")
-	);
+	image_url: "string >= 1",
 });
 
 const inputFileBlockSchema = type({

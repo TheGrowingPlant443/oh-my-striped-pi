@@ -10,8 +10,8 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 const repoRoot = path.resolve(import.meta.dir, "../../..");
 const cliEntry = path.join(repoRoot, "packages/coding-agent/src/cli.ts");
 const TTY_ERROR = "interactive mode requires a terminal";
-const NO_API_KEY = "No API key found for anthropic.";
-const MODEL_ARGS = ["--provider", "anthropic", "--model", "claude-sonnet-4-5"];
+const NO_API_KEY = "No API key found for github-copilot.";
+const MODEL_ARGS = ["--provider", "github-copilot", "--model", "gpt-5.6-sol"];
 
 interface LaunchRun {
 	exitCode: number;

@@ -175,22 +175,20 @@ export class OAuthSelectorComponent extends OverlayPanel {
 	#loadProviders(disabledProviders: readonly string[] = []): void {
 		const providers = getOAuthProviders();
 		if (this.#mode === "logout") {
-			// Logout stays unfiltered by `disabledProviders`: a now-disabled
-			// provider may still hold stored credentials worth removing.
 			this.#menu.setItems(providers.filter(provider => this.#hasSelectableAuth(provider.id)));
 		} else {
-			const disabled = new Set(disabledProviders);
-			// Hide a login entry when either its own id or the provider id it
-			// stores credentials under is disabled, so alias logins (e.g.
-			// `openai-codex-device` ⇒ `openai-codex`) disappear alongside the
-			// model provider they authenticate.
-			this.#menu.setItems(
-				providers.filter(
+			this.#menu.setItems([
+				...(this.#sheet && !disabledProviders.includes("local")
+					? [{ id: "local", name: "Local", available: true }]
+					: []),
+				...providers.filter(
 					provider =>
-						!disabled.has(provider.id) &&
-						!(provider.storeCredentialsAs && disabled.has(provider.storeCredentialsAs)),
+						!disabledProviders.includes(provider.id) &&
+						!disabledProviders.includes(provider.storeCredentialsAs ?? provider.id),
 				),
-			);
+			]);
+			const copilot = this.#menu.items.findIndex(provider => provider.id === "github-copilot");
+			if (copilot >= 0) this.#menu.setSelectedIndex(copilot);
 		}
 	}
 
@@ -277,6 +275,7 @@ export class OAuthSelectorComponent extends OverlayPanel {
 	}
 
 	#getStatusIndicator(providerId: string): string {
+		if (providerId === "local") return theme.fg("muted", " · No login required");
 		const state = this.#authState.get(providerId);
 		const source = this.#getSourceLabel(providerId);
 		if (state === "checking") {
@@ -461,6 +460,11 @@ export class OAuthSelectorComponent extends OverlayPanel {
 	/** Confirm the selected provider (Enter or mouse click). */
 	#confirmSelection(): void {
 		const selectedProvider = this.#menu.selectedItem;
+		if (selectedProvider?.id === "local") {
+			this.#statusMessage = "Local models need no login. Select a local model with /model.";
+			this.#updateList();
+			return;
+		}
 		if (selectedProvider?.available) {
 			this.#statusMessage = undefined;
 			this.stopValidation();
@@ -473,6 +477,7 @@ export class OAuthSelectorComponent extends OverlayPanel {
 
 	/** Credential status of a provider row: `value` (state) and `detail` (origin) spans. */
 	#describeStatus(providerId: string): { value?: readonly TspSpan[]; detail?: readonly TspSpan[] } {
+		if (providerId === "local") return { value: [span("No login required", "muted")] };
 		const origin = this.#authStorage.keys.source(providerId);
 		const detail = origin
 			? [
@@ -493,6 +498,16 @@ export class OAuthSelectorComponent extends OverlayPanel {
 
 	/** One provider card: initials mark, origin detail, auth-state dot, disabled reason. */
 	#pickerItem(provider: OAuthProviderInfo): TspPickerItem {
+		if (provider.id === "local") {
+			return {
+				id: "local",
+				label: "Local",
+				detail: "On-device models · No login required",
+				mark: { text: "L", seed: "local" },
+				dot: "success",
+				disabled: "No login required. Select a local model with /model.",
+			};
+		}
 		const origin = this.#authStorage.keys.source(provider.id);
 		const state = this.#authState.get(provider.id);
 		const dot: TspTone =

@@ -10,9 +10,6 @@
  */
 import { afterEach, describe, expect, it } from "bun:test";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import type { HindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
 import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/memory-backend/recall-entry";
 import type { MemoryPromptPreparation } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
 import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
@@ -70,7 +67,6 @@ function startProcess(
 		},
 		getXdevToolEntries: () => [],
 		emitNotice: () => {},
-		getHindsightSessionState: () => undefined,
 		subscribe: () => () => {},
 		refreshBaseSystemPrompt: async () => {},
 	};
@@ -432,91 +428,5 @@ describe("Mnemopi recall across a resume", () => {
 		expect(block).toContain("beta-9");
 		expect(block).not.toContain("alpha-7");
 		expect(notice).toBeUndefined();
-	});
-});
-
-describe("Hindsight recall across a resume", () => {
-	const config: HindsightConfig = {
-		hindsightApiUrl: "http://localhost:8888",
-		hindsightApiToken: null,
-		bankId: null,
-		bankIdPrefix: "",
-		scoping: "global",
-		bankMission: "",
-		retainMission: null,
-		autoRecall: true,
-		autoRetain: false,
-		retainMode: "full-session",
-		retainEveryNTurns: 3,
-		retainOverlapTurns: 2,
-		retainContext: "omp",
-		recallBudget: "mid",
-		recallMaxTokens: 1024,
-		recallTypes: [],
-		recallContextTurns: 1,
-		recallMaxQueryChars: 800,
-		recallPromptPreamble: "preamble",
-		debug: false,
-		requestTimeoutMs: 30_000,
-		reflectTimeoutMs: 120_000,
-		recallTimeoutMs: 30_000,
-		retainTimeoutMs: 60_000,
-		mentalModelsEnabled: false,
-		mentalModelAutoSeed: false,
-		mentalModelMaxRenderChars: 16_000,
-	};
-
-	/** What a Hindsight recall reads besides its bank: server, account, and tag filter. */
-	interface HindsightScope {
-		hindsightApiUrl?: string;
-		hindsightApiToken?: string;
-		recallTags?: string[];
-	}
-
-	function startHindsight(
-		sessionManager: SessionManager,
-		bankId: string,
-		memory: string,
-		{ recallTags, ...overrides }: HindsightScope = {},
-	): HindsightSessionState {
-		const client = { recall: async () => ({ results: [{ id: "m", text: memory }] }) } as unknown as HindsightApi;
-		return new HindsightSessionState({
-			sessionId: sessionManager.getSessionId(),
-			client,
-			bankId,
-			recallTags,
-			config: { ...config, ...overrides },
-			session: { sessionManager, subscribe: () => () => {} } as never,
-			banksSet: new Set(),
-		});
-	}
-
-	async function hindsightFirstTurn(state: HindsightSessionState): Promise<string | undefined> {
-		const preparation = await state.beforeAgentStartPrompt(PROMPT);
-		expect(preparation?.commit()).toBe(true);
-		return preparation?.context;
-	}
-
-	it("reuses the transcript's recall for the same server, account, bank and tag filter only", async () => {
-		const dir = tempDir();
-		const live = startHindsight(newSession(dir), "project", "The deploy host is alpha-7.");
-		const sent = await hindsightFirstTurn(live);
-		expect(sent).toContain("alpha-7");
-		const sessionFile = await writeTranscript(live.session.sessionManager);
-
-		const sessions = dir.join("sessions");
-		const resumed = startHindsight(await SessionManager.open(sessionFile, sessions), "project", "moved to beta-9");
-		expect(await hindsightFirstTurn(resumed)).toBe(sent);
-
-		const elsewhere: Array<[bankId: string, scope: HindsightScope]> = [
-			["other", {}],
-			["project", { hindsightApiToken: "token" }],
-			["project", { hindsightApiUrl: "http://memory.internal:8888" }],
-			["project", { recallTags: ["project:other"] }],
-		];
-		for (const [bankId, scope] of elsewhere) {
-			const state = startHindsight(await SessionManager.open(sessionFile, sessions), bankId, "gamma-3", scope);
-			expect(await hindsightFirstTurn(state)).toContain("gamma-3");
-		}
 	});
 });

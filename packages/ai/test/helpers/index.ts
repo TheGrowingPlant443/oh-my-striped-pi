@@ -3,7 +3,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { isEnoent } from "@oh-my-pi/pi-utils";
 
 export async function withEnv(
@@ -54,25 +53,6 @@ export async function waitForDelayOrAbort(delayMs: number, signal: AbortSignal |
 		clearTimeout(timer);
 		signal?.removeEventListener("abort", onAbort);
 	}
-}
-
-export function createCodexModel(
-	id: string,
-	spec?: Partial<ModelSpec<"openai-codex-responses">>,
-): Model<"openai-codex-responses"> {
-	return buildModel({
-		id,
-		name: id,
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		baseUrl: "https://api.openai.com/v1",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 272000,
-		maxTokens: 128000,
-		...spec,
-	});
 }
 
 export interface AuthGatewayE2EStatus {
@@ -142,22 +122,14 @@ export function withOfficialAnthropicEndpoint(): void {
 	});
 }
 
-/**
- * MiniMax Token Plan model on the plan's OpenAI-compatible route (`/v1`). The
- * bundled Token Plan rows ride MiniMax's Anthropic endpoint, so OpenAI-route
- * repros build the row explicitly; compat still resolves from the same rules
- * as a bundled row.
- */
-export function minimaxTokenPlanOpenAIModel(
-	provider: "minimax-code" | "minimax-code-cn",
-	id: string,
-): Model<"openai-completions"> {
+/** Scripted generic completions fixture using the retained Copilot transport. */
+export function copilotCompletionsModel(id: string): Model<"openai-completions"> {
 	return buildModel({
 		id,
 		name: id,
 		api: "openai-completions",
-		provider,
-		baseUrl: provider === "minimax-code" ? "https://api.minimax.io/v1" : "https://api.minimaxi.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

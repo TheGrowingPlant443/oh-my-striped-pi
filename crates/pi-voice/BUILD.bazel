@@ -5,10 +5,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files(["Cargo.toml"])
 
-# napi-free voice engine (in-house capture/playback backends + WebRTC/Opus live
-# peer). Keeping the webrtc/opus graph behind this rlib means the pi_natives
-# leaf — which recompiles whenever its own sources change — does not pay for
-# the voice stack's monomorphization.
+# napi-free voice engine with in-house capture/playback backends.
 rust_library(
     name = "pi-voice",
     srcs = glob(["src/**/*.rs"]),

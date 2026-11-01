@@ -48,7 +48,7 @@ describe("/login slash command", () => {
 	it("submits manual callback URL without opening selector", async () => {
 		const manualInput = new OAuthManualInputManager();
 		const callbackUrl = "http://localhost:1455/auth/callback?code=abc&state=xyz";
-		const pending = manualInput.waitForInput("openai-codex");
+		const pending = manualInput.waitForInput("github-copilot");
 		const harness = createRuntimeHarness(manualInput);
 
 		const handled = await executeBuiltinSlashCommand(`/login ${callbackUrl}`, harness.runtime);
@@ -69,26 +69,15 @@ describe("/login slash command", () => {
 		expect(harness.getSelectorMode()).toBe("login");
 	});
 
-	it("routes /login kagi to direct provider login", async () => {
+	it("routes /login github-copilot to direct provider login", async () => {
 		const manualInput = new OAuthManualInputManager();
 		const harness = createRuntimeHarness(manualInput);
 
-		const handled = await executeBuiltinSlashCommand("/login kagi", harness.runtime);
+		const handled = await executeBuiltinSlashCommand("/login github-copilot", harness.runtime);
 
 		expect(handled).toBe(true);
 		expect(harness.getSelectorMode()).toBe("login");
-		expect(harness.getSelectorProvider()).toBe("kagi");
-	});
-
-	it("routes /login parallel to direct provider login", async () => {
-		const manualInput = new OAuthManualInputManager();
-		const harness = createRuntimeHarness(manualInput);
-
-		const handled = await executeBuiltinSlashCommand("/login parallel", harness.runtime);
-
-		expect(handled).toBe(true);
-		expect(harness.getSelectorMode()).toBe("login");
-		expect(harness.getSelectorProvider()).toBe("parallel");
+		expect(harness.getSelectorProvider()).toBe("github-copilot");
 	});
 
 	it("warns when no pending login exists for manual callback", async () => {

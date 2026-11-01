@@ -57,6 +57,11 @@ async function command(args: string) {
 }
 
 describe("/security", () => {
+	test("rejects removed hosted scan actions at the public tool boundary", () => {
+		const tool = new SecurityScanTool({ cwd: repositoryRoot, settings } as ToolSession);
+		expect(tool.parameters.allows({ action: "cloud_start" })).toBe(false);
+	});
+
 	test("imports SARIF, lists it, renders it, and records dispositions explicitly", async () => {
 		await command(`import ${JSON.stringify(SARIF_FIXTURE)}`);
 		const store = await SecurityStore.open(repositoryRoot);

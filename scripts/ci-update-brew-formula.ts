@@ -1,32 +1,24 @@
 #!/usr/bin/env bun
 //
-// Render the Homebrew formula for `omp` from a build published on the build
-// service (build.stencil.so) and write it to a tap checkout. Each formula
-// target points at the build's immutable download URL
-// (`/d/omp/<build-id>/<file>`) with the sha256 the service recorded at upload,
-// so the formula never drifts from the shipped binaries. Fails when the
-// version is not published for every formula target.
+// Render the Homebrew formula for `omp` from a GitHub release and write it to
+// a tap checkout. Each formula target points at the release asset with the
+// sha256 listed in the release's SHA256SUMS.txt, so the formula never drifts
+// from the shipped binaries. Fails when the release lacks a formula target.
 //
 // Usage:
 //   bun scripts/ci-update-brew-formula.ts <tag> --out <path/to/Formula/omp.rb>
 //   bun scripts/ci-update-brew-formula.ts v18.8.9        # prints to stdout
-//
-// Environment:
-//   BUILD_URL   service origin (default https://build.stencil.so)
 
-const PRODUCT = "omp";
-const SERVICE_URL = (process.env.BUILD_URL ?? "https://build.stencil.so").replace(/\/+$/, "");
 const HOMEPAGE = "https://omp.sh";
 const DESC = "Coding agent with the IDE wired in";
-/** GitHub release assets: the same bytes `release_github` publishes before the build service. */
 const RELEASE_DOWNLOAD_URL = "https://github.com/can1357/oh-my-pi/releases/download";
 
-/** Build-service target of each formula stanza. */
+/** Release asset name of each formula stanza. */
 const FORMULA_TARGETS = {
-	macosArm: "macos-arm64",
-	macosIntel: "macos-x86_64",
-	linuxArm: "linux-arm64",
-	linuxIntel: "linux-x86_64",
+	macosArm: "omp-darwin-arm64",
+	macosIntel: "omp-darwin-x64",
+	linuxArm: "omp-linux-arm64",
+	linuxIntel: "omp-linux-x64",
 } as const;
 
 type FormulaTarget = keyof typeof FORMULA_TARGETS;
@@ -35,12 +27,6 @@ type FormulaTarget = keyof typeof FORMULA_TARGETS;
 export interface FormulaFile {
 	url: string;
 	sha256: string;
-}
-
-/** The fields of a build-service version answer the formula needs. */
-interface VersionAnswer {
-	build: { id: string };
-	file: { name: string; sha256: string };
 }
 
 function parseArgs(argv: readonly string[]): {
@@ -60,23 +46,12 @@ function parseArgs(argv: readonly string[]): {
 	return { tag, out };
 }
 
-/** The formula file for `target` of `version`; throws when the service has not published it. */
-async function resolveFile(version: string, target: string): Promise<FormulaFile> {
-	const url = `${SERVICE_URL}/api/products/${PRODUCT}/versions/${encodeURIComponent(version)}/${target}`;
-	const response = await fetch(url);
-	if (!response.ok) {
-		throw new Error(
-			`${PRODUCT} ${version} is not published for ${target}: HTTP ${response.status} ${(await response.text()).trim()}`,
-		);
-	}
-	const answer = (await response.json()) as VersionAnswer;
-	if (!/^[0-9a-f]{64}$/.test(answer.file.sha256)) {
-		throw new Error(`${url} answered no sha256 for ${answer.file.name}`);
-	}
-	return {
-		url: `${SERVICE_URL}/d/${PRODUCT}/${encodeURIComponent(answer.build.id)}/${encodeURIComponent(answer.file.name)}`,
-		sha256: answer.file.sha256,
-	};
+/** The formula file for `asset` of `tag`, hashed per the release's SHA256SUMS.txt. */
+function resolveFile(tag: string, asset: string, sums: string): FormulaFile {
+	const line = sums.split("\n").find(l => l.endsWith(`  ${asset}`));
+	const sha256 = line?.split("  ")[0] ?? "";
+	if (!/^[0-9a-f]{64}$/.test(sha256)) throw new Error(`SHA256SUMS.txt of ${tag} has no sha256 for ${asset}`);
+	return { url: `${RELEASE_DOWNLOAD_URL}/${tag}/${asset}`, sha256 };
 }
 
 // `${...}` is JS interpolation; the literal `#{bin}` below is a Ruby
@@ -92,12 +67,6 @@ export function renderFormula(version: string, files: Record<FormulaTarget, Form
 	// the writable staging dir so `generate_completions_from_executable` does
 	// not touch the real `/Users/<user>/.omp` (denied by Homebrew's sandbox
 	// profile, which would otherwise fail the popen).
-	//
-	// Each `mirror` points at the same file on the GitHub release. Homebrew
-	// tries it when the build-service download fails, e.g. when a proxy blocks
-	// the service's redirect to R2 storage; `sha256` still checks the bytes.
-	const mirror = (file: FormulaFile) =>
-		`${RELEASE_DOWNLOAD_URL}/v${version}/${file.url.slice(file.url.lastIndexOf("/") + 1)}`;
 	return `class Omp < Formula
   desc "${DESC}"
   homepage "${HOMEPAGE}"
@@ -108,13 +77,11 @@ export function renderFormula(version: string, files: Record<FormulaTarget, Form
     on_arm do
       url "${files.macosArm.url}",
           using: :nounzip
-      mirror "${mirror(files.macosArm)}"
       sha256 "${files.macosArm.sha256}"
     end
     on_intel do
       url "${files.macosIntel.url}",
           using: :nounzip
-      mirror "${mirror(files.macosIntel)}"
       sha256 "${files.macosIntel.sha256}"
     end
   end
@@ -123,13 +90,11 @@ export function renderFormula(version: string, files: Record<FormulaTarget, Form
     on_arm do
       url "${files.linuxArm.url}",
           using: :nounzip
-      mirror "${mirror(files.linuxArm)}"
       sha256 "${files.linuxArm.sha256}"
     end
     on_intel do
       url "${files.linuxIntel.url}",
           using: :nounzip
-      mirror "${mirror(files.linuxIntel)}"
       sha256 "${files.linuxIntel.sha256}"
     end
   end
@@ -153,10 +118,12 @@ async function main(): Promise<void> {
 	const { tag, out } = parseArgs(process.argv.slice(2));
 	const version = tag.replace(/^v/, "");
 
-	const entries = await Promise.all(
-		(Object.entries(FORMULA_TARGETS) as [FormulaTarget, string][]).map(
-			async ([key, target]) => [key, await resolveFile(version, target)] as const,
-		),
+	const sumsUrl = `${RELEASE_DOWNLOAD_URL}/${tag}/SHA256SUMS.txt`;
+	const response = await fetch(sumsUrl);
+	if (!response.ok) throw new Error(`${sumsUrl}: HTTP ${response.status}`);
+	const sums = await response.text();
+	const entries = (Object.entries(FORMULA_TARGETS) as [FormulaTarget, string][]).map(
+		([key, asset]) => [key, resolveFile(tag, asset, sums)] as const,
 	);
 	const formula = renderFormula(version, Object.fromEntries(entries) as Record<FormulaTarget, FormulaFile>);
 	if (out) {

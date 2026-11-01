@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -16,6 +15,7 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 import { readArchiveEntries } from "@oh-my-pi/pi-utils/ar";
 import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
+import { getTestModel } from "../helpers/model-fixtures";
 
 function subagentJsonl(id: string, userText: string | null): string {
 	const lines = [
@@ -48,8 +48,7 @@ describe("AgentSession.dumpSessionArchiveToTmpDir", () => {
 	const archives: string[] = [];
 
 	function createSession(prompt: string): AgentSession {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled anthropic model");
+		const model = getTestModel("github-copilot");
 		const authStorage = createInMemoryAuthStorage();
 		return new AgentSession({
 			agent: new Agent({
@@ -250,8 +249,7 @@ describe("AgentSession.dumpSessionArchiveToTmpDir", () => {
 	it("reports malformed records skipped while loading the main session", async () => {
 		const file = path.join(tempDir.path(), "corrupt.jsonl");
 		await Bun.write(file, `${subagentJsonl("main", "hello")}{"type":"message","id":"broken`);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled anthropic model");
+		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 		const reopened = new AgentSession({
 			agent: new Agent({
 				initialState: {

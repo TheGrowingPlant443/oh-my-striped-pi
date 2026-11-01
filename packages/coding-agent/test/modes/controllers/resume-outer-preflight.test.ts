@@ -32,8 +32,8 @@ async function createMode(opts: { flushFails?: boolean } = {}): Promise<{
 
 	const authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 	const modelRegistry = new ModelRegistry(authStorage);
-	const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+	const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 
 	const initialTools = await createTools(
 		{ cwd: tempDir.path(), hasUI: false, getSessionFile: () => null, getSessionSpawns: () => "*", settings },

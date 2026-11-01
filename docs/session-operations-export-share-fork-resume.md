@@ -1,10 +1,10 @@
-# Session Operations: export, dump, share, fresh, clear, fork, resume/continue
+# Session Operations: export, dump, fresh, clear, fork, resume/continue
 
-This document describes operator-visible behavior for session export, sharing, conversation reset, lifecycle, fork, and resume operations as currently implemented.
+This document describes operator-visible behavior for session export, conversation reset, lifecycle, fork, and resume operations as currently implemented.
 
 ## Implementation files
 
-- [`src/slash-commands/builtin-collaboration.ts`](../packages/coding-agent/src/slash-commands/builtin-collaboration.ts) — export/dump/share command specs
+- [`src/slash-commands/builtin-collaboration.ts`](../packages/coding-agent/src/slash-commands/builtin-collaboration.ts) — export/dump command specs
 - [`src/slash-commands/builtin-lifecycle.ts`](../packages/coding-agent/src/slash-commands/builtin-lifecycle.ts) — lifecycle command specs
 - [`src/slash-commands/seance.ts`](../packages/coding-agent/src/slash-commands/seance.ts) — `/seance` command and session-picker adapter
 - [`src/modes/controllers/command-controller.ts`](../packages/coding-agent/src/modes/controllers/command-controller.ts) — TUI execution
@@ -12,8 +12,6 @@ This document describes operator-visible behavior for session export, sharing, c
 - [`src/session/agent-session.ts`](../packages/coding-agent/src/session/agent-session.ts)
 - [`src/session/session-manager.ts`](../packages/coding-agent/src/session/session-manager.ts)
 - [`src/export/html/index.ts`](../packages/coding-agent/src/export/html/index.ts)
-- [`src/export/share.ts`](../packages/coding-agent/src/export/share.ts)
-- [`src/export/custom-share.ts`](../packages/coding-agent/src/export/custom-share.ts)
 - [`src/cli/flag-tables.ts`](../packages/coding-agent/src/cli/flag-tables.ts) — restart argument rewriting
 - [`src/main.ts`](../packages/coding-agent/src/main.ts)
 
@@ -24,7 +22,6 @@ This document describes operator-visible behavior for session export, sharing, c
 | `/dump [all]`                             | Slash command (TUI/headless) | No                                            | No                                                                                                                                                                           | Clipboard/command text plus best-effort temporary JSON sidecar; `all`: temp zip     |
 | `/export [--themes] [path]`               | Slash command (TUI/headless) | No                                            | No                                                                                                                                                                           | HTML file                                                                           |
 | `--export <session.jsonl> [outputPath]`   | CLI startup fast-path        | No runtime session mutation                   | No active session; reads target file                                                                                                                                         | HTML file                                                                           |
-| `/share`                                  | Slash command (TUI/headless) | No                                            | No                                                                                                                                                                           | Encrypted share link (gist or share server); temp HTML only for TUI custom handlers |
 | `/new`                                    | Interactive slash command    | Yes (starts an empty conversation)            | Switches identity and materializes a new header in persistent mode                                                                                                           | None                                                                                |
 | `/fresh`                                  | Slash command (TUI/headless) | Yes (provider-facing in-memory id/state only) | No; keeps current session file/header                                                                                                                                        | None                                                                                |
 | `/clear`                                  | Interactive slash command    | Yes (clears live/model conversation context)  | Retains identity/file/history; a lazy session still follows the normal persistence gate                                                                                      | Appends `reset_boundary`                                                            |
@@ -51,8 +48,7 @@ Flow:
 4. The TUI shows the path and opens the file in a browser. Headless command execution prints the path without opening it.
 
 In the TUI, `/export` targets `viewSession`: a focused subagent exports its own
-transcript and descendants, not the main session. `/dump` and `/share` still
-target the main session.
+transcript and descendants, not the main session. `/dump` targets the main session.
 
 Behavior details:
 
@@ -60,16 +56,17 @@ Behavior details:
 - Export embeds session header/entries/leaf plus current `systemPrompt` and tool descriptions from agent state. `previousSessionFiles` is omitted from exported headers.
 - The viewer uses the `/stats` design, with Auto/Light/Dark themes; Light uses soft-gray surfaces and high-contrast secondary text. The sidebar lists the main session, nested subagents, and advisors; selecting a session or a task-card agent opens its transcript and conversation tree. Session and message links preserve the selected transcript.
 - Child transcripts stored next to the session file (`<session>/<AgentId>.jsonl`, recursively for nested spawns) are embedded as `subSessions`, including advisor and gzip-compressed transcripts. Discovery descends only into real child directories and flags tombstoned agents as `aborted`. `includeSubSessions: false` in `ExportOptions` excludes child transcripts and their trace tracks.
-- The bottom **Timeline** drawer and **Trace** view reuse `/trace`'s span assembly and viewer: duration/turn/call axes, idle compression, search, zoom, nested tracks, entry details, and tool aggregates. **Jump to transcript** opens the corresponding session and message. All transcript and trace data remain embedded; no stats server is needed. Both development and release exports load shared libraries from `stencil.so`, so opening the HTML requires network access.
-- Tool calls use `<omp-tool-view>` (shared with collab-web); traces use `<omp-session-trace>` (shared with stats). `bun gen:export-viewer` bundles these with the shell, styles and default themes. A source checkout inlines the generated viewer into each export; packaged releases load their versioned viewer from `build.stencil.so`. Both load shared Markdown and highlighting libraries from content-addressed `stencil.so/assets/omp/` URLs, pinned with Subresource Integrity. Only viewer code is uploaded, never session data.
-- Packaged exports add roughly 2 KiB of fixed HTML overhead; source exports also contain the generated viewer. `--themes` embeds the selected TUI theme overrides in addition to the session data.
+- The bottom **Timeline** drawer and **Trace** view reuse `/trace`'s span assembly and viewer: duration/turn/call axes, idle compression, search, zoom, nested tracks, entry details, and tool aggregates. **Jump to transcript** opens the corresponding session and message. All transcript, trace and viewer data remain embedded; no network or stats server is needed.
+- Tool calls use `<omp-tool-view>`; traces use `<omp-session-trace>`. `bun run gen:export-viewer` bundles these with React, Markdown, Highlight.js, the shell, styles and default themes. Source, packaged and compiled exports all inline the same complete viewer; no remote JavaScript is loaded.
+- Transcript hyperlinks stay clickable. Remote Markdown images render as links instead of fetching when the file opens; embedded attachments stay offline. Raw transcript HTML is escaped.
+- Each export contains the viewer in addition to the session data. `--themes` also embeds the selected TUI theme overrides.
 - No session entries are appended during export.
 - The default filename is `omp-session-<session-file-stem>.html` in the current directory. HTML export is not secret-redacted or encrypted; it can contain raw context, image data, and extension payloads.
 
 Caveat:
 
 - Parsing is whitespace-based, so quoted paths with spaces are not preserved. Use a path without spaces.
-- A source checkout needs `bun gen:export-viewer` before exporting. A missing generated viewer reports the command to run; packaged viewer assets become available when release CI publishes them.
+- A source checkout needs `bun run gen:export-viewer` before exporting or building. Packaged releases already contain the generated viewer.
 
 ### `--export <inputSessionFile> [outputPath]` (CLI)
 
@@ -122,86 +119,6 @@ No session persistence entries are appended by dumping.
 - `subagents/<path>.md` — one file per persisted subagent found by `collectSubSessions` (e.g. `subagents/Scout.md`, `subagents/Scout/Helper.md`), headed `# Subagent: <path>` with the persisted model, thinking level, `Status: aborted` for killed agents, and the messages on the subagent's last-entry branch, deobfuscated like the main session
 
 Subagent system prompts and tool inventories are not persisted, so subagent files omit them. Subagents with no messages are skipped. If subagent discovery fails, the archive still holds the main dump and the report says why subagents are missing. The TUI copies the archive path to the clipboard and lists its members; headless/ACP returns the same report as command output. Like the sidecar, the archive persists and can contain raw context or secrets.
-
-## Share
-
-`/share` publishes an end-to-end encrypted snapshot of the session and prints
-a viewer link. Implementation: [`../packages/coding-agent/src/export/share.ts`](../packages/coding-agent/src/export/share.ts).
-
-### TUI phase 1: custom share handler (if present)
-
-The interactive TUI's `loadCustomShare()` checks the active agent directory
-(default `~/.omp/agent`) for the first existing candidate:
-
-- `share.ts`
-- `share.js`
-- `share.mjs`
-
-Requirements:
-
-- Module must default-export a function `(htmlPath) => Promise<CustomShareResult | string | undefined>`.
-
-If present and valid, the legacy contract is preserved: the session is
-exported to a temp HTML file (`${os.tmpdir()}/${Snowflake.next()}.html`),
-the handler receives its path, and the temp file is removed afterwards.
-Handler result interpretation:
-
-- string => treated as URL, shown and opened
-- object => `url` and/or `message` shown; `url` opened
-- `undefined`/falsy => generic `Session shared`
-
-Critical fallback behavior:
-
-- If custom handler exists but loading fails, command errors and returns.
-- If custom handler executes and throws, command errors and returns.
-- In both failure cases, it **does not** fall back to the default flow.
-- The default flow runs only when no custom share script exists.
-- Headless/ACP slash-command execution does not load custom share scripts; it always uses the default encrypted flow.
-
-Custom handlers receive ordinary HTML export, not the default redacted/encrypted
-snapshot. Their publishing, encryption, and privacy policy are entirely their
-own. The HTML-export contract also means a custom handler cannot share an
-in-memory session through this path.
-
-### Default encrypted share
-
-For headless execution, or in the TUI only when no custom share handler is found, `shareSession()`:
-
-1. Builds the main-session snapshot (`header`, `entries`, `leafId`, plus current
-   `systemPrompt` and tool descriptions from agent state), omitting header
-   `previousSessionFiles`. Unlike HTML export, this flow does not collect
-   subagent transcript files.
-2. If `share.redactSecrets` is enabled (default) and the obfuscator has configured or regex-discovered secrets, a typed per-field redaction pass rewrites text-bearing header, prompt, tool, entry, sub-session, and message fields. Inline image bytes remain for the later size pass. Opaque provider replay fields and untyped extension payloads (`details`, `data`, `outputSchema`, compaction preserve data) are dropped rather than traversed.
-3. The JSON is gzipped and sealed with a fresh AES-256-GCM key
-   (`[12B IV][ciphertext+tag]`).
-4. Upload target is chosen by `share.store`:
-   - **Share server** (default, `store: "blob"`) — `POST <share.serverUrl>`
-     (default `https://my.omp.sh/s`) with the raw blob, capped at 1 MB.
-     Oversized snapshots are trimmed until they fit: inline images first,
-     then long strings (32,768 → 8,192 → 2,048 → 512 character caps), then
-     oldest entries. If the reduced snapshot still exceeds the budget, sharing
-     fails rather than uploading an oversized blob.
-   - **Secret gist** (`store: "gist"`) — when `gh` is installed and
-     authenticated, the sealed blob is pushed base64-encoded as
-     `session.ompshare.txt` (budget 5 MB sealed; gist raw fetches cap at
-     10 MB), falling back to the share server when `gh` is unusable or gist
-     creation fails.
-5. The link is `<share.serverUrl>/<id>#<base64url key>` in both cases. The
-   viewer page served there fetches the blob (hex ids via the GitHub gist
-   API, anything else from the server's blob store) and decrypts it
-   client-side; the key lives only in the URL fragment and never appears in
-   any HTTP request.
-
-The UI reports the share URL (plus the underlying gist URL and a truncation
-note when applicable). Headless `/share` prints the same lines. Unlike
-`/export`, `/share` works for in-memory (`--no-session`) sessions: the
-snapshot is built from live entries, no session file required.
-
-Cancellation/abort semantics in share:
-
-- Loader has `onAbort` hook that restores editor UI and reports `Share cancelled`.
-- The upload itself is not aborted mid-flight; cancellation is UI-level and
-  checked after the upload returns.
 
 ## New and delete
 
@@ -594,21 +511,19 @@ These callbacks are observational; they do not cancel switch/fork.
 - `/fork` is blocked while streaming (user must wait/abort current response first).
 - `/resume` selector can be cancelled by user closing selector.
 - Cross-project `--resume <id>` can be cancelled by declining the missing-directory move/re-root prompt.
-- `/share` has a UI abort path (`Share cancelled`); the upload itself is not killed mid-flight.
 
 ## Non-persistent (in-memory) session behavior
 
 When session manager is created with `SessionManager.inMemory()` (`--no-session`):
 
 - Session file path is absent.
-- `/export` fails with `Cannot export in-memory session to HTML` (propagated to command error UI). `/share` still works: the snapshot is built from live entries.
+- `/export` fails with `Cannot export in-memory session to HTML` (propagated to command error UI).
 - `/fork` fails because `SessionManager.fork()` requires persistence.
 - `/dump` still works because it serializes in-memory agent state.
 - Native CLI `--resume`, `--continue`, and `--fork` are rejected with `--no-session`; the preliminary startup parse may allocate an in-memory manager, but validation rejects these combinations before normal execution.
 
 ## Known implementation caveats (as of current code)
 
-- `/share` custom-share failures do not degrade to the default encrypted share flow; they terminate the TUI command with an error.
 - `/export` argument tokenization does not preserve quoted paths with spaces.
 - `/delete` treats deletion as best-effort: it attempts to delete the current
   session JSONL and artifact directory, logs any deletion failure, and still

@@ -1,8 +1,10 @@
 import { afterEach, expect, it, spyOn } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
+import { Effort } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponseSource } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -11,6 +13,27 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { ONE_PIXEL_PNG as PNG, VISION_DESCRIPTION_SSE } from "./helpers/skill-image-vision";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
+
+const textSpec: ModelSpec<"openai-completions"> = {
+	id: "company-text",
+	name: "Company text",
+	provider: "company-skill",
+	api: "openai-completions",
+	baseUrl: "https://skill.company.invalid/v1",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 16_000,
+};
+const visionSpec: ModelSpec<"openai-completions"> = {
+	...textSpec,
+	id: "company-vision",
+	name: "Company vision",
+	input: ["text", "image"],
+};
 
 const skill: Pick<CustomMessage, "customType" | "content" | "display" | "attribution" | "details"> = {
 	customType: "skill-prompt",
@@ -31,17 +54,26 @@ afterEach(async () => {
 function setup(options: { responses?: MockResponseSource; beforeVisionReply?: () => Promise<void> } = {}) {
 	const tempDir = TempDir.createSync("@skill-image-");
 	const authStorage = createInMemoryAuthStorage();
-	authStorage.keys.setRuntime("zai", "test-key");
+	authStorage.keys.setRuntime(textSpec.provider, "test-key");
 	const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+	registry.registerProvider(textSpec.provider, {
+		api: textSpec.api,
+		baseUrl: textSpec.baseUrl,
+		apiKey: "test-key",
+		models: [toProviderModelConfig(textSpec), toProviderModelConfig(visionSpec)],
+	});
 	const settings = Settings.isolated({
 		"compaction.enabled": false,
-		modelRoles: { vision: "zai/glm-5.3-flash:max", default: "zai/glm-5.3:max" },
+		modelRoles: {
+			vision: `${visionSpec.provider}/${visionSpec.id}:high`,
+			default: `${textSpec.provider}/${textSpec.id}:high`,
+		},
 	});
 	const mock = createMockModel({ responses: options.responses, handler: () => ({ content: ["done"] }) });
 	const agent = new Agent({
 		getApiKey: () => "test-key",
 		initialState: {
-			model: getBundledModel("zai", "glm-5.3"),
+			model: buildModel(textSpec),
 			systemPrompt: ["Test"],
 			tools: [],
 			messages: [],
@@ -59,8 +91,7 @@ function setup(options: { responses?: MockResponseSource; beforeVisionReply?: ()
 	const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(
 		Object.assign(
 			async (input: string | URL | Request) => {
-				// Only the vision role (openai-completions) is gated; unrelated side requests
-				// such as auto-title generation on the anthropic endpoint pass straight through.
+				// Gate the vision transport before replying so preprocessing races stay observable.
 				const url = input instanceof Request ? input.url : String(input);
 				if (url.endsWith("/chat/completions")) await options.beforeVisionReply?.();
 				return new Response(VISION_DESCRIPTION_SSE, {

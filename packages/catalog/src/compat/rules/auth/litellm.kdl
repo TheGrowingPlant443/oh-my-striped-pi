@@ -1,8 +1,10 @@
 auth "litellm" {
+	allows-missing-api-key #true
 	name "LiteLLM"
 	login "api-key" {
 		auth-url "https://docs.litellm.ai/docs/proxy/deploy"
-		instructions "Run LiteLLM proxy (default http://localhost:4000/v1; set LITELLM_BASE_URL to customize it), then copy your master key or virtual key"
-		prompt "Paste your LiteLLM API key (master key or virtual key)" placeholder="sk-..."
+		instructions "Run your LiteLLM proxy (default http://localhost:4000/v1; set LITELLM_BASE_URL to customize it). Paste a master or virtual key if required; leave empty for a keyless deployment."
+		prompt "Paste your LiteLLM API key (optional for keyless deployments)" placeholder="sk-..."
+		empty-fallback ""
 	}
 }

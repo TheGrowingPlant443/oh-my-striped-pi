@@ -982,9 +982,7 @@ export class EvalTool implements AgentTool<typeof evalSchema> {
 							mimeType: resized.mimeType,
 							...(output.detail === undefined ? {} : { detail: output.detail }),
 							// Remote references are valid only while the bytes remain unchanged.
-							...(data === output.data && resized.mimeType === output.mimeType
-								? { url: output.url, providerFile: output.providerFile }
-								: {}),
+							...(data === output.data && resized.mimeType === output.mimeType ? { url: output.url } : {}),
 						};
 						images.push(image);
 						const dimensionNote = formatDimensionNote(resized);

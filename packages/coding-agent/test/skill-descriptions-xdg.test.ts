@@ -20,6 +20,7 @@ import {
 import type { Skill } from "../src/extensibility/skills";
 import type { AuthStorage } from "../src/session/auth-storage";
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
 
 const ENV_KEYS = ["PI_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME"] as const;
 
@@ -151,8 +152,9 @@ describe("skill description failure caching and shutdown", () => {
 	function modelCompressor(stopReason: AssistantMessage["stopReason"]): SkillDescriptionCompressor {
 		const authStorage = createInMemoryAuthStorage();
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		const settings = Settings.isolated({ modelRoles: { smol: "anthropic/claude-sonnet-4-5" } });
+		const model = getTestModel("github-copilot");
+		authStorage.keys.setRuntime(model.provider, "test-key");
+		const settings = Settings.isolated({ modelRoles: { smol: `${model.provider}/${model.id}` } });
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
 		vi.spyOn(agentCore, "instrumentedCompleteSimple").mockResolvedValue({
 			...createAssistantMessage(compressed),
@@ -365,7 +367,6 @@ describe("skill description compressor model selection", () => {
 	function fixture(modelRoles: Record<string, string>) {
 		const authStorage = createInMemoryAuthStorage();
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
 		const settings = Settings.isolated({ modelRoles });
 		const registry = new ModelRegistry(
 			authStorage,
@@ -374,18 +375,32 @@ describe("skill description compressor model selection", () => {
 				settings,
 			},
 		);
+		registry.registerProvider("skill-company", {
+			baseUrl: "https://models.company.test",
+			api: "anthropic-messages",
+			apiKey: "company-test-key",
+			models: ["claude-opus-4-5", "claude-haiku-4-5"].map(id => ({
+				id,
+				name: id,
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200_000,
+				maxTokens: 8192,
+			})),
+		});
 		return { registry, settings, authStorage, compressor: createSkillDescriptionCompressor(registry, settings) };
 	}
 
 	it("does not materialize unrelated catalogs for the first exact role selection", () => {
-		const { registry, compressor } = fixture({ default: "anthropic/claude-opus-4-5" });
+		const { registry, compressor } = fixture({ default: "skill-company/claude-opus-4-5" });
 		const all = spyOn(registry, "getAvailable").mockImplementation(() => {
 			throw new Error("Unrelated catalogs must stay lazy");
 		});
 		const scoped = spyOn(registry, "getAvailableForProviders");
-		expect(compressor.modelKey()).toBe("anthropic/claude-opus-4-5");
-		expect(compressor.modelKey()).toBe("anthropic/claude-opus-4-5");
-		expect(scoped).toHaveBeenCalledWith(new Set(["anthropic"]));
+		expect(compressor.modelKey()).toBe("skill-company/claude-opus-4-5");
+		expect(compressor.modelKey()).toBe("skill-company/claude-opus-4-5");
+		expect(scoped).toHaveBeenCalledWith(new Set(["skill-company"]));
 		expect(all).not.toHaveBeenCalled();
 	});
 
@@ -409,7 +424,7 @@ describe("skill description compressor model selection", () => {
 		});
 		for (const selector of [
 			"anthropic/claude-opus-4-5:high",
-			"missing-provider/missing,anthropic/claude-haiku-4-5",
+			"missing-provider/missing,skill-company/claude-haiku-4-5",
 			"claude-haiku-4-5",
 			"skill-custom/anthropic/claude-opus-4-5:high",
 			"missing-provider/missing",
@@ -426,18 +441,18 @@ describe("skill description compressor model selection", () => {
 	});
 
 	it("observes live role, disabled-provider and runtime catalog changes after a scoped lookup", () => {
-		const { registry, settings, compressor } = fixture({ smol: "anthropic/claude-haiku-4-5" });
-		expect(compressor.modelKey()).toBe("anthropic/claude-haiku-4-5");
-		settings.setModelRole("smol", "anthropic/claude-opus-4-5");
-		expect(compressor.modelKey()).toBe("anthropic/claude-opus-4-5");
-		cfgDisabledProviders.set(settings, ["anthropic"]);
+		const { registry, settings, compressor } = fixture({ smol: "skill-company/claude-haiku-4-5" });
+		expect(compressor.modelKey()).toBe("skill-company/claude-haiku-4-5");
+		settings.setModelRole("smol", "skill-company/claude-opus-4-5");
+		expect(compressor.modelKey()).toBe("skill-company/claude-opus-4-5");
+		cfgDisabledProviders.set(settings, ["skill-company"]);
 		const available = registry.getAvailable();
 		const expected =
 			resolveRoleChain("smol", settings, available)[0]?.model ??
 			resolveRoleSelection(["tiny"], settings, available)?.model;
 		expect(compressor.modelKey()).toBe(expected ? `${expected.provider}/${expected.id}` : undefined);
 		cfgDisabledProviders.set(settings, []);
-		expect(compressor.modelKey()).toBe("anthropic/claude-opus-4-5");
+		expect(compressor.modelKey()).toBe("skill-company/claude-opus-4-5");
 
 		settings.setModelRole("smol", "skill-runtime/first");
 		const register = (id: string) =>
@@ -465,12 +480,17 @@ describe("skill description compressor model selection", () => {
 	});
 
 	it("uses the configured default for an unset smol role instead of the built-in smol chain", () => {
-		expect(fixture({ default: "anthropic/claude-opus-4-5" }).compressor.modelKey()).toBe("anthropic/claude-opus-4-5");
+		expect(fixture({ default: "skill-company/claude-opus-4-5" }).compressor.modelKey()).toBe(
+			"skill-company/claude-opus-4-5",
+		);
 	});
 
 	it("prefers a configured smol role over the configured default", () => {
 		expect(
-			fixture({ default: "anthropic/claude-opus-4-5", smol: "anthropic/claude-haiku-4-5" }).compressor.modelKey(),
-		).toBe("anthropic/claude-haiku-4-5");
+			fixture({
+				default: "skill-company/claude-opus-4-5",
+				smol: "skill-company/claude-haiku-4-5",
+			}).compressor.modelKey(),
+		).toBe("skill-company/claude-haiku-4-5");
 	});
 });

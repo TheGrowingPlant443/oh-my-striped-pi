@@ -11,14 +11,14 @@ export default class Login extends Command {
 	static description = commandHelp.description;
 	static args = {
 		provider: Args.string({
-			description: "OAuth provider id (e.g. anthropic, openai-codex); omit to pick interactively",
+			description: "OAuth provider id (github-copilot); omit to pick interactively",
 			required: false,
 		}),
 	};
 
 	static examples = [
 		`# Pick a provider interactively\n  ${APP_NAME} login`,
-		`# Log in to a specific provider\n  ${APP_NAME} login anthropic`,
+		`# Log in to GitHub Copilot\n  ${APP_NAME} login github-copilot`,
 	];
 
 	async run(): Promise<void> {

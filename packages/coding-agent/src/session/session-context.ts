@@ -505,20 +505,12 @@ export function buildSessionContext(
 	} else if (compaction) {
 		const remotePayload = getOpenAiRemoteCompactionPayload(compaction);
 		const remoteReplacementHistory = remotePayload?.items;
-		// Anthropic server compaction persists a plain-text summary plus its
-		// native replay; the kept tail still comes from entries below.
 		const anthropicPayload = getAnthropicCompactionPayload(compaction.preserveData);
 		const providerPayload = remotePayload ?? anthropicPayload;
 
 		// Find compaction index in path
 		const compactionIdx = path.findIndex(e => e.type === "compaction" && e.id === compaction.id);
-
-		// A natively replayed summary must not invalidate the retained tail's
-		// bound thinking: the commit timestamp as historyRewriteAt would be newer
-		// than the tail and strip its signatures on the next request. Predate the
-		// marker before the first retained entry instead (other lanes use the
-		// commit timestamp). The summary itself keeps the commit timestamp, which
-		// still retires the tail's pre-compaction usage reports.
+		// Native replay must not strip the retained tail's bound thinking.
 		let historyRewriteAt: number | undefined;
 		if (anthropicPayload !== undefined) {
 			const firstKeptIdx = path.findIndex(entry => entry.id === compaction.firstKeptEntryId);
@@ -530,11 +522,6 @@ export function buildSessionContext(
 				(firstKeptIdx >= 0 && firstKeptIdx < compactionIdx ? path[firstKeptIdx] : undefined) ??
 				(snapshotIdx >= 0 && snapshotIdx < compactionIdx - 1 ? path[snapshotIdx + 1] : undefined) ??
 				path[compactionIdx + 1];
-			// The message's own time, not the entry's: an assistant message is
-			// stamped when its stream starts and saved after it ends, so a marker
-			// derived from the entry would postdate that turn and strip its thinking.
-			// Summaries without `exactTail` keep the entry time: thinking created
-			// after them was signed against requests that stripped that turn's.
 			if (firstRetained?.type === "message" && anthropicPayload.exactTail) {
 				historyRewriteAt = firstRetained.message.timestamp - 1;
 			} else if (firstRetained) {
@@ -671,11 +658,7 @@ export function buildSessionContext(
 		if (notes && renderedNotes.length > 0) {
 			const sourceEntry = path.find(entry => entry.id === notes.entryId);
 			if (sourceEntry) {
-				// A native Anthropic compaction block must open the request, and the
-				// provider folds it into a directly following retained assistant turn
-				// (whose signed thinking is bound to that prefix). Nothing may precede
-				// the block or split that fold, so the notes follow the summary and any
-				// retained assistant turn with its tool results.
+				// The native block and its retained assistant/tool fold must stay together.
 				const head = messages[0];
 				let insertAt = 0;
 				if (head?.role === "compactionSummary" && head.providerPayload?.type === "anthropicCompaction") {

@@ -3,7 +3,7 @@ import {
 	composeRecallQuery,
 	formatCurrentTime,
 	formatMemories,
-	type HindsightMessage,
+	type MemoryMessage as HindsightMessage,
 	hasSubstantiveContent,
 	prepareEmbeddableRetentionTranscript,
 	prepareRetentionTranscript,
@@ -12,7 +12,7 @@ import {
 	stripMemoryTags,
 	stripRetentionProtocolMarkers,
 	truncateRecallQuery,
-} from "@oh-my-pi/pi-coding-agent/hindsight/content";
+} from "@oh-my-pi/pi-coding-agent/memory-backend/content";
 
 describe("stripMemoryTags", () => {
 	it("removes both <memories> and legacy memory blocks", () => {

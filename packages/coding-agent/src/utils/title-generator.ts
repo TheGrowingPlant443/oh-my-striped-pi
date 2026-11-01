@@ -14,7 +14,7 @@ import {
 	type Model,
 	retryTransientCompletion,
 } from "@oh-my-pi/pi-ai";
-import { StreamMarkupHealing } from "@oh-my-pi/pi-ai/utils/stream-markup-healing";
+import { ThinkingInbandScanner } from "@oh-my-pi/pi-ai/dialect/thinking";
 import { writeTerminalSequence } from "@oh-my-pi/pi-tui";
 import { isNativeRendering, onNativeRenderingChange } from "@oh-my-pi/pi-tui/native/state";
 import { theme } from "@oh-my-pi/pi-tui/theme";
@@ -551,8 +551,15 @@ function stripLeadingLeakedThinkingMarkup(text: string): string {
 }
 
 function stripLeakedThinkingMarkup(text: string): string {
-	const healer = new StreamMarkupHealing({ pattern: "thinking" });
-	return healer.feed(text) + healer.flushPending();
+	const scanner = new ThinkingInbandScanner();
+	let visible = "";
+	for (const event of scanner.feed(text)) {
+		if (event.type === "text") visible += event.text;
+	}
+	for (const event of scanner.flush()) {
+		if (event.type === "text") visible += event.text;
+	}
+	return visible;
 }
 
 /**

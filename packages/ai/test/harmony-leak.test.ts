@@ -27,26 +27,24 @@ interface CorpusNegative {
 const positives = corpus.positives as CorpusPositive[];
 const negatives = corpus.negatives as CorpusNegative[];
 
-// Mitigation is a provider-wide rule (`providers/openai-codex.kdl`), so any
-// Codex id resolves it; a bare spec keeps this independent of the bundled roster.
-const codexModel: Model = buildModel({
-	id: "gpt-5.5",
-	name: "GPT-5.5",
-	api: "openai-codex-responses",
-	provider: "openai-codex",
-	baseUrl: "https://chatgpt.com/backend-api/codex",
+const gptOssModel = buildModel({
+	id: "gpt-oss-20b",
+	name: "GPT OSS 20B",
+	api: "openai-responses",
+	provider: "vllm",
+	baseUrl: "http://127.0.0.1:8000/v1",
 	reasoning: true,
-	input: ["text", "image"],
+	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 272_000,
+	contextWindow: 131_072,
 	maxTokens: 128_000,
-} satisfies ModelSpec<"openai-codex-responses">);
+} satisfies ModelSpec<"openai-responses">);
 const anthropicModel: Model = buildModel({
-	id: "claude-sonnet-4-5",
+	id: "claude-sonnet-4.5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text", "image"],
 	cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
@@ -61,9 +59,9 @@ function createAssistantMessage(
 	return {
 		role: "assistant",
 		content,
-		api: "mock",
-		provider: "mock",
-		model: "mock-model",
+		api: gptOssModel.api,
+		provider: gptOssModel.provider,
+		model: gptOssModel.id,
 		usage: createUsage(),
 		stopReason,
 		timestamp: Date.now(),
@@ -101,13 +99,11 @@ function makeToolCallMessage(toolName: string, input: string | null, argJson: st
 const wholePayloadTrailing = () => 0;
 
 describe("isHarmonyLeakMitigationTarget", () => {
-	it("targets models enabled by resolved compatibility policy", () => {
-		expect(codexModel.compat).toMatchObject({ harmonyLeakMitigation: true });
-		expect(isHarmonyLeakMitigationTarget(codexModel)).toBe(true);
+	it("targets self-hosted GPT OSS models", () => {
+		expect(isHarmonyLeakMitigationTarget(gptOssModel)).toBe(true);
 	});
 
-	it("does not target models without the compatibility policy", () => {
-		expect(anthropicModel.compat).not.toMatchObject({ harmonyLeakMitigation: true });
+	it("does not target non-Harmony model families", () => {
 		expect(isHarmonyLeakMitigationTarget(anthropicModel)).toBe(false);
 	});
 });
@@ -316,7 +312,7 @@ describe("createHarmonyAuditEvent", () => {
 		const event = createHarmonyAuditEvent({
 			action: "truncate_resume",
 			detection,
-			model: codexModel,
+			model: gptOssModel,
 			retryN: 0,
 			removed: recovered.removed,
 		});

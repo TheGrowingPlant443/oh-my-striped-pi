@@ -67,6 +67,8 @@ const result = await compact(preparation, { model });
 - **Budgets**: `providerImageBudget`, `frameDataBytesBudget`, `MAX_FRAMES_DEFAULT`, `FRAME_TOKEN_ESTIMATE`, `frameBilling`, `frameTokens`, `frameBillingKey`, `plannedFrameTokens`, `HQ_EDGE_FRAMES`
 - **File ops**: `createFileOps`, `computeFileLists`, `upsertFileOperations`
 
+Image budgets use the deployment's declared catalog policy and an explicit `imageCountBudget` override when supplied. Archive frames receive half a declared inline-image byte budget; deployments without one use `DEFAULT_FRAME_DATA_BYTES_BUDGET`.
+
 ## References
 
 - [Monorepo README](https://github.com/can1357/oh-my-pi#readme)

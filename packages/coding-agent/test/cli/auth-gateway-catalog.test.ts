@@ -13,6 +13,7 @@ import {
 } from "../../src/cli/auth-gateway-cli";
 import { ModelRegistry } from "../../src/config/model-registry";
 import { Settings } from "../../src/config/settings";
+import { getTestModel } from "../helpers/model-fixtures";
 
 const authStores: AuthStorage[] = [];
 
@@ -26,6 +27,22 @@ afterEach(() => {
 	for (const storage of authStores.splice(0)) storage.close();
 });
 
+/** A served chat model, built through the catalog rules like discovery output. */
+function servedModel(provider: string, id: string, api: Api): Model<Api> {
+	return buildModel({
+		id,
+		name: id,
+		api,
+		provider,
+		baseUrl: "https://models.company.test/v1",
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 8192,
+	});
+}
+
 describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 	test("resolves a discovery-only model absent from the bundled catalog", async () => {
 		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
@@ -33,8 +50,8 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 		// Simulate a model reached via provider discovery but not compiled into
 		// the bundle (e.g. a post-release id). registerProvider merges it into
 		// getAll() exactly as runtime discovery does.
-		registry.registerProvider("anthropic", {
-			baseUrl: "https://api.anthropic.com",
+		registry.registerProvider("company-discovery", {
+			baseUrl: "https://models.company.test/v1",
 			api: "anthropic-messages",
 			apiKey: "test-key",
 			models: [
@@ -49,32 +66,37 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 				},
 			],
 		});
-		expect(getBundledModels("anthropic").map(m => m.id)).not.toContain("claude-opus-5-repro");
+		expect(getBundledModels("company-discovery").map(m => m.id)).not.toContain("claude-opus-5-repro");
 
-		const index = indexModelsByRequestId(registry.getAll(), new Set(["anthropic"]));
+		const index = indexModelsByRequestId(registry.getAll(), new Set(["company-discovery"]));
 
 		// The gateway can now resolve it by qualified id and bare id — was
 		// "Unknown model" when the index was built from getBundledModels only.
-		expect(resolveGatewayModel("anthropic/claude-opus-5-repro", index)?.id).toBe("claude-opus-5-repro");
+		expect(resolveGatewayModel("company-discovery/claude-opus-5-repro", index)?.id).toBe("claude-opus-5-repro");
 		expect(resolveGatewayModel("claude-opus-5-repro", index)?.id).toBe("claude-opus-5-repro");
 	});
 
 	test("gateway registry ignores local models.yml credential and routing overrides", async () => {
 		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
 		const modelsPath = tempDir.join("models.yml");
-		// anthropic: a plain credential/baseUrl override (no transport) — the
-		// reviewer's leak. openai: a pi-native gateway route — the self-routing loop.
+		// Keep credential overrides and pi-native self-routes in separate company namespaces.
 		await Bun.write(
 			modelsPath,
 			[
 				"providers:",
-				"  anthropic:",
+				"  company-direct:",
 				"    baseUrl: http://127.0.0.1:18899",
 				"    apiKey: gateway-token",
-				"  openai:",
+				"    api: openai-completions",
+				"    models:",
+				"      - id: direct-chat",
+				"  company-native:",
 				"    baseUrl: http://127.0.0.1:18899",
 				"    apiKey: gateway-token",
 				"    transport: pi-native",
+				"    api: openai-completions",
+				"    models:",
+				"      - id: native-chat",
 				"",
 			].join("\n"),
 		);
@@ -83,9 +105,9 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 		// config API keys into AuthStorage.
 		const clientAuthStorage = await createAuthStorage();
 		const clientRegistry = new ModelRegistry(clientAuthStorage, modelsPath);
-		expect(clientRegistry.find("anthropic", "claude-sonnet-4-5")?.baseUrl).toBe("http://127.0.0.1:18899");
-		expect(clientRegistry.getAll().find(model => model.provider === "openai")?.transport).toBe("pi-native");
-		expect(await clientAuthStorage.keys.get("anthropic")).toBe("gateway-token");
+		expect(clientRegistry.find("company-direct", "direct-chat")?.baseUrl).toBe("http://127.0.0.1:18899");
+		expect(clientRegistry.find("company-native", "native-chat")?.transport).toBe("pi-native");
+		expect(await clientAuthStorage.keys.get("company-direct")).toBe("gateway-token");
 
 		// The gateway registry ignores models.yml entirely: bundled routing wins,
 		// no config key reaches AuthStorage, and no pi-native self-route survives.
@@ -93,111 +115,111 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 		const gatewayRegistry = new ModelRegistry(gatewayAuthStorage, modelsPath, {
 			ignoreLocalModelConfig: true,
 		});
-		const gatewayModel = gatewayRegistry.find("anthropic", "claude-sonnet-4-5");
-		const bundledModel = getBundledModels("anthropic").find(model => model.id === "claude-sonnet-4-5");
-		if (!gatewayModel || !bundledModel) throw new Error("expected bundled Anthropic model");
+		const bundledModel = getTestModel("github-copilot");
+		const gatewayModel = gatewayRegistry.find(bundledModel.provider, bundledModel.id);
+		if (!gatewayModel) throw new Error("expected retained bundled model");
 
 		expect(gatewayModel.baseUrl).toBe(bundledModel.baseUrl);
-		expect(gatewayModel.transport).toBeUndefined();
-		expect(await gatewayAuthStorage.keys.get("anthropic")).not.toBe("gateway-token");
-		expect(gatewayRegistry.getAll().find(model => model.provider === "openai")?.transport).toBeUndefined();
-		const gatewayIndex = indexModelsByRequestId(gatewayRegistry.getAll(), new Set(["anthropic"]));
+		expect(gatewayRegistry.find("company-direct", "direct-chat")).toBeUndefined();
+		expect(gatewayRegistry.find("company-native", "native-chat")).toBeUndefined();
+		expect(await gatewayAuthStorage.keys.get("company-direct")).not.toBe("gateway-token");
+		expect(await gatewayAuthStorage.keys.get("company-native")).not.toBe("gateway-token");
+		const gatewayIndex = indexModelsByRequestId(gatewayRegistry.getAll(), new Set([bundledModel.provider]));
 		expect(resolveGatewayModel(gatewayModel.id, gatewayIndex)).toBe(gatewayModel);
 	});
 
 	test("scopes the catalog to providers with credentials", async () => {
 		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
 		const registry = new ModelRegistry(await createAuthStorage(), tempDir.join("models.yml"));
-		const all = registry.getAll();
-		const anthropicModel = all.find(m => m.provider === "anthropic");
-		const foreignModel = all.find(m => m.provider !== "anthropic");
-		if (!anthropicModel || !foreignModel) throw new Error("expected mixed-provider bundled catalog");
+		const companyModel = servedModel("company-primary", "company-chat", "openai-completions");
+		registry.registerProvider(companyModel.provider, {
+			baseUrl: companyModel.baseUrl,
+			api: companyModel.api,
+			apiKey: "company-key",
+			models: [{ ...companyModel, contextWindow: 200_000, maxTokens: 8192 }],
+		});
+		const foreignModel = getTestModel("github-copilot");
+		const index = indexModelsByRequestId(registry.getAll(), new Set([companyModel.provider]));
 
-		const index = indexModelsByRequestId(all, new Set(["anthropic"]));
-
-		expect(resolveGatewayModel(`anthropic/${anthropicModel.id}`, index)).toBeDefined();
+		expect(resolveGatewayModel(`${companyModel.provider}/${companyModel.id}`, index)).toBeDefined();
 		expect(resolveGatewayModel(`${foreignModel.provider}/${foreignModel.id}`, index)).toBeUndefined();
 	});
 
 	test("drops providers disabled in settings from the served catalog", async () => {
 		const storage = await createAuthStorage();
-		await storage.credentials.set("anthropic", { type: "api_key", key: "sk-test-anthropic" });
-		await storage.credentials.set("openrouter", { type: "api_key", key: "sk-test-openrouter" });
-		const settings = Settings.isolated({ disabledProviders: ["openrouter"] });
+		await storage.credentials.set("company-primary", { type: "api_key", key: "primary-key" });
+		await storage.credentials.set("company-secondary", { type: "api_key", key: "secondary-key" });
+		const settings = Settings.isolated({ disabledProviders: ["company-secondary"] });
 		const registry = new ModelRegistry(storage, undefined, { ignoreLocalModelConfig: true, settings });
+		for (const provider of ["company-primary", "company-secondary"]) {
+			const model = servedModel(provider, "company-chat", "openai-completions");
+			registry.registerProvider(provider, {
+				baseUrl: model.baseUrl,
+				api: model.api,
+				apiKey: `${provider}-key`,
+				models: [{ ...model, contextWindow: 200_000, maxTokens: 8192 }],
+			});
+		}
 
 		const routable = gatewayRoutableProviders(storage, settings);
 		const index = indexModelsByRequestId(gatewayRoutableModels(registry), routable);
 
-		expect([...routable].sort()).toEqual(["anthropic"]);
-		expect(index.models.some(model => model.provider === "openrouter")).toBe(false);
-		expect(index.models.some(model => model.provider === "anthropic")).toBe(true);
+		expect([...routable].sort()).toEqual(["company-primary"]);
+		expect(index.models.some(model => model.provider === "company-secondary")).toBe(false);
+		expect(index.models.some(model => model.provider === "company-primary")).toBe(true);
 	});
 
 	test("serves judge-kind models alongside chat and keeps unrouted kinds out", async () => {
 		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
 		const registry = new ModelRegistry(await createAuthStorage(), tempDir.join("models.yml"));
+		const judge = buildModel({
+			...servedModel("company-judge", "judge-latest", "openai-decisions"),
+			kind: "judge",
+		});
+		registry.registerProvider(judge.provider, {
+			baseUrl: judge.baseUrl,
+			api: judge.api,
+			apiKey: "judge-key",
+			models: [
+				{ ...judge, contextWindow: 200_000, maxTokens: 8192 },
+				{
+					...servedModel(judge.provider, "company-chat", "openai-completions"),
+					contextWindow: 200_000,
+					maxTokens: 8192,
+				},
+			],
+		});
+		const tiny = buildModel({
+			...servedModel("company-tiny", "tiny-chat", "local-inference"),
+			kind: "tiny",
+		});
+		registry.registerProvider(tiny.provider, {
+			baseUrl: tiny.baseUrl,
+			api: tiny.api,
+			auth: "none",
+			models: [{ ...tiny, contextWindow: 200_000, maxTokens: 8192 }],
+		});
+		expect(registry.getAll("tiny").some(model => model.provider === tiny.provider)).toBe(true);
 		const routable = gatewayRoutableModels(registry);
-		// `getAll()` alone is chat-only, which is what left `/v1/systemone` with
-		// "Unknown model: jev-latest" for a credentialed TypeSafe account.
-		expect(registry.getAll().some(model => model.provider === "typesafe")).toBe(false);
+		expect(registry.getAll().some(model => model.provider === judge.provider && model.id === judge.id)).toBe(false);
 
-		const index = indexModelsByRequestId(routable, new Set(["typesafe", "local"]));
+		const index = indexModelsByRequestId(routable, new Set([judge.provider, tiny.provider]));
 
-		expect(resolveGatewayModel("typesafe/jev-latest", index)?.api).toBe("typesafe");
-		expect(resolveGatewayModel("jev-latest", index)?.provider).toBe("typesafe");
+		expect(resolveGatewayModel("company-judge/judge-latest", index)?.api).toBe(judge.api);
+		expect(resolveGatewayModel("judge-latest", index)?.provider).toBe(judge.provider);
+		expect(resolveGatewayModel("company-chat", index)?.api).toBe("openai-completions");
 		// Tiny on-device models have no gateway route and are not advertised.
 		expect(index.models.some(model => modelKind(model) === "tiny")).toBe(false);
 	});
 });
 
 describe("resolveGatewayModel", () => {
-	test("routes an OpenRouter variant selector the catalog does not list to its base model", async () => {
-		const storage = await createAuthStorage();
-		await storage.credentials.set("openrouter", { type: "api_key", key: "sk-test-openrouter" });
-		await storage.credentials.set("anthropic", { type: "api_key", key: "sk-test-anthropic" });
-		const settings = Settings.isolated({});
-		const registry = new ModelRegistry(storage, undefined, { ignoreLocalModelConfig: true, settings });
-		const index = indexModelsByRequestId(
-			gatewayRoutableModels(registry),
-			gatewayRoutableProviders(storage, settings),
-		);
-		const base = index.models.find(model => model.provider === "openrouter" && !model.id.includes(":"));
-		const anthropic = index.models.find(model => model.provider === "anthropic");
-		if (!base || !anthropic) throw new Error("expected bundled openrouter and anthropic models");
-
-		// Previously "Unknown model: openrouter/<id>:floor" — the suffix must survive to the wire id.
-		const floor = resolveGatewayModel(`openrouter/${base.id}:floor`, index);
-		expect(floor?.provider).toBe("openrouter");
-		expect(floor?.id).toBe(`${base.id}:floor`);
-		expect(floor?.api).toBe(base.api);
-		// Route suffixes are an OpenRouter concept; other providers stay exact-match.
-		expect(resolveGatewayModel(`anthropic/${anthropic.id}:floor`, index)).toBeUndefined();
-		expect(resolveGatewayModel("openrouter/no-such-vendor/no-such-model:floor", index)).toBeUndefined();
-	});
-
-	/** A served chat model, built through the catalog rules like discovery output. */
-	function servedModel(provider: string, id: string, api: Api): Model<Api> {
-		return buildModel({
-			id,
-			name: id,
-			api,
-			provider,
-			baseUrl: "https://example.test",
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 200_000,
-			maxTokens: 8192,
-		});
-	}
-
-	// `cursor`, `snowflake` and `venice` are unranked by the built-in provider order; `anthropic` is native.
-	const anthropic = servedModel("anthropic", "claude-x", "anthropic-messages");
-	const cursor = servedModel("cursor", "claude-x", "cursor-agent");
-	const snowflake = servedModel("snowflake", "claude-x", "anthropic-messages");
-	const venice = servedModel("venice", "claude-x", "openai-completions");
-	const catalog = [cursor, venice, snowflake, anthropic];
+	// Retained Copilot ranks ahead of explicit company namespaces by default.
+	const preferred = getTestModel("github-copilot");
+	const alpha = servedModel("company-alpha", preferred.id, "openai-completions");
+	const beta = servedModel("company-beta", preferred.id, "anthropic-messages");
+	const gamma = servedModel("company-gamma", preferred.id, "openai-completions");
+	const catalog = [alpha, gamma, beta, preferred];
 	const credentialed = new Set(catalog.map(model => model.provider));
 
 	test("a bare id resolves to the highest-priority provider whatever order the catalog lists it in", () => {
@@ -205,31 +227,32 @@ describe("resolveGatewayModel", () => {
 		// used to follow that order and land on whichever mirror stayed in front.
 		for (const order of [catalog, [...catalog].reverse()]) {
 			const index = indexModelsByRequestId(order, credentialed);
-			expect(resolveGatewayModel("claude-x", index)).toBe(anthropic);
+			expect(resolveGatewayModel(preferred.id, index)).toBe(preferred);
 			// The route's wire never outranks provider priority.
-			expect(resolveGatewayModel("claude-x", index, { api: "openai-completions" })).toBe(anthropic);
+			expect(resolveGatewayModel(preferred.id, index, { api: "openai-completions" })).toBe(preferred);
 		}
 	});
 
 	test("the configured provider order outranks the built-in one", () => {
-		const index = indexModelsByRequestId(catalog, credentialed, ["venice"]);
-		expect(resolveGatewayModel("claude-x", index)).toBe(venice);
+		const index = indexModelsByRequestId(catalog, credentialed, ["company-gamma"]);
+		expect(resolveGatewayModel(preferred.id, index)).toBe(gamma);
 	});
 
 	test("among equally ranked providers a bare id prefers the route's wire, then provider id", () => {
 		const index = indexModelsByRequestId(catalog, credentialed);
-		const unranked = { accepts: (model: Model<Api>) => model !== anthropic };
-		expect(resolveGatewayModel("claude-x", index, unranked)).toBe(cursor);
-		expect(resolveGatewayModel("claude-x", index, { ...unranked, api: "anthropic-messages" })).toBe(snowflake);
-		expect(resolveGatewayModel("claude-x", index, { ...unranked, api: "openai-completions" })).toBe(venice);
+		const unranked = { accepts: (model: Model<Api>) => model !== preferred };
+		expect(resolveGatewayModel(preferred.id, index, unranked)).toBe(alpha);
+		expect(resolveGatewayModel(preferred.id, index, { ...unranked, api: "anthropic-messages" })).toBe(beta);
+		expect(resolveGatewayModel(preferred.id, index, { ...unranked, api: "openai-completions" })).toBe(alpha);
 	});
 
 	test("a refused provider/id never resolves to another provider's bare id spelled the same way", () => {
-		const aggregated = servedModel("openrouter", "anthropic/claude-x", "openai-completions");
-		const index = indexModelsByRequestId([anthropic, aggregated], new Set(["anthropic", "openrouter"]));
-		expect(resolveGatewayModel("anthropic/claude-x", index)).toBe(anthropic);
+		const direct = servedModel("company-direct", "shared-chat", "anthropic-messages");
+		const aggregated = servedModel("company-mirror", "company-direct/shared-chat", "openai-completions");
+		const index = indexModelsByRequestId([direct, aggregated], new Set(["company-direct", "company-mirror"]));
+		expect(resolveGatewayModel("company-direct/shared-chat", index)).toBe(direct);
 		expect(
-			resolveGatewayModel("anthropic/claude-x", index, { accepts: model => model !== anthropic }),
+			resolveGatewayModel("company-direct/shared-chat", index, { accepts: model => model !== direct }),
 		).toBeUndefined();
 	});
 });

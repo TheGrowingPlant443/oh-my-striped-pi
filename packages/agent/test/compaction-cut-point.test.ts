@@ -102,7 +102,7 @@ describe("findCutPoint backward scan boundaries", () => {
 		// The replay keeps the latest assistant turn byte-for-byte, so a turn
 		// whose tool calls ended on max_tokens still sends its 30,000 tokens of
 		// signed reasoning, and the kept tail must count them.
-		const opus = getBundledModel("anthropic", "claude-opus-5-5");
+		const opus = getBundledModel("github-copilot", "claude-opus-5.5");
 		const fromOpus = (content: AssistantMessage["content"], stop: AssistantMessage["stopReason"]) => ({
 			...createAssistantMessage(content, stop),
 			api: opus.api,

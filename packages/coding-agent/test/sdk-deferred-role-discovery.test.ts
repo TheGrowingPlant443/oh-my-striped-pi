@@ -12,7 +12,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 
 // Regression for #8863: a deferred `--model @<role>` whose role maps to a model
-// on a discovery-backed provider (ollama/oMLX/llama-swap) must trigger the
+// on configured Copilot discovery must trigger the
 // online-if-uncached discovery refresh. Before the fix the deferred guard in
 // sdk.ts treated the role's expanded `configuredPatterns` as a resolved runtime
 // match, so `runtimeResolved` was `true`, the fallback refresh was skipped, and
@@ -21,13 +21,8 @@ describe("createAgentSession deferred role alias on discoverable provider (#8863
 	let tempDir: string;
 	let modelsJsonPath: string;
 	let authStorage: AuthStorage;
-	const savedOllamaEnv: Record<string, string | undefined> = {};
 
 	beforeEach(async () => {
-		for (const key of ["OLLAMA_BASE_URL", "OLLAMA_HOST", "OLLAMA_CONTEXT_LENGTH"] as const) {
-			savedOllamaEnv[key] = Bun.env[key];
-			delete Bun.env[key];
-		}
 		tempDir = path.join(os.tmpdir(), `pi-test-sdk-deferred-role-${Snowflake.next()}`);
 		fs.mkdirSync(tempDir, { recursive: true });
 		modelsJsonPath = path.join(tempDir, "models.json");
@@ -35,31 +30,16 @@ describe("createAgentSession deferred role alias on discoverable provider (#8863
 	});
 
 	afterEach(() => {
-		for (const key of ["OLLAMA_BASE_URL", "OLLAMA_HOST", "OLLAMA_CONTEXT_LENGTH"] as const) {
-			const original = savedOllamaEnv[key];
-			if (original === undefined) delete Bun.env[key];
-			else Bun.env[key] = original;
-		}
 		authStorage.close();
 		if (tempDir && fs.existsSync(tempDir)) removeSyncWithRetries(tempDir);
 	});
 
-	const mockOllamaDiscovery = (modelNames: string[], endpoint = "http://127.0.0.1:11434"): FetchImpl => {
+	const mockDiscovery = (modelNames: string[]): FetchImpl => {
 		return async input => {
-			const url = String(input);
-			if (url === `${endpoint}/api/tags`) {
-				return new Response(JSON.stringify({ models: modelNames.map(name => ({ name })) }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
+			if (String(input) === "https://copilot.example/v1/models") {
+				return Response.json({ data: modelNames.map(id => ({ id })) });
 			}
-			if (url === `${endpoint}/api/show`) {
-				return new Response(JSON.stringify({ capabilities: ["completion"] }), {
-					status: 200,
-					headers: { "Content-Type": "application/json" },
-				});
-			}
-			throw new Error(`Unexpected URL: ${url}`);
+			return new Response("", { status: 404 });
 		};
 	};
 
@@ -68,22 +48,22 @@ describe("createAgentSession deferred role alias on discoverable provider (#8863
 			modelsJsonPath,
 			JSON.stringify({
 				providers: {
-					ollama: {
-						baseUrl: "http://127.0.0.1:11434/v1",
+					"github-copilot": {
+						baseUrl: "https://copilot.example/v1",
 						api: "openai-completions",
 						auth: "none",
-						discovery: { type: "ollama" },
+						discovery: { type: "openai-models-list" },
 					},
 				},
 			}),
 		);
-		// Fresh registry with no discovery cache: the ollama model is only
+		// Fresh registry with no discovery cache: the requested model is only
 		// reachable through a refresh, which the deferred path must perform.
 		const modelRegistry = new ModelRegistry(authStorage, modelsJsonPath, {
-			fetch: mockOllamaDiscovery(["phi3"]),
+			fetch: mockDiscovery(["phi3"]),
 		});
 		const settings = Settings.isolated({
-			modelRoles: { smol: "ollama/phi3" },
+			modelRoles: { smol: "github-copilot/phi3" },
 			"compaction.enabled": false,
 		});
 
@@ -110,7 +90,7 @@ describe("createAgentSession deferred role alias on discoverable provider (#8863
 			});
 			session = result.session;
 
-			expect(result.session.model?.provider).toBe("ollama");
+			expect(result.session.model?.provider).toBe("github-copilot");
 			expect(result.session.model?.id).toBe("phi3");
 		} finally {
 			session?.dispose();

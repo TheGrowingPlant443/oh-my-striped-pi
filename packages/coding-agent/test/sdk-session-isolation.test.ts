@@ -4,7 +4,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -19,6 +18,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { VibeSessionRegistry } from "@oh-my-pi/pi-coding-agent/vibe/runtime";
 import { getSessionsDir, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 import { getActiveProfile, getConfigRootDir, setProfile } from "@oh-my-pi/pi-utils/dirs";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function createTtsrRule(name: string): Rule {
 	return {
@@ -473,8 +473,7 @@ describe("createAgentSession session storage isolation", () => {
 					"- type: plain\n  content: sdk-secret-token-123456\n",
 				);
 
-				const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-				if (!model) throw new Error("Expected anthropic model");
+				const model = getTestModel("github-copilot");
 
 				const obfuscator = new secrets.SecretObfuscator(
 					[{ type: "plain", content: "sdk-secret-token-123456" }],

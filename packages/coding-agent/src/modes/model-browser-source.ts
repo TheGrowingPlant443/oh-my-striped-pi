@@ -7,6 +7,8 @@ import { buildServiceTierByFamily } from "../config/service-tier";
 import type { Settings } from "../config/settings";
 import { describeModelCompactionPoint } from "../session/model-compaction-threshold";
 
+import { SEARCH_ENGINE_MODELS } from "../web/search/provider";
+import { DEFAULT_SEARCH_CHAIN, resolveSearchRoleValue } from "../web/search/selection";
 import {
 	cfgCycleOrder,
 	cfgDisabledProviders,
@@ -83,8 +85,12 @@ export function createModelBrowserSource(
 		getGlobalModelRole: role => settings.getGlobalModelRole(role),
 		getModelRoleSource: role => settings.getModelRoleSource(role),
 		getRoleInfo: role => getRoleInfo(role, settings),
-		defaultRoleChain: role => rolePriorityDefaults(role),
-		resolveRoleValue: (value, models, roleLookup) => resolveModelRoleValue(value, models, { settings, roleLookup }),
+		roleCandidates: role => (role === "web" ? SEARCH_ENGINE_MODELS : undefined),
+		defaultRoleChain: role => (role === "web" ? [...DEFAULT_SEARCH_CHAIN] : rolePriorityDefaults(role)),
+		resolveRoleValue: (value, models, roleLookup, role) =>
+			role === "web"
+				? resolveSearchRoleValue(value, settings, roleLookup)
+				: resolveModelRoleValue(value, models, { settings, roleLookup }),
 		getModelPresets: () => ({ names: getModelPresetNames(settings), active: findActiveModelPreset(settings) }),
 		compactionPointFor: model => describeModelCompactionPoint(settings, model),
 	};

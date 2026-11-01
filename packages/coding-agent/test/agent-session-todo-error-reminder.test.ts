@@ -35,7 +35,7 @@ describe("AgentSession todo-error reminder", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-todo-error-reminder-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		authStorage.keys.setRuntime("github-copilot", "copilot-test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -56,7 +56,7 @@ describe("AgentSession todo-error reminder", () => {
 		reminders: string[];
 		settledState: { isSettled: boolean; queuedMessageCount: number };
 	}> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) throw new Error("Expected bundled test model to exist");
 		const mock = createMockModel({ responses: [...firstRun, { content: ["Next answer"] }] });
 		const settings = Settings.isolated({

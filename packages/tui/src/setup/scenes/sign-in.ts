@@ -1,5 +1,4 @@
 import type { AuthStorage } from "@oh-my-pi/pi-ai";
-import { PASTE_CODE_LOGIN_PROVIDERS } from "@oh-my-pi/pi-ai";
 import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
 import type { OAuthProvider } from "@oh-my-pi/pi-ai/oauth/types";
 import type { TspText } from "@oh-my-pi/pi-wire";
@@ -25,12 +24,12 @@ import {
 	type StyledLine,
 } from "./types";
 
-const SCENE_TITLE = "Sign in to your providers";
+const SCENE_TITLE = "Model providers";
 /** Login dialog rows kept above a cut on short screens: top border, spacer, first sign-in link row. */
 const DIALOG_HEAD_ROWS = 3;
-const LIST_LEAD = "Pick a provider to sign in — you can connect more than one.";
-/** The provider sheet's subtitle: its title and rows already say "pick a provider". */
-const SHEET_LEAD = "You can connect more than one.";
+const LIST_LEAD = "Local models need no login. Sign in to GitHub Copilot to use its models.";
+/** The provider sheet's subtitle also explains the non-login local provider. */
+const SHEET_LEAD = LIST_LEAD;
 
 /** The last finished sign-in (`provider` is the display name): shown on the provider sheet (natively) or under the list (ANSI). */
 type SignInOutcome =
@@ -38,9 +37,8 @@ type SignInOutcome =
 	| { readonly kind: "error"; readonly provider: string; readonly message: string };
 
 /**
- * "Sign in" scene: lets the user authenticate one or more model providers via
- * OAuth. It never auto-advances the wizard — the user may sign in to several
- * providers and then leave the step with Esc.
+ * Provider setup: local models need no login; GitHub Copilot uses OAuth.
+ * It never auto-advances the wizard; Esc leaves the step.
  *
  * Picking is the provider selector (natively a setup sheet: Skip/Continue on
  * Esc, Sign in on Enter); signing in is the app's {@link LoginDialogComponent},
@@ -50,7 +48,7 @@ type SignInOutcome =
 export class SignInScene implements SetupSceneController {
 	readonly title = SCENE_TITLE;
 	get subtitle(): string {
-		return `Sign in to one or more providers. Press ${editorKey("tui.select.cancel")} when you're done.`;
+		return `Local needs no login. Sign in to GitHub Copilot, or press ${editorKey("tui.select.cancel")} to continue.`;
 	}
 
 	#authStorage: AuthStorage;
@@ -179,10 +177,7 @@ export class SignInScene implements SetupSceneController {
 		const outcome = this.#outcome;
 		let status: TspText | undefined;
 		if (outcome?.kind === "success") {
-			status = [
-				span(`Signed in to ${outcome.provider}.`, "success"),
-				span(" Add another provider or continue.", "muted"),
-			];
+			status = [span(`Signed in to ${outcome.provider}.`, "success"), span(" Continue to choose a model.", "muted")];
 		} else if (outcome?.kind === "error") {
 			status = [span(`Couldn't sign in to ${outcome.provider}: ${outcome.message}`, "error")];
 		}
@@ -209,7 +204,7 @@ export class SignInScene implements SetupSceneController {
 		return [
 			{ text: `Login failed: ${outcome.message}`, color: "error" },
 			{
-				text: `Choose another provider or press ${editorKey("tui.select.cancel")} to continue.`,
+				text: `Try again or press ${editorKey("tui.select.cancel")} to continue.`,
 				color: "dim",
 			},
 		];
@@ -233,7 +228,6 @@ export class SignInScene implements SetupSceneController {
 	async #login(providerId: string): Promise<void> {
 		if (this.#dialog || this.#lifetime.signal.aborted) return;
 		const ctx = this.#host.ctx;
-		const useManualInput = PASTE_CODE_LOGIN_PROVIDERS.has(providerId);
 		const name = getOAuthProviders().find(provider => provider.id === providerId)?.name ?? providerId;
 		const dialog = new LoginDialogComponent(
 			this.#host,
@@ -249,17 +243,9 @@ export class SignInScene implements SetupSceneController {
 		try {
 			await this.#authStorage.oauth.login(providerId as OAuthProvider, {
 				signal: AbortSignal.any([dialog.signal, this.#lifetime.signal]),
-				onBrowserSession: (request, signal) => ctx.captureBrowserSession(request, signal),
 				onAuth: info => dialog.showAuth(info.url, info.instructions, info.launchUrl),
 				onPrompt: prompt => dialog.showPrompt(prompt),
 				onProgress: message => dialog.showProgress(message),
-				onManualCodeInput: useManualInput
-					? signal =>
-							dialog.showManualInput(
-								`Paste the authorization code (or full redirect URL), then press ${editorKey("tui.input.submit")}:`,
-								signal,
-							)
-					: undefined,
 			});
 			// Provider-scoped online refresh so the just-persisted credential re-runs
 			// discovery instead of reusing a fresh authoritative cache row (#5780).
@@ -285,7 +271,7 @@ export class SignInScene implements SetupSceneController {
 export const providersSetupScene: SetupScene = {
 	id: "providers",
 	title: SCENE_TITLE,
-	step: "Sign in",
+	step: "Providers",
 	minVersion: 1,
 	mount: host => new SignInScene(host),
 };

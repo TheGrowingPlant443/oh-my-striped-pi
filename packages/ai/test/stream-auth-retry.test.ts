@@ -1,14 +1,21 @@
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import type { ApiKeyResolution, ApiKeyResolveContext } from "@oh-my-pi/pi-ai";
-import { registerCustomApi, resolveApiKeyOnce, seedApiKeyResolver, unregisterCustomApis } from "@oh-my-pi/pi-ai";
-import { OAuthError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
+import {
+	getCustomApi,
+	type RegisteredCustomApi,
+	registerCustomApi,
+	resolveApiKeyOnce,
+	seedApiKeyResolver,
+	unregisterCustomApis,
+} from "@oh-my-pi/pi-ai";
+import { MissingApiKeyError, OAuthError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
 import { classify } from "@oh-my-pi/pi-ai/error/flags";
 import { streamSimple } from "@oh-my-pi/pi-ai/stream";
 import type { Api, AssistantMessage, Context, Model, SimpleStreamOptions, Usage } from "@oh-my-pi/pi-ai/types";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 
 const SOURCE_ID = "stream-auth-retry-test";
-const API = "stream-auth-retry-test" as Api;
+const API = "openai-completions" as const;
 
 function usage(): Usage {
 	return {
@@ -26,7 +33,7 @@ function assistant(content: string[] = []): AssistantMessage {
 		role: "assistant",
 		content: content.map(text => ({ type: "text" as const, text })),
 		api: API,
-		provider: "test-provider",
+		provider: "company",
 		model: "test-model",
 		timestamp: 1,
 		stopReason: "stop",
@@ -48,35 +55,13 @@ function usageLimitError(): Error & { status: number } {
 	});
 }
 
-const GOOGLE_CAPACITY_EXHAUSTED_MESSAGE = `Cloud Code Assist API error (429): ${JSON.stringify({
-	error: {
-		code: 429,
-		message: "You have exhausted your capacity on this model. Resets in 0s.",
-		status: "RESOURCE_EXHAUSTED",
-		details: [
-			{
-				"@type": "type.googleapis.com/google.rpc.ErrorInfo",
-				reason: "RATE_LIMIT_EXCEEDED",
-				domain: "cloudcode-pa.googleapis.com",
-				metadata: {
-					model: "gemini-3.7-flash-medium",
-					quotaResetDelay: "835.150299ms",
-				},
-			},
-			{
-				"@type": "type.googleapis.com/google.rpc.RetryInfo",
-				retryDelay: "0.835150299s",
-			},
-		],
-	},
-})}`;
-
 function model(): Model<Api> {
 	return {
 		id: "test-model",
 		name: "Test Model",
 		api: API,
-		provider: "test-provider",
+		provider: "company",
+		baseUrl: "https://inference.company.example/v1",
 		contextWindow: 1000,
 		maxTokens: 100,
 	} as Model<Api>;
@@ -99,8 +84,18 @@ function ok(stream: AssistantMessageEventStream): void {
 }
 
 describe("streamSimple resolver auth retry", () => {
+	let previousApi: RegisteredCustomApi | undefined;
+	beforeEach(() => {
+		previousApi = getCustomApi(API);
+		// The missing-key case must reach built-in auth, not a prior keyless custom registration.
+		if (previousApi) {
+			registerCustomApi(API, previousApi.streamSimple, SOURCE_ID, previousApi.stream);
+			unregisterCustomApis(SOURCE_ID);
+		}
+	});
 	afterEach(() => {
 		unregisterCustomApis(SOURCE_ID);
+		if (previousApi) registerCustomApi(API, previousApi.streamSimple, previousApi.sourceId, previousApi.stream);
 	});
 
 	it("retries with a refreshed key when a 401 is thrown before the first event", async () => {
@@ -188,7 +183,7 @@ describe("streamSimple resolver auth retry", () => {
 						? stream.fail(
 								new OAuthError("OAuth token expired before request", {
 									kind: "token-refresh",
-									provider: "google-antigravity",
+									provider: "company",
 								}),
 							)
 						: ok(stream),
@@ -220,11 +215,11 @@ describe("streamSimple resolver auth retry", () => {
 		const contexts: ApiKeyResolveContext[] = [];
 		const firstError = new OAuthError("First token expired before request", {
 			kind: "token-refresh",
-			provider: "google-antigravity",
+			provider: "company",
 		});
 		const secondError = new OAuthError("Refreshed token also expired before request", {
 			kind: "token-refresh",
-			provider: "google-antigravity",
+			provider: "company",
 		});
 		let providerCalls = 0;
 		registerCustomApi(
@@ -265,7 +260,7 @@ describe("streamSimple resolver auth retry", () => {
 		const contexts: ApiKeyResolveContext[] = [];
 		const configurationError = new OAuthError("OAuth provider is misconfigured", {
 			kind: "configuration",
-			provider: "google-antigravity",
+			provider: "company",
 		});
 		let providerCalls = 0;
 		registerCustomApi(
@@ -411,41 +406,6 @@ describe("streamSimple resolver auth retry", () => {
 
 		expect((await stream.result()).content).toEqual([{ type: "text", text: "ok" }]);
 		expect(keys).toEqual(["old-key", "new-key"]);
-	});
-
-	it("retries when Codex reports an invalidated OAuth token without an HTTP status", async () => {
-		const keys: unknown[] = [];
-		registerCustomApi(
-			API,
-			(_model: Model<Api>, _context: Context, options?: SimpleStreamOptions) => {
-				pushKey(keys, options);
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(() => {
-					if (keys.length === 1) {
-						stream.push({ type: "start", partial: assistant() });
-						stream.push({
-							type: "error",
-							reason: "error",
-							error: assistantError("Encountered invalidated oauth token for user, failing request"),
-						});
-						return;
-					}
-					ok(stream);
-				});
-				return stream;
-			},
-			SOURCE_ID,
-		);
-
-		const stream = streamSimple(model(), context, {
-			apiKey: async ctx => (ctx.error === undefined ? "invalidated-key" : "healthy-key"),
-		});
-		for await (const _event of stream) {
-			// drain
-		}
-
-		expect((await stream.result()).content).toEqual([{ type: "text", text: "ok" }]);
-		expect(keys).toEqual(["invalidated-key", "healthy-key"]);
 	});
 
 	it("does not retry after replay-unsafe content has been emitted", async () => {
@@ -693,53 +653,6 @@ describe("streamSimple resolver auth retry", () => {
 		expect(eventTypes).toEqual(["start", "text_start", "text_delta", "text_end", "done"]);
 	});
 
-	it("rotates through every distinct sibling on Codex cyber-policy denials", async () => {
-		const keys: unknown[] = [];
-		const eventTypes: string[] = [];
-		const contexts: ApiKeyResolveContext[] = [];
-		const pool = ["credential-A", "credential-B", "credential-C", "credential-D"];
-		const errorMessage =
-			"Codex error event: This content was flagged for possible cybersecurity risk. Join Trusted Access for Cyber. (code=cyber_policy)";
-		const errorId = classify(new Error(errorMessage), "openai-codex-responses");
-		let nextSibling = 0;
-		registerCustomApi(
-			API,
-			(_model: Model<Api>, _context: Context, options?: SimpleStreamOptions) => {
-				pushKey(keys, options);
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(() => {
-					if (options?.apiKey === "credential-D") {
-						ok(stream);
-						return;
-					}
-					stream.push({ type: "start", partial: assistant() });
-					stream.push({
-						type: "error",
-						reason: "error",
-						error: assistantError(errorMessage, undefined, errorId),
-					});
-				});
-				return stream;
-			},
-			SOURCE_ID,
-		);
-
-		const stream = streamSimple(model(), context, {
-			apiKey: async ctx => {
-				contexts.push(ctx);
-				return ctx.error === undefined ? pool[0] : pool[++nextSibling];
-			},
-		});
-		for await (const event of stream) {
-			eventTypes.push(event.type);
-		}
-
-		expect((await stream.result()).content).toEqual([{ type: "text", text: "ok" }]);
-		expect(keys).toEqual(pool);
-		expect(contexts.map(ctx => ctx.lastChance)).toEqual([false, true, true, true]);
-		expect(eventTypes).toEqual(["start", "text_start", "text_delta", "text_end", "done"]);
-	});
-
 	it("stops replay-safe usage rotation when the resolver cycles to an attempted credential", async () => {
 		const keys: unknown[] = [];
 		const resolved = ["credential-A", "credential-B", "credential-A"];
@@ -881,51 +794,6 @@ describe("streamSimple resolver auth retry", () => {
 		}
 	});
 
-	it("rotates on short Google account capacity exhaustion before content", async () => {
-		const keys: unknown[] = [];
-		const retryContexts: ApiKeyResolveContext[] = [];
-		registerCustomApi(
-			API,
-			(_model: Model<Api>, _context: Context, options?: SimpleStreamOptions) => {
-				pushKey(keys, options);
-				const stream = new AssistantMessageEventStream();
-				queueMicrotask(() => {
-					if (options?.apiKey === "next-key") {
-						ok(stream);
-						return;
-					}
-					stream.push({ type: "start", partial: assistant() });
-					stream.push({
-						type: "error",
-						reason: "error",
-						error: assistantError(GOOGLE_CAPACITY_EXHAUSTED_MESSAGE, 429),
-					});
-				});
-				return stream;
-			},
-			SOURCE_ID,
-		);
-
-		const stream = streamSimple(model(), context, {
-			apiKey: async ctx => {
-				if (ctx.error !== undefined) retryContexts.push(ctx);
-				return ctx.error === undefined ? "old-key" : ctx.lastChance ? "next-key" : "old-key";
-			},
-		});
-		for await (const _event of stream) {
-			// drain
-		}
-
-		expect((await stream.result()).content).toEqual([{ type: "text", text: "ok" }]);
-		expect(keys).toEqual(["old-key", "next-key"]);
-		expect(retryContexts.map(ctx => ({ lastChance: ctx.lastChance, hasError: ctx.error !== undefined }))).toEqual([
-			{ lastChance: true, hasError: true },
-		]);
-		const retryError = retryContexts[0]?.error;
-		if (!(retryError instanceof Error)) throw new Error("Expected credential retry error");
-		expect(retryError.message).toContain("exhausted your capacity");
-	});
-
 	it("surfaces the original error when the resolver declines every retry", async () => {
 		const keys: unknown[] = [];
 		const original = usageLimitError();
@@ -960,16 +828,13 @@ describe("streamSimple resolver auth retry", () => {
 
 	it("fails the stream when the initial resolve yields no key", async () => {
 		let attempts = 0;
-		registerCustomApi(
-			API,
-			() => {
+		const stream = streamSimple(model(), context, {
+			apiKey: async () => undefined,
+			fetch: async () => {
 				attempts += 1;
-				return new AssistantMessageEventStream();
+				throw new Error("unexpected upstream request without a credential");
 			},
-			SOURCE_ID,
-		);
-
-		const stream = streamSimple(model(), context, { apiKey: async () => undefined });
+		});
 
 		let caught: unknown;
 		try {
@@ -980,7 +845,11 @@ describe("streamSimple resolver auth retry", () => {
 			caught = error;
 		}
 
-		expect((caught as Error).message).toMatch(/No API key for provider/);
+		expect(caught).toBeInstanceOf(MissingApiKeyError);
+		expect(caught).toMatchObject({
+			provider: "company",
+			message: expect.stringMatching(/No API key for provider/),
+		});
 		expect(attempts).toBe(0);
 	});
 });

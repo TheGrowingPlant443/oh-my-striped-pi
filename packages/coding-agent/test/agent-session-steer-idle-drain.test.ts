@@ -29,8 +29,8 @@ function createAssistantMessage(): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text: "Done." }],
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot",
+		model: "claude-sonnet-4.5",
 		stopReason: "stop",
 		usage: {
 			input: 100,
@@ -64,13 +64,13 @@ describe("AgentSession steer idle drain", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-steer-idle-drain-");
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
 	async function createSession(messages: Parameters<typeof Agent.prototype.appendMessage>[0][]): Promise<void> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected built-in Copilot model to exist");
 
 		const agent = new Agent({
 			initialState: { model, systemPrompt: ["Test"], tools: [], messages },
@@ -154,8 +154,8 @@ describe("AgentSession steer idle drain", () => {
 		// suite's fake clock would gate (it hangs otherwise), and the parked turn is
 		// cancelled by abort via the AbortSignal — never waited on — so there is no 60s wait.
 		vi.useRealTimers();
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected built-in Copilot model to exist");
 		const started = Promise.withResolvers<void>();
 		const mock = createMockModel({
 			responses: [

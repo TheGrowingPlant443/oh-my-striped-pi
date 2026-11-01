@@ -12,9 +12,9 @@ describe("auth-gateway explicit OpenAI prompt cache controls", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-openai-prompt-cache-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("mock", "test-key");
+		storage.keys.setRuntime("local", "test-key");
 		const mock = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "gateway-prompt-cache",
 			handler: () => ({ content: ["ok"] }),
 		});

@@ -10,7 +10,7 @@ const model: Model<"openai-responses"> = buildModel({
 	id: "anthropic/claude-sonnet-5.5",
 	name: "Claude Sonnet 5.5",
 	api: "openai-responses",
-	provider: "openrouter",
+	provider: "github-copilot",
 	baseUrl: "https://openrouter.ai/api/v1",
 	reasoning: true,
 	input: ["text"],

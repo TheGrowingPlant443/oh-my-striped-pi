@@ -74,7 +74,6 @@ describe("eval prelude runtime", () => {
 				data: Buffer.from(pixels).toBase64(),
 				detail: "original",
 				url: "https://images.example/frame.png",
-				providerFile: { provider: "google", uri: "gs://frames/native.png" },
 			};
 			const ordinary: ImageContent = { ...original, detail: "high" };
 			const calls: unknown[] = [];
@@ -94,8 +93,8 @@ describe("eval prelude runtime", () => {
 			const result = await tool.execute(`frame-fidelity-${language}`, { language, code, timeout: 30 });
 			expect(result.details?.cells?.[0]?.status).toBe("complete");
 			expect(calls).toHaveLength(1);
-			const model = getBundledModels("openai")[0];
-			if (!model) throw new Error("Missing bundled OpenAI model");
+			const model = getBundledModels("github-copilot")[0];
+			if (!model) throw new Error("Missing bundled GitHub Copilot model");
 			const messages: Message[] = [
 				{
 					role: "toolResult",
@@ -117,14 +116,12 @@ describe("eval prelude runtime", () => {
 					expect([metadata.width, metadata.height]).toEqual([3840, 2160]);
 					expect(image.detail).toBe("original");
 					expect(image.url).toBe(original.url);
-					expect(image.providerFile).toEqual(original.providerFile);
 					expect(Buffer.from(image.data, "base64")).toEqual(Buffer.from(pixels));
 				} else {
 					expect([metadata.width, metadata.height]).toEqual([1568, 882]);
 					expect(image.detail).toBe("high");
 					expect(image.data).not.toBe(original.data);
 					expect(image.url).toBeUndefined();
-					expect(image.providerFile).toBeUndefined();
 				}
 			}
 		}, 60_000);

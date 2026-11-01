@@ -1055,26 +1055,10 @@ export class EventController {
 		this.#lastTtsrNotification = undefined;
 		this.#streamingReveal.stop();
 		this.#toolArgsReveal.stop();
-		this.#seedHeldCompletionsFromPendingResults();
-	}
-
-	/** Restore display state without replaying completion notifications or persistence. */
-	#seedHeldCompletionsFromPendingResults(): void {
-		const pending = this.ctx.viewSession.agent.getPendingToolResults();
-		for (const result of pending) {
-			this.#orphanedToolCompletions.set(result.toolCallId, {
-				type: "tool_execution_end",
-				toolCallId: result.toolCallId,
-				toolName: result.toolName,
-				result: { content: result.content, details: result.details },
-				isError: result.isError,
-			});
-		}
 	}
 
 	/** Settle replay-created cards without waiting for another streaming update. */
 	restorePendingToolResults(): void {
-		this.#seedHeldCompletionsFromPendingResults();
 		for (const [toolCallId, component] of this.ctx.pendingTools) {
 			this.#toolTimelineComponents.set(toolCallId, component);
 			this.#settleHeldCompletionIfPresent(toolCallId, component);
@@ -1190,7 +1174,6 @@ export class EventController {
 		this.#readToolCallArgs.clear();
 		this.#readToolCallAssistantComponents.clear();
 		this.#resetReadGroup();
-		this.#seedHeldCompletionsFromPendingResults();
 		this.#resolveDisplaceableTodo();
 		this.#lastAssistantComponent = undefined;
 		// Restore terminal errors in transcript history when their banner clears.
@@ -1238,7 +1221,7 @@ export class EventController {
 			}
 			this.#renderedCustomMessages.add(signature);
 			this.#resetReadGroup();
-			// A directly-invoked `/skill:` or writable-collab custom prompt is the
+			// A directly-invoked `/skill:` prompt is the
 			// run's initiating message (user attribution): seed the prompt→yield
 			// delta from it, the same as a user message.
 			if (event.message.role === "custom" && isUserTurnInitiator(event.message)) {
@@ -1470,10 +1453,7 @@ export class EventController {
 	 * live, without touching their animation state. `#handleToolExecutionEnd`
 	 * settles a displaceable `wait`/`todo` result out of `pendingTools` into
 	 * these trackers instead (see the `isDisplaceableBlock()` branch there), so
-	 * a caller that enumerates only `pendingTools` before replacing the whole
-	 * transcript — the collab guest resync (`guest.ts#finalizeSnapshot`) —
-	 * misses a still-animated "waiting" card. That caller must fold this
-	 * method's result into its own live-block accounting.
+	 * callers must account for still-animated "waiting" cards when replacing a transcript.
 	 */
 	takeDisplaceableComponents(): ToolExecutionHandle[] {
 		const components: ToolExecutionHandle[] = [];
@@ -2364,7 +2344,7 @@ export class EventController {
 		// the turn-end teardown now would stop the loader the live turn just created,
 		// leaving "Working…" gone while the agent keeps running. The live turn owns
 		// the loader and finalizes it at its own agent_end (isStreaming === false by
-		// then). Mirrors the collab guest's !isStreaming loader reconciler.
+		// then).
 		if (this.ctx.session.isStreaming) {
 			// A focused worker can end while the main session streams; its run is
 			// over even though main's is not. Tear down only what the viewed worker

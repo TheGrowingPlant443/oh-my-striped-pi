@@ -26,7 +26,7 @@ describe("provider response metadata", () => {
 
 	it("invokes the response callback with normalized metadata", async () => {
 		const seen: Array<{ response: ProviderResponseMetadata; model: Model | undefined }> = [];
-		const model = { provider: "openai", api: "openai-responses", id: "gpt-test" } as Model;
+		const model = { provider: "github-copilot", api: "openai-responses", id: "gpt-test" } as Model;
 
 		await notifyProviderResponse(
 			{
@@ -65,7 +65,7 @@ function createSseResponse(events: unknown[], headers: Record<string, string> = 
 describe("streamSimple onResponse propagation", () => {
 	it("invokes onResponse for the default openai-completions path through streamSimple", async () => {
 		const model: Model<"openai-completions"> = {
-			...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
+			...(getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">),
 			api: "openai-completions",
 		};
 

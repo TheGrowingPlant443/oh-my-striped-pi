@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
@@ -6,10 +10,8 @@ import * as path from "node:path";
 import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
 import { removeWithRetries } from "../../utils/src/temp";
 
-const PROVIDER = "anthropic";
-const PROVIDER_KEY = "anthropic:oauth";
-const CODEX_PROVIDER = "openai-codex";
-const CODEX_PROVIDER_KEY = "openai-codex:oauth";
+const PROVIDER = "github-copilot";
+const PROVIDER_KEY = "github-copilot:oauth";
 const FUTURE_BLOCK_MS = 1_899_999_999_000;
 const EXPIRED_BLOCK_MS = 1;
 const LEGACY_TIMESTAMP = 1_700_000_000;
@@ -74,45 +76,6 @@ function readCredentialBlockRows(dbPath: string): Array<{
 	}
 }
 
-function readLegacyCodexSharedBlock(
-	dbPath: string,
-	credentialId: number,
-	nowMs = Date.now(),
-): { blocked_until_ms: number; updated_at: number } | undefined {
-	const db = new Database(dbPath, { readonly: true });
-	try {
-		const row = db
-			.prepare(
-				`SELECT blocked_until_ms, updated_at
-				FROM auth_credential_blocks
-				WHERE credential_id = ?
-					AND provider_key = ?
-					AND block_scope = 'shared'
-					AND blocked_until_ms > ?`,
-			)
-			.get(credentialId, CODEX_PROVIDER_KEY, nowMs) as
-			| { blocked_until_ms: number; updated_at: number }
-			| null
-			| undefined;
-		return row ?? undefined;
-	} finally {
-		db.close();
-	}
-}
-
-function prepareV6BlockSchema(db: Database): void {
-	db.run(`
-		DROP TRIGGER IF EXISTS auth_codex_shared_insert_to_meters;
-		DROP TRIGGER IF EXISTS auth_codex_shared_update_to_meters;
-		DROP TRIGGER IF EXISTS auth_codex_meter_insert_to_shared;
-		DROP TRIGGER IF EXISTS auth_codex_meter_update_to_shared;
-		DROP TRIGGER IF EXISTS auth_codex_shared_delete_to_meters;
-		DROP TRIGGER IF EXISTS auth_codex_meter_delete_to_shared;
-		DROP TABLE IF EXISTS auth_credential_block_mirror_guard;
-		UPDATE auth_schema_version SET version = 6 WHERE id = 1;
-	`);
-}
-
 describe("AuthStorage credential block persistence", () => {
 	let tempDir = "";
 	let dbPath = "";
@@ -130,7 +93,7 @@ describe("AuthStorage credential block persistence", () => {
 		}
 	});
 
-	it("honors scoped and unscoped blocks written by a previous AuthStorage instance", async () => {
+	it("honors explicit ranking-scope and unscoped blocks written by a previous AuthStorage instance", async () => {
 		const firstStore = await SqliteAuthCredentialStore.open(dbPath);
 		await firstStore.saveOAuth(PROVIDER, oauthCredential("1"));
 		await firstStore.saveOAuth(PROVIDER, oauthCredential("2"));
@@ -156,7 +119,14 @@ describe("AuthStorage credential block persistence", () => {
 		}
 
 		const reopenedStore = await SqliteAuthCredentialStore.open(dbPath);
-		const reopenedStorage = new AuthStorage(reopenedStore);
+		const reopenedStorage = new AuthStorage(reopenedStore, {
+			usageProviderResolver: () => undefined,
+			rankingStrategyResolver: () => ({
+				findWindowLimits: () => ({}),
+				windowDefaults: { primaryMs: 0, secondaryMs: 0 },
+				blockScope: () => "tier:fable",
+			}),
+		});
 		await reopenedStorage.credentials.reload();
 		try {
 			const fableKey = await reopenedStorage.keys.get(PROVIDER, "session-3", { modelId: "claude-fable-5" });
@@ -376,269 +346,26 @@ describe("AuthStorage credential block persistence", () => {
 		}
 	});
 
-	it("migrates v6 Codex shared blocks to meter rows while retaining a legacy mirror", async () => {
-		const setupStore = await SqliteAuthCredentialStore.open(dbPath);
-		await setupStore.saveOAuth(CODEX_PROVIDER, oauthCredential("codex"));
-		await setupStore.saveOAuth(PROVIDER, oauthCredential("anthropic"));
-		const [codexRow] = setupStore.listAuthCredentials(CODEX_PROVIDER);
-		const [anthropicRow] = setupStore.listAuthCredentials(PROVIDER);
-		setupStore.close();
-		if (!codexRow || !anthropicRow) throw new Error("expected credential rows");
-
-		const sharedExpiryMs = FUTURE_BLOCK_MS + 60_000;
-		const chatExpiryMs = FUTURE_BLOCK_MS + 120_000;
-		const sparkExpiryMs = FUTURE_BLOCK_MS;
-		const sharedUpdatedAt = LEGACY_TIMESTAMP;
-		const chatUpdatedAt = LEGACY_TIMESTAMP - 100;
-		const sparkUpdatedAt = LEGACY_TIMESTAMP + 100;
-		const db = new Database(dbPath);
-		try {
-			prepareV6BlockSchema(db);
-			const insert = db.prepare(
-				"INSERT INTO auth_credential_blocks (credential_id, provider_key, block_scope, blocked_until_ms, updated_at) VALUES (?, ?, ?, ?, ?)",
-			);
-			insert.run(codexRow.id, CODEX_PROVIDER_KEY, "shared", sharedExpiryMs, sharedUpdatedAt);
-			insert.run(codexRow.id, CODEX_PROVIDER_KEY, "chat", chatExpiryMs, chatUpdatedAt);
-			insert.run(codexRow.id, CODEX_PROVIDER_KEY, "spark", sparkExpiryMs, sparkUpdatedAt);
-			insert.run(anthropicRow.id, PROVIDER_KEY, "shared", FUTURE_BLOCK_MS, LEGACY_TIMESTAMP);
-			insert.finalize();
-		} finally {
-			db.close();
-		}
-
-		const preMigrationRows = [
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "chat",
-				blocked_until_ms: chatExpiryMs,
-				updated_at: chatUpdatedAt,
-			},
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "shared",
-				blocked_until_ms: sharedExpiryMs,
-				updated_at: sharedUpdatedAt,
-			},
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "spark",
-				blocked_until_ms: sparkExpiryMs,
-				updated_at: sparkUpdatedAt,
-			},
-			{
-				credential_id: anthropicRow.id,
-				provider_key: PROVIDER_KEY,
-				block_scope: "shared",
-				blocked_until_ms: FUTURE_BLOCK_MS,
-				updated_at: LEGACY_TIMESTAMP,
-			},
-		];
-		const failureDb = new Database(dbPath);
-		try {
-			failureDb.run(`
-				CREATE TRIGGER fail_auth_schema_v7_version_write
-				BEFORE INSERT ON auth_schema_version
-				WHEN NEW.version = 7
-				BEGIN
-					SELECT RAISE(ABORT, 'forced v7 version write failure');
-				END;
-			`);
-		} finally {
-			failureDb.close();
-		}
-
-		await expect(SqliteAuthCredentialStore.open(dbPath)).rejects.toThrow("forced v7 version write failure");
-		expect(readCredentialBlockRows(dbPath)).toEqual(preMigrationRows);
-		expect(readAuthSchemaVersion(dbPath)).toBe(6);
-
-		const cleanupDb = new Database(dbPath);
-		try {
-			cleanupDb.run("DROP TRIGGER fail_auth_schema_v7_version_write");
-		} finally {
-			cleanupDb.close();
-		}
-
-		const expectedRows = [
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "chat",
-				blocked_until_ms: chatExpiryMs,
-				updated_at: sharedUpdatedAt,
-			},
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "shared",
-				blocked_until_ms: chatExpiryMs,
-				updated_at: sparkUpdatedAt,
-			},
-			{
-				credential_id: codexRow.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "spark",
-				blocked_until_ms: sharedExpiryMs,
-				updated_at: sparkUpdatedAt,
-			},
-			{
-				credential_id: anthropicRow.id,
-				provider_key: PROVIDER_KEY,
-				block_scope: "shared",
-				blocked_until_ms: FUTURE_BLOCK_MS,
-				updated_at: LEGACY_TIMESTAMP,
-			},
-		];
-
-		const firstReopen = await SqliteAuthCredentialStore.open(dbPath);
-		expect(firstReopen.listCredentialBlocks([codexRow.id])).toEqual([
-			{
-				credentialId: codexRow.id,
-				providerKey: CODEX_PROVIDER_KEY,
-				blockScope: "chat",
-				blockedUntilMs: chatExpiryMs,
-				updatedAtMs: sharedUpdatedAt * 1000,
-			},
-			{
-				credentialId: codexRow.id,
-				providerKey: CODEX_PROVIDER_KEY,
-				blockScope: "spark",
-				blockedUntilMs: sharedExpiryMs,
-				updatedAtMs: sparkUpdatedAt * 1000,
-			},
-		]);
-		expect(firstReopen.getCredentialBlock(codexRow.id, CODEX_PROVIDER_KEY, "shared")).toBeUndefined();
-		firstReopen.close();
-		expect(readCredentialBlockRows(dbPath)).toEqual(expectedRows);
-		expect(readLegacyCodexSharedBlock(dbPath, codexRow.id)?.blocked_until_ms).toBe(chatExpiryMs);
-		expect(readAuthSchemaVersion(dbPath)).toBe(8);
-
-		const secondReopen = await SqliteAuthCredentialStore.open(dbPath);
-		secondReopen.close();
-		expect(readCredentialBlockRows(dbPath)).toEqual(expectedRows);
-		expect(readAuthSchemaVersion(dbPath)).toBe(8);
-	});
-
-	it("mirrors a legacy Codex shared insert into meter rows while hiding shared from current APIs", async () => {
+	it("keeps steady-state scoped block reads read-only while another connection owns the writer lock", async () => {
 		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("late"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
-		if (!row) throw new Error("expected credential row");
-		const blockedUntilMs = FUTURE_BLOCK_MS + 60_000;
-		const db = new Database(dbPath);
-		try {
-			db.prepare(
-				"INSERT INTO auth_credential_blocks (credential_id, provider_key, block_scope, blocked_until_ms, updated_at) VALUES (?, ?, ?, ?, ?)",
-			).run(row.id, CODEX_PROVIDER_KEY, "shared", blockedUntilMs, LEGACY_TIMESTAMP);
-		} finally {
-			db.close();
-		}
-
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)).toEqual({
-			blocked_until_ms: blockedUntilMs,
-			updated_at: LEGACY_TIMESTAMP,
-		});
-		expect(store.getCredentialBlock(row.id, CODEX_PROVIDER_KEY, "chat")).toBe(blockedUntilMs);
-		expect(store.getCredentialBlock(row.id, CODEX_PROVIDER_KEY, "shared")).toBeUndefined();
-		expect(store.listCredentialBlocks([row.id]).map(block => block.blockScope)).toEqual(["chat", "spark"]);
-		// The bulk read behind `blocks.blockedUntil` hides the legacy row exactly like the point reads.
-		expect(store.getCredentialBlockScopes(row.id, CODEX_PROVIDER_KEY)).toEqual(
-			new Map([
-				["chat", blockedUntilMs],
-				["spark", blockedUntilMs],
-			]),
-		);
-		expect(readCredentialBlockRows(dbPath)).toEqual([
-			{
-				credential_id: row.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "chat",
-				blocked_until_ms: blockedUntilMs,
-				updated_at: LEGACY_TIMESTAMP,
-			},
-			{
-				credential_id: row.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "shared",
-				blocked_until_ms: blockedUntilMs,
-				updated_at: LEGACY_TIMESTAMP,
-			},
-			{
-				credential_id: row.id,
-				provider_key: CODEX_PROVIDER_KEY,
-				block_scope: "spark",
-				blocked_until_ms: blockedUntilMs,
-				updated_at: LEGACY_TIMESTAMP,
-			},
-		]);
-		store.close();
-	});
-
-	it("mirrors a late legacy Codex upsert before calculating scoped reconciliation", async () => {
-		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("late-reconcile"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
-		if (!row) throw new Error("expected credential row");
-		const insertedAtMs = Date.now();
-		const insertedAtSec = Math.floor(insertedAtMs / 1000);
-		const blockedUntilMs = FUTURE_BLOCK_MS + 60_000;
-		const db = new Database(dbPath);
-		try {
-			db.prepare(
-				"INSERT INTO auth_credential_blocks (credential_id, provider_key, block_scope, blocked_until_ms, updated_at) VALUES (?, ?, ?, ?, ?)",
-			).run(row.id, CODEX_PROVIDER_KEY, "shared", blockedUntilMs, insertedAtSec);
-		} finally {
-			db.close();
-		}
-
-		store.deleteCredentialBlock(row.id, CODEX_PROVIDER_KEY, "chat");
-		expect(store.listCredentialBlocks([row.id]).map(block => block.blockScope)).toEqual(["spark"]);
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)?.blocked_until_ms).toBe(blockedUntilMs);
-
-		const legacyWriter = new Database(dbPath);
-		try {
-			legacyWriter
-				.prepare(
-					`INSERT INTO auth_credential_blocks (
-						credential_id,
-						provider_key,
-						block_scope,
-						blocked_until_ms,
-						updated_at
-					)
-					VALUES (?, ?, ?, ?, ?)
-					ON CONFLICT(credential_id, provider_key, block_scope) DO UPDATE SET
-						blocked_until_ms = MAX(blocked_until_ms, excluded.blocked_until_ms),
-						updated_at = excluded.updated_at`,
-				)
-				.run(row.id, CODEX_PROVIDER_KEY, "shared", blockedUntilMs, insertedAtSec + 1);
-		} finally {
-			legacyWriter.close();
-		}
-
-		const reconcileAfterMs = store.getCredentialBlockReconcileAfter(row.id, CODEX_PROVIDER_KEY, "chat");
-		expect(reconcileAfterMs).toBeGreaterThan(insertedAtMs);
-		expect(reconcileAfterMs).toBeLessThan(blockedUntilMs);
-		expect(store.listCredentialBlocks([row.id]).map(block => block.blockScope)).toEqual(["chat", "spark"]);
-		expect(readCredentialBlockRows(dbPath).map(block => block.block_scope)).toEqual(["chat", "shared", "spark"]);
-		store.close();
-	});
-
-	it("keeps steady-state Codex block reads read-only while another connection owns the writer lock", async () => {
-		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("read-only"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
+		await store.saveOAuth(PROVIDER, oauthCredential("read-only"));
+		const [row] = store.listAuthCredentials(PROVIDER);
 		if (!row) throw new Error("expected credential row");
 		const blockedUntilMs = FUTURE_BLOCK_MS + 60_000;
 		store.upsertCredentialBlock({
 			credentialId: row.id,
-			providerKey: CODEX_PROVIDER_KEY,
+			providerKey: PROVIDER_KEY,
 			blockScope: "chat",
 			blockedUntilMs,
 		});
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)?.blocked_until_ms).toBe(blockedUntilMs);
+		expect(readCredentialBlockRows(dbPath)).toContainEqual(
+			expect.objectContaining({
+				credential_id: row.id,
+				provider_key: PROVIDER_KEY,
+				block_scope: "chat",
+				blocked_until_ms: blockedUntilMs,
+			}),
+		);
 
 		const writer = new Database(dbPath);
 		let writerLocked = false;
@@ -646,9 +373,9 @@ describe("AuthStorage credential block persistence", () => {
 			writer.run("BEGIN IMMEDIATE");
 			writerLocked = true;
 
-			expect(store.getCredentialBlock(row.id, CODEX_PROVIDER_KEY, "chat")).toBe(blockedUntilMs);
-			expect(store.getCredentialBlock(row.id, CODEX_PROVIDER_KEY, "shared")).toBeUndefined();
-			const reconcileAfterMs = store.getCredentialBlockReconcileAfter(row.id, CODEX_PROVIDER_KEY, "chat");
+			expect(store.getCredentialBlock(row.id, PROVIDER_KEY, "chat")).toBe(blockedUntilMs);
+			expect(store.getCredentialBlock(row.id, PROVIDER_KEY, "shared")).toBeUndefined();
+			const reconcileAfterMs = store.getCredentialBlockReconcileAfter(row.id, PROVIDER_KEY, "chat");
 			expect(reconcileAfterMs).toBeGreaterThan(Date.now());
 			expect(reconcileAfterMs).toBeLessThan(blockedUntilMs);
 		} finally {
@@ -689,124 +416,6 @@ describe("AuthStorage credential block persistence", () => {
 		}
 	});
 
-	it("persists a Codex shared upsert as meter rows plus a hidden compatibility mirror", async () => {
-		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("upsert"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
-		if (!row) throw new Error("expected credential row");
-		const blockedUntilMs = FUTURE_BLOCK_MS + 60_000;
-
-		store.upsertCredentialBlock({
-			credentialId: row.id,
-			providerKey: CODEX_PROVIDER_KEY,
-			blockScope: "shared",
-			blockedUntilMs,
-		});
-		store.upsertCredentialBlock({
-			credentialId: row.id,
-			providerKey: CODEX_PROVIDER_KEY,
-			blockScope: "shared",
-			blockedUntilMs: FUTURE_BLOCK_MS,
-		});
-
-		expect(store.listCredentialBlocks([row.id])).toEqual([
-			{
-				credentialId: row.id,
-				providerKey: CODEX_PROVIDER_KEY,
-				blockScope: "chat",
-				blockedUntilMs,
-				updatedAtMs: expect.any(Number),
-			},
-			{
-				credentialId: row.id,
-				providerKey: CODEX_PROVIDER_KEY,
-				blockScope: "spark",
-				blockedUntilMs,
-				updatedAtMs: expect.any(Number),
-			},
-		]);
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)?.blocked_until_ms).toBe(blockedUntilMs);
-		expect(readCredentialBlockRows(dbPath).map(block => block.block_scope)).toEqual(["chat", "shared", "spark"]);
-		store.close();
-	});
-
-	it("recomputes and removes the legacy mirror as meter blocks are deleted", async () => {
-		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("delete-mirror"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
-		if (!row) throw new Error("expected credential row");
-		const chatBlockedUntilMs = FUTURE_BLOCK_MS + 120_000;
-		const sparkBlockedUntilMs = FUTURE_BLOCK_MS + 60_000;
-
-		store.upsertCredentialBlock({
-			credentialId: row.id,
-			providerKey: CODEX_PROVIDER_KEY,
-			blockScope: "chat",
-			blockedUntilMs: chatBlockedUntilMs,
-		});
-		store.upsertCredentialBlock({
-			credentialId: row.id,
-			providerKey: CODEX_PROVIDER_KEY,
-			blockScope: "spark",
-			blockedUntilMs: sparkBlockedUntilMs,
-		});
-
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)?.blocked_until_ms).toBe(chatBlockedUntilMs);
-		store.deleteCredentialBlock(row.id, CODEX_PROVIDER_KEY, "chat");
-		expect(store.listCredentialBlocks([row.id])).toEqual([
-			{
-				credentialId: row.id,
-				providerKey: CODEX_PROVIDER_KEY,
-				blockScope: "spark",
-				blockedUntilMs: sparkBlockedUntilMs,
-				updatedAtMs: expect.any(Number),
-			},
-		]);
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)?.blocked_until_ms).toBe(sparkBlockedUntilMs);
-
-		store.deleteCredentialBlock(row.id, CODEX_PROVIDER_KEY, "spark");
-		expect(store.listCredentialBlocks([row.id])).toEqual([]);
-		expect(readLegacyCodexSharedBlock(dbPath, row.id)).toBeUndefined();
-		expect(readCredentialBlockRows(dbPath)).toEqual([]);
-		store.close();
-	});
-
-	it("keeps current bulk deletes and legacy shared deletes synchronized", async () => {
-		const store = await SqliteAuthCredentialStore.open(dbPath);
-		await store.saveOAuth(CODEX_PROVIDER, oauthCredential("delete-compatible"));
-		const [row] = store.listAuthCredentials(CODEX_PROVIDER);
-		if (!row) throw new Error("expected credential row");
-		const upsertMeterBlocks = (): void => {
-			for (const blockScope of ["chat", "spark"]) {
-				store.upsertCredentialBlock({
-					credentialId: row.id,
-					providerKey: CODEX_PROVIDER_KEY,
-					blockScope,
-					blockedUntilMs: FUTURE_BLOCK_MS,
-				});
-			}
-		};
-
-		upsertMeterBlocks();
-		store.deleteCredentialBlocks(row.id);
-		expect(readCredentialBlockRows(dbPath)).toEqual([]);
-
-		upsertMeterBlocks();
-		const legacyWriter = new Database(dbPath);
-		try {
-			legacyWriter
-				.prepare(
-					"DELETE FROM auth_credential_blocks WHERE credential_id = ? AND provider_key = ? AND block_scope = 'shared'",
-				)
-				.run(row.id, CODEX_PROVIDER_KEY);
-		} finally {
-			legacyWriter.close();
-		}
-		expect(store.listCredentialBlocks([row.id])).toEqual([]);
-		expect(readCredentialBlockRows(dbPath)).toEqual([]);
-		store.close();
-	});
-
 	it("backfills refresh leases for a v5 auth database", async () => {
 		const legacyDb = new Database(dbPath);
 		legacyDb.run(`
@@ -839,7 +448,7 @@ describe("AuthStorage credential block persistence", () => {
 		}
 	});
 
-	it("migrates a v4 auth database to current version 7 without dropping credential rows", async () => {
+	it("migrates a v4 auth database to current version 8 without dropping credential rows", async () => {
 		const legacyDb = new Database(dbPath);
 		legacyDb.run(`
 			CREATE TABLE auth_schema_version (

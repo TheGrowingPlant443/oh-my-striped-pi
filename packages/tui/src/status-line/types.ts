@@ -124,7 +124,6 @@ export interface SegmentContext {
 		display: "text" | "icon" | "none";
 	} | null;
 	collab: CollabStatus | null;
-	stream: { viewers: number } | null;
 	/** A `/record` capture of this screen is running. */
 	recording: boolean;
 	// Cached values for performance (computed once per render)
@@ -196,25 +195,7 @@ export interface SegmentContext {
 		fiveHour?: { percent: number; resetMinutes?: number };
 		daily?: { percent: number; resetMinutes?: number };
 		sevenDay?: { percent: number; resetHours?: number };
-		monthly?: { percent: number; resetHours?: number };
-		resetCredits?: {
-			bankedCount: number;
-			redeemableCount: number;
-			expiryHours?: number;
-			expired?: boolean;
-			unavailableReason?: string;
-			expiring?: StatusResetExpiry;
-		};
 	} | null;
-}
-
-/** How close an account's saved resets are to expiring, when it is worth a warning. */
-export interface StatusResetExpiry {
-	/** `soon`: within 7 days; `imminent`: within 24 hours. */
-	tier: "soon" | "imminent";
-	count: number;
-	/** Expiry of the reset the warning is about (epoch ms); it can be later than the soonest banked one. */
-	expiresAtMs: number;
 }
 
 export interface RenderedSegment {

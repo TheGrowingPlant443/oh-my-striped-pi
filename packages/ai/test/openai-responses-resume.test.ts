@@ -10,11 +10,14 @@ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 const SOCKET_CLOSE =
 	"The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()";
 
-/** The shipped bundled rows: resume must work on the first request, before any discovery. */
-function bundledModel(provider: "muse-code" | "openai"): Model<"openai-responses"> {
-	const model = getBundledModel<"openai-responses">(provider, provider === "muse-code" ? "muse-spark-1.3" : "gpt-5");
-	if (!model || model.api !== "openai-responses") throw new Error(`Expected bundled ${provider} Responses model`);
-	return model;
+/** Exercise the generic Responses storage capability with retained provider fixtures. */
+function responseModel(storeResponses: boolean): Model<"openai-responses"> {
+	const model = getBundledModel<"openai-responses">("github-copilot", "gpt-5");
+	return {
+		...model,
+		baseUrl: "https://api.githubcopilot.com",
+		compat: { ...model.compat, storeResponses },
+	};
 }
 
 function sseFrame(payload: { type: string }): string {
@@ -177,7 +180,7 @@ describe("openai-responses socket-drop resume", () => {
 			() => new Response("{}", { status: 404 }),
 			() => new Response(JSON.stringify(completedResult("resp_resume1")), { status: 200 }),
 		]);
-		const result = await streamOpenAIResponses(bundledModel("muse-code"), context, {
+		const result = await streamOpenAIResponses(responseModel(true), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -189,8 +192,8 @@ describe("openai-responses socket-drop resume", () => {
 		expect(result.responseId).toBe("resp_resume1");
 		expect(scenario.posts).toHaveLength(1);
 		expect(scenario.gets).toEqual([
-			"https://api.meta.ai/v1/responses/resp_resume1",
-			"https://api.meta.ai/v1/responses/resp_resume1",
+			"https://api.githubcopilot.com/responses/resp_resume1",
+			"https://api.githubcopilot.com/responses/resp_resume1",
 		]);
 		const thinking = result.content.find(block => block.type === "thinking");
 		if (!thinking || thinking.type !== "thinking") throw new Error("Expected adopted thinking block");
@@ -207,7 +210,7 @@ describe("openai-responses socket-drop resume", () => {
 		const scenario = dropScenario("resp_resume4", [
 			() => new Response(JSON.stringify(completedResult("resp_resume4")), { status: 200 }),
 		]);
-		const stream = streamOpenAIResponses(bundledModel("muse-code"), context, {
+		const stream = streamOpenAIResponses(responseModel(true), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -233,7 +236,7 @@ describe("openai-responses socket-drop resume", () => {
 			[() => new Response(JSON.stringify(completedResult("resp_resume5")), { status: 200 })],
 			{ committedText: "draft" },
 		);
-		const result = await streamOpenAIResponses(bundledModel("muse-code"), context, {
+		const result = await streamOpenAIResponses(responseModel(true), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -246,8 +249,8 @@ describe("openai-responses socket-drop resume", () => {
 	});
 
 	it("keeps the socket failure when the stored result is definitively rejected", async () => {
-		const scenario = dropScenario("resp_resume2", [() => new Response("gone", { status: 403 })]);
-		const result = await streamOpenAIResponses(bundledModel("muse-code"), context, {
+		const scenario = dropScenario("resp_resume2", [() => new Response("invalid stored result", { status: 400 })]);
+		const result = await streamOpenAIResponses(responseModel(true), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -270,7 +273,7 @@ describe("openai-responses socket-drop resume", () => {
 		const scenario = dropScenario("resp_resume3", [
 			() => new Response(JSON.stringify(completedResult("resp_resume3")), { status: 200 }),
 		]);
-		const result = await streamOpenAIResponses(bundledModel("openai"), context, {
+		const result = await streamOpenAIResponses(responseModel(false), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -291,7 +294,7 @@ describe("openai-responses socket-drop resume", () => {
 			[() => new Response(JSON.stringify(completedResult("resp_resume6")), { status: 200 })],
 			{ completedReasoning: true },
 		);
-		const result = await streamOpenAIResponses(bundledModel("muse-code"), context, {
+		const result = await streamOpenAIResponses(responseModel(true), context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -304,15 +307,17 @@ describe("openai-responses socket-drop resume", () => {
 		expect(payload.items.map(item => item.id)).toEqual(["rs_1", "msg_1"]);
 	});
 
-	it("never polls when only stateful chaining forces store on a non-storing host", async () => {
-		// Official OpenAI turns chained through `previous_response_id` send
-		// `store: true`, but that host is not known to finish a dropped run
-		// server-side. Resume follows the host contract, not the wire flag, so the
-		// drop fails fast as before instead of parking the turn on polls.
+	it("never polls when explicit stateful chaining forces store on a non-storing host", async () => {
+		// Chaining and dropped-run recovery are separate endpoint capabilities.
 		const scenario = dropScenario("resp_resume7", [
 			() => new Response(JSON.stringify(completedResult("resp_resume7")), { status: 200 }),
 		]);
-		const result = await streamOpenAIResponses(bundledModel("openai"), context, {
+		const model = responseModel(false);
+		const statefulModel: Model<"openai-responses"> = {
+			...model,
+			compat: { ...model.compat, statefulResponses: true },
+		};
+		const result = await streamOpenAIResponses(statefulModel, context, {
 			fetch: scenario.fetchImpl,
 			apiKey: "test-key",
 			providerRetryWait: noWait,
@@ -334,13 +339,13 @@ describe("openai-responses socket-drop resume", () => {
 	] as const)("storage %s", async (_label, env, hostDefault, storeResponses, stored) => {
 		// Privacy: storage is opt-in. Off sends `store: false` and skips the resume
 		// poll, so the drop fails fast with no GETs; on adopts the stored result.
-		configureProviderStoreResponses(hostDefault === undefined ? undefined : { "muse-code": hostDefault });
+		configureProviderStoreResponses(hostDefault === undefined ? undefined : { "github-copilot": hostDefault });
 		try {
 			await withStoreEnv(env, async () => {
 				const scenario = dropScenario("resp_resume8", [
 					() => new Response(JSON.stringify(completedResult("resp_resume8")), { status: 200 }),
 				]);
-				const result = await streamOpenAIResponses(bundledModel("muse-code"), context, {
+				const result = await streamOpenAIResponses(responseModel(true), context, {
 					fetch: scenario.fetchImpl,
 					apiKey: "test-key",
 					providerRetryWait: noWait,
@@ -400,7 +405,7 @@ describe("openai-responses socket-drop resume", () => {
 					{ status: 200, headers: { "content-type": "text/event-stream" } },
 				);
 			}) as FetchImpl;
-			const base = bundledModel("muse-code");
+			const base = responseModel(true);
 			const model: Model<"openai-responses"> = { ...base, compat: { ...base.compat, supportsStrictMode: true } };
 			const tools: Context["tools"] = [
 				{
@@ -455,7 +460,7 @@ describe("openai-responses socket-drop resume", () => {
 });
 
 describe("pollOpenAIResponsesResultForCompletion", () => {
-	const url = "https://api.meta.ai/v1/responses/resp_poll1";
+	const url = "https://api.githubcopilot.com/responses/resp_poll1";
 	const headers = { authorization: "Bearer test-key" };
 
 	function sequencedFetch(statuses: Array<{ status: number; body?: unknown }>): {

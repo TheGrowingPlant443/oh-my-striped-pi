@@ -1,7 +1,7 @@
 import { createModelBrowserSource } from "../src/modes/model-browser-source";
 import { beforeAll, describe, expect, test } from "bun:test";
 import { Agent, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
+import { Effort, type Model } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -563,47 +563,30 @@ describe("ModelBrowser native model metadata", () => {
 	});
 });
 
-describe("Factory Droid credits badge", () => {
-	beforeAll(async () => {
-		await initTheme(false);
-	});
-
-	/** A Factory Droid row: upstream list price as `cost`, the base Standard Credits rate as the badge. */
-	function makeDroidModel(id: string, credits: number): Model {
-		return {
-			...makeModel("factory-droid", id),
-			cost: { input: 1.25, output: 10, cacheRead: 0, cacheWrite: 0 },
-			factoryDroidCredits: credits,
-		};
-	}
-
-	test("shows list price with the credit badge and never advertises unknown list prices as free", () => {
-		const priced = makeDroidModel("claude-opus-5", 2);
-		const paid = makeDroidModel("preview-credit-model", 2);
-		paid.cost = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-		const browser = makeBrowser([priced, paid], []);
-		const rows = browser.render(120).map(line => Bun.stripANSI(line));
-		const pricedRow = rows.find(row => row.includes("claude-opus-5"));
-		const paidRow = rows.find(row => row.includes("preview-credit-model"));
-
-		expect(pricedRow).toContain("$1.25/10 2×");
-		expect(paidRow).toContain("2×");
-		expect(paidRow).not.toContain("free");
-		browser.setQuery("free");
-		expect(browser.visibleCount).toBe(0);
-	});
-});
-
 describe("serviceTierFor", () => {
+	const privateOpenAIModel = buildModel({
+		id: "gpt-6-astra",
+		name: "GPT 6 Astra",
+		api: "openai-responses",
+		provider: "company-openai",
+		baseUrl: "https://inference.company.example/v1",
+		reasoning: true,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 400_000,
+		maxTokens: 128_000,
+		serviceTiers: ["priority"],
+		thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh] },
+	});
+
 	beforeAll(async () => {
 		await initTheme(false);
 	});
 
 	test("labels the live session tier rather than the configured setting", async () => {
-		// The setting asks for ultrafast, but `/fast ultra` and `/slow` act on the
-		// session's per-family map; the browser must follow the session.
-		const settings = Settings.isolated({ "tier.openai": "ultrafast" });
-		const astra = makeModel("openai", "gpt-6-astra");
+		// Configured tiers do not override the live session's per-family map.
+		const settings = Settings.isolated({ "tier.openai": "priority" });
+		const astra = privateOpenAIModel;
 		const auth = await AuthStorage.create(":memory:");
 		try {
 			const session = new AgentSession({
@@ -619,21 +602,21 @@ describe("serviceTierFor", () => {
 				browser.setItems(buildBrowserItems([astra]));
 				browser.setPerfStats(
 					new Map([
-						["openai/gpt-6-astra", { samples: 4, tps: 25, ttftMs: null }],
-						["openai/gpt-6-astra@ultrafast", { samples: 2, tps: 300, ttftMs: null }],
+						["company-openai/gpt-6-astra", { samples: 4, tps: 25, ttftMs: null }],
+						["company-openai/gpt-6-astra@priority", { samples: 2, tps: 300, ttftMs: null }],
 					]),
 				);
 				const row = () => Bun.stripANSI(browser.render(120)[2] ?? "");
 
 				expect(row()).toContain("25t/s");
-				expect(row()).not.toContain("ultrafast");
+				expect(row()).not.toContain("priority");
 
-				expect(session.setUltrafastMode(true)).toBe(true);
-				expect(row()).toContain("300t/s ultrafast");
+				expect(session.setFastMode(true)).toBe(true);
+				expect(row()).toContain("300t/s priority");
 
-				session.setUltrafastMode(false);
+				session.setFastMode(false);
 				expect(row()).toContain("25t/s");
-				expect(row()).not.toContain("ultrafast");
+				expect(row()).not.toContain("priority");
 			} finally {
 				await session.dispose();
 			}
@@ -643,41 +626,23 @@ describe("serviceTierFor", () => {
 	});
 
 	test("without a session, returns the configured tier only when the request would carry it", () => {
-		const source = createModelBrowserSource(Settings.isolated({ "tier.openai": "ultrafast" }));
-		const firstParty = makeModel("openai", "gpt-6-astra");
-		const codexUnlisted = makeModel("openai-codex", "gpt-6-astra");
-		const codexAdvertised = buildModel({
-			id: "gpt-6-astra",
-			name: "gpt-6-astra",
-			api: "openai-codex-responses",
-			provider: "openai-codex",
-			baseUrl: "https://chatgpt.com/backend-api",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 0 },
-			contextWindow: 400_000,
-			maxTokens: 128_000,
-			serviceTiers: ["ultrafast"],
-		});
+		const source = createModelBrowserSource(Settings.isolated({ "tier.openai": "priority" }));
 		const anthropic = buildModel({
 			id: "claude-opus-5-5",
 			name: "claude-opus-5-5",
 			api: "anthropic-messages",
-			provider: "anthropic",
-			baseUrl: "https://api.anthropic.com",
+			provider: "company-anthropic",
+			baseUrl: "https://anthropic.company.example",
 			reasoning: true,
 			input: ["text"],
 			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
 			contextWindow: 200_000,
 			maxTokens: 64_000,
+			serviceTiers: ["priority"],
+			thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
 		});
 
-		// First-party OpenAI takes ultrafast as-is.
-		expect(source.serviceTierFor?.(firstParty)).toBe("ultrafast");
-		// Codex realizes it only when discovery advertises it, so the browser must
-		// not label a tier the request would drop.
-		expect(source.serviceTierFor?.(codexUnlisted)).toBeUndefined();
-		expect(source.serviceTierFor?.(codexAdvertised)).toBe("ultrafast");
+		expect(source.serviceTierFor?.(privateOpenAIModel)).toBe("priority");
 		// No configured tier for the family.
 		expect(source.serviceTierFor?.(anthropic)).toBeUndefined();
 
@@ -685,6 +650,6 @@ describe("serviceTierFor", () => {
 		// so no served tier is ever recorded for it and there is no row to label.
 		const anthropicPriority = createModelBrowserSource(Settings.isolated({ "tier.anthropic": "priority" }));
 		expect(anthropicPriority.serviceTierFor?.(anthropic)).toBeUndefined();
-		expect(anthropicPriority.serviceTierFor?.(firstParty)).toBeUndefined();
+		expect(anthropicPriority.serviceTierFor?.(privateOpenAIModel)).toBeUndefined();
 	});
 });

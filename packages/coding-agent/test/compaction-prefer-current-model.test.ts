@@ -2,9 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import * as AIError from "@oh-my-pi/pi-ai/error";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -12,6 +11,35 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { assistantMsg, userMsg } from "./utilities";
+
+const summaryModelSpec = {
+	id: "claude-sonnet-4-5",
+	name: "Private summary fixture",
+	api: "anthropic-messages",
+	provider: "anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 16_384,
+	compat: { supportsServerCompaction: false },
+	remoteCompaction: { enabled: false },
+} satisfies ModelSpec<"anthropic-messages">;
+
+const remoteModelSpec = {
+	id: "gpt-5",
+	name: "Private Responses compaction fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true, v2StreamingEnabled: false },
+} satisfies ModelSpec<"openai-responses">;
 
 /**
  * Regression: when the user sets `modelRoles.default` to a model on a different
@@ -40,11 +68,8 @@ describe("compaction prefers the current session model over modelRoles.default",
 	});
 
 	it("uses the active Anthropic chat model when modelRoles.default points at an OpenAI model", async () => {
-		const currentModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const defaultRoleModel = getBundledModel("openai", "gpt-5");
-		if (!currentModel || !defaultRoleModel) {
-			throw new Error("Expected bundled test models to exist");
-		}
+		const currentModel = buildModel(summaryModelSpec);
+		const defaultRoleModel = buildModel(remoteModelSpec);
 
 		const settings = Settings.isolated({ "compaction.keepRecentTokens": 1, "compaction.methodOrder": ["soft"] });
 		settings.setModelRole("default", `${defaultRoleModel.provider}/${defaultRoleModel.id}`);
@@ -66,6 +91,12 @@ describe("compaction prefers the current session model over modelRoles.default",
 		authStorage.keys.setRuntime(currentModel.provider, "anthropic-token");
 		authStorage.keys.setRuntime(defaultRoleModel.provider, "openai-token");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider(defaultRoleModel.provider, {
+			apiKey: "test-key",
+			api: defaultRoleModel.api,
+			baseUrl: defaultRoleModel.baseUrl,
+			models: [remoteModelSpec],
+		});
 
 		session = new AgentSession({
 			agent,
@@ -103,82 +134,9 @@ describe("compaction prefers the current session model over modelRoles.default",
 		expect(compactSpy.mock.calls[0]?.[5]?.promptCacheKey).toBe(promptCacheKey);
 	});
 
-	it("falls back when the authenticated Bedrock candidate cannot resolve AWS credentials", async () => {
-		const currentModel = getBundledModel("amazon-bedrock", "global.anthropic.claude-opus-4-6-v1");
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!currentModel || !fallbackModel) {
-			throw new Error("Expected bundled test models to exist");
-		}
-
-		const settings = Settings.isolated({ "compaction.keepRecentTokens": 1, "compaction.methodOrder": ["soft"] });
-		settings.setModelRole("smol", `${fallbackModel.provider}/${fallbackModel.id}`);
-
-		const agent = new Agent({
-			initialState: {
-				model: currentModel,
-				systemPrompt: ["Test"],
-				tools: [],
-				messages: [],
-			},
-		});
-
-		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime(currentModel.provider, "bedrock-credentials");
-		authStorage.keys.setRuntime(fallbackModel.provider, "anthropic-token");
-		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
-
-		session = new AgentSession({
-			agent,
-			sessionManager: SessionManager.inMemory(),
-			settings,
-			modelRegistry,
-		});
-		session.subscribe(() => {});
-
-		for (const [userText, assistantText] of [
-			["first question", "first answer"],
-			["second question", "second answer"],
-		] as const) {
-			const user = userMsg(userText);
-			const assistant = assistantMsg(assistantText);
-			session.agent.appendMessage(user);
-			session.sessionManager.appendMessage(user);
-			session.agent.appendMessage(assistant);
-			session.sessionManager.appendMessage(assistant);
-		}
-
-		const compactSpy = vi.spyOn(compactionModule, "compact").mockImplementation(async (preparation, model) => {
-			if (model.provider === currentModel.provider && model.id === currentModel.id) {
-				throw new AIError.AwsCredentialsError("opaque provider setup failure", "resolution");
-			}
-			if (model.provider !== fallbackModel.provider || model.id !== fallbackModel.id) {
-				throw new Error(`Unexpected compaction model ${model.provider}/${model.id}`);
-			}
-			return {
-				summary: "fallback summary",
-				shortSummary: "fallback short summary",
-				firstKeptEntryId: preparation.firstKeptEntryId,
-				tokensBefore: 42,
-				details: { provider: model.provider },
-			};
-		});
-
-		const result = await session.compact();
-
-		expect(result.summary).toBe("fallback summary");
-		expect(compactSpy).toHaveBeenCalledTimes(2);
-		expect(compactSpy.mock.calls.map(([, model]) => `${model.provider}/${model.id}`)).toEqual([
-			`${currentModel.provider}/${currentModel.id}`,
-			`${fallbackModel.provider}/${fallbackModel.id}`,
-		]);
-	});
-
 	it("uses compactionModel only for the summary call and leaves the active model unchanged", async () => {
-		const baseCurrentModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const compactionModel = getBundledModel("openai", "gpt-5");
-		if (!baseCurrentModel || !compactionModel) {
-			throw new Error("Expected bundled test models to exist");
-		}
+		const baseCurrentModel = buildModel(summaryModelSpec);
+		const compactionModel = buildModel(remoteModelSpec);
 		const currentModel = buildModel({
 			...baseCurrentModel,
 			compactionModel: `${compactionModel.provider}/${compactionModel.id}`,
@@ -198,6 +156,12 @@ describe("compaction prefers the current session model over modelRoles.default",
 		authStorage.keys.setRuntime(currentModel.provider, "anthropic-token");
 		authStorage.keys.setRuntime(compactionModel.provider, "openai-token");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider(compactionModel.provider, {
+			apiKey: "test-key",
+			api: compactionModel.api,
+			baseUrl: compactionModel.baseUrl,
+			models: [remoteModelSpec],
+		});
 
 		session = new AgentSession({
 			agent,
@@ -245,11 +209,8 @@ describe("compaction prefers the current session model over modelRoles.default",
 		// silent-fallback the reviewer flagged for `/compact remote`. The fix
 		// filters non-remote candidates in this mode, so the spy must observe
 		// the OpenAI model as the first invocation.
-		const baseCurrentModel = getBundledModel("openai", "gpt-5");
-		const nonRemoteCompactionModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!baseCurrentModel || !nonRemoteCompactionModel) {
-			throw new Error("Expected bundled test models to exist");
-		}
+		const baseCurrentModel = buildModel(remoteModelSpec);
+		const nonRemoteCompactionModel = buildModel(summaryModelSpec);
 		const currentModel = buildModel({
 			...baseCurrentModel,
 			compactionModel: `${nonRemoteCompactionModel.provider}/${nonRemoteCompactionModel.id}`,
@@ -269,6 +230,12 @@ describe("compaction prefers the current session model over modelRoles.default",
 		authStorage.keys.setRuntime(currentModel.provider, "openai-token");
 		authStorage.keys.setRuntime(nonRemoteCompactionModel.provider, "anthropic-token");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider(nonRemoteCompactionModel.provider, {
+			apiKey: "test-key",
+			api: nonRemoteCompactionModel.api,
+			baseUrl: nonRemoteCompactionModel.baseUrl,
+			models: [summaryModelSpec],
+		});
 
 		session = new AgentSession({
 			agent,

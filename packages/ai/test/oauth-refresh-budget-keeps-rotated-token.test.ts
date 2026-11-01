@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import { removeWithRetries } from "../../utils/src/temp";
 
-const PROVIDER = "unit-oauth-rotating";
+const PROVIDER = "github-copilot";
 const TOKEN_URL = "https://auth.example.test/token";
 const WHOAMI_URL = "https://api.example.test/whoami";
 

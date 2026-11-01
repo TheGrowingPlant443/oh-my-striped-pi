@@ -47,7 +47,6 @@ function startSession(overrides: Record<string, unknown>): { state: MnemopiSessi
 			} as never,
 			sessionManager: { getEntries: () => [], getCwd: () => dir.path() } as never,
 			emitNotice: () => {},
-			getHindsightSessionState: () => undefined,
 			subscribe: () => () => {},
 		} as never,
 	});
@@ -60,7 +59,6 @@ function startSession(overrides: Record<string, unknown>): { state: MnemopiSessi
 		getSessionFile: () => null,
 		getSessionId: () => SESSION_ID,
 		getSessionSpawns: () => null,
-		getHindsightSessionState: () => undefined,
 		getMnemopiSessionState: () => state,
 	} as unknown as ToolSession;
 	return { state, tools };

@@ -1,12 +1,10 @@
 /**
- * TypeSafe System One judgments: `POST /v1/systemone` (TypeSafe's path) and
- * `POST /alpha/decisions` (OpenRouter's Decisions path, same wire).
+ * System One judgments through explicitly configured native endpoints.
  *
  * Same bearer auth, model resolution, broker credential lookup, and a/b/c
  * credential rotation as the chat routes, dispatched through
- * {@link NativeJudge} — pi-ai's client for every judgment API, which
- * translates to the resolved model's own wire (OpenAI Decisions, Workers AI)
- * — so 401 rotation and 429/529 backoff match omp's own judgments. A judgment
+ * {@link NativeJudge}, which translates to the resolved model's System One or
+ * compatible Decisions wire while preserving rotation and bounded backoff. A judgment
  * is one JSON round-trip: no stream, no provider session state. Most judgment
  * APIs report tokens only, so the cost is priced from the catalog model for the
  * response header and the broker's observed-usage ledger.
@@ -78,6 +76,9 @@ export async function handleSystemOne(
 			error instanceof Error ? error.message : String(error),
 		);
 	}
+	if (!model.baseUrl?.trim())
+		return systemOne.formatError(400, "invalid_request_error", "Model requires an explicit base URL");
+
 	const client = resolveClientIdentity(req.headers);
 	// Judgments carry no conversation to derive a session from. One sticky
 	// session per model keeps credential selection stable across calls and

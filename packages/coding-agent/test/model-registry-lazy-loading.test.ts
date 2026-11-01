@@ -1,9 +1,6 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import * as path from "node:path";
 import type { Api, Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { litellmModelManagerOptions } from "@oh-my-pi/pi-catalog/provider-models";
 import { modelKind } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { cfgDisabledProviders } from "@oh-my-pi/pi-coding-agent/config/model-settings";
@@ -27,10 +24,8 @@ function expectSameModelObjects(models: readonly Model<Api>[], allModels: readon
 describe("ModelRegistry lazy bundled composition", () => {
 	const tempDirs: TempDir[] = [];
 	const authStorages: AuthStorage[] = [];
-	const spies: Array<{ mockRestore: () => void }> = [];
 
 	afterEach(async () => {
-		for (const spy of spies.splice(0)) spy.mockRestore();
 		for (const authStorage of authStorages.splice(0)) authStorage.close();
 		await Promise.all(tempDirs.splice(0).map(tempDir => tempDir.remove().catch(() => {})));
 	});
@@ -50,39 +45,6 @@ describe("ModelRegistry lazy bundled composition", () => {
 		expect(JSON.parse(stdout)).toEqual({ buildCalls: 0 });
 	});
 
-	test("loads the default LiteLLM namespaced cache", async () => {
-		const tempDir = TempDir.createSync("@model-registry-lazy-litellm-cache-");
-		tempDirs.push(tempDir);
-		const authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
-		authStorages.push(authStorage);
-		const cacheProviderId = litellmModelManagerOptions().cacheProviderId;
-		if (!cacheProviderId) throw new Error("LiteLLM must define a cache namespace");
-		writeModelCache(
-			cacheProviderId,
-			Date.now(),
-			[
-				buildModel({
-					id: "cached-fixture",
-					name: "Cached Fixture",
-					api: "openai-completions",
-					provider: "litellm",
-					baseUrl: "http://localhost:4000/v1",
-					reasoning: false,
-					input: ["text"],
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-					contextWindow: 8192,
-					maxTokens: 1024,
-				}),
-			],
-			true,
-			"",
-			path.join(tempDir.path(), "models.db"),
-		);
-
-		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
-		expect(registry.find("litellm", "cached-fixture")?.name).toBe("Cached Fixture");
-	});
-
 	test("scoped snapshots retain live availability and cannot be mutated through returned arrays", async () => {
 		const tempDir = TempDir.createSync("@model-registry-scoped-snapshot-");
 		tempDirs.push(tempDir);
@@ -90,7 +52,7 @@ describe("ModelRegistry lazy bundled composition", () => {
 		authStorages.push(authStorage);
 		const settings = Settings.isolated();
 		const registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), { settings });
-		const provider = "snapshot-fixture";
+		const provider = "github-copilot";
 		const providers = new Set([provider]);
 		const definition = {
 			id: "first",
@@ -108,14 +70,14 @@ describe("ModelRegistry lazy bundled composition", () => {
 			models: [definition],
 		});
 		const first = registry.getAvailableForProviders(providers, "all");
-		expect(first.map(model => model.id)).toEqual(["first"]);
-		expect(registry.find(provider, "first")).toBe(first[0]);
+		expect(first.map(model => model.id)).toContain("first");
+		expect(registry.find(provider, "first")).toBe(first.find(model => model.id === "first"));
 		first.length = 0;
-		expect(registry.getAvailableForProviders(providers, "all").map(model => model.id)).toEqual(["first"]);
+		expect(registry.getAvailableForProviders(providers, "all").map(model => model.id)).toContain("first");
 		cfgDisabledProviders.set(settings, [provider]);
 		expect(registry.getAvailableForProviders(providers)).toEqual([]);
 		cfgDisabledProviders.set(settings, []);
-		expect(registry.getAvailableForProviders(providers).map(model => model.id)).toEqual(["first"]);
+		expect(registry.getAvailableForProviders(providers).map(model => model.id)).toContain("first");
 
 		registry.registerProvider(provider, {
 			api: "openai-completions",
@@ -124,11 +86,10 @@ describe("ModelRegistry lazy bundled composition", () => {
 			models: [{ ...definition, id: "second", contextWindow: 16384 }],
 		});
 		expect(registry.find(provider, "first")).toBeUndefined();
-		const second = registry.getAvailableForProviders(providers);
-		expect(second.map(model => model.id)).toEqual(["second"]);
-		expect(second[0].contextWindow).toBe(16384);
-		expect(second[0].baseUrl).toBe("https://example.invalid/v2");
-		expect(registry.find(provider, "second")).toBe(second[0]);
+		const second = registry.getAvailableForProviders(providers).find(model => model.id === "second");
+		expect(second?.contextWindow).toBe(16384);
+		expect(second?.baseUrl).toBe("https://example.invalid/v2");
+		expect(registry.find(provider, "second")).toBe(second);
 	});
 
 	test("policy refresh invalidates scoped catalogs after models config edits", async () => {
@@ -139,7 +100,7 @@ describe("ModelRegistry lazy bundled composition", () => {
 		const configPath = path.join(tempDir.path(), "models.json");
 		const config = {
 			providers: {
-				"refresh-fixture": {
+				"github-copilot": {
 					api: "openai-completions",
 					baseUrl: "https://example.invalid/v1",
 					apiKey: "test-key",
@@ -149,55 +110,43 @@ describe("ModelRegistry lazy bundled composition", () => {
 		};
 		await Bun.write(configPath, JSON.stringify(config));
 		const registry = new ModelRegistry(authStorage, configPath);
-		const providers = new Set(["refresh-fixture"]);
-		const before = registry.getAvailableForProviders(providers)[0];
+		const providers = new Set(["github-copilot"]);
+		const before = registry.find("github-copilot", "fixture")!;
 		expect(before.name).toBe("Before");
-		config.providers["refresh-fixture"].models[0].name = "After";
-		config.providers["refresh-fixture"].models[0].contextWindow = 16384;
+		config.providers["github-copilot"].models[0].name = "After";
+		config.providers["github-copilot"].models[0].contextWindow = 16384;
 		await Bun.write(configPath, JSON.stringify(config));
 		await registry.reapplyModelPolicies();
-		const after = registry.getAvailableForProviders(providers)[0];
+		const after = registry.getAvailableForProviders(providers).find(model => model.id === "fixture")!;
 		expect(after.name).toBe("After");
 		expect(after.contextWindow).toBe(16384);
 		expect(after).not.toBe(before);
-		expect(registry.find("refresh-fixture", "fixture")).toBe(after);
+		expect(registry.find("github-copilot", "fixture")).toBe(after);
 	});
 
 	test("query order preserves ordering, snapshots, and model identity", async () => {
-		const createRegistry = async (name: string, maskTypeSafeEnvAuth = false): Promise<ModelRegistry> => {
+		const createRegistry = async (name: string): Promise<ModelRegistry> => {
 			const tempDir = TempDir.createSync(`@model-registry-lazy-${name}-`);
 			tempDirs.push(tempDir);
 			const authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 			authStorages.push(authStorage);
-			authStorage.keys.setRuntime("anthropic", "test-key");
-			if (maskTypeSafeEnvAuth) {
-				const source = authStorage.keys.source.bind(authStorage.keys);
-				spies.push(
-					spyOn(authStorage.keys, "source").mockImplementation((provider, options) =>
-						provider === "typesafe" ? undefined : source(provider, options),
-					),
-				);
-			}
+			authStorage.keys.setRuntime("github-copilot", "test-key");
 			return new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 		};
 
 		const findFirstRegistry = await createRegistry("find-first");
-		const scopedRegistry = await createRegistry("scoped-first", true);
-		const scopedProviders = new Set(["anthropic", "local", "web", "typesafe"]);
+		const scopedRegistry = await createRegistry("scoped-first");
+		const scopedProviders = new Set(["github-copilot", "local"]);
 		const startupPool = scopedRegistry.getAvailableForProviders(scopedProviders);
-		expect(startupPool.some(model => model.provider === "anthropic")).toBe(true);
+		expect(startupPool.some(model => model.provider === "github-copilot")).toBe(true);
 		expect(startupPool.every(model => modelKind(model) === "chat")).toBe(true);
-		expect(startupPool.some(model => ["local", "web", "typesafe"].includes(model.provider))).toBe(false);
+		expect(startupPool.some(model => model.provider === "local")).toBe(false);
 		const scopedAllKinds = scopedRegistry.getAvailableForProviders(scopedProviders, "all");
 		expect(scopedAllKinds).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ provider: "local", kind: "tiny" }),
-				expect.objectContaining({ provider: "web", kind: "search" }),
-			]),
+			expect.arrayContaining([expect.objectContaining({ provider: "local", kind: "tiny" })]),
 		);
-		expect(scopedAllKinds.some(model => model.provider === "typesafe")).toBe(false);
 
-		const foundBeforeAll = findFirstRegistry.find("anthropic", "claude-sonnet-4-5");
+		const foundBeforeAll = findFirstRegistry.find("github-copilot", "claude-sonnet-4.5");
 		expect(foundBeforeAll).toBeDefined();
 		const availableBeforeAll = findFirstRegistry.getAvailable();
 		const availableAgain = findFirstRegistry.getAvailable();
@@ -209,20 +158,24 @@ describe("ModelRegistry lazy bundled composition", () => {
 		const allAfterSelectiveQueries = findFirstRegistry.getAll();
 		expect(findFirstRegistry.getAll()).toBe(allAfterSelectiveQueries);
 		expect(foundBeforeAll).toBe(
-			allAfterSelectiveQueries.find(model => model.provider === "anthropic" && model.id === "claude-sonnet-4-5"),
+			allAfterSelectiveQueries.find(
+				model => model.provider === "github-copilot" && model.id === "claude-sonnet-4.5",
+			),
 		);
 		expect(foundBeforeAll).toBe(
-			availableBeforeAll.find(model => model.provider === "anthropic" && model.id === "claude-sonnet-4-5"),
+			availableBeforeAll.find(model => model.provider === "github-copilot" && model.id === "claude-sonnet-4.5"),
 		);
 		expectSameModelObjects(availableBeforeAll, allAfterSelectiveQueries);
 
 		const allFirstRegistry = await createRegistry("all-first");
 		const allBeforeSelectiveQueries = allFirstRegistry.getAll();
 		const availableAfterAll = allFirstRegistry.getAvailable();
-		const foundAfterAll = allFirstRegistry.find("anthropic", "claude-sonnet-4-5");
+		const foundAfterAll = allFirstRegistry.find("github-copilot", "claude-sonnet-4.5");
 		expect(allFirstRegistry.getAll()).toBe(allBeforeSelectiveQueries);
 		expect(foundAfterAll).toBe(
-			allBeforeSelectiveQueries.find(model => model.provider === "anthropic" && model.id === "claude-sonnet-4-5"),
+			allBeforeSelectiveQueries.find(
+				model => model.provider === "github-copilot" && model.id === "claude-sonnet-4.5",
+			),
 		);
 		expectSameModelObjects(availableAfterAll, allBeforeSelectiveQueries);
 		expect(modelKeys(allBeforeSelectiveQueries)).toEqual(modelKeys(allAfterSelectiveQueries));

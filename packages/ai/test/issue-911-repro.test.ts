@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { Context, FetchImpl } from "@oh-my-pi/pi-ai/types";
+import { copilotCompletionsModel } from "./helpers";
 
 function createSseResponse(events: unknown[]): Response {
 	const payload = `${events
@@ -39,9 +39,7 @@ function baseContext(): Context {
 // `currentBlock.text += text`, which coerces the array via `String([{...}])` and produces
 // the literal `[object Object]` sequence the user observes.
 describe("issue #911 - Mistral Medium 3.5 array content parts", () => {
-	const model: Model<"openai-completions"> = {
-		...getBundledModel("mistral", "mistral-medium-2604"),
-	};
+	const model = copilotCompletionsModel("array-content-parts");
 
 	it("normalizes array-of-parts delta.content into the assembled text without [object Object]", async () => {
 		const fetchMock = createMockFetch([

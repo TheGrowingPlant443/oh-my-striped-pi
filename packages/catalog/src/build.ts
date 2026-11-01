@@ -9,7 +9,6 @@
 
 import RULES from "./compat/rules.json" with { type: "json" };
 import { resolveDiscoveryApi, resolveModelPolicy } from "./compat/resolve";
-import type { ModelIdentity } from "./compat/types";
 import { resolveModelTokenizer } from "./model-tokenizer";
 import {
 	applyDueDatedCostCard,
@@ -20,16 +19,7 @@ import {
 	NO_RECURRING_TARIFF,
 	parseDatedCostCards,
 } from "./pricing";
-import {
-	type AntigravityModelWireProfile,
-	type Api,
-	type EffectiveTokenCost,
-	MODEL_KINDS,
-	type Model,
-	type ModelAccountAccess,
-	type ModelCost,
-	type ModelSpec,
-} from "./types";
+import { type Api, type EffectiveTokenCost, MODEL_KINDS, type Model, type ModelCost, type ModelSpec } from "./types";
 import { cleanModelName } from "./utils";
 
 function numberField(source: object, key: string): number | undefined {
@@ -69,22 +59,11 @@ function applyCatalogAssignments<TApi extends Api>(model: Model<TApi>, catalog: 
 	} else {
 		delete model.longContextWindowUncapped;
 	}
-	const webSearch = catalog.webSearch;
-	if (
-		webSearch === "gemini" ||
-		webSearch === "anthropic" ||
-		webSearch === "codex" ||
-		webSearch === "xai" ||
-		webSearch === "openrouter" ||
-		webSearch === "openai"
-	) {
-		model.webSearch = webSearch;
-	}
-	if (typeof catalog.webSearchModel === "string") model.webSearchModel = catalog.webSearchModel;
 	if (catalog.hostedImage === true) model.hostedImage = true;
 	else if (catalog.hostedImage === false) delete model.hostedImage;
 	if (typeof catalog.imageModel === "string") model.imageModel = catalog.imageModel;
 	else if (catalog.imageModel === false) delete model.imageModel;
+	if (typeof catalog.premiumMultiplier === "number") model.premiumMultiplier = catalog.premiumMultiplier;
 	const serviceTierCost = objectPayload(catalog.serviceTierCost);
 	if (serviceTierCost !== undefined) {
 		const flex = numberField(serviceTierCost, "flex");
@@ -363,95 +342,10 @@ export function applyCatalogCorrections(
 	}
 }
 
-/**
- * Lower discovered Antigravity per-SKU output caps to the host's
- * `max-tokens-ceiling`. The transport sends a profile's `maxOutputTokens`
- * verbatim, so a roster value above the ceiling (Claude 4.x advertises 65,536;
- * Cloud Code Assist 400s past 64,000, #3067) must be corrected here as the
- * row's `maxTokens` is.
- */
-function capAntigravityWireProfiles(
-	model: Pick<Model<Api>, "antigravityWireProfiles" | "accountAccess">,
-	ceiling: unknown,
-): void {
-	if (typeof ceiling !== "number") return;
-	const cap = (
-		profiles: Readonly<Record<string, AntigravityModelWireProfile>> | undefined,
-	): Readonly<Record<string, AntigravityModelWireProfile>> | undefined => {
-		if (profiles === undefined) return undefined;
-		let capped: Record<string, AntigravityModelWireProfile> | undefined;
-		for (const [wireId, profile] of Object.entries(profiles)) {
-			if (profile.maxOutputTokens === undefined || profile.maxOutputTokens <= ceiling) continue;
-			capped ??= { ...profiles };
-			capped[wireId] = { ...profile, maxOutputTokens: ceiling };
-		}
-		return capped ?? profiles;
-	};
-	model.antigravityWireProfiles = cap(model.antigravityWireProfiles);
-	if (model.accountAccess === undefined) return;
-	let accountAccess: Record<string, ModelAccountAccess> | undefined;
-	for (const [accountKey, access] of Object.entries(model.accountAccess)) {
-		const profiles = cap(access.antigravityWireProfiles);
-		if (profiles === access.antigravityWireProfiles) continue;
-		accountAccess ??= { ...model.accountAccess };
-		accountAccess[accountKey] = { ...access, antigravityWireProfiles: profiles };
-	}
-	if (accountAccess !== undefined) model.accountAccess = accountAccess;
-}
-
-/**
- * Direct first-party OpenAI Responses endpoints (api.openai.com, Azure OpenAI
- * deployments). Gates GA computer-use detection; identity supplies the model
- * generation.
- */
-function isDirectOpenAIResponsesEndpoint(spec: ModelSpec<Api>): boolean {
-	if (spec.api === "openai-responses") {
-		if (spec.provider !== "openai") return false;
-		if (!spec.baseUrl) return true;
-		try {
-			const url = new URL(spec.baseUrl);
-			return url.protocol === "https:" && url.hostname === "api.openai.com";
-		} catch {
-			return false;
-		}
-	}
-	if (spec.api !== "azure-openai-responses" || (spec.provider !== "azure" && spec.provider !== "azure-openai")) {
-		return false;
-	}
-	if (!spec.baseUrl) return true;
-	try {
-		const url = new URL(spec.baseUrl);
-		return (
-			url.protocol === "https:" &&
-			(url.hostname.endsWith(".openai.azure.com") || url.hostname === "models.inference.ai.azure.com")
-		);
-	} catch {
-		return false;
-	}
-}
-
 function explicitComputerUseConfig(spec: ModelSpec<Api>): boolean | undefined {
 	if (!("supportsComputerUseConfig" in spec)) return spec.supportsComputerUse;
 	const value: unknown = Reflect.get(spec, "supportsComputerUseConfig");
 	return typeof value === "boolean" ? value : undefined;
-}
-
-function revisionAtLeast(identity: ModelIdentity, major: number, minor: number): boolean {
-	if (identity.revision === undefined) return false;
-	const [revMajor = 0, revMinor = 0] = identity.revision.split(".").map(Number);
-	return revMajor > major || (revMajor === major && revMinor >= minor);
-}
-
-function supportsOpenAIGAComputerUse(
-	spec: ModelSpec<Api>,
-	identity: ModelIdentity,
-	explicitSupport: boolean | undefined,
-): boolean {
-	if (explicitSupport !== undefined) return explicitSupport;
-	if (!isDirectOpenAIResponsesEndpoint(spec)) return false;
-	const wireIdentity =
-		spec.requestModelId === undefined ? identity : resolveModelPolicy({ ...spec, id: spec.requestModelId }).identity;
-	return wireIdentity.class === "openai" && revisionAtLeast(wireIdentity, 5, 4);
 }
 
 /**
@@ -530,14 +424,13 @@ export function buildModel<TApi extends Api>(spec: ModelSpec<TApi>): Model<TApi>
 		requiresGlyphTokenization: policy.identity.class === "anthropic",
 		tokenizer: spec.tokenizer ?? resolveModelTokenizer(spec.requestModelId ?? spec.id, spec.provider),
 		thinking: policy.thinking,
-		supportsComputerUse: supportsOpenAIGAComputerUse(spec, policy.identity, supportsComputerUseConfig),
+		supportsComputerUse: supportsComputerUseConfig ?? false,
 		supportsComputerUseConfig,
 		compat: policy.compat,
 		compatConfig: spec.compat,
 	};
 	applyCatalogAssignments(model, policy.catalog);
 	applyCatalogCorrections(model, policy.catalog);
-	capAntigravityWireProfiles(model, policy.catalog.maxTokensCeiling);
 	// Configured kinds and lifetimes replace catalog values rather than merging with them.
 	if (spec.kindConfig !== undefined) model.kind = spec.kindConfig;
 	if (spec.promptCacheConfig !== undefined) model.promptCache = { ...spec.promptCacheConfig };

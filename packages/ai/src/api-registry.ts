@@ -1,47 +1,7 @@
-/**
- * Custom API provider registry.
- *
- * Allows extensions to register streaming functions for custom API types
- * (e.g., "vertex-claude-api") that are not built into stream.ts.
- */
+/** Custom inference transport registration for hosts and extensions. */
 
 import * as AIError from "./error";
-import type {
-	Api,
-	AssistantMessageEventStream,
-	Context,
-	KnownApi,
-	Model,
-	SimpleStreamOptions,
-	StreamOptions,
-} from "./types";
-
-const BUILTIN_API_IDS = [
-	"openai-completions",
-	"openai-responses",
-	"openrouter",
-	"openai-codex-responses",
-	"azure-openai-responses",
-	"anthropic-messages",
-	"bedrock-converse-stream",
-	"google-generative-ai",
-	"google-gemini-cli",
-	"google-vertex",
-	"ollama-chat",
-	"cursor-agent",
-	"factory-droid-agent",
-	"gitlab-duo-agent",
-	"devin-agent",
-	"apple-foundation-models",
-] as const satisfies readonly KnownApi[];
-
-type _MissingBuiltinApis = Exclude<KnownApi, (typeof BUILTIN_API_IDS)[number]>;
-type _CheckBuiltinApis = _MissingBuiltinApis extends never
-	? true
-	: ["BUILTIN_APIS is missing KnownApi values", _MissingBuiltinApis];
-true satisfies _CheckBuiltinApis;
-
-const BUILTIN_APIS = new Set<KnownApi>(BUILTIN_API_IDS);
+import type { Api, AssistantMessageEventStream, Context, Model, SimpleStreamOptions, StreamOptions } from "./types";
 
 export type CustomStreamFn = (
 	model: Model<Api>,
@@ -63,8 +23,8 @@ export interface RegisteredCustomApi {
 const customApiRegistry = new Map<string, RegisteredCustomApi>();
 
 function assertCustomApiName(api: string): void {
-	if (BUILTIN_APIS.has(api as KnownApi)) {
-		throw new AIError.ConfigurationError(`Cannot register custom API "${api}": built-in API names are reserved.`);
+	if (!api.trim() || api.includes("\0")) {
+		throw new AIError.ConfigurationError("Custom API must be a nonempty name without NUL characters");
 	}
 }
 

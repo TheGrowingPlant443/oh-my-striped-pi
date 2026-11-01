@@ -6,11 +6,7 @@ import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream"
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
-// Whether a model accepts `temperature`/`top_p` is a property of the model
-// lineage, not of the provider serving it: GPT-5+/GPT-6 and adaptive Claude
-// reject them with a 400 on Bedrock, OpenRouter, and every other host. Class
-// rules assign `supportsSamplingParams` on every compat record, and the
-// stream entry points drop sampling options when it resolves `false`.
+// Sampling support follows model lineage on both retained providers.
 
 const context: Context = { messages: [{ role: "user", content: "hi", timestamp: 0 }] };
 
@@ -29,7 +25,6 @@ function simplePayload(model: Model<Api>): Promise<Record<string, unknown>> {
 	const { promise, resolve } = Promise.withResolvers<Record<string, unknown>>();
 	void streamSimple(model, context, {
 		apiKey: "test-key",
-		providerOptions: { bearerToken: "test-token" },
 		maxTokens: 16,
 		temperature: 0,
 		topP: 0.9,
@@ -40,53 +35,34 @@ function simplePayload(model: Model<Api>): Promise<Record<string, unknown>> {
 	return promise;
 }
 
-function bedrockInference(payload: Record<string, unknown>): Record<string, unknown> {
-	const inference = payload.inferenceConfig;
-	return typeof inference === "object" && inference !== null ? { ...inference } : {};
-}
-
 afterEach(() => {
 	clearCustomApis();
 });
 
-describe("sampling params are gated by model, on every provider", () => {
-	test.each([["global.openai.gpt-6-luna"], ["global.anthropic.claude-opus-5-5"]])(
-		"Bedrock %s omits temperature and topP",
-		async id => {
-			const inference = bedrockInference(await simplePayload(bundled("amazon-bedrock", id)));
-			expect(inference).not.toHaveProperty("temperature");
-			expect(inference).not.toHaveProperty("topP");
-			expect(inference.maxTokens).toBe(16);
-		},
-	);
-
-	test("Bedrock Claude Sonnet 4.5 still sends temperature and topP", async () => {
-		const inference = bedrockInference(
-			await simplePayload(bundled("amazon-bedrock", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")),
-		);
-		expect(inference.temperature).toBe(0);
-		expect(inference.topP).toBe(0.9);
-	});
-
-	test("OpenRouter Claude Opus 5.5 omits temperature and top_p", async () => {
-		const payload = await simplePayload(bundled("openrouter", "anthropic/claude-opus-5.5"));
+describe("sampling params are gated by model on retained providers", () => {
+	test.each(["gpt-6-luna", "claude-opus-5.5"])("Copilot %s omits sampling params", async id => {
+		const payload = await simplePayload(bundled("github-copilot", id));
 		expect(payload).not.toHaveProperty("temperature");
 		expect(payload).not.toHaveProperty("top_p");
 	});
 
-	test("OpenRouter Claude Sonnet 4.5 still sends temperature", async () => {
-		const payload = await simplePayload(bundled("openrouter", "anthropic/claude-sonnet-4.5"));
+	test("Copilot GPT-4o still sends temperature", async () => {
+		const payload = await simplePayload(bundled("github-copilot", "gpt-4o"));
 		expect(payload.temperature).toBe(0);
 	});
 
-	test("a custom API adapter receives no sampling options, including frequencyPenalty", () => {
+	test("the local inference adapter receives no unsupported sampling options", () => {
 		let received: SimpleStreamOptions | undefined;
-		registerCustomApi("sampling-gate-test", (_model, _context, options) => {
+		registerCustomApi("local-inference", (_model, _context, options) => {
 			received = options;
 			return new AssistantMessageEventStream();
 		});
-		const model = bundled("amazon-bedrock", "global.openai.gpt-6-luna");
-		void streamSimple({ ...model, api: "sampling-gate-test" }, context, {
+		const model: Model<Api> = {
+			...bundled("github-copilot", "gpt-6-luna"),
+			api: "local-inference",
+			provider: "local",
+		};
+		void streamSimple(model, context, {
 			temperature: 0,
 			topP: 0.9,
 			frequencyPenalty: 1,
@@ -104,7 +80,7 @@ describe("sampling params are gated by model, on every provider", () => {
 			id: "gpt-5",
 			name: "gpt-5",
 			api: "openai-completions",
-			provider: "custom-proxy",
+			provider: "github-copilot",
 			baseUrl: "http://127.0.0.1:9/v1",
 			reasoning: true,
 			input: ["text"],
@@ -119,13 +95,13 @@ describe("sampling params are gated by model, on every provider", () => {
 
 	test("the non-simple stream() entry applies the same gate", async () => {
 		const { promise, resolve } = Promise.withResolvers<Record<string, unknown>>();
-		void stream(bundled<"bedrock-converse-stream">("amazon-bedrock", "global.openai.gpt-6-luna"), context, {
-			bearerToken: "test-token",
+		void stream(bundled<"openai-responses">("github-copilot", "gpt-6-luna"), context, {
+			apiKey: "test-key",
 			maxTokens: 16,
 			temperature: 0,
 			fetch: emptyResponse,
 			onPayload: payload => resolve(wire(payload)),
 		});
-		expect(bedrockInference(await promise)).not.toHaveProperty("temperature");
+		expect(await promise).not.toHaveProperty("temperature");
 	});
 });

@@ -212,9 +212,9 @@ mkdir -p "$TARBALL_APP_DIR"
       echo "Platform leaf package not installed: $leaf_dir"
       exit 1
    }
-   wire_proto="$(bun -e 'import { COLLAB_PROTO } from "@oh-my-pi/pi-wire"; process.stdout.write(String(COLLAB_PROTO));')"
-   [ "$wire_proto" = "3" ] || {
-      echo "Unexpected @oh-my-pi/pi-wire COLLAB_PROTO: $wire_proto"
+   wire_intent="$(bun -e 'import { INTENT_FIELD } from "@oh-my-pi/pi-wire"; process.stdout.write(INTENT_FIELD);')"
+   [ "$wire_intent" = "i" ] || {
+      echo "Unexpected @oh-my-pi/pi-wire INTENT_FIELD: $wire_intent"
       exit 1
    }
    omptype_probe="$(bun -e '
@@ -228,8 +228,12 @@ mkdir -p "$TARBALL_APP_DIR"
       echo "Unexpected @oh-my-pi/omptype probe result: $omptype_probe"
       exit 1
    }
-   [ -f "node_modules/@oh-my-pi/collab-web/dist/index.html" ] || {
-      echo "Collab web tarball did not install built dist/index.html"
+   [ -f "node_modules/@oh-my-pi/collab-web/src/export-standalone.ts" ] || {
+      echo "Export viewer package did not install src/export-standalone.ts"
+      exit 1
+   }
+   [ -s "node_modules/@oh-my-pi/pi-coding-agent/src/export/html/viewer.generated.js.txt" ] || {
+      echo "Coding agent tarball did not install the embedded export viewer"
       exit 1
    }
    smoke_cli ./node_modules/.bin/omp

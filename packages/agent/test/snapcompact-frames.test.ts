@@ -9,7 +9,7 @@ import { Tokenizer } from "../src/tokenizer";
 
 const tokenizer = new Tokenizer();
 
-function bundled(provider: "anthropic" | "openai-codex", id: string): Model {
+function bundled(provider: "github-copilot", id: string): Model {
 	const model = getBundledModel(provider, id);
 	if (!model) throw new Error(`Expected bundled ${provider}/${id}`);
 	return model;
@@ -48,9 +48,9 @@ describe("compaction summary message with snapcompact frames", () => {
 	});
 
 	it("charges each frame what its reading model bills for the frame's size", async () => {
-		const codex = { api: "openai-codex-responses", id: "gpt-6-astra" } as const;
-		const opus = { api: "anthropic-messages", id: "claude-opus-5-5" } as const;
-		const gemini = { api: "google-generative-ai", id: "gemini-3-pro-preview" } as const;
+		const codex = { api: "openai-responses", provider: "github-copilot", id: "gpt-6-astra" } as const;
+		const opus = { api: "anthropic-messages", provider: "github-copilot", id: "claude-opus-5.5" } as const;
+		const gemini = { api: "openai-completions", provider: "github-copilot", id: "gemini-3-pro-preview" } as const;
 		const codexShape = snapcompact.resolveShape(codex);
 		const opusShape = snapcompact.resolveShape(opus);
 		const geminiShape = snapcompact.resolveShape(gemini);
@@ -84,13 +84,13 @@ describe("compaction summary message with snapcompact frames", () => {
 
 	it("re-prices the archive when the active model's frame billing changes", async () => {
 		const opusFrame = await frameImage(
-			snapcompact.resolveShape({ api: "anthropic-messages", id: "claude-opus-5-5" }),
+			snapcompact.resolveShape({ api: "anthropic-messages", provider: "github-copilot", id: "claude-opus-5.5" }),
 		);
 		// Same (absent) encoding on every model, so only the frame billing can force a new tokenizer.
-		const opus55: Model = { ...bundled("anthropic", "claude-opus-5-5"), tokenizer: undefined };
-		const opus46: Model = { ...bundled("anthropic", "claude-opus-4-6"), tokenizer: undefined };
-		const opus48: Model = { ...bundled("anthropic", "claude-opus-4-8"), tokenizer: undefined };
-		const codexModel: Model = { ...bundled("openai-codex", "gpt-6-astra"), tokenizer: undefined };
+		const opus55: Model = { ...bundled("github-copilot", "claude-opus-5.5"), tokenizer: undefined };
+		const opus46: Model = { ...bundled("github-copilot", "claude-opus-4.6"), tokenizer: undefined };
+		const opus48: Model = { ...bundled("github-copilot", "claude-opus-4.8"), tokenizer: undefined };
+		const codexModel: Model = { ...bundled("github-copilot", "gpt-6-astra"), tokenizer: undefined };
 		const agent = new Agent({ initialState: { model: opus55, systemPrompt: [], tools: [], messages: [] } });
 		const charges = [frameCharge(agent.tokenizer, [opusFrame])];
 		for (const model of [codexModel, opus46, opus48]) {

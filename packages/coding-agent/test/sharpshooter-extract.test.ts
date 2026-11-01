@@ -5,7 +5,6 @@ import * as path from "node:path";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
 import * as ai from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -15,6 +14,9 @@ import {
 	maybeStartSharpshooterExtraction,
 } from "@oh-my-pi/pi-coding-agent/sharpshooter/extract";
 import { listSharpshooterDeltas } from "@oh-my-pi/pi-coding-agent/sharpshooter/queue";
+import { getTestModel } from "./helpers/model-fixtures";
+
+const model = getTestModel("github-copilot");
 
 function message(role: "user" | "assistant", content: unknown): AgentMessage {
 	return { role, content, timestamp: Date.now() } as unknown as AgentMessage;
@@ -24,9 +26,9 @@ function assistantResponse(content: AssistantMessage["content"]): AssistantMessa
 	return {
 		role: "assistant",
 		content,
-		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-haiku-4-5",
+		api: model.api,
+		provider: model.provider,
+		model: model.id,
 		stopReason: "stop",
 		usage: {
 			input: 0,
@@ -46,8 +48,6 @@ function extractionDependencies(
 	sessionId = "session-extract",
 	overrides: Record<string, unknown> = {},
 ) {
-	const model = getBundledModel("anthropic", "claude-haiku-4-5");
-	if (!model) throw new Error("Expected bundled Claude Haiku model");
 	const settings = Settings.isolated({ "sharpshooter.model": `${model.provider}/${model.id}`, ...overrides });
 	const modelRegistry = {
 		getAll: () => [model],

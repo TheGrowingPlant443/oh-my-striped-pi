@@ -23,7 +23,7 @@ import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
  * (e.g. called `todo` or `edit`) between the prior reminder and the next stop.
  */
 const sharedAuthStorage = createInMemoryAuthStorage();
-sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 const sharedModelRegistry = new ModelRegistry(sharedAuthStorage);
 
 afterAll(() => {
@@ -41,8 +41,8 @@ describe("AgentSession todo reminder self-continuation suppression", () => {
 			role: "assistant",
 			content: [{ type: "text", text }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: {
 				input: 100,
@@ -69,8 +69,8 @@ describe("AgentSession todo reminder self-continuation suppression", () => {
 			role: "assistant",
 			content: [toolCall],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "toolUse",
 			usage: {
 				input: 50,
@@ -114,8 +114,8 @@ describe("AgentSession todo reminder self-continuation suppression", () => {
 		tempDir = TempDir.createSync("@pi-todo-reminder-loop-");
 		sessionManager = SessionManager.inMemory(tempDir.path());
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected built-in Copilot model to exist");
 
 		const settings = Settings.isolated({
 			"compaction.enabled": false,

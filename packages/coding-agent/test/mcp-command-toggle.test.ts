@@ -39,7 +39,6 @@ function createController() {
 			errors: new Map<string, string>(),
 			connectedServers: [],
 			tools: [],
-			exaApiKeys: [],
 		}),
 	);
 	const mcpManager = createMcpManagerStub({ connectServers });
@@ -49,7 +48,7 @@ function createController() {
 	});
 	const controller = new MCPCommandController(ctx);
 
-	return { controller, mcpManager, refreshMCPTools, connectServers };
+	return { controller, ctx, mcpManager, refreshMCPTools, connectServers };
 }
 
 async function writeProjectConfig(projectDir: string, servers: Record<string, MCPServerConfig>): Promise<void> {
@@ -87,6 +86,30 @@ describe("/mcp enable and disable", () => {
 		await removeWithRetries(projectDir);
 		await removeWithRetries(agentDir);
 	});
+
+	test.each(["smithery-search filesystem", "smithery-login", "smithery-logout"])(
+		"rejects removed registry command %s without requests or user-data changes",
+		async command => {
+			await writeProjectConfig(projectDir, { smithery: { type: "stdio", command: "company-mcp" } });
+			const configPath = getMCPConfigPath("project", projectDir);
+			const originalConfig = await fs.readFile(configPath, "utf8");
+			const credentialPath = path.join(agentDir, "smithery.json");
+			const originalCredential = JSON.stringify({ apiKey: "test-preserved-key" });
+			await Bun.write(credentialPath, originalCredential);
+			const request = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected registry request"));
+			const { controller, ctx, mcpManager } = createController();
+			const error = vi.spyOn(ctx, "showError");
+
+			await controller.handle(`/mcp ${command}`);
+
+			expect(error).toHaveBeenCalledTimes(1);
+			expect(request).not.toHaveBeenCalled();
+			expect(mcpManager.discoverAndConnect).not.toHaveBeenCalled();
+			expect(mcpManager.connectServers).not.toHaveBeenCalled();
+			expect(await fs.readFile(configPath, "utf8")).toBe(originalConfig);
+			expect(await fs.readFile(credentialPath, "utf8")).toBe(originalCredential);
+		},
+	);
 
 	test("disabling one configured server does not reload other MCP servers", async () => {
 		await writeProjectConfig(projectDir, {

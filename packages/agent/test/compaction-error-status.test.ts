@@ -32,9 +32,9 @@ function makeAssistantStop(content: AssistantMessage["content"]): AssistantMessa
 		role: "assistant",
 		content,
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -52,9 +52,9 @@ function makeAssistantError(errorStatus: number | undefined, errorMessage: strin
 		role: "assistant",
 		content: [],
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -70,8 +70,8 @@ function makeAssistantError(errorStatus: number | undefined, errorMessage: strin
 }
 
 function getAnthropicModel(): Model {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected built-in anthropic/claude-sonnet-4-5 to exist");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!model) throw new Error("Expected bundled github-copilot/claude-sonnet-4.5 model");
 	return model;
 }
 
@@ -143,7 +143,10 @@ describe("compaction error-status propagation", () => {
 
 	test("missing errorStatus does not attach .status (preserves auth_unavailable regex path)", async () => {
 		vi.spyOn(ai, "completeSimple").mockResolvedValue(
-			makeAssistantError(undefined, "503 auth_unavailable: no auth available (providers=codex, model=gpt-5.4-mini)"),
+			makeAssistantError(
+				undefined,
+				"503 auth_unavailable: no auth available (providers=github-copilot, model=gpt-5.4-mini)",
+			),
 		);
 
 		const error = await generateHandoff(handoffMessages, getAnthropicModel(), "stale-key", {

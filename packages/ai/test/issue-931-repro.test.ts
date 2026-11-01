@@ -36,7 +36,7 @@ function customResponsesModel(compat: OpenAICompat): Model<"openai-responses"> {
 		id: "deepseek-v4-flash:cloud",
 		name: "deepseek-v4-flash:cloud",
 		api: "openai-responses",
-		provider: "custom",
+		provider: "github-copilot",
 		baseUrl: "http://127.0.0.1:11434/v1",
 		reasoning: true,
 		input: ["text"],

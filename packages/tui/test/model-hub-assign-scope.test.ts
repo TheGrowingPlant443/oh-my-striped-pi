@@ -80,7 +80,12 @@ const registryStub: ModelHubRegistry = {
 	refreshProvider: async () => {},
 };
 
-function createHub(): { hub: ModelHubComponent; body: () => string; assigned: string[]; key: (data: string) => void } {
+function createHub(source = createSource()): {
+	hub: ModelHubComponent;
+	body: () => string;
+	assigned: string[];
+	key: (data: string) => void;
+} {
 	const assigned: string[] = [];
 	const callbacks: ModelHubCallbacks = {
 		onAssign: (_m, role, _t, selector) => {
@@ -91,7 +96,7 @@ function createHub(): { hub: ModelHubComponent; body: () => string; assigned: st
 		onCancel: () => {},
 	};
 	const scoped: ScopedModelItem[] = [{ model: webModel }, { model: chatModel }];
-	const hub = new ModelHubComponent(tuiStub, createSource(), registryStub, scoped, callbacks);
+	const hub = new ModelHubComponent(tuiStub, source, registryStub, scoped, callbacks);
 	return {
 		hub,
 		body: () => hub.render(120).join("\n").replace(ANSI_PATTERN, ""),
@@ -151,5 +156,26 @@ describe("model hub assign mode scope filtering (#12692)", () => {
 
 		const rendered = body();
 		expect(rendered).toContain("chat-only");
+	});
+
+	test("offers independent role candidates without registering their provider", () => {
+		const independent = buildModel({
+			...webModel,
+			provider: "web",
+			id: "public",
+			name: "Public Web",
+			kind: "search",
+		});
+		const { body, key, assigned } = createHub({
+			...createSource(),
+			roleCandidates: () => [independent],
+		});
+		expect(body()).not.toContain("Public Web");
+		startWebAssign(key);
+		expect(body()).toContain("Public Web");
+		expect(body()).not.toContain("chat-only");
+		key("\r");
+		expect(assigned).toEqual(["web:web/public"]);
+		expect(registryStub.find("web", "public")).toBeUndefined();
 	});
 });

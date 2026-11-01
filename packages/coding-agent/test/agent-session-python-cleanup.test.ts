@@ -72,7 +72,7 @@ class FakeKernel {
 }
 
 const getModel = () => {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 	if (!model) throw new Error("Expected bundled model");
 	return model;
 };

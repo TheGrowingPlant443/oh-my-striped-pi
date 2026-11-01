@@ -129,7 +129,7 @@ describe("AgentSession interrupted thinking persistence", () => {
 	beforeEach(() => {
 		tempDir = TempDir.createSync("@pi-interrupted-thinking-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		authStorage.keys.setRuntime("github-copilot", "anthropic-test-key");
 	});
 
 	afterEach(async () => {
@@ -147,7 +147,7 @@ describe("AgentSession interrupted thinking persistence", () => {
 	// refuses quoted reasoning, so it skips the hidden continuity quote entirely.
 	function createSession(
 		extensionRunner?: ExtensionRunner,
-		providerModel: [GeneratedProvider, string] = ["openai", "gpt-5.2"],
+		providerModel: [GeneratedProvider, string] = ["github-copilot", "gpt-5.2"],
 	): {
 		model: Model<Api>;
 		sessionManager: SessionManager;
@@ -239,7 +239,7 @@ describe("AgentSession interrupted thinking persistence", () => {
 		expect(developerLlm.some(entry => JSON.stringify(entry.content).includes(REASONING_TEXT))).toBe(true);
 	});
 	it("skips hidden continuity for a Claude target — reasoning never replays as text", async () => {
-		const harness = createSession(undefined, ["anthropic", "claude-sonnet-4-5"]);
+		const harness = createSession(undefined, ["github-copilot", "claude-sonnet-4.6"]);
 		await emitAssistantEnd(
 			harness.session,
 			harness.sessionManager,

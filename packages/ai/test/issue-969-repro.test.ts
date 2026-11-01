@@ -20,15 +20,16 @@ function createSseResponse(events: unknown[]): Response {
 function customOpenAICompatModel(): Model<"openai-completions"> {
 	return buildModel({
 		id: "gpt-5.1",
-		name: "GPT-5.1 proxy",
+		name: "GPT-5.1 custom Copilot policy",
 		api: "openai-completions",
-		provider: "custom",
-		baseUrl: "https://proxy.example.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		thinking: {
 			mode: "effort",
 			efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh],
 		},
+		compat: { supportsReasoningParams: true },
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 128_000,
@@ -37,7 +38,7 @@ function customOpenAICompatModel(): Model<"openai-completions"> {
 }
 
 describe("issue #969 — custom thinking metadata must preserve explicit xhigh", () => {
-	it("uses the configured xhigh effort for custom OpenAI-compatible models", async () => {
+	it("uses the configured xhigh effort with an explicit reasoning-parameter override", async () => {
 		const model = customOpenAICompatModel();
 		let payload: Record<string, unknown> | undefined;
 		const fetchMock: FetchImpl = Object.assign(

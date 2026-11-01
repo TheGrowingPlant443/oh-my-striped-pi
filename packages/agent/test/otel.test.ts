@@ -44,7 +44,7 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { createUserMessage } from "./helpers";
 
-const MOCK_IDENT = { id: "mock-model", provider: "mock-provider" } as const;
+const MOCK_IDENT = { id: "mock-model", provider: "local" } as const;
 
 const exporter = new InMemorySpanExporter();
 let provider: BasicTracerProvider;
@@ -145,7 +145,7 @@ describe("agent-loop OTEL instrumentation", () => {
 
 		// chat envelope
 		expect(chat?.attributes[GenAIAttr.OperationName]).toBe(GenAIOperation.Chat);
-		expect(chat?.attributes[GenAIAttr.ProviderName]).toBe("mock-provider");
+		expect(chat?.attributes[GenAIAttr.ProviderName]).toBe("local");
 		expect(chat?.attributes[GenAIAttr.RequestModel]).toBe("mock-model");
 		expect(chat?.attributes[GenAIAttr.RequestMaxTokens]).toBe(1024);
 		expect(chat?.attributes[GenAIAttr.RequestTemperature]).toBe(0.7);
@@ -167,10 +167,10 @@ describe("agent-loop OTEL instrumentation", () => {
 		expect(chat?.attributes[GenAIAttr.UsageReasoningOutputTokens]).toBe(11);
 	});
 
-	it("normalizes provider and service-tier attributes to OTEL keys", async () => {
+	it("keeps local provider identity and omits unsupported service-tier attributes", async () => {
 		const googleMock = createMockModel({
-			id: "gemini-mock",
-			provider: "google",
+			id: "local-mock",
+			provider: "local",
 			responses: [{ content: ["ok"] }],
 		});
 		await runAndDrain(
@@ -183,14 +183,14 @@ describe("agent-loop OTEL instrumentation", () => {
 			),
 		);
 
-		const googleChat = findSpan(exporter.getFinishedSpans(), "chat gemini-mock");
-		expect(googleChat?.attributes[GenAIAttr.ProviderName]).toBe("gcp.gemini");
+		const googleChat = findSpan(exporter.getFinishedSpans(), "chat local-mock");
+		expect(googleChat?.attributes[GenAIAttr.ProviderName]).toBe("local");
 		expect(googleChat?.attributes["gen_ai.system"]).toBeUndefined();
 
 		exporter.reset();
 		const openAiMock = createMockModel({
 			id: "gpt-mock",
-			provider: "openai",
+			provider: "local",
 			responses: [{ content: ["ok"] }],
 		});
 		await runAndDrain(
@@ -209,7 +209,7 @@ describe("agent-loop OTEL instrumentation", () => {
 		);
 
 		const openAiChat = findSpan(exporter.getFinishedSpans(), "chat gpt-mock");
-		expect(openAiChat?.attributes[OpenAIAttr.RequestServiceTier]).toBe("priority");
+		expect(openAiChat?.attributes[OpenAIAttr.RequestServiceTier]).toBeUndefined();
 		expect(openAiChat?.attributes["gen_ai.request.service_tier"]).toBeUndefined();
 	});
 
@@ -464,7 +464,7 @@ describe("agent-loop OTEL instrumentation", () => {
 	it("gives costEstimator the request's computed cost and the requested model's registry ids", async () => {
 		const mock = createMockModel({
 			id: "requested-model",
-			provider: "openai-codex",
+			provider: "local",
 			responses: [
 				{
 					content: ["ok"],
@@ -511,8 +511,8 @@ describe("agent-loop OTEL instrumentation", () => {
 		await runAndDrain(agentLoop([createUserMessage("hi")], ctx, config, undefined, servedModelStream));
 
 		expect(seen).toMatchObject({
-			provider: "openai",
-			providerId: "openai-codex",
+			provider: "local",
+			providerId: "local",
 			model: "served-model",
 			modelId: "requested-model",
 		});
@@ -553,7 +553,7 @@ describe("agent-loop OTEL instrumentation", () => {
 			telemetry: {
 				agent: { name: "prefix.worker" },
 				normalizeAgentName: name => name?.replace(/^prefix\./, ""),
-				normalizeProvider: provider => (provider === "mock-provider" ? "normalized-provider" : provider),
+				normalizeProvider: provider => (provider === "local" ? "normalized-provider" : provider),
 				resolveAttributes: ctx => ({ "tenant.id": "tenant-1", "telemetry.kind": ctx.kind }),
 				costEstimator: () => ({ usd: 0.25 }),
 				onCostDelta: delta => deltas.push(delta),
@@ -610,7 +610,7 @@ describe("agent-loop OTEL instrumentation", () => {
 			telemetry: {
 				agent: { id: "agent-1", name: "worker" },
 				resolveAttributes: ctx => ({ "tenant.id": "tenant-7", "telemetry.kind": ctx.kind }),
-				normalizeProvider: provider => (provider === "mock-provider" ? "normalized-provider" : provider),
+				normalizeProvider: provider => (provider === "local" ? "normalized-provider" : provider),
 				onChatUsage: event => {
 					events.push(event);
 				},
@@ -910,29 +910,17 @@ describe("detectGatewayFromHeaders", () => {
 	it("identifies Helicone via helicone-id", () => {
 		const detection = detectGatewayFromHeaders({
 			"helicone-id": "req_42",
-			"helicone-target-provider": "openai",
+			"helicone-target-provider": "local",
 		});
-		expect(detection).toEqual({ name: "helicone", callId: "req_42", routedTo: "openai" });
+		expect(detection).toEqual({ name: "helicone", callId: "req_42", routedTo: "local" });
 	});
 
 	it("identifies Portkey via x-portkey-trace-id with provider routing", () => {
 		const detection = detectGatewayFromHeaders({
 			"x-portkey-trace-id": "trace_99",
-			"x-portkey-llm-provider": "anthropic",
+			"x-portkey-llm-provider": "local",
 		});
-		expect(detection).toEqual({ name: "portkey", callId: "trace_99", routedTo: "anthropic" });
-	});
-
-	it("identifies OpenRouter via x-generation-id with gen- prefix", () => {
-		expect(detectGatewayFromHeaders({ "x-generation-id": "gen-1234567890" })).toEqual({
-			name: "openrouter",
-			callId: "gen-1234567890",
-			routedTo: undefined,
-		});
-	});
-
-	it("ignores x-generation-id without the OpenRouter gen- prefix", () => {
-		expect(detectGatewayFromHeaders({ "x-generation-id": "1234567890" })).toBeUndefined();
+		expect(detection).toEqual({ name: "portkey", callId: "trace_99", routedTo: "local" });
 	});
 
 	it("falls back to x-portkey-request-id when trace id is absent", () => {
@@ -977,12 +965,6 @@ describe("detectGatewayFromHeaders", () => {
 				"cf-aig-cache-status": "BYPASS",
 			})?.name,
 		).toBe("portkey");
-		expect(
-			detectGatewayFromHeaders({
-				"x-generation-id": "gen-cf-1",
-				"cf-aig-cache-status": "HIT",
-			})?.name,
-		).toBe("openrouter");
 	});
 });
 

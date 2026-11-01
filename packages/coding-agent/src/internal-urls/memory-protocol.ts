@@ -29,13 +29,6 @@ import { cfgMemoryBackend } from "../memory-backend/settings";
 const DEFAULT_MEMORY_FILE = "memory_summary.md";
 const MEMORY_NAMESPACE = "root";
 
-/**
- * Hindsight keeps memories server-side and exposes no `memory://<id>`
- * addressing, yet the shared `recall` tool description still steers a
- * follow-up `read memory://<id>`. This corrective pointer lets that stray read
- * self-correct in one turn instead of derailing on the generic namespace
- * error (issue #7587).
- */
 const HINDSIGHT_UNADDRESSABLE =
 	"Hindsight memories are not addressable via memory://. Recall results are final — use `recall` to search or `reflect` to synthesize. `read memory://<id>` is only available with memory.backend=mnemopi.";
 
@@ -246,8 +239,8 @@ function unknownNamespaceError(namespace: string): Error {
 
 /**
  * Error for the file-backed `memory://root` namespace when it is unavailable.
- * Only `memory.backend=local` owns this namespace; hindsight keeps memory
- * server-side and mnemopi in SQLite banks. Non-local callers must not see
+ * Only `memory.backend=local` owns this namespace; Hindsight keeps memories
+ * server-side and Mnemopi in SQLite banks. Non-local callers must not see
  * potentially stale files left by an earlier local session. The backend-aware
  * message points at the tools that can actually answer instead of prescribing
  * "enable memories" to a caller whose backend is already healthy.
@@ -412,13 +405,12 @@ export class MemoryProtocolHandler implements ProtocolHandler {
 			}
 
 			const mnemopiStates = mnemopiSessionStatesFromRegistry();
-			const hindsightActive =
-				backend === "hindsight" ||
-				(mnemopiStates.length === 0 &&
-					AgentRegistry.global()
-						.list()
-						.some(ref => ref.session?.getHindsightSessionState?.()));
-			if (hindsightActive) {
+			if (
+				mnemopiStates.length === 0 &&
+				AgentRegistry.global()
+					.list()
+					.some(ref => ref.session?.getHindsightSessionState?.())
+			) {
 				throw new Error(HINDSIGHT_UNADDRESSABLE);
 			}
 			if (mnemopiStates.length === 0) {

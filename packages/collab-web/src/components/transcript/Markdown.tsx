@@ -73,6 +73,16 @@ const md = new Marked({
 			const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
 			return `<a href="${escapeHtml(url)}"${titleAttr} target="_blank" rel="noopener">${inner}</a>`;
 		},
+		// Exports must not fetch transcript images merely by opening the file.
+		image({ href, text }) {
+			if (/^data:image\/(?:png|jpeg|gif|webp|avif|bmp);base64,[a-z0-9+/=\s]+$/i.test(href)) {
+				return `<img src="${escapeHtml(href)}" alt="${escapeHtml(text)}">`;
+			}
+			const url = safeHref(href);
+			return url === null
+				? escapeHtml(text)
+				: `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text || href)}</a>`;
+		},
 	},
 	breaks: true,
 });

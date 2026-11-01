@@ -30,10 +30,10 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 describe("Duplicate Tool Results Regression", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
-		baseUrl: "https://api.anthropic.com",
+		baseUrl: "https://api.githubcopilot.com",
 		input: ["text"],
 		cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
 		maxTokens: 8192,
@@ -44,9 +44,9 @@ describe("Duplicate Tool Results Regression", () => {
 	const makeEvalAssistantMessage = (id: string, timestamp: number): AssistantMessage => ({
 		role: "assistant",
 		content: [{ type: "toolCall", id, name: "eval", arguments: {} }],
-		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-3-5-sonnet-20241022",
+		api: "openai-responses",
+		provider: "github-copilot",
+		model: "gpt-5-codex",
 		usage: {
 			input: 0,
 			output: 0,
@@ -96,7 +96,7 @@ describe("Duplicate Tool Results Regression", () => {
 				},
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,
@@ -156,7 +156,7 @@ describe("Duplicate Tool Results Regression", () => {
 				},
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,
@@ -246,7 +246,7 @@ describe("Duplicate Tool Results Regression", () => {
 				{ type: "toolCall", id: toolCallId3, name: "read", arguments: { path: "/file3.ts" } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,
@@ -453,7 +453,7 @@ describe("Duplicate Tool Results Regression", () => {
 		]);
 	});
 
-	it("keeps duplicate ids distinct after OpenAI completions provider caps", () => {
+	it("keeps duplicate ids distinct with an explicit OpenAI id-limit override", () => {
 		const assistantWireMessages = (messages: ChatCompletionMessageParam[]): ChatCompletionAssistantMessageParam[] =>
 			messages.filter(
 				(message): message is ChatCompletionAssistantMessageParam =>
@@ -472,34 +472,19 @@ describe("Duplicate Tool Results Regression", () => {
 			{
 				model: buildModel({
 					api: "openai-completions",
-					provider: "openai",
-					id: "gpt-4o-mini",
-					name: "GPT-4o Mini",
-					baseUrl: "https://api.openai.com/v1",
+					provider: "github-copilot",
+					id: "gpt-4o",
+					name: "GPT-4o",
+					baseUrl: "https://api.githubcopilot.com",
 					input: ["text"],
 					cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
 					maxTokens: 8192,
 					contextWindow: 128000,
 					reasoning: false,
+					compat: { usesOpenAIToolCallIdLimit: true },
 				}),
 				duplicateId: `call_${"a".repeat(35)}`,
 				expectedDuplicateId: `${`call_${"a".repeat(35)}`.slice(0, 35)}_dup1`,
-			},
-			{
-				model: buildModel({
-					api: "openai-completions",
-					provider: "mistral",
-					id: "mistral-large-latest",
-					name: "Mistral Large",
-					baseUrl: "https://api.mistral.ai/v1",
-					input: ["text"],
-					cost: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
-					maxTokens: 8192,
-					contextWindow: 128000,
-					reasoning: false,
-				}),
-				duplicateId: "ABCDEF123",
-				expectedDuplicateId: "ABCDEdup1",
 			},
 		];
 
@@ -545,7 +530,7 @@ describe("Composite Tool-Call Id Pairing", () => {
 	// NOT fire). Model the tests on that path so composite ids reach the fix.
 	const model: Model<"openai-responses"> = buildModel({
 		api: "openai-responses",
-		provider: "openai",
+		provider: "github-copilot",
 		id: "gpt-5-codex",
 		name: "GPT-5 Codex",
 		baseUrl: "https://api.openai.com",
@@ -560,7 +545,7 @@ describe("Composite Tool-Call Id Pairing", () => {
 		role: "assistant",
 		content: ids.map(id => ({ type: "toolCall", id, name: "tool_search", arguments: {} })),
 		api: "openai-responses",
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-5-codex",
 		usage: {
 			input: 0,
@@ -845,7 +830,7 @@ describe("Composite Tool-Call Id Pairing", () => {
 		// call_ component's normalized id onto the result across normalization.
 		const anthropicTarget: Model<"anthropic-messages"> = buildModel({
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			id: "claude-sonnet-4-5",
 			name: "Claude Sonnet 4.5",
 			baseUrl: "https://api.anthropic.com",
@@ -889,7 +874,7 @@ describe("Composite Tool-Call Id Pairing", () => {
 		// must be recorded even when the assistant id is plain.
 		const anthropicTarget: Model<"anthropic-messages"> = buildModel({
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			id: "claude-sonnet-4-5",
 			name: "Claude Sonnet 4.5",
 			baseUrl: "https://api.anthropic.com",
@@ -935,7 +920,7 @@ describe("Composite Tool-Call Id Pairing", () => {
 describe("Opaque Chat Completions ids are not canonicalized (#10284)", () => {
 	const model: Model<"openai-completions"> = buildModel({
 		api: "openai-completions",
-		provider: "openai",
+		provider: "github-copilot",
 		id: "gpt-4o",
 		name: "GPT-4o",
 		baseUrl: "https://api.openai.com/v1",
@@ -950,7 +935,7 @@ describe("Opaque Chat Completions ids are not canonicalized (#10284)", () => {
 		role: "assistant",
 		content: ids.map(id => ({ type: "toolCall", id, name: "read", arguments: {} })),
 		api: "openai-completions",
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-4o",
 		usage: {
 			input: 0,
@@ -1014,7 +999,7 @@ describe("Opaque Chat Completions ids are not canonicalized (#10284)", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: "call_A", name: "read", arguments: {} }],
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5-codex",
 			usage: {
 				input: 0,
@@ -1074,7 +1059,7 @@ describe("Opaque Chat Completions ids are not canonicalized (#10284)", () => {
 describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -1093,7 +1078,7 @@ describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 		role: "assistant",
 		content: [{ type: "toolCall", id, name, arguments: args }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-3-5-sonnet-20241022",
 		usage: {
 			input: 0,
@@ -1192,7 +1177,7 @@ describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 				role: "assistant",
 				content: [{ type: "text", text: "done" }],
 				api: "anthropic-messages",
-				provider: "anthropic",
+				provider: "github-copilot",
 				model: "claude-3-5-sonnet-20241022",
 				usage: {
 					input: 0,
@@ -1392,7 +1377,7 @@ describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: abortedId, name: "bash", arguments: { cmd: "long-running" } }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 0,
@@ -1495,7 +1480,7 @@ describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 
 		const openaiModel: Model<"openai-responses"> = buildModel({
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			id: "gpt-5",
 			name: "GPT-5",
 			baseUrl: "https://api.openai.com",
@@ -1553,7 +1538,7 @@ describe("Orphan Tool Result (handoff/compaction) Regression", () => {
 describe("Codex-style Abort Handling", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -1574,7 +1559,7 @@ describe("Codex-style Abort Handling", () => {
 				{ type: "toolCall", id: toolCallId, name: "read", arguments: { path: "/test.ts" } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,
@@ -1614,7 +1599,7 @@ describe("Codex-style Abort Handling", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: toolCallId, name: "edit", arguments: { path: "/file.ts" } }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,
@@ -1648,7 +1633,7 @@ describe("Codex-style Abort Handling", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: toolCallId, name: "read", arguments: { path: "/file.ts" } }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-3-5-sonnet-20241022",
 			usage: {
 				input: 100,

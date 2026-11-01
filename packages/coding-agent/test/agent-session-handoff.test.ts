@@ -62,12 +62,12 @@ describe("AgentSession handoff", () => {
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-handoff-shared-");
 		authStorage = await AuthStorage.create(path.join(sharedDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!bundled) {
-			throw new Error("Expected built-in anthropic model to exist");
+			throw new Error("Expected bundled Copilot model to exist");
 		}
 		model = bundled;
 	});

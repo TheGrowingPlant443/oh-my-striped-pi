@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ServiceTierByFamily } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import {
 	resolveAgentServiceTierOverride,
 	validateAgentServiceTierOverrides,
@@ -12,6 +11,7 @@ import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
 import { getProjectAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 import { YAML } from "bun";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "./helpers/settings-test-state";
+import { getTestModel } from "./helpers/model-fixtures";
 
 import {
 	cfgTierAdvisor,
@@ -21,15 +21,22 @@ import {
 	cfgTierSubagent,
 } from "@oh-my-pi/pi-coding-agent/session/settings";
 
-function requiredBundledModel(provider: "openai-codex" | "anthropic" | "google", id: string) {
-	const model = getBundledModel(provider, id);
-	if (!model) throw new Error(`Expected bundled model ${provider}/${id}`);
-	return model;
-}
-
-const openAIModel = requiredBundledModel("openai-codex", "gpt-5.6-sol");
-const anthropicModel = requiredBundledModel("anthropic", "claude-sonnet-4-5");
-const googleModel = requiredBundledModel("google", "gemini-2.5-flash");
+const openAIModel = {
+	...getTestModel("github-copilot", model => model.identity.class === "openai"),
+	provider: "company-openai",
+	baseUrl: "http://inference.company/v1",
+};
+const anthropicModel = {
+	...getTestModel("github-copilot", model => model.api === "anthropic-messages"),
+	provider: "company-anthropic",
+	baseUrl: "http://inference.company",
+};
+// Historical Google-family settings remain readable without a built-in Google transport.
+const googleModel = {
+	...getTestModel("github-copilot", model => model.identity.class === "gemini"),
+	provider: "google",
+	baseUrl: "http://inference.company/v1",
+};
 
 // Locks the back-compat migration of the legacy single `serviceTier` enum (with
 // scoped `openai-only`/`claude-only` sentinels) plus `serviceTierSubagent`/

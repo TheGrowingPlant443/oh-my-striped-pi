@@ -6,6 +6,7 @@ import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { loadAdvisorTranscriptCosts } from "@oh-my-pi/pi-coding-agent/advisor/transcript-recorder";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -17,6 +18,7 @@ import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
 import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { __resetDirsFromEnvForTests, getProjectAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 function restoreEnv(key: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -43,16 +45,30 @@ describe("AgentSession advisor toggle", () => {
 
 	beforeAll(() => {
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
-		authStorage.keys.setRuntime("openrouter", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const replacement = getBundledModel("openai", "gpt-4o-mini");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
-		if (!replacement) throw new Error("Expected built-in OpenAI model to exist");
+		const bundled = getBundledModel("github-copilot", "gpt-5.4");
+		if (!bundled) throw new Error("Expected bundled Copilot model to exist");
 		model = bundled;
-		replacementModel = replacement;
+		replacementModel = buildModel({
+			provider: "company-advisor-replacement",
+			id: "replacement-reviewer",
+			name: "Company replacement reviewer",
+			api: "openai-completions",
+			baseUrl: "https://advisor-replacement.company.invalid",
+			reasoning: false,
+			input: ["text"],
+			supportsTools: true,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128_000,
+			maxTokens: 16_384,
+		});
+		modelRegistry.registerProvider(replacementModel.provider, {
+			api: replacementModel.api,
+			apiKey: "test-key",
+			baseUrl: replacementModel.baseUrl,
+			models: [toProviderModelConfig(replacementModel)],
+		});
 	});
 
 	afterAll(() => {
@@ -109,9 +125,9 @@ describe("AgentSession advisor toggle", () => {
 		return {
 			role: "assistant",
 			content: [{ type: "text", text: "reviewed" }],
-			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
 			usage: {
 				input: 1,
 				output: 1,
@@ -160,7 +176,7 @@ describe("AgentSession advisor toggle", () => {
 		sessionManager.appendMessage({
 			role: "assistant",
 			content: [{ type: "text", text: "done" }],
-			api: "anthropic-messages",
+			api: model.api,
 			provider: model.provider,
 			model: model.id,
 			usage: {
@@ -179,12 +195,12 @@ describe("AgentSession advisor toggle", () => {
 	}
 
 	it("toggle enables the advisor and runtime", () => {
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", `${model.provider}/${model.id}`);
 		const active = session.toggleAdvisorEnabled();
 		expect(active).toBe(true);
 		expect(session.isAdvisorActive()).toBe(true);
 		expect(session.isAdvisorEnabled()).toBe(true);
-		expect(session.formatAdvisorStatus()).toContain("Advisor is enabled (anthropic/claude-sonnet-4-5)");
+		expect(session.formatAdvisorStatus()).toContain(`Advisor is enabled (${model.provider}/${model.id})`);
 	});
 
 	it("explicit enable rebuilds the runtime when the advisor role changes", () => {
@@ -212,27 +228,6 @@ describe("AgentSession advisor toggle", () => {
 
 		expect(session.getAdvisorAgent()?.state.model.provider).toBe(replacementModel.provider);
 		expect(session.getAdvisorAgent()?.state.model.id).toBe(replacementModel.id);
-	});
-
-	it("refreshes the live advisor when only the advisor route changes", async () => {
-		session.settings.setModelRole("advisor", "openrouter/z-ai/glm-4.7@cerebras");
-		expect(session.setAdvisorEnabled(true)).toBe(true);
-		expect(session.getAdvisorAgent()?.state.model.provider).toBe("openrouter");
-		expect(session.getAdvisorAgent()?.state.model.id).toBe("z-ai/glm-4.7");
-		expect(
-			(session.getAdvisorAgent()?.state.model.compat as { openRouterRouting?: { only?: string[] } } | undefined)
-				?.openRouterRouting?.only,
-		).toEqual(["cerebras"]);
-
-		session.settings.setModelRole("advisor", "openrouter/z-ai/glm-4.7@fireworks");
-		await Promise.resolve();
-
-		expect(session.getAdvisorAgent()?.state.model.provider).toBe("openrouter");
-		expect(session.getAdvisorAgent()?.state.model.id).toBe("z-ai/glm-4.7");
-		expect(
-			(session.getAdvisorAgent()?.state.model.compat as { openRouterRouting?: { only?: string[] } } | undefined)
-				?.openRouterRouting?.only,
-		).toEqual(["fireworks"]);
 	});
 
 	it("rebuilds a running advisor on budget edits without overriding a session-only disable", async () => {
@@ -317,7 +312,7 @@ describe("AgentSession advisor toggle", () => {
 	});
 
 	it("explicit enable overrides default-off setting for the session only", () => {
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", `${model.provider}/${model.id}`);
 		cfgAdvisorEnabled.override(session.settings, false);
 		const customSession = new AgentSession({
 			agent: session.agent,
@@ -337,7 +332,7 @@ describe("AgentSession advisor toggle", () => {
 	});
 
 	it("toggle disables the advisor and runtime", () => {
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", `${model.provider}/${model.id}`);
 		session.toggleAdvisorEnabled();
 		const active = session.toggleAdvisorEnabled();
 		expect(active).toBe(false);
@@ -376,6 +371,12 @@ describe("AgentSession advisor toggle", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false, "advisor.enabled": true });
 		settings.setModelRole("advisor", advisorSelector);
 		const registry = new ModelRegistry(authStorage);
+		registry.registerProvider(replacementModel.provider, {
+			api: replacementModel.api,
+			apiKey: "test-key",
+			baseUrl: replacementModel.baseUrl,
+			models: [toProviderModelConfig(replacementModel)],
+		});
 		const fullCatalog = registry.getAvailable();
 		const withoutAdvisorModel = fullCatalog.filter(
 			m => !(m.provider === replacementModel.provider && m.id === replacementModel.id),
@@ -416,7 +417,7 @@ describe("AgentSession advisor toggle", () => {
 
 	it("keeps sessions isolated when sharing a Settings instance", async () => {
 		const sharedSettings = Settings.isolated({ "compaction.enabled": false });
-		sharedSettings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		sharedSettings.setModelRole("advisor", `${model.provider}/${model.id}`);
 		expect(cfgAdvisorEnabled.get(sharedSettings)).toBe(false);
 
 		const sessionA = new AgentSession({

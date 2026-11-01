@@ -16,6 +16,14 @@ async function collect(events: AsyncIterable<AssistantMessageEvent>): Promise<As
 }
 
 describe("mock provider", () => {
+	test("keeps configured provider identity when running scripted responses", async () => {
+		const model = createMockModel({ provider: "company-provider", responses: [{ content: ["company answer"] }] });
+		const response = await streamMock(model, emptyContext()).result();
+		expect(response.provider).toBe("company-provider");
+		expect(response.content).toEqual([{ type: "text", text: "company answer" }]);
+		expect(model.calls).toHaveLength(1);
+	});
+
 	test("emits start → text_start/delta/end → done for a single text response", async () => {
 		const mock = createMockModel({
 			responses: [{ content: ["hello world"] }],
@@ -141,7 +149,7 @@ describe("mock provider", () => {
 	});
 
 	test("streamMock with a foreign model fails with a clear message", async () => {
-		const foreign = { api: MOCK_API, id: "x" } as unknown as Parameters<typeof streamMock>[0];
+		const foreign = { api: MOCK_API, provider: "local", id: "x" } as unknown as Parameters<typeof streamMock>[0];
 		const stream = streamMock(foreign, emptyContext());
 		await expect(stream.result()).rejects.toThrow(/not produced by createMockModel/);
 	});

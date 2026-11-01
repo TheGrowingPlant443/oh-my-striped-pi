@@ -11,7 +11,6 @@ from omp_rpc import (
     ExtensionUiRequest,
     GoalUpdatedEvent,
     IrcMessageEvent,
-    LiveTranscriptEvent,
     MessageEndEvent,
     MessageStartEvent,
     MessageUpdateEvent,
@@ -191,16 +190,6 @@ class ProtocolParsingTests(unittest.TestCase):
         assert isinstance(valid, SubagentEvent)
         self.assertIsInstance(valid.payload.event, MessageEndEvent)
 
-    def test_parse_live_frames(self) -> None:
-        self.assertEqual(
-            parse_notification(
-                {"type": "live_transcript", "role": "user", "turn": 3, "text": "hello", "final": False}
-            ),
-            LiveTranscriptEvent(role="user", turn=3, text="hello", final=False),
-        )
-        with self.assertRaises(ValueError):
-            parse_notification({"type": "live_phase", "phase": "dozing"})
-
     def test_parse_message_update_preserves_assistant_event_type(self) -> None:
         assistant = {"role": "assistant"}
         common = {"contentIndex": 0, "partial": assistant}
@@ -355,11 +344,6 @@ class ProtocolParsingTests(unittest.TestCase):
                 "slowModeSupported": True,
                 "slowModeEnabled": True,
                 "slowModeScope": "global",
-                "usageLimit": {
-                    "stage": "low_priority",
-                    "resetsAtSec": 1770000000,
-                    "allowanceLeftPercent": 62,
-                },
                 "autoCompactionEnabled": True,
                 "messageCount": 4,
                 "queuedMessageCount": 1,
@@ -419,46 +403,8 @@ class ProtocolParsingTests(unittest.TestCase):
         self.assertTrue(state.slow_mode_supported)
         self.assertTrue(state.slow_mode_enabled)
         self.assertEqual(state.slow_mode_scope, "global")
-        assert state.usage_limit is not None
-        self.assertEqual(state.usage_limit.stage, "low_priority")
-        self.assertEqual(state.usage_limit.resets_at_sec, 1770000000)
-        self.assertEqual(state.usage_limit.allowance_left_percent, 62)
         self.assertTrue(state.has_pending_async_work)
         self.assertFalse(state.is_settled)
-
-    def test_parse_session_state_validates_usage_limit_variants(self) -> None:
-        base = {
-            "sessionId": "session-123",
-            "steeringMode": "one-at-a-time",
-            "followUpMode": "all",
-            "interruptMode": "immediate",
-        }
-        wrap_up = parse_session_state(
-            {
-                **base,
-                "usageLimit": {
-                    "stage": "wrap_up",
-                    "extraUsage": True,
-                },
-            }
-        ).usage_limit
-        assert wrap_up is not None
-        self.assertEqual(wrap_up.stage, "wrap_up")
-        self.assertTrue(wrap_up.extra_usage)
-        self.assertIsNone(wrap_up.resets_at_sec)
-        self.assertIsNone(parse_session_state(base).usage_limit)
-        self.assertFalse(parse_session_state(base).slow_mode_supported)
-
-        invalid = (
-            ({"stage": "low_priority"}, "resetsAtSec"),
-            ({"stage": "wrap_up"}, "extraUsage"),
-            ({"stage": "wrap_up", "extraUsage": "false"}, "extraUsage"),
-            ({"stage": "unknown"}, "stage"),
-        )
-        for slow_mode, field in invalid:
-            with self.subTest(slow_mode=slow_mode):
-                with self.assertRaisesRegex(ValueError, field):
-                    parse_session_state({**base, "usageLimit": slow_mode})
 
     def test_parse_session_state_defaults_missing_fast_mode_and_throughput(
         self,
@@ -488,6 +434,7 @@ class ProtocolParsingTests(unittest.TestCase):
                     ),
                     (False, False, expected),
                 )
+                self.assertFalse(state.slow_mode_supported)
 
     def test_parse_agent_end_notification(self) -> None:
         notification = parse_notification(

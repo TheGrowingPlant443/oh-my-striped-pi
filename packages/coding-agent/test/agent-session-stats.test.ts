@@ -2,6 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, Message, Model, Usage, UserMessage } from "@oh-my-pi/pi-ai";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -9,6 +11,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { estimateToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 describe("AgentSession session stats", () => {
 	let authStorage: AuthStorage;
@@ -97,8 +100,37 @@ describe("AgentSession session stats", () => {
 	});
 
 	it("keeps mixed peak and off-peak charges in session and footer totals after resume", async () => {
-		const target = modelRegistry.find("deepseek", "deepseek-v4-flash");
-		if (!target) throw new Error("Expected bundled DeepSeek Flash");
+		const spec: ModelSpec<"openai-completions"> = {
+			id: "company-scheduled",
+			name: "Company scheduled pricing",
+			provider: "company-stats",
+			api: "openai-completions",
+			baseUrl: "https://stats.company.invalid/v1",
+			reasoning: false,
+			input: ["text"],
+			cost: {
+				input: 0.3,
+				output: 1.2,
+				cacheRead: 0.006,
+				cacheWrite: 0,
+				timeBased: {
+					offPeakMultiplier: 0.5,
+					peakWindows: [
+						{ weekdays: [0, 1, 2, 3, 4, 5, 6], startMinute: 0, endMinute: 240 },
+						{ weekdays: [0, 1, 2, 3, 4, 5, 6], startMinute: 960, endMinute: 1440 },
+					],
+				},
+			},
+			contextWindow: 128_000,
+			maxTokens: 16_000,
+		};
+		const target = buildModel(spec);
+		modelRegistry.registerProvider(spec.provider, {
+			api: spec.api,
+			baseUrl: spec.baseUrl,
+			apiKey: "test-key",
+			models: [toProviderModelConfig(spec)],
+		});
 		using tempDir = TempDir.createSync("@omp-session-mixed-cost-");
 		const manager = SessionManager.create(tempDir.path(), tempDir.path());
 		manager.appendMessage({ role: "user", content: "First request", timestamp: 1 });

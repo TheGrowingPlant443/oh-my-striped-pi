@@ -3,7 +3,7 @@ import { OctagonX, RotateCcw, SendHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { GuestClient } from "../../lib/client";
-import { fmtCost, fmtDuration, fmtTokens } from "../../lib/format";
+import { fmtCost, formatDuration, fmtTokens } from "../../lib/format";
 import { decideTranscriptPoll } from "../../lib/transcript-poll";
 import type { TranscriptProps } from "../transcript/Transcript";
 import { Transcript } from "../transcript/Transcript";
@@ -193,7 +193,7 @@ export function AgentDrawer(props: {
 						<span className="ag-stat-value">{p.toolCount}</span>
 					</span>
 					<span className="ag-stat">
-						<span className="ag-stat-value">{fmtDuration(p.durationMs)}</span>
+						<span className="ag-stat-value">{formatDuration(p.durationMs)}</span>
 					</span>
 				</div>
 			) : null}

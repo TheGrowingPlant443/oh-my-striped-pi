@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCustomApis, type FetchImpl } from "@oh-my-pi/pi-ai";
-import { unregisterOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
+import type { FetchImpl } from "@oh-my-pi/pi-ai";
 import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
@@ -16,7 +15,7 @@ describe("issue #5780 post-auth runtime provider refresh", () => {
 	let registry: ModelRegistry;
 
 	const sourceId = "ext://issue-5780";
-	const providerName = "issue-5780-provider";
+	const providerName = "github-copilot";
 	const FAKE_KEY = "issue-5780-fake-credential-abc123";
 	const offlineFetch: FetchImpl = () => Promise.reject(new Error("network disabled"));
 
@@ -31,8 +30,6 @@ describe("issue #5780 post-auth runtime provider refresh", () => {
 
 	afterEach(() => {
 		vi.useRealTimers();
-		clearCustomApis();
-		unregisterOAuthProviders(sourceId);
 		authStorage.close();
 		if (tempDir && fs.existsSync(tempDir)) removeSyncWithRetries(tempDir);
 	});

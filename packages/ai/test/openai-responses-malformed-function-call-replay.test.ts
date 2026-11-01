@@ -7,7 +7,7 @@ const model: Model<"openai-responses"> = buildModel({
 	id: "gpt-5",
 	name: "GPT-5",
 	api: "openai-responses",
-	provider: "openai",
+	provider: "github-copilot",
 	baseUrl: "https://api.openai.com/v1",
 	reasoning: true,
 	input: ["text"],
@@ -21,7 +21,7 @@ function assistantWithNativeHistory(items: Array<Record<string, unknown>>): Assi
 		role: "assistant",
 		content: [],
 		api: "openai-responses",
-		provider: "openai",
+		provider: "github-copilot",
 		model: model.id,
 		usage: {
 			input: 0,
@@ -33,7 +33,7 @@ function assistantWithNativeHistory(items: Array<Record<string, unknown>>): Assi
 		},
 		stopReason: "toolUse",
 		timestamp: 1,
-		providerPayload: { type: "openaiResponsesHistory", provider: "openai", items },
+		providerPayload: { type: "openaiResponsesHistory", provider: "github-copilot", items },
 	};
 }
 

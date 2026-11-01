@@ -1,5 +1,6 @@
 import type { AgentSession } from "../session/agent-session";
 import { resolveMemoryBackend } from "./resolve";
+import { cfgMemoryBackend } from "./settings";
 import type {
 	MemoryBackendId,
 	MemoryBackendOperationContext,
@@ -63,4 +64,19 @@ function unavailableSearch(backend: MemoryBackendId, query: string, message: str
 
 function unavailableSave(backend: MemoryBackendId, message: string) {
 	return { backend, stored: 0, message };
+}
+
+/** Re-route memory after a cwd change without retaining the old transcript in the new bank. */
+export async function rebindMemoryBackendForCwd(session: AgentSession): Promise<void> {
+	if (!session.memoryEnabled) return;
+	await session.settleMemoryBackend();
+	if (cfgMemoryBackend.get(session.settings) === "hindsight") {
+		const { awaitPrimaryStateRebuild } = await import("../hindsight/backend");
+		await awaitPrimaryStateRebuild(session);
+		return;
+	}
+	await session.applyMemoryBackend({ retainMnemopi: false });
+	if (cfgMemoryBackend.get(session.settings) === "mnemopi" && !session.getMnemopiSessionState()) {
+		throw new Error("Mnemopi backend failed to initialise for the destination cwd.");
+	}
 }

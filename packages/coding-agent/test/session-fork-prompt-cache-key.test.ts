@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { type Args, parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import type { ScopedModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
@@ -14,8 +13,9 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { CURRENT_SESSION_VERSION, type SessionHeader } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
-const OPENAI_TEST_MODEL = getBundledModel("openai", "gpt-4o-mini");
+const OPENAI_TEST_MODEL = getTestModel("github-copilot", model => model.api === "openai-responses");
 
 interface ArgsWithPromptCacheKey extends Args {
 	providerPromptCacheKey?: string;
@@ -52,7 +52,7 @@ async function createMinimalSession(
 	options: CreateAgentSessionOptions,
 ): Promise<{ session: AgentSession; authStorage: AuthStorage }> {
 	const authStorage = await AuthStorage.create(tempDir.join("sdk-auth.db"));
-	authStorage.keys.setRuntime("openai", "test-key");
+	authStorage.keys.setRuntime(OPENAI_TEST_MODEL.provider, "test-key");
 	const shouldSupplyModel = options.sessionManager?.getHeader()?.parentSession === undefined;
 	const result = await createAgentSession({
 		...options,

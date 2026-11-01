@@ -23,7 +23,7 @@ function makeModel(): Model<"openai-responses"> {
 		api: "openai-responses",
 		name: "Llama",
 		id: "llama-3",
-		provider: "llama.cpp",
+		provider: "github-copilot",
 		baseUrl: "http://127.0.0.1:8080/v1",
 		contextWindow: 8192,
 		maxTokens: 2048,
@@ -38,7 +38,7 @@ function makeOutput(): AssistantMessage {
 		role: "assistant",
 		content: [],
 		timestamp: Date.now(),
-		provider: "llama.cpp",
+		provider: "github-copilot",
 		model: "llama-3",
 		api: "openai-responses",
 		usage: {

@@ -6,15 +6,8 @@ import * as vcs from "@oh-my-pi/pi-natives/vcs";
 import type { Component, OverlayHandle } from "@oh-my-pi/pi-tui";
 import { Loader, Spacer, Text } from "@oh-my-pi/pi-tui";
 import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
-import { appKey, editorKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
-import {
-	getAgentDbPath,
-	getAgentDir,
-	getProjectDir,
-	logger,
-	normalizePathForComparison,
-	sanitizeText,
-} from "@oh-my-pi/pi-utils";
+import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
+import { getAgentDbPath, getAgentDir, getProjectDir, logger, normalizePathForComparison } from "@oh-my-pi/pi-utils";
 import {
 	ADVISOR_DEFAULT_TOOL_NAMES,
 	discoverAdvisorConfigs,
@@ -57,7 +50,6 @@ import type {
 	SessionPickHandler,
 } from "../../modes/types";
 import type { SessionOAuthAccountList } from "../../session/agent-session-types";
-import type { ResetCreditAccountStatus, ResetCreditRedeemOutcome } from "../../session/auth-storage";
 import {
 	createForeignSessionStore,
 	foreignSessionInfoToSessionInfo,
@@ -75,7 +67,6 @@ import { loadPinnedSessionIds, setSessionPinned } from "../../session/session-pi
 import { FileSessionStorage } from "../../session/session-storage";
 import { listLogoutAccounts, logoutCredential } from "../../slash-commands/helpers/logout";
 import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
-import { describeRedeemOutcome, toResetUsageAccounts } from "../../slash-commands/helpers/reset-usage";
 import { toSessionPinAccounts } from "../../slash-commands/helpers/session-pin";
 import {
 	accountIdentityLabel,
@@ -96,7 +87,6 @@ import { type AskToolDetails } from "@oh-my-pi/pi-tui/tools/ask";
 import { sanitizeDisplayWarnings, shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
 import { sanitizeErrorLine } from "@oh-my-pi/pi-tui/chrome/error-block";
 import { ToolAbortError } from "../../tools/tool-errors";
-import { captureBrowserSession } from "../../utils/browser-session";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
 import { setSessionTerminalTitle } from "../../utils/title-generator";
@@ -119,7 +109,6 @@ import { createModelBrowserSource } from "../model-browser-source";
 import { formatSessionContinuationNotice } from "../persistence-failure";
 import { ModelPickerComponent } from "@oh-my-pi/pi-tui/overlays/model-picker";
 import { PluginSelectorComponent } from "@oh-my-pi/pi-tui/overlays/plugin-selector";
-import { type ResetUsageAccount, ResetUsageSelectorComponent } from "@oh-my-pi/pi-tui/overlays/reset-usage-selector";
 import { type BranchVariantPath, RewindSelectorComponent } from "@oh-my-pi/pi-tui/overlays/rewind-selector";
 import { SessionAccountSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-account-selector";
 import { SessionSelectorComponent, type SessionSelectorOptions } from "@oh-my-pi/pi-tui/overlays/session-selector";
@@ -152,17 +141,14 @@ import { cfgTaskAgentModelOverrides } from "../../task/settings";
 
 /** First-use boundary for provider auth catalog and dialog components. */
 async function loadProviderAuthUi() {
-	const [{ PASTE_CODE_LOGIN_PROVIDERS }, oauth, loginDialog, logoutSelector, oauthSelector] = await Promise.all([
-		import("@oh-my-pi/pi-ai"),
+	const [oauth, loginDialog, logoutSelector, oauthSelector] = await Promise.all([
 		import("@oh-my-pi/pi-ai/oauth"),
 		import("@oh-my-pi/pi-tui/overlays/login-dialog"),
 		import("@oh-my-pi/pi-tui/overlays/logout-account-selector"),
 		import("@oh-my-pi/pi-tui/overlays/oauth-selector"),
 	]);
 	return {
-		PASTE_CODE_LOGIN_PROVIDERS,
 		getOAuthProviders: oauth.getOAuthProviders,
-		getOAuthCredentialProvider: oauth.getOAuthCredentialProvider,
 		LoginDialogComponent: loginDialog.LoginDialogComponent,
 		LogoutAccountSelectorComponent: logoutSelector.LogoutAccountSelectorComponent,
 		OAuthSelectorComponent: oauthSelector.OAuthSelectorComponent,
@@ -1385,7 +1371,7 @@ export class SelectorController {
 	/**
 	 * Complete an esc-esc rewind in place via `navigateTree`: the session tree
 	 * keeps the old path as a sibling branch instead of forking a child
-	 * session. A user-request target (plain prompt, user-invoked skill/collab
+	 * session. A user-request target (plain prompt or user-invoked skill
 	 * prompt) rewinds PAST itself (leaf moves to its parent) and its draft
 	 * replaces the editor text, so it is a real move even when it is the
 	 * current leaf; every other target lands the leaf on the entry. `done`
@@ -1679,7 +1665,7 @@ export class SelectorController {
 	 * every other target keeps the target as the new leaf. Returns undefined
 	 * when the navigation is not a pure rewind or the boundary entry cannot
 	 * anchor an in-place truncation (non-message boundary; custom messages
-	 * render unkeyed components, so a skill/collab target takes the replay).
+	 * render unkeyed components, so a skill target takes the replay).
 	 */
 	#treeRewindBoundary(
 		targetId: string,
@@ -1742,8 +1728,8 @@ export class SelectorController {
 			if (error instanceof ToolAbortError) return undefined;
 			throw error;
 		}
-		// The rich ask dialog can race a collab guest choosing "Chat about this"
-		// (`AskTool`'s `chatRedirect` result); that's meaningful inside a live
+		// The rich ask dialog can return "Chat about this" (`AskTool`'s
+		// `chatRedirect` result); that's meaningful inside a live
 		// agent turn, where the model sees the redirect and starts a
 		// conversation, but this standalone re-answer has no turn to hand it
 		// to — completing the navigation with it would silently drop the
@@ -2120,9 +2106,7 @@ export class SelectorController {
 	 */
 	async #handleOAuthLogin(providerId: string): Promise<boolean> {
 		this.ctx.showStatus(`Logging in to ${providerId}…`);
-		const { getOAuthCredentialProvider, LoginDialogComponent, PASTE_CODE_LOGIN_PROVIDERS } =
-			await loadProviderAuthUi();
-		const useManualInput = PASTE_CODE_LOGIN_PROVIDERS.has(providerId);
+		const { LoginDialogComponent, getOAuthProviders } = await loadProviderAuthUi();
 		let restored = false;
 		const restoreEditor = () => {
 			if (restored) return;
@@ -2150,7 +2134,6 @@ export class SelectorController {
 		try {
 			const identity = await this.ctx.session.modelRegistry.authStorage.oauth.login(providerId as OAuthProvider, {
 				signal: dialog.signal,
-				onBrowserSession: captureBrowserSession,
 				onAuth: (info: { url: string; launchUrl?: string; instructions?: string }) => {
 					// The dialog renders the full URL (SSH-safe copy target) and
 					// opens the browser best-effort.
@@ -2160,19 +2143,6 @@ export class SelectorController {
 				onProgress: (message: string) => {
 					dialog.showProgress(message);
 				},
-				// Paste-code providers (e.g. Codex) may need the user to paste the
-				// fallback redirect URL when the loopback callback can't complete
-				// (headless/remote/Windows). Mount a focused input in the dialog so
-				// the paste lands somewhere the OAuth flow consumes — the hidden
-				// editor's `/login <url>` path is unreachable while the dialog holds
-				// focus (#5339).
-				onManualCodeInput: useManualInput
-					? signal =>
-							dialog.showManualInput(
-								`Paste the authorization code (or full redirect URL), then press ${editorKey("tui.input.submit")}:`,
-								signal,
-							)
-					: undefined,
 			});
 			// Scope the post-login refresh to the just-authenticated provider with an
 			// `online` strategy: the default all-provider `online-if-uncached` reuses
@@ -2181,22 +2151,25 @@ export class SelectorController {
 			// models would stay unavailable in-session (#5780). Unrelated providers
 			// are left untouched. `refreshProvider` swallows discovery failures, so
 			// awaiting cannot reject the login.
-			await this.ctx.session.modelRegistry.refreshProvider(getOAuthCredentialProvider(providerId), "online");
+			const credentialProvider =
+				getOAuthProviders().find(provider => provider.id === providerId)?.storeCredentialsAs ?? providerId;
+			await this.ctx.session.modelRegistry.refreshProvider(credentialProvider, "online");
 			try {
 				await this.ctx.refreshScopedModelsAfterLogin?.();
 			} catch (error) {
 				logger.warn("Scoped model refresh after login failed", { error: String(error) });
 			}
 			const block = new TranscriptBlock();
-			// Name the account (and Anthropic organization) that was stored so a
-			// login that lands on an unintended account/subscription is visible
-			// immediately instead of silently replacing an existing registration.
+			// Name the stored account so an unintended login is visible immediately.
 			const who = formatLoginIdentity(identity);
+			const authenticated = this.ctx.session.modelRegistry.authStorage.keys.source(credentialProvider) !== undefined;
 			block.addChild(
 				new Text(
 					theme.fg(
 						"success",
-						`${theme.status.success} Successfully logged in to ${providerId}${who ? ` as ${who}` : ""}`,
+						authenticated
+							? `${theme.status.success} Successfully logged in to ${providerId}${who ? ` as ${who}` : ""}`
+							: `${theme.status.success} Configured keyless access to ${providerId}`,
 					),
 					1,
 					0,
@@ -2268,10 +2241,7 @@ export class SelectorController {
 		const { getOAuthProviders, LogoutAccountSelectorComponent } = await loadProviderAuthUi();
 		const provider = getOAuthProviders().find(candidate => candidate.id === providerId);
 		if (accounts.length === 0) {
-			const source = authStorage.keys.describe(
-				provider?.storeCredentialsAs ?? providerId,
-				this.ctx.session.sessionId,
-			);
+			const source = authStorage.keys.describe(providerId, this.ctx.session.sessionId);
 			const suffix = source ? ` Current auth comes from ${source}; remove that source to log out.` : "";
 			this.ctx.showError(`Logout skipped: no stored credentials for ${providerId}.${suffix}`);
 			return;
@@ -2408,82 +2378,6 @@ export class SelectorController {
 			);
 			return { component: selector, focus: selector };
 		});
-	}
-
-	async showResetUsageSelector(): Promise<void> {
-		const session = this.ctx.session;
-		this.ctx.showStatus("Checking saved rate-limit resets…", { dim: true });
-		let statuses: ResetCreditAccountStatus[];
-		try {
-			statuses = await session.listResetCredits();
-		} catch (error) {
-			this.ctx.showError(
-				sanitizeText(
-					`Could not load saved resets: ${error instanceof Error ? error.message : String(error)}`.replace(
-						/[\r\n\t]+/g,
-						" ",
-					),
-				),
-			);
-			return;
-		}
-		const accounts = toResetUsageAccounts(statuses);
-		if (accounts.length === 0) {
-			this.ctx.showStatus("No provider accounts found. Use /login to add one.");
-			return;
-		}
-		if (!accounts.some(account => account.availableCount > 0)) {
-			this.ctx.showStatus(
-				accounts.some(account => account.error)
-					? "No saved resets available — some accounts couldn't be reached (try /login)."
-					: "No saved rate-limit resets available to spend right now.",
-			);
-			return;
-		}
-		this.showSelector(done => {
-			const selector = new ResetUsageSelectorComponent(
-				accounts,
-				account => {
-					done();
-					void this.#redeemReset(account);
-				},
-				() => {
-					done();
-					this.ctx.ui.requestRender();
-				},
-			);
-			return { component: selector, focus: selector };
-		});
-	}
-
-	async #redeemReset(account: ResetUsageAccount): Promise<void> {
-		this.ctx.showStatus(
-			`Spending 1 saved reset for ${sanitizeText(account.label.replace(/[\r\n\t]+/g, " "))} (${account.providerLabel})…`,
-			{ dim: true },
-		);
-		let outcome: ResetCreditRedeemOutcome;
-		try {
-			outcome = await this.ctx.session.redeemResetCredit(account.target);
-		} catch (error) {
-			this.ctx.showError(
-				sanitizeText(
-					`Reset failed for ${account.label}: ${error instanceof Error ? error.message : String(error)}`.replace(
-						/[\r\n\t]+/g,
-						" ",
-					),
-				),
-			);
-			return;
-		}
-		const message = sanitizeText(describeRedeemOutcome(outcome, account.label).replace(/[\r\n\t]+/g, " "));
-		if (outcome.ok) {
-			this.ctx.showStatus(message);
-			// Refresh the status-line usage so the freshly-reset window shows.
-			this.ctx.statusLine.invalidate();
-			this.ctx.ui.requestRender();
-		} else {
-			this.ctx.showWarning(message);
-		}
 	}
 
 	async showDebugSelector(): Promise<void> {

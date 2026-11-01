@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
 import { SessionAccountPoolScope } from "@oh-my-pi/pi-coding-agent/config/account-pools";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -15,19 +15,51 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 const PROVIDER_SESSION_ID = "pooled-provider-session";
+const PROVIDER = "company-pool-dispose";
+const MODEL = buildModel({
+	id: "pool-model",
+	name: "Pool model",
+	provider: PROVIDER,
+	api: "openai-completions",
+	baseUrl: "https://company.example.invalid/v1",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 8192,
+	maxTokens: 2048,
+});
 
 describe("AgentSession account pools after a dispose deadline", () => {
 	let tempDir: TempDir;
 	let authStorage: AuthStorage;
+	let registry: ModelRegistry;
 	let sessions: AgentSession[] = [];
 
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@omp-pool-dispose-");
 		authStorage = createInMemoryAuthStorage();
+		registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		registry.registerProvider(PROVIDER, {
+			api: MODEL.api,
+			baseUrl: MODEL.baseUrl,
+			models: [toProviderModelConfig(MODEL)],
+			oauth: {
+				name: "Company pool",
+				login: async () => ({
+					access: "access-c",
+					refresh: "refresh-c",
+					expires: Date.now() + 3_600_000,
+					accountId: "account-c",
+				}),
+				refreshToken: async credential => credential,
+				getApiKey: credential => credential.access,
+			},
+		});
 		await authStorage.credentials.set(
-			"anthropic",
+			PROVIDER,
 			["a", "b", "c"].map(suffix => ({
 				type: "oauth" as const,
 				access: `access-${suffix}`,
@@ -39,12 +71,13 @@ describe("AgentSession account pools after a dispose deadline", () => {
 			})),
 		);
 		// An unrestricted session resolves the runtime key; a pooled one never does.
-		authStorage.keys.setRuntime("anthropic", "runtime-key");
+		authStorage.keys.setRuntime(PROVIDER, "runtime-key");
 	});
 
 	afterEach(async () => {
 		for (const session of sessions.reverse()) await session.dispose();
 		sessions = [];
+		registry.unregisterProvider(PROVIDER);
 		authStorage.close();
 		AsyncJobManager.resetForTests();
 		vi.restoreAllMocks();
@@ -60,17 +93,14 @@ describe("AgentSession account pools after a dispose deadline", () => {
 	async function createPooledSession(
 		stallUntil?: Promise<void>,
 	): Promise<{ session: AgentSession; released: Promise<void> }> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected bundled model");
+		const model = MODEL;
 		const sessionManager = SessionManager.inMemory(tempDir.path());
 		const accountPoolScope = new SessionAccountPoolScope(
 			authStorage,
-			{ anthropic: ["email:c@example.com|org:org-c"] },
+			{ [PROVIDER]: ["account:account-c"] },
 			PROVIDER_SESSION_ID,
 		);
-		const modelRegistry = accountPoolScope.registry(
-			new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml")),
-		);
+		const modelRegistry = accountPoolScope.registry(registry);
 		const reached = Promise.withResolvers<void>();
 		let extensionRunner: ExtensionRunner | undefined;
 		if (stallUntil) {
@@ -136,11 +166,11 @@ describe("AgentSession account pools after a dispose deadline", () => {
 		const { session, released } = await createPooledSession(release.promise);
 		await session.dispose({ drainTimeoutMs: 20 });
 		// The unsettled run may still resolve keys, so the pool stays for now.
-		expect(await authStorage.keys.get("anthropic", PROVIDER_SESSION_ID)).toBe("access-c");
+		expect(await authStorage.keys.get(PROVIDER, PROVIDER_SESSION_ID)).toBe("access-c");
 
 		release.resolve();
 		await released;
-		expect(await authStorage.keys.get("anthropic", PROVIDER_SESSION_ID)).toBe("runtime-key");
+		expect(await authStorage.keys.get(PROVIDER, PROVIDER_SESSION_ID)).toBe("runtime-key");
 	});
 
 	it("keeps the pool a revival installed on the same provider session id", async () => {
@@ -152,9 +182,9 @@ describe("AgentSession account pools after a dispose deadline", () => {
 		release.resolve();
 		await released;
 		// The late release holds the timed-out session's lease, not the revival's.
-		expect(await authStorage.keys.get("anthropic", PROVIDER_SESSION_ID)).toBe("access-c");
+		expect(await authStorage.keys.get(PROVIDER, PROVIDER_SESSION_ID)).toBe("access-c");
 
 		await revived.dispose();
-		expect(await authStorage.keys.get("anthropic", PROVIDER_SESSION_ID)).toBe("runtime-key");
+		expect(await authStorage.keys.get(PROVIDER, PROVIDER_SESSION_ID)).toBe("runtime-key");
 	});
 });

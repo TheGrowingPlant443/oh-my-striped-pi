@@ -1,4 +1,5 @@
 auth "ollama" {
+	allows-missing-api-key #true
 	name "Ollama (Local OpenAI-compatible)"
 	login "api-key" {
 		auth-url "https://github.com/ollama/ollama/blob/main/docs/api.md"

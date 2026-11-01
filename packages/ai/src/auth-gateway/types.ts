@@ -5,6 +5,7 @@ import type {
 	AssistantMessageEventStream,
 	CacheRetention,
 	Context,
+	Model,
 	OpenAIResponseInclude,
 	ServiceTier,
 	TokenTaskBudget,
@@ -130,7 +131,8 @@ export interface AuthGatewayStreamControl {
 }
 
 export interface AuthGatewayFormatModule {
-	parseRequest(body: unknown, headers?: Headers): AuthGatewayParsedRequest;
+	/** The gateway supplies the resolved target so replay provenance never depends on a wire alias. */
+	parseRequest(body: unknown, target: Pick<Model, "id" | "provider">, headers?: Headers): AuthGatewayParsedRequest;
 	encodeResponse(message: AssistantMessage, requestedModelId: string): Record<string, unknown>;
 	encodeStream(
 		events: AssistantMessageEventStream,

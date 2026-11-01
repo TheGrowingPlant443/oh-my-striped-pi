@@ -37,8 +37,8 @@ describe("InteractiveMode paused-plan guard message", () => {
 	beforeEach(async () => {
 		resetSettingsForTest();
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		vi.spyOn(modelRegistry, "getApiKey").mockResolvedValue("test-key");
 		session = new AgentSession({
 			agent: new Agent({

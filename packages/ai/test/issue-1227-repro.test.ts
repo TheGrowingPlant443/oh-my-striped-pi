@@ -29,13 +29,13 @@ function abortedSignal(): AbortSignal {
 }
 
 function bedrockModel(): Model<"openai-completions"> {
-	const base = getBundledModel("openai", "gpt-4o-mini");
+	const base = getBundledModel("github-copilot", "gpt-4o");
 	return buildModel({
 		...base,
 		api: "openai-completions",
 		id: "bedrock-claude-sonnet-4-6",
 		name: "Bedrock Claude Sonnet 4.6 (LiteLLM)",
-		provider: "litellm-bedrock",
+		provider: "github-copilot",
 		baseUrl: "https://example.test/v1",
 		compat: base.compatConfig,
 	} as ModelSpec<"openai-completions">);
@@ -60,7 +60,7 @@ function assistantWithToolCall(): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "toolCall", id: "call_1", name: "search", arguments: { q: "x" } }],
 		api: "openai-completions",
-		provider: "litellm-bedrock",
+		provider: "github-copilot",
 		model: "bedrock-claude-sonnet-4-6",
 		usage: {
 			input: 0,

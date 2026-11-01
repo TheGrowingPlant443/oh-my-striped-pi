@@ -4,7 +4,7 @@ import { Agent, CompactionCancelledError, type AgentTool } from "@oh-my-pi/pi-ag
 import type { AssistantMessage, UserMessage } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -23,16 +23,36 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 import { computeNonMessageTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
 import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
 import type { Tool, ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 import { ContextNotesTool, NewContextTool } from "@oh-my-pi/pi-coding-agent/tools/context-notes";
 import { BUILTIN_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/tools/builtin-names";
 import { GrepTool } from "@oh-my-pi/pi-coding-agent/tools/grep";
 import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
+const companyChatModel = buildModel({
+	id: "company-chat",
+	name: "Company Chat",
+	provider: "company-messages",
+	api: "anthropic-messages",
+	baseUrl: "https://models.company.test/v1",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 16_384,
+});
+
 const authStorage = createInMemoryAuthStorage();
-authStorage.keys.setRuntime("anthropic", "test-key");
+authStorage.keys.setRuntime(companyChatModel.provider, "test-key");
 authStorage.keys.setRuntime("mock", "test-key");
 const modelRegistry = new ModelRegistry(authStorage);
+modelRegistry.registerProvider(companyChatModel.provider, {
+	api: companyChatModel.api,
+	baseUrl: companyChatModel.baseUrl,
+	apiKey: "test-key",
+	models: [toProviderModelConfig(companyChatModel)],
+});
 
 afterAll(() => {
 	authStorage.close();
@@ -46,9 +66,9 @@ function assistant(text: string): AssistantMessage {
 	return {
 		role: "assistant",
 		content: [{ type: "text", text }],
-		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-4-5",
+		api: companyChatModel.api,
+		provider: companyChatModel.provider,
+		model: companyChatModel.id,
 		stopReason: "stop",
 		usage: {
 			input: 100,
@@ -340,8 +360,7 @@ describe("experimental context management", () => {
 	});
 
 	it("keeps exact earlier requirements and the latest notebook through three real rollover boundaries", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = companyChatModel;
 		const manager = SessionManager.inMemory();
 		const first = [
 			user("earliest requirement: preserve the release-blocking migration."),
@@ -420,8 +439,7 @@ describe("experimental context management", () => {
 	});
 
 	it("consumes a new context request only after every tool result in its batch is journaled", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = companyChatModel;
 		const manager = SessionManager.inMemory();
 		const seed = [
 			user("first task"),
@@ -513,8 +531,7 @@ describe("experimental context management", () => {
 	});
 
 	async function createExplicitRolloverSession(settingsOverrides: Record<string, unknown>, withRolloverCall: boolean) {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = companyChatModel;
 		const manager = SessionManager.inMemory();
 		const history = [
 			user("old task"),
@@ -619,8 +636,7 @@ describe("experimental context management", () => {
 	}
 
 	it("retains a user-invoked skill prompt across rollover instead of an older ordinary request", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = companyChatModel;
 		const manager = SessionManager.inMemory();
 		const seed = [
 			user("plain earlier request"),
@@ -665,8 +681,7 @@ describe("experimental context management", () => {
 	});
 
 	it("counts the injected notebook and retained request in the persisted rollover tokensAfter", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = companyChatModel;
 		const manager = SessionManager.inMemory();
 		const seed = [
 			user("first task"),
@@ -708,8 +723,7 @@ describe("experimental context management", () => {
 	it("skips built-in remote memory recall during local rollover while preserving the boundary", async () => {
 		const recallSpy = vi.spyOn(mnemopiBackend, "preCompactionContext").mockResolvedValue("recalled context");
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected bundled model");
+			const model = companyChatModel;
 			const manager = SessionManager.inMemory();
 			const seed = [
 				user("first task"),
@@ -744,8 +758,7 @@ describe("experimental context management", () => {
 	it("commits no boundary when the run aborts mid-rollover while the compaction hook is parked", async () => {
 		const tempDir = TempDir.createSync("@pi-experimental-abort-");
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected bundled model");
+			const model = companyChatModel;
 			const manager = SessionManager.inMemory(tempDir.path());
 			const seed = [
 				user("first task"),

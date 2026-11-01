@@ -174,3 +174,31 @@ test("token refuses a managed MCP id scoped to another profile", async () => {
 	expect(stdout).not.toContain("work-access");
 	expect(stderr).toContain('profile "work"');
 }, 30_000);
+
+test("token retains the independent Perplexity credential helper", async () => {
+	using tempDir = TempDir.createSync("@omp-token-perplexity-");
+	const storage = new AuthStorage(await SqliteAuthCredentialStore.open(tempDir.join("agent.db")));
+	await storage.credentials.reload();
+	await storage.credentials.set("perplexity", { type: "api_key", key: "independent-search-key" });
+	storage.close();
+
+	const proc = Bun.spawn([process.execPath, cliEntry, "token", "perplexity"], {
+		cwd: tempDir.path(),
+		env: {
+			PATH: process.env.PATH,
+			HOME: tempDir.path(),
+			USERPROFILE: tempDir.path(),
+			NO_COLOR: "1",
+			PI_CODING_AGENT_DIR: tempDir.path(),
+		},
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	const [exitCode, stdout, stderr] = await Promise.all([
+		proc.exited,
+		new Response(proc.stdout).text(),
+		new Response(proc.stderr).text(),
+	]);
+	expect(exitCode, stderr).toBe(0);
+	expect(stdout).toBe("independent-search-key\n");
+}, 30_000);

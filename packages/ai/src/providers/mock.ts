@@ -1,7 +1,7 @@
 /**
  * Mock provider for tests.
  *
- * Implements `Model<"mock">` + `streamMock` so test code can drive
+ * Implements `Model<"local-inference">` + `streamMock` so test code can drive
  * pi-agent-core / streamSimple-shaped consumers without an HTTP client.
  *
  * Usage:
@@ -63,7 +63,7 @@ import type {
 import { AssistantMessageEventStream } from "../utils/event-stream";
 
 /** The API string this provider serves. */
-export const MOCK_API = "mock" as const;
+export const MOCK_API = "local-inference" as const;
 export type MockApi = typeof MOCK_API;
 
 /** Shorthand for a single content block. Strings become text blocks. */
@@ -142,7 +142,7 @@ export interface MockCall {
 export interface MockModelOptions {
 	/** Model id. Defaults to `"mock-model"`. */
 	id?: string;
-	/** Provider string used in the returned AssistantMessage. Defaults to `"mock"`. */
+	/** Provider string used in the returned AssistantMessage. Defaults to `"local"`. */
 	provider?: string;
 	/** Base URL reported by the model. Defaults to `"mock://"`. */
 	baseUrl?: string;
@@ -168,7 +168,7 @@ const ZERO_COST: Model["cost"] = {
 };
 
 /**
- * A `Model<"mock">` that carries its own scripted state. Pass instances to
+ * A `Model<"local-inference">` that carries its own scripted state. Pass instances to
  * `stream()` or agent configs, and use the same instance to inspect calls
  * and feed additional handlers.
  */
@@ -198,7 +198,7 @@ export class MockModel implements Model<MockApi> {
 	constructor(options: MockModelOptions = {}) {
 		this.id = options.id ?? "mock-model";
 		this.name = options.id ?? "mock-model";
-		this.provider = options.provider ?? "mock";
+		this.provider = options.provider ?? "local";
 		this.identity = classifyModel(this.provider, this.id, { lenient: true });
 		this.baseUrl = options.baseUrl ?? "mock://";
 		this.reasoning = options.reasoning ?? false;
@@ -245,7 +245,7 @@ export function createMockModel(options: MockModelOptions = {}): MockModel {
 	return new MockModel(options);
 }
 
-/** Stream function for `Model<"mock">`. Matches the pi-ai per-provider stream signature. */
+/** Stream function for `Model<"local-inference">`. Matches the pi-ai per-provider stream signature. */
 export function streamMock(
 	model: Model<Api>,
 	context: Context,

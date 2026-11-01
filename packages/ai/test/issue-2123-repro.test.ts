@@ -5,7 +5,7 @@
  * Claude Opus 4.6 fails immediately with
  *   `400 ... clear_thinking_20251015 strategy requires thinking to be enabled or adaptive`.
  *
- * Root cause: OAuth requests on adaptive-thinking Opus models attach a
+ * Root cause: adaptive-thinking Opus requests attach a
  * `context_management.edits[clear_thinking_20251015]` block. On the very
  * first user turn the coding-agent's eager-todo prelude pins a forced
  * `tool_choice: { type: "tool", name: "todo" }`, which routes through
@@ -25,11 +25,11 @@ import type { Context, Model, Tool } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 
-const OPUS_46_OAUTH: Model<"anthropic-messages"> = buildModel({
+const OPUS_46: Model<"anthropic-messages"> = buildModel({
 	id: "claude-opus-4-6",
 	name: "Claude Opus 4.6",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text", "image"],
@@ -72,9 +72,8 @@ type CapturedPayload = {
 
 function capturePayload(toolChoice: "any" | { type: "tool"; name: string }): Promise<CapturedPayload> {
 	const { promise, resolve } = Promise.withResolvers<CapturedPayload>();
-	void streamAnthropic(OPUS_46_OAUTH, firstTurnContext, {
-		apiKey: "sk-ant-oat-test",
-		isOAuth: true,
+	void streamAnthropic(OPUS_46, firstTurnContext, {
+		apiKey: "copilot-test-token",
 		signal: abortedSignal(),
 		thinkingEnabled: true,
 		reasoning: Effort.High,
@@ -87,7 +86,7 @@ function capturePayload(toolChoice: "any" | { type: "tool"; name: string }): Pro
 	return promise;
 }
 
-describe("issue #2123 — OAuth Opus + forced tool_choice must strip context_management with thinking", () => {
+describe("issue #2123 — Opus + forced tool_choice must strip context_management with thinking", () => {
 	it("strips context_management when forced named tool_choice deletes adaptive thinking", async () => {
 		// Mirrors the eager-todo prelude: first user turn on Opus pins
 		// tool_choice: { type: "tool", name: "<active-tool>" } while adaptive

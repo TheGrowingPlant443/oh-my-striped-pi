@@ -34,7 +34,7 @@ function makeSnapshot(generatedAt: number): SnapshotResponse {
 		credentials: [
 			{
 				id: 1,
-				provider: "anthropic",
+				provider: "github-copilot",
 				credential: { type: "api_key", key: "secret-api-key" },
 				identityKey: null,
 				rotatesInMs: null,

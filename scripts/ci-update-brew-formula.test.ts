@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { renderFormula } from "./ci-update-brew-formula";
 
-const BASE = "https://build.stencil.so/d/omp/20261010-171748-fa5ff4a";
+const BASE = "https://github.com/can1357/oh-my-pi/releases/download/v18.8.9";
 const FILES = {
 	macosArm: { url: `${BASE}/omp-darwin-arm64`, sha256: "darwin_arm64_sha" },
 	macosIntel: { url: `${BASE}/omp-darwin-x64`, sha256: "darwin_x64_sha" },
@@ -16,17 +16,12 @@ describe("renderFormula", () => {
 	// Without `using: :nounzip` the default CurlDownloadStrategy nests the file
 	// outside the staging CWD, `Dir["omp-*"].first` returns `nil`, and
 	// `bin.install nil => "omp"` raises (issue #2398).
-	// Each stanza falls back to the GitHub release asset when the build-service
-	// download fails (e.g. its R2 redirect blocked by a proxy, issue #15907).
-	it("attaches `using: :nounzip` and a GitHub release mirror to every per-platform url stanza", () => {
+	it("attaches `using: :nounzip` to every per-platform url stanza", () => {
 		const matches = formula.match(/using: :nounzip/g) ?? [];
 		expect(matches).toHaveLength(4);
 		for (const key in FILES) {
 			const file = FILES[key as keyof typeof FILES];
-			const asset = file.url.slice(file.url.lastIndexOf("/") + 1);
-			expect(formula).toContain(
-				`url "${file.url}",\n          using: :nounzip\n      mirror "https://github.com/can1357/oh-my-pi/releases/download/v18.8.9/${asset}"\n      sha256 "${file.sha256}"`,
-			);
+			expect(formula).toContain(`url "${file.url}",\n          using: :nounzip\n      sha256 "${file.sha256}"`);
 		}
 	});
 

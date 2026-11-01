@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { BtwController } from "@oh-my-pi/pi-coding-agent/modes/controllers/btw-controller";
-import { LiveCommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/live-command-controller";
 import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -28,8 +28,7 @@ describe("InteractiveMode long shutdown status", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected bundled model");
+		const model = createMockModel({ provider: "local" }).model;
 		session = new AgentSession({
 			agent: new Agent({ initialState: { model, systemPrompt: ["test"], tools: [], messages: [] } }),
 			sessionManager: SessionManager.inMemory(tempDir.path()),
@@ -52,7 +51,7 @@ describe("InteractiveMode long shutdown status", () => {
 		resetSettingsForTest();
 	});
 
-	it.each(["live command", "BTW history", "main session"] as const)(
+	it.each(["BTW history", "main session"] as const)(
 		"shows progress before and during pending %s cleanup",
 		async pendingCleanup => {
 			vi.useFakeTimers();
@@ -64,9 +63,7 @@ describe("InteractiveMode long shutdown status", () => {
 				return release.promise;
 			};
 			const dispose = vi.spyOn(session, "dispose").mockResolvedValue(undefined);
-			if (pendingCleanup === "live command") {
-				vi.spyOn(LiveCommandController.prototype, "stop").mockImplementation(holdCleanup);
-			} else if (pendingCleanup === "BTW history") {
+			if (pendingCleanup === "BTW history") {
 				vi.spyOn(BtwController.prototype, "flush").mockImplementation(holdCleanup);
 			} else {
 				dispose.mockImplementation(holdCleanup);

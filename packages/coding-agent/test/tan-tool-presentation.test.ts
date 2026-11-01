@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { type CustomTool, createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -9,6 +8,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { createSubagentSettings } from "@oh-my-pi/pi-coding-agent/task/executor";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
 
 const mcpTool: CustomTool = {
 	name: "mcp__fixture_probe",
@@ -29,11 +29,11 @@ describe("/tan prompt-cache tool presentation", () => {
 			const cwd = dir.path();
 			const settings = Settings.isolated({ "tools.xdev": xdev, "marketplace.autoUpdate": "off" });
 			const auth = createInMemoryAuthStorage();
-			auth.keys.setRuntime("openai", "test-key");
+			auth.keys.setRuntime("github-copilot", "test-key");
 			const base = {
 				cwd,
 				agentDir: cwd,
-				model: getBundledModel("openai", "gpt-4o-mini"),
+				model: getTestModel("github-copilot", candidate => candidate.api === "openai-responses"),
 				modelRegistry: new ModelRegistry(auth),
 				skills: [],
 				contextFiles: [],

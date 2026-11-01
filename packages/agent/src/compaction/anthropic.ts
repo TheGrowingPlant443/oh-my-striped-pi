@@ -18,10 +18,8 @@ import type {
 	Usage,
 } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
-import {
-	supportsAnthropicCompaction,
-	supportsBedrockConverseCompaction,
-} from "@oh-my-pi/pi-ai/providers/anthropic-compaction";
+import { resolveAnthropicCompactionEffort } from "@oh-my-pi/pi-ai/providers/anthropic";
+import { supportsAnthropicCompaction } from "@oh-my-pi/pi-ai/providers/anthropic-compaction";
 import { isRecord, prompt } from "@oh-my-pi/pi-utils";
 import { type InstrumentedChatSpanOptions, instrumentedCompleteSimple } from "../telemetry";
 import type { AgentMessage } from "../types";
@@ -55,27 +53,12 @@ function isAnthropicMessagesModel(model: Model): model is Model<"anthropic-messa
 	return model.api === "anthropic-messages";
 }
 
-function isBedrockConverseModel(model: Model): model is Model<"bedrock-converse-stream"> {
-	return model.api === "bedrock-converse-stream";
+/** Whether the model declares native compaction on the Anthropic wire. */
+export function shouldUseAnthropicNativeCompaction(model: Model): model is Model<"anthropic-messages"> {
+	return isAnthropicMessagesModel(model) && supportsAnthropicCompaction(model);
 }
 
-/**
- * Whether a model compacts through the Anthropic compaction beta. Model
- * eligibility is catalog policy (`compat.supportsServerCompaction`, the
- * lineage the beta documents); endpoint eligibility is resolved the way the
- * provider routes requests, so a Foundry or `ANTHROPIC_BASE_URL` reroute of a
- * first-party model is excluded unless the route opted in with
- * `remoteCompaction.enabled`. Bedrock Converse models compact through a
- * Bedrock Runtime side request; their ordinary turns stay on Converse.
- */
-export function shouldUseAnthropicNativeCompaction(
-	model: Model,
-): model is Model<"anthropic-messages" | "bedrock-converse-stream"> {
-	if (isAnthropicMessagesModel(model)) return supportsAnthropicCompaction(model);
-	return isBedrockConverseModel(model) && supportsBedrockConverseCompaction(model);
-}
-
-type AnthropicNativeCompactionModel = Model<"anthropic-messages" | "bedrock-converse-stream">;
+type AnthropicNativeCompactionModel = Model<"anthropic-messages">;
 
 export function getPreservedAnthropicCompactionData(
 	preserveData: Record<string, unknown> | undefined,
@@ -250,14 +233,7 @@ export async function requestAnthropicNativeCompaction(
 	signal: AbortSignal | undefined,
 	options: AnthropicNativeCompactionOptions,
 ): Promise<AnthropicNativeCompactionResponse> {
-	// Pure compaction policy checks must not load the provider; only an actual request needs it.
-	const reasoning = isAnthropicMessagesModel(model)
-		? (await import("@oh-my-pi/pi-ai/providers/anthropic")).resolveAnthropicCompactionEffort(
-				model,
-				request.context.messages,
-				request.reasoning,
-			)
-		: request.reasoning;
+	const reasoning = resolveAnthropicCompactionEffort(model, request.context.messages, request.reasoning);
 	const response = await instrumentedCompleteSimple(
 		model,
 		request.context,

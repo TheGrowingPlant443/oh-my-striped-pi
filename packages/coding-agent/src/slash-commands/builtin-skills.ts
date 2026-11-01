@@ -38,11 +38,7 @@ function parseTargets(rest: string): { names: string[]; global: boolean } | { er
 
 async function withClient<T>(run: (client: SkillshareClient) => Promise<T>): Promise<T> {
 	const client = await SkillshareClient.create();
-	try {
-		return await run(client);
-	} finally {
-		client.close();
-	}
+	return run(client);
 }
 
 function tuiHooks(ctx: InteractiveModeContext): SkillInstallHooks {

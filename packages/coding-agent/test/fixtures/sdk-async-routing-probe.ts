@@ -28,6 +28,7 @@ const auth = await AuthStorage.create(":memory:");
 auth.keys.setRuntime("mock", "repro-key");
 registerMockApi("repro-sdk-async-routing");
 const model = createMockModel({
+	provider: "mock",
 	handler: context => {
 		if (context.tools?.some(tool => tool.name === "yield")) {
 			if (context.messages.at(-1)?.role === "toolResult") return { content: ["done"] };

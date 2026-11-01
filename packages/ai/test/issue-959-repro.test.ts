@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { copilotCompletionsModel } from "./helpers";
 
 function createSseResponse(events: unknown[]): Response {
 	const payload = `${events
@@ -33,8 +33,10 @@ function baseContext(): Context {
 }
 
 describe("issue #959 - deepseek chat-template token leakage", () => {
+	const base = copilotCompletionsModel("special-token-filter");
 	const model: Model<"openai-completions"> = {
-		...getBundledModel("deepseek", "deepseek-v4-flash"),
+		...base,
+		compat: { ...base.compat, stripDeepseekSpecialTokens: true },
 	};
 
 	it("strips leaked deepseek chat-template markers from visible text for deepseek providers", async () => {

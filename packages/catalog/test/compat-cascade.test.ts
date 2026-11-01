@@ -53,16 +53,16 @@ describe("cascade rank precedence", () => {
 	test("API selectors match independently of custom provider names", () => {
 		const cascade = compile(
 			`class "cls" {
-				on-api "google-generative-ai" {
-					requires-skip-thought-signature #true
+				on-api "openai-responses" {
+					supports-store #true
 				}
 			}`,
 		);
 
-		expect(resolveCascadeRules(cascade, target({ api: "google-generative-ai" })).wire).toMatchObject({
-			requiresSkipThoughtSignature: true,
+		expect(resolveCascadeRules(cascade, target({ api: "openai-responses" })).wire).toMatchObject({
+			supportsStore: true,
 		});
-		expect(resolveCascadeRules(cascade, target({ api: "google-vertex" })).wire).toEqual({});
+		expect(resolveCascadeRules(cascade, target({ api: "openai-completions" })).wire).toEqual({});
 	});
 
 	test("priority breaks intentional equal-specificity overlap", () => {
@@ -271,27 +271,26 @@ describe("cascade rank precedence", () => {
 });
 
 describe("resolveCascade over committed rules", () => {
-	test("glm-5.2 on a blanket-glm provider resolves without overlapping the class ladder", () => {
-		// Regression: providers/alibaba-coding-plan.kdl has a direct `class "glm"`
-		// efforts block and no exact glm-5.2 residue, so it used to tie with the
-		// classes/glm.kdl revision >=5.2 ladder and throw AmbiguousOverlapError.
+	test("Copilot GPT-5.2 inherits the generic family ladder", () => {
 		const resolved = resolveCascade({
-			provider: "alibaba-coding-plan",
-			api: "openai-completions",
-			class: "glm",
-			model: "glm-5.2",
+			provider: "github-copilot",
+			api: "openai-responses",
+			class: "openai",
+			family: "gpt",
+			model: "gpt-5.2",
 			revision: "5.2",
 			reasoning: true,
 		});
-		expect(resolved.thinking.efforts).toEqual(["minimal", "low", "medium", "high", "max"]);
+		expect(resolved.thinking.efforts).toEqual(["low", "medium", "high", "xhigh"]);
 	});
 
 	test("memoized bundled results cannot be contaminated by consumers", () => {
 		const lookup: ResolveTarget = {
-			provider: "alibaba-coding-plan",
-			api: "openai-completions",
-			class: "glm",
-			model: "glm-5.2",
+			provider: "github-copilot",
+			api: "openai-responses",
+			class: "openai",
+			family: "gpt",
+			model: "gpt-5.2",
 			revision: "5.2",
 			reasoning: true,
 		};
@@ -300,7 +299,7 @@ describe("resolveCascade over committed rules", () => {
 		first.thinking.mode = "poisoned";
 
 		const repeated = resolveCascade({ ...lookup });
-		expect(repeated.thinking.efforts).toEqual(["minimal", "low", "medium", "high", "max"]);
+		expect(repeated.thinking.efforts).toEqual(["low", "medium", "high", "xhigh"]);
 		expect(repeated.thinking.mode).not.toBe("poisoned");
 		expect(repeated).not.toBe(first);
 		expect(repeated.thinking.efforts).not.toBe(first.thinking.efforts);

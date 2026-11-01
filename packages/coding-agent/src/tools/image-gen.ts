@@ -10,14 +10,11 @@ import {
 	type ImageGenerationResult,
 	isImageGenerationApi,
 	type Model,
-	parseAntigravityCredentials,
 } from "@oh-my-pi/pi-ai";
-import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { getEffectiveTokenCost } from "@oh-my-pi/pi-catalog/models";
+import { MissingApiKeyError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
 import { isEnoent, logger, parseImageMetadata, prompt, ptree, Snowflake, untilAborted } from "@oh-my-pi/pi-utils";
 import { type RoleChainCandidate, resolveModelRoleValue, resolveRoleChain } from "../config/model-resolver";
 import { roleCandidatePool } from "../config/model-roles";
-import { isAuthenticated, type ModelRegistry } from "../config/model-registry";
 import { settings } from "../config/settings";
 import type { CustomTool } from "../extensibility/custom-tools/types";
 import imageGenDescription from "../prompts/tools/image-gen.md" with { type: "text" };
@@ -139,40 +136,12 @@ async function saveImagesToTemp(images: ImageGenerationResult["images"]): Promis
 }
 
 /**
- * Chat model that relays a hosted Responses image model's `image_generation`
- * call: the session model when it can carry the tool on the same provider,
- * otherwise the cheapest available carrier there.
- */
-function resolveHostedImageCarrier(
-	modelRegistry: ModelRegistry,
-	selectedModel: Model,
-	activeModel: Model | undefined,
-): Model | undefined {
-	if (activeModel?.provider === selectedModel.provider && activeModel.hostedImage) return activeModel;
-	let carrier: Model | undefined;
-	let carrierInput = Infinity;
-	for (const model of modelRegistry.getAvailable()) {
-		if (model.provider !== selectedModel.provider || !model.hostedImage) continue;
-		const input = getEffectiveTokenCost(model.cost).input;
-		if (!carrier || input < carrierInput) {
-			carrier = model;
-			carrierInput = input;
-		}
-	}
-	return carrier;
-}
-
-/**
  * Default image candidates: explicit role entries first, then the session's
- * own provider (its `imageModel` swap, then the session model itself when it
- * carries the hosted image tool), then the remaining built-in chain.
+ * own provider (its `imageModel` swap), then the remaining built-in chain.
  */
 function defaultImageCandidates(chain: RoleChainCandidate[], sessionModel: Model | undefined, pool: Model[]): Model[] {
 	const sessionCandidates = sessionModel
-		? [
-				resolveConfiguredModelTarget(sessionModel.imageModel, sessionModel, pool),
-				sessionModel.hostedImage ? sessionModel : undefined,
-			]
+		? [resolveConfiguredModelTarget(sessionModel.imageModel, sessionModel, pool)]
 		: [];
 	const ordered = [
 		...chain.filter(candidate => candidate.explicit).map(candidate => candidate.model),
@@ -270,31 +239,11 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 					continue;
 				}
 
-				const initialKey = await ctx.modelRegistry.getApiKey(model, sessionId, { signal: requestSignal });
-				if (!isAuthenticated(initialKey)) {
-					skipped.push(`${model.provider}/${model.id} (credentials unavailable)`);
+				if (!model.baseUrl?.trim()) {
+					skipped.push(`${model.provider}/${model.id} (explicit endpoint required)`);
 					continue;
 				}
-				if (model.api === "google-gemini-cli" && !parseAntigravityCredentials(initialKey)) {
-					skipped.push(`${model.provider}/${model.id} (invalid credentials)`);
-					continue;
-				}
-
-				let carrier: Model | undefined;
-				let apiKey = ctx.modelRegistry.resolver(model, sessionId);
-				if (model.api === "openai-responses" || model.api === "openai-codex-responses") {
-					carrier = model.hostedImage ? model : resolveHostedImageCarrier(ctx.modelRegistry, model, ctx.model);
-					if (!carrier) {
-						skipped.push(`${model.provider}/${model.id} (hosted chat carrier unavailable)`);
-						continue;
-					}
-					const carrierKey = await ctx.modelRegistry.getApiKey(carrier, sessionId, { signal: requestSignal });
-					if (!isAuthenticated(carrierKey)) {
-						skipped.push(`${model.provider}/${model.id} (carrier credentials unavailable)`);
-						continue;
-					}
-					apiKey = ctx.modelRegistry.resolver(carrier, sessionId);
-				}
+				const apiKey = ctx.modelRegistry.resolver(model, sessionId);
 
 				if (!inputImages) {
 					inputImages = [];
@@ -314,23 +263,18 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 					resolveHeaders: (headerSignal?: AbortSignal) =>
 						ctx.modelRegistry.resolveModelHeaders(model, headerSignal),
 				};
-				const resolvedCarrier = carrier
-					? {
-							...carrier,
-							resolveHeaders: (headerSignal?: AbortSignal) =>
-								ctx.modelRegistry.resolveModelHeaders(carrier, headerSignal),
-						}
-					: undefined;
 				try {
 					const result = await generateImage(resolvedModel, request, {
 						apiKey,
 						fetch: ctx.fetch ?? fetch,
 						signal: requestSignal,
-						carrier: resolvedCarrier,
-						sessionId,
 					});
 					return buildToolResult(model, result);
 				} catch (error) {
+					if (error instanceof MissingApiKeyError && !requestSignal?.aborted) {
+						skipped.push(`${model.provider}/${model.id} (credentials unavailable)`);
+						continue;
+					}
 					if (!(error instanceof ProviderHttpError) || requestSignal?.aborted) throw error;
 					failures.push(error);
 				}
@@ -345,17 +289,3 @@ export const imageGenTool: CustomTool<typeof imageGenSchema, ImageGenToolDetails
 		});
 	},
 };
-
-export async function getImageGenTools(
-	_modelRegistry?: ModelRegistry,
-	_activeModel?: Model,
-): Promise<Array<CustomTool<typeof imageGenSchema, ImageGenToolDetails>>> {
-	return [imageGenTool];
-}
-
-export async function getImageGenToolsWithRegistry(
-	_modelRegistry: ModelRegistry,
-	_activeModel?: Model,
-): Promise<Array<CustomTool<typeof imageGenSchema, ImageGenToolDetails>>> {
-	return [imageGenTool];
-}

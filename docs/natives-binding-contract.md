@@ -42,7 +42,7 @@ Do not import unexported `native/*` implementation paths from package consumers.
 | Shell and PTY            | `executeShell`, `Shell`, `PtySession`                                                                                                                                                | `shell.rs`, `pty.rs`                                                  | classes/promises                    |
 | Process and files        | `Process`, `FileLock`, `execReplace`                                                                                                                                                 | `ps.rs`, `file_lock/mod.rs`                                           | classes/mixed                       |
 | Desktop and clipboard    | `DesktopSession`, `copyToClipboard`, `readImageFromClipboard`                                                                                                                        | `desktop/mod.rs`, `clipboard.rs`                                      | class, sync, promise                |
-| Audio and live media     | `AudioCapture`, `AudioPlayback`, `LiveWebRtcPeer`                                                                                                                                    | `audio.rs`, `live.rs`                                                 | classes/mixed                       |
+| Audio                    | `AudioCapture`, `AudioPlayback`                                                                                                                                                      | `audio.rs`                                                           | classes/mixed                       |
 | Text and highlighting    | `wrapTextWithAnsi`, `truncateToWidth`, `sliceWithWidth`, `extractSegments`, `visibleWidth`, `setHangulCompatJamoWidthOverride`, `highlightCode`, `HighlightStream`, language queries | `text.rs`, `highlight.rs`                                             | sync                                |
 | Conversion and rendering | `htmlToMarkdown`, `pdfToMarkdown`, `rasterizeSvg`, `encodeSixel`, `renderSnapcompactPng`, `snapcompactSupportedChars`                                                                | `html.rs`, `pdf.rs`, `svg.rs`, `sixel.rs`, `snapcompact.rs`           | mixed sync/promise                  |
 | Tokens and system        | `countTokens`, macOS appearance, cross-platform power exports, `getWorkProfile`, `deviceCheckGenerateToken`                                                                          | `tokens.rs`, `appearance.rs`, `power.rs`, `prof.rs`, `devicecheck.rs` | mixed                               |
@@ -68,7 +68,7 @@ Newer surface members on existing exports (all present in `native/index.d.ts`):
 The call style is part of the public contract:
 
 - CPU-heavy/blocking APIs generally return promises through napi-rs tasks, including `grep`, `glob`, `fuzzyFind`, AST search/edit, `summarizeCodeAsync`, snapcompact rendering, and HTML conversion.
-- Tokio-backed operations such as shell, PTY, isolation lifecycle, device check, desktop operations, and live media use promises where declared.
+- Tokio-backed operations such as shell, PTY, isolation lifecycle, device check, and desktop operations use promises where declared.
 - In-memory transforms and direct probes generally remain synchronous: `search`, `hasMatch`, block boundaries, text/layout helpers, diffs, vector ranking, highlighting, key parsing, and isolation probe/resolve helpers.
 - Stateful resources are classes. Their constructors and individual methods can have different sync/async behavior; use the declarations rather than assuming the whole class is asynchronous.
 
@@ -78,7 +78,7 @@ Callback parameters generated from napi-rs `ThreadsafeFunction` use an error-fir
 
 ## Objects, enums, and binary data
 
-`#[napi(object)]` structs become TS interfaces such as search results, AST payloads, shell/PTY results, desktop options/results, audio/live events, and isolation records. napi-rs owns runtime conversion; TypeScript optionality does not provide semantic validation to untyped callers.
+`#[napi(object)]` structs become TS interfaces such as search results, AST payloads, shell/PTY results, desktop options/results, audio events, and isolation records. napi-rs owns runtime conversion; TypeScript optionality does not provide semantic validation to untyped callers.
 
 The generated runtime enum objects currently are:
 

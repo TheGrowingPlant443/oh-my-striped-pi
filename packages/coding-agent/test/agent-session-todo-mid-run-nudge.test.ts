@@ -35,7 +35,7 @@ import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
  * point without spinning a real model.
  */
 const sharedAuthStorage = createInMemoryAuthStorage();
-sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 const sharedModelRegistry = new ModelRegistry(sharedAuthStorage);
 
 afterAll(() => {
@@ -60,8 +60,8 @@ describe("AgentSession mid-run todo reconciliation nudge", () => {
 			role: "assistant",
 			content: [toolCall],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "toolUse",
 			usage: {
 				input: 50,
@@ -80,8 +80,8 @@ describe("AgentSession mid-run todo reconciliation nudge", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "paused for instruction" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			stopReason: "stop",
 			usage: {
 				input: 50,
@@ -137,8 +137,8 @@ describe("AgentSession mid-run todo reconciliation nudge", () => {
 		tempDir = TempDir.createSync("@pi-todo-mid-run-nudge-");
 		sessionManager = SessionManager.inMemory(tempDir.path());
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected built-in Copilot model to exist");
 
 		const settings = Settings.isolated({
 			"compaction.enabled": false,

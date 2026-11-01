@@ -9,7 +9,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { AuthStorage } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
@@ -21,6 +20,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { computerTurnInFlight, registerComputerController } from "@oh-my-pi/pi-coding-agent/tools/computer/supervisor";
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 describe("SDK session dialogs and the computer display hold", () => {
 	let tempDir: string;
@@ -33,7 +33,7 @@ describe("SDK session dialogs and the computer display hold", () => {
 		await initTheme(false);
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `pi-computer-user-wait-${Snowflake.next()}-`));
 		authStorage = await AuthStorage.create(path.join(tempDir, "auth.db"));
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -74,7 +74,7 @@ describe("SDK session dialogs and the computer display hold", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "async.enabled": false, "bash.autoBackground.enabled": false, ...settings }),
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			hasUI: true,
 			disableExtensionDiscovery: true,
 			skills: [],

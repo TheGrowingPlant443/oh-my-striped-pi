@@ -78,7 +78,7 @@ function shouldReplaceReference(existing: Model<Api> | undefined, candidate: Mod
 	if (candidate.maxTokens !== existing.maxTokens) {
 		return (candidate.maxTokens ?? 0) > (existing.maxTokens ?? 0);
 	}
-	return existing.provider !== "openai" && candidate.provider === "openai";
+	return false;
 }
 
 function buildCanonicalSuffixAliasMap(references: ReadonlyMap<string, Model<Api>>): Map<string, string> {

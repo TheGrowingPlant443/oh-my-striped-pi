@@ -37,7 +37,7 @@ describe("estimateImageTokens", () => {
 });
 
 describe("image pricing by the reading model", () => {
-	function reader(provider: "anthropic" | "google" | "openai-codex", id: string): Model {
+	function reader(provider: "github-copilot", id: string): Model {
 		const model = getBundledModel(provider, id);
 		if (!model) throw new Error(`missing bundled model ${provider}/${id}`);
 		return model as Model;
@@ -46,9 +46,9 @@ describe("image pricing by the reading model", () => {
 
 	test.each([
 		// Claude's 28px patches: ⌈1000/28⌉² = 36².
-		["Claude", reader("anthropic", "claude-opus-5-5"), 1296],
+		["Claude", reader("github-copilot", "claude-opus-5.5"), 1296],
 		// Gemini 3 bills a fixed budget per image.
-		["Gemini", reader("google", "gemini-3-pro-preview"), 1120],
+		["Gemini", reader("github-copilot", "gemini-3-pro-preview"), 1120],
 	] as const)("a user image costs what %s bills for it", (_reader, model, expected) => {
 		const message: UserMessage = { role: "user", content: [image], timestamp: 0 };
 		expect(new Tokenizer(model).countMessage(message)).toBe(expected);
@@ -61,7 +61,7 @@ describe("image pricing by the reading model", () => {
 	});
 
 	test("the remote-compaction probe charges an image what the local count charges", () => {
-		const tokenizer = new Tokenizer(reader("openai-codex", "gpt-6.1-sol"));
+		const tokenizer = new Tokenizer(reader("github-copilot", "gpt-6.1-sol"));
 		const charges = (width: number, height: number) => {
 			const data = pngWithSize(width, height);
 			const local = tokenizer.countMessage({

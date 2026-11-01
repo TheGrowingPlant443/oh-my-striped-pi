@@ -26,8 +26,7 @@ describe("disabledProviders takes effect live", () => {
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-model-availability-live-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -58,38 +57,35 @@ describe("disabledProviders takes effect live", () => {
 	};
 
 	it("drops a provider disabled mid-session from the model list and the Ctrl+P cycle", async () => {
-		const sonnet = bundled("anthropic", "claude-sonnet-4-5");
-		const opus = bundled("anthropic", "claude-opus-4-5");
-		const gpt = bundled("openai", "gpt-5");
+		const sonnet = bundled("github-copilot", "claude-sonnet-4.5");
+		const opus = bundled("github-copilot", "claude-opus-4.5");
 		const settings = Settings.isolated();
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), { settings });
-		const live = startSession(settings, modelRegistry, [sonnet, gpt, opus]);
-		expect(live.getAvailableModels().some(model => model.provider === "openai")).toBe(true);
+		const live = startSession(settings, modelRegistry, [sonnet, opus]);
+		expect(live.getAvailableModels().some(model => model.provider === "github-copilot")).toBe(true);
 
-		cfgDisabledProviders.set(settings, ["openai"]);
+		cfgDisabledProviders.set(settings, ["github-copilot"]);
 
-		expect(live.scopedModels.map(entry => entry.model.id)).toEqual([sonnet.id, opus.id]);
-		expect(live.getAvailableModels().some(model => model.provider === "openai")).toBe(false);
-		const cycled = await live.cycleModel();
-		expect(cycled?.model.id).toBe(opus.id);
-		expect((await live.cycleModel())?.model.id).toBe(sonnet.id);
+		expect(live.scopedModels).toEqual([]);
+		expect(live.getAvailableModels().some(model => model.provider === "github-copilot")).toBe(false);
+		expect(await live.cycleModel()).toBeUndefined();
 	});
 
-	it("re-seeds implicit discovery for a provider re-enabled mid-session", async () => {
-		const sonnet = bundled("anthropic", "claude-sonnet-4-5");
+	it("restores the retained provider when re-enabled mid-session", async () => {
+		const sonnet = bundled("github-copilot", "claude-sonnet-4.5");
 		const settings = Settings.isolated();
-		cfgDisabledProviders.set(settings, ["lm-studio"]);
+		cfgDisabledProviders.set(settings, ["github-copilot"]);
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"), { settings });
 		startSession(settings, modelRegistry, [sonnet]);
-		expect(modelRegistry.getDiscoverableProviders()).not.toContain("lm-studio");
-		// Only a catalog rebuild re-seeds implicit discovery; await the one the session's
-		// settings listener starts (the rebuild is async and exposes no other signal).
+		expect(modelRegistry.getAvailable()).toEqual([]);
 		const reapply = vi.spyOn(modelRegistry, "reapplyModelPolicies");
+		const discoverableProviders = modelRegistry.getDiscoverableProviders();
 
 		cfgDisabledProviders.set(settings, []);
 		await Promise.resolve();
 		await reapply.mock.results[0]?.value;
 
-		expect(modelRegistry.getDiscoverableProviders()).toContain("lm-studio");
+		expect(modelRegistry.getAvailable().some(model => model.provider === "github-copilot")).toBe(true);
+		expect(modelRegistry.getDiscoverableProviders()).toEqual(discoverableProviders);
 	});
 });

@@ -1,4 +1,5 @@
 auth "llama.cpp" {
+	allows-missing-api-key #true
 	name "llama.cpp (Local OpenAI-compatible)"
 	env "LLAMA_CPP_API_KEY"
 	login "api-key" {

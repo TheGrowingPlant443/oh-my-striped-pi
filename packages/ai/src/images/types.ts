@@ -1,4 +1,4 @@
-import type { Api, FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
+import type { FetchImpl, Usage } from "@oh-my-pi/pi-catalog/types";
 import type { ApiKey } from "../auth-retry";
 
 export interface ImageInput {
@@ -38,8 +38,4 @@ export interface ImageGenerationOptions {
 	apiKey: ApiKey;
 	fetch?: FetchImpl;
 	signal?: AbortSignal;
-	/** Chat model that carries a Responses `image_generation` tool call. */
-	carrier?: Model<Api>;
-	/** Stable provider session id, used by the Codex Responses carrier. */
-	sessionId?: string;
 }

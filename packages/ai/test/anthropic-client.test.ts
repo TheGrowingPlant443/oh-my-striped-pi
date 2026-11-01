@@ -38,7 +38,12 @@ describe("AnthropicMessagesClient error mapping", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response(anthropicErrorBody, { status: 400, headers: { "request-id": "req_err" } }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", baseURL: "https://api.anthropic.com", fetch });
+		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			baseURL: "https://api.anthropic.com",
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -74,7 +79,12 @@ describe("AnthropicMessagesClient error mapping", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response(body, { status: 403, headers: { "request-id": "req_oauth_403" } }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", baseURL: "https://api.anthropic.com", fetch });
+		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			baseURL: "https://api.anthropic.com",
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -94,7 +104,13 @@ describe("AnthropicMessagesClient error mapping", () => {
 
 	it("does not invent a body when the error response is empty", async () => {
 		const { fetch } = createFetchMock([new Response(null, { status: 500 })]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 0, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 0,
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -111,6 +127,7 @@ describe("AnthropicMessagesClient error mapping", () => {
 		});
 		const { calls, fetch } = createFetchMock([networkError]);
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
 			apiKey: "sk-test",
 			baseURL: "https://api.anthropic.com",
 			maxRetries: 0,
@@ -134,6 +151,8 @@ describe("AnthropicMessagesClient error mapping", () => {
 		const { calls, fetch } = createFetchMock([new Response(null, { status: 200 })]);
 		const preAborted = AbortSignal.abort();
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch,
@@ -156,7 +175,13 @@ describe("AnthropicMessagesClient retries", () => {
 			new Response("overloaded", { status: 429, headers: { "retry-after-ms": "1" } }),
 			new Response("{}", { status: 200 }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 2, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 2,
+			fetch,
+		});
 
 		const response = await client.messages.create(params).asResponse();
 
@@ -168,7 +193,13 @@ describe("AnthropicMessagesClient retries", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response("stop", { status: 503, headers: { "x-should-retry": "false" } }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 3, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 3,
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -184,7 +215,13 @@ describe("AnthropicMessagesClient retries", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response("err", { status: 500, headers: { "retry-after-ms": "1" } }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 2, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 2,
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -200,7 +237,13 @@ describe("AnthropicMessagesClient retries", () => {
 			new Response("overloaded", { status: 429, headers: { "retry-after-ms": "1" } }),
 			new Response("{}", { status: 200 }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch,
+		});
 
 		const response = await client.messages.create(params, { maxRetryDelayMs: -1 }).asResponse();
 
@@ -216,7 +259,12 @@ describe("AnthropicMessagesClient timeout and abort", () => {
 			init?.signal?.addEventListener("abort", () => reject(new Error("aborted by signal")), { once: true });
 			return promise;
 		}) as typeof fetch;
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", fetch: hangingFetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			fetch: hangingFetch,
+		});
 
 		const error = await client.messages
 			.create(params, { timeout: 5, maxRetries: 0 })
@@ -235,7 +283,13 @@ describe("AnthropicMessagesClient timeout and abort", () => {
 			controller.abort();
 			return fetch(input, init);
 		}) as typeof fetch;
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch: abortingFetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch: abortingFetch,
+		});
 
 		const error = await client.messages
 			.create(params, { signal: controller.signal })
@@ -248,18 +302,19 @@ describe("AnthropicMessagesClient timeout and abort", () => {
 });
 
 describe("AnthropicMessagesClient request assembly", () => {
-	it("sends auth, body, and beta URL according to client options", async () => {
+	it("sends auth and body according to client options", async () => {
 		const { calls, fetch } = createFetchMock([new Response("{}", { status: 200 })]);
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
 			authToken: "oauth-token",
-			baseURL: "https://api.anthropic.com",
+			baseURL: "https://api.githubcopilot.com",
 			defaultHeaders: { "Anthropic-Version": "2023-06-01" },
 			fetch,
 		});
 
-		await client.beta.messages.create(params).asResponse();
+		await client.messages.create(params).asResponse();
 
-		expect(calls[0].url).toBe("https://api.anthropic.com/v1/messages?beta=true");
+		expect(calls[0].url).toBe("https://api.githubcopilot.com/v1/messages");
 		expect(calls[0].init.method).toBe("POST");
 		const headers = calls[0].init.headers as Record<string, string>;
 		expect(headers.Authorization).toBe("Bearer oauth-token");
@@ -270,6 +325,8 @@ describe("AnthropicMessagesClient request assembly", () => {
 	it("never overrides auth headers already present in defaultHeaders", async () => {
 		const { calls, fetch } = createFetchMock([new Response("{}", { status: 200 })]);
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-wrong",
 			authToken: "wrong-token",
 			defaultHeaders: { "X-Api-Key": "sk-right", authorization: "Bearer right-token" },
@@ -282,7 +339,7 @@ describe("AnthropicMessagesClient request assembly", () => {
 		expect(headers["X-Api-Key"]).toBe("sk-right");
 		expect(headers.authorization).toBe("Bearer right-token");
 		expect(headers.Authorization).toBeUndefined();
-		expect(calls[0].url).toBe("https://api.anthropic.com/v1/messages");
+		expect(calls[0].url).toBe("https://api.githubcopilot.com/v1/messages");
 	});
 });
 
@@ -291,7 +348,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response(anthropicOverloadedErrorBody, { status: 429, headers: { "retry-after": "120" } }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params)
@@ -308,7 +371,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 		const { calls, fetch } = createFetchMock([
 			new Response(anthropicOverloadedErrorBody, { status: 429, headers: errorHeaders }),
 		]);
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch,
+		});
 
 		const error = await client.messages
 			.create(params, { maxRetryDelayMs: 60_000 })
@@ -348,7 +417,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			});
 			return response;
 		};
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch,
+		});
 
 		const pending = client.messages
 			.create(params, { signal: controller.signal, maxRetryDelayMs: 60_000 })
@@ -391,7 +466,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			});
 			return response;
 		};
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 5, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 5,
+			fetch,
+		});
 
 		AIError.__anthropicApiErrorForTesting.setBodyReadTimeoutMs(5);
 		try {
@@ -424,6 +505,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => {
@@ -453,6 +536,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => {
@@ -488,6 +573,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => {
@@ -525,6 +612,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => new Response(incompleteBody, { status: 500 }),
@@ -563,7 +652,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			response = new Response(oversizedBody, { status: 400 });
 			return response;
 		};
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 0, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 0,
+			fetch,
+		});
 
 		const startedAt = performance.now();
 		const error = await client.messages
@@ -592,6 +687,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => new Response(exactBody, { status: 400 }),
@@ -621,6 +718,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => new Response(overflowingBody, { status: 400 }),
@@ -640,6 +739,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 		const body = new Uint8Array(64 * 1024 + 2).fill(120);
 		body.set([0xe2, 0x82, 0xac], 64 * 1024 - 1);
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => new Response(body, { status: 400 }),
@@ -668,6 +769,8 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			},
 		});
 		const client = new AnthropicMessagesClient({
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			baseURL: "https://api.githubcopilot.com",
 			apiKey: "sk-test",
 			maxRetries: 0,
 			fetch: async () => new Response(emptyBody, { status: 500 }),
@@ -710,7 +813,13 @@ describe("AnthropicMessagesClient retry-after cap", () => {
 			response = new Response(alwaysReadyBody, { status: 500 });
 			return response;
 		};
-		const client = new AnthropicMessagesClient({ apiKey: "sk-test", maxRetries: 0, fetch });
+		const client = new AnthropicMessagesClient({
+			baseURL: "https://api.githubcopilot.com",
+			model: { provider: "github-copilot", api: "anthropic-messages" },
+			apiKey: "sk-test",
+			maxRetries: 0,
+			fetch,
+		});
 
 		AIError.__anthropicApiErrorForTesting.setBodyReadTimeoutMs(0);
 		try {

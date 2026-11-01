@@ -80,7 +80,6 @@ import { pageRpcMessages, RPC_MESSAGES_PAGE_BUSY_ERROR, RpcMessagesPageError } f
 import { RpcBtwController } from "./rpc-btw";
 import { RpcGoalController } from "./rpc-goal";
 import { RpcDictationBridge, type RpcDictationControllerFactory } from "./rpc-dictation";
-import { RpcLiveBridge, type RpcLiveSessionFactory } from "./rpc-live";
 import { RpcOutputWriter } from "./rpc-output";
 import {
 	RpcExtensionUserMessageTracker,
@@ -432,8 +431,6 @@ export function dispatchRpcControlFrame(parsed: unknown, deps: RpcInputFrameDeps
 const BACKGROUND_COMMANDS: ReadonlySet<string> = new Set<RpcCommand["type"]>([
 	"bash",
 	"predict_word",
-	"live_start",
-	"live_connect",
 	"btw_cancel",
 	"abort_branch_summary",
 ]);
@@ -452,14 +449,14 @@ const BACKGROUND_COMMANDS: ReadonlySet<string> = new Set<RpcCommand["type"]>([
  * while a shell command runs, or `abort` (and `steer`/`follow_up`/`get_state`)
  * while a `prompt` or `steer_subagent` is still admitting. `predict_word` is
  * backgrounded too, so a cold prediction engine never stalls the command queue
- * behind a keystroke. `live_start`, `live_connect` and `dictation_start` respond only once
- * connected or recording, so they are backgrounded and their stop commands can cancel them.
+ * behind a keystroke. `dictation_start` responds only once recording, so it is
+ * backgrounded and its stop command can cancel it.
  * Response correlation is preserved via each command's `id`; ordering across
  * concurrent commands is not guaranteed and clients MUST match on `id`.
  *
  * @returns `undefined` when the frame was routed to a side-channel handler
  *   (extension UI response, host tool/URI frames) or dispatched in the
- *   background (`bash`, `predict_word`, `live_start`, `live_connect`, `dictation_start`, `prompt`, `steer`, `follow_up`, `steer_subagent`). Otherwise a promise that
+ *   background (`bash`, `predict_word`, `dictation_start`, `prompt`, `steer`, `follow_up`, `steer_subagent`). Otherwise a promise that
  *   resolves once the response for the command has been emitted via `output`.
  *   Errors from `handleCommand` on a command dispatched inline propagate; the
  *   caller is expected to wrap them.
@@ -1373,8 +1370,6 @@ export interface RpcModeOptions {
 	headless?: boolean;
 	subagentEventBus?: EventBus;
 	input?: ReadableStream<Uint8Array>;
-	/** Builds `live_start` sessions; defaults to the real {@link LiveSessionController}. */
-	createLiveSession?: RpcLiveSessionFactory;
 	/** Builds the native speech controller; tests may substitute the capture boundary. */
 	createDictationController?: RpcDictationControllerFactory;
 	/** The session's MCP manager, so `/mcp` builtins resolve and reconnect live servers. */
@@ -1391,7 +1386,6 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		headless = false,
 		subagentEventBus,
 		input = claimRpcInput(),
-		createLiveSession,
 		createDictationController,
 	} = options;
 	// Signal to RPC clients that the server is ready to accept commands
@@ -1466,8 +1460,6 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	const pendingExtensionRequests = new RpcPendingExtensionRequests();
 	const hostToolBridge = new RpcHostToolBridge(output);
 	const hostUriBridge = new RpcHostUriBridge(output);
-	// Live frames go straight to `output`, so `set_event_filter` (session events only) never drops them.
-	const liveBridge = new RpcLiveBridge(session, output, createLiveSession);
 	let lastDictationError: { message: string } | undefined;
 	const sessionDictationBridge = new RpcDictationBridge(
 		session,
@@ -1828,9 +1820,8 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				logger.error(message);
 				output({ type: "notice", level: "error", message, source: "btw-history" });
 			});
-			// Close the realtime call (microphone, socket) before the session it delegates into.
+			// Close the microphone before disposing the session.
 			dictationBridge.dispose();
-			await liveBridge.stop();
 			await session.dispose();
 		} catch (error) {
 			if (!persistenceFailure || error !== persistenceFailure) throw error;
@@ -2279,7 +2270,6 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 					slowModeSupported: session.isSlowModeSupported(),
 					slowModeEnabled: session.isSlowModeEnabled(),
 					slowModeScope: session.getSlowModeScope(),
-					usageLimit: session.getUsageLimitState(),
 					messageCount: session.messages.length,
 					systemPrompt: session.systemPrompt,
 					dumpTools: session.agent.state.tools.map(tool => ({
@@ -2369,42 +2359,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 				return success(id, "set_host_tools", { toolNames: tools.map(tool => tool.name) });
 			}
 
-			case "live_start":
-			case "live_connect": {
-				const sdpOffer = command.type === "live_connect" ? command.sdpOffer : undefined;
-				// The frame is untyped input: without an offer, live_connect would open the host microphone.
-				if (command.type === "live_connect" && (typeof sdpOffer !== "string" || !sdpOffer.trim())) {
-					return error(id, command.type, "live_connect requires a non-empty sdpOffer");
-				}
-				if (dictationBridge.active) return error(id, command.type, "End dictation before starting live voice");
-				if (sessionChangesInProgress > 0 || shutdownState.requested)
-					return error(id, command.type, "Session is changing or shutting down");
-				try {
-					return success(
-						id,
-						command.type,
-						await liveBridge.start({ voice: command.voice, instructions: command.instructions, sdpOffer }),
-					);
-				} catch (err) {
-					return error(id, command.type, err instanceof Error ? err.message : String(err));
-				}
-			}
-
-			case "live_stop": {
-				await liveBridge.stop();
-				return success(id, "live_stop");
-			}
-
-			case "live_mute": {
-				try {
-					return success(id, "live_mute", liveBridge.setMuted(command.muted));
-				} catch (err) {
-					return error(id, "live_mute", err instanceof Error ? err.message : String(err));
-				}
-			}
-
 			case "dictation_start": {
-				if (liveBridge.active) return error(id, "dictation_start", "End live voice before starting dictation");
 				if (sessionChangesInProgress > 0 || shutdownState.requested)
 					return error(id, "dictation_start", "Session is changing or shutting down");
 				if (!cfgSttEnabled.get(session.settings))
@@ -2740,7 +2695,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 			case "login": {
 				const knownProvider = getOAuthProviders().find(p => p.id === command.providerId);
 				if (!knownProvider) {
-					return error(id, "login", `Unknown OAuth provider: ${command.providerId}`);
+					return error(id, "login", `Unknown login provider: ${command.providerId}`);
 				}
 				const uiCtx = new RpcExtensionUIContext(pendingExtensionRequests, output);
 				// Track whether onAuth has fired. Providers that require interactive
@@ -2940,7 +2895,6 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	hostToolBridge.close("RPC client disconnected before host tool execution completed");
 	hostUriBridge.clear("RPC client disconnected before host URI request completed");
 	dictationBridge.dispose();
-	await liveBridge.stop();
 	await inputDispatcher.drain();
 	// A backgrounded builtin (e.g. a /mcp reauth browser wait) must not park
 	// the drain: tear it down now that the client is gone.

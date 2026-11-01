@@ -46,7 +46,26 @@ describe("set_event_filter over RPC", () => {
 		const home = dir.path();
 		await Bun.write(
 			join(home, ".omp/agent/models.yml"),
-			`providers:\n  anthropic:\n    baseUrl: http://127.0.0.1:${server.port}\n    apiKey: test-dummy-key\n`,
+			JSON.stringify({
+				providers: {
+					"rpc-wire": {
+						api: "anthropic-messages",
+						baseUrl: `http://127.0.0.1:${server.port}`,
+						apiKey: "test-dummy-key",
+						models: [
+							{
+								id: model,
+								name: "Private RPC wire fixture",
+								reasoning: false,
+								input: ["text"],
+								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+								contextWindow: 200_000,
+								maxTokens: 8192,
+							},
+						],
+					},
+				},
+			}),
 		);
 		const child = Bun.spawn(
 			[
@@ -59,7 +78,7 @@ describe("set_event_filter over RPC", () => {
 				"--no-skills",
 				"--no-rules",
 				"--provider",
-				"anthropic",
+				"rpc-wire",
 				"--model",
 				model,
 			],

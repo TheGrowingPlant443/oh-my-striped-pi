@@ -1,19 +1,17 @@
 /**
  * Contract: when the SDK supplies provider-shaping options to AgentSession,
  * the advisor `Agent` constructed by `#buildAdvisorRuntime` inherits them so
- * its OpenRouter/OpenAI requests cache and route like the main turn.
+ * its Copilot requests cache and route like the main turn.
  *
  * Regression for can1357/oh-my-pi#3639: before the fix, the advisor was built
  * with only `sessionId`/`getApiKey`/telemetry — it dropped the session's
- * `streamFn` wrapper (so `providers.openrouterVariant` and `loopGuard` never
+ * `streamFn` wrapper (so `loopGuard` never
  * landed on advisor requests), its `promptCacheKey` (so OpenAI Responses
- * fell back to a different cache shard), its shared `providerSessionState`,
- * and its explicit websocket preference.
+ * fell back to a different cache shard), and its shared `providerSessionState`.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { Agent, type StreamFn } from "@oh-my-pi/pi-agent-core";
-import type { Context, FetchImpl, Model, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { streamSimple } from "@oh-my-pi/pi-ai";
+import type { Context, Model, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
 import { resolveApiKeyOnce } from "@oh-my-pi/pi-ai/auth-retry";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
@@ -26,11 +24,7 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgProvidersOpenaiWebsockets } from "@oh-my-pi/pi-coding-agent/session/settings";
-
-/** Provider-facing advisor session ids must be UUIDv7 (issue #5040): Codex writes
- *  them verbatim onto `conversation_id`/`session_id` headers, so `-advisor`
- *  labels stay local-only (telemetry, transcripts). */
+/** Provider-facing advisor session ids remain UUIDv7; advisor labels stay local. */
 const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function metadataSessionId(options: SimpleStreamOptions | undefined): string {
@@ -53,13 +47,13 @@ describe("AgentSession advisor provider-options parity", () => {
 
 	beforeAll(() => {
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		// An isolated discovery cache keeps the bundled catalog authoritative; the
 		// developer's `~/.omp` models.db can drop models these tests select.
 		cacheDir = TempDir.createSync("@pi-advisor-parity-cache-");
 		modelRegistry = new ModelRegistry(authStorage, undefined, { cacheDbPath: cacheDir.join("models.db") });
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
+		const bundled = getBundledModel("github-copilot", "gpt-5.4");
+		if (!bundled) throw new Error("Expected built-in Copilot model to exist");
 		model = bundled;
 	});
 
@@ -75,7 +69,6 @@ describe("AgentSession advisor provider-options parity", () => {
 	const settings = () =>
 		Settings.isolated({
 			"compaction.enabled": false,
-			"providers.openrouterVariant": "floor",
 			"model.loopGuard.enabled": true,
 		});
 
@@ -119,14 +112,12 @@ describe("AgentSession advisor provider-options parity", () => {
 			onSseEvent,
 			transformProviderContext,
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		const advisor = session.getAdvisorAgent();
 		if (!advisor) throw new Error("Expected advisor agent to be live");
 
-		// Flipped after the advisor exists: the websocket hint is read per request.
-		cfgProvidersOpenaiWebsockets.set(session.settings, "on");
 		await advisor.prompt("ping").catch(() => {});
 
 		expect(capturedStreamOptions.length).toBeGreaterThan(0);
@@ -151,7 +142,6 @@ describe("AgentSession advisor provider-options parity", () => {
 		expect(opts.sessionId).toBe(advisor.sessionId);
 		expect(opts.promptCacheKey).toBe(advisor.sessionId);
 		expect(opts.providerSessionState).toBe(session.providerSessionState);
-		expect(opts.preferWebsockets).toBe(true);
 	});
 
 	it("gives each advisor a provider transform of its own, apart from the main loop's", async () => {
@@ -185,7 +175,7 @@ describe("AgentSession advisor provider-options parity", () => {
 			transformProviderContext,
 			createAdvisorTransformProviderContext,
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 		expect(advisorRequests).toHaveLength(2);
 
@@ -198,48 +188,9 @@ describe("AgentSession advisor provider-options parity", () => {
 		expect(mainRequests).toHaveLength(0);
 	});
 
-	it("caps Codex SSE attempts inside each advisor-level retry", async () => {
-		authStorage.keys.setRuntime("openai-codex", "test-key");
-		const capturedStreamOptions: Array<SimpleStreamOptions | undefined> = [];
-		const capturedModels: Model[] = [];
-		let requestCount = 0;
-		const fetchMock: FetchImpl = async () => {
-			requestCount += 1;
-			throw new TypeError("The socket connection was closed unexpectedly");
-		};
-		const captureStreamFn: StreamFn = (requestModel, context, opts) => {
-			capturedModels.push(requestModel);
-			capturedStreamOptions.push(opts);
-			return streamSimple(requestModel, context, { ...opts, preferWebsockets: false, fetch: fetchMock });
-		};
-		const mainAgent = new Agent({
-			initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
-		});
-		session = new AgentSession({
-			agent: mainAgent,
-			sessionManager,
-			settings: settings(),
-			modelRegistry,
-			advisorTools: [],
-			advisorStreamFn: captureStreamFn,
-		});
-		session.settings.setModelRole("advisor", "openai-codex/gpt-5.6-sol");
-		expect(session.setAdvisorEnabled(true)).toBe(true);
-
-		const advisor = session.getAdvisorAgent();
-		if (!advisor) throw new Error("Expected advisor agent to be live");
-		await advisor.prompt("ping").catch(() => {});
-
-		expect(capturedModels[0]?.api).toBe("openai-codex-responses");
-		expect(capturedStreamOptions[0]?.codexSseMaxAttempts).toBe(1);
-		expect(requestCount).toBe(1);
-		expect(advisor.state.error).toContain("socket connection was closed unexpectedly");
-	});
-
 	it("reuses the main agent's providerPromptCacheKey unchanged so tan/shared sessions stay on the parent shard", () => {
-		// Regression for codex-connector review on #3640: when the SDK pins
-		// `agent.promptCacheKey` (tan/shared-session callers do this to share
-		// the parent provider cache while keeping a distinct providerSessionId),
+		// An SDK-pinned cache key shares the parent's provider cache while keeping
+		// a distinct provider session id.
 		// the advisor MUST pass that key through unchanged or it cannot read the
 		// exact shard populated by the parent turn.
 		const parentPromptCacheKey = "tan-parent-cache-key";
@@ -254,7 +205,7 @@ describe("AgentSession advisor provider-options parity", () => {
 			modelRegistry,
 			advisorTools: [],
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		const advisor = session.getAdvisorAgent();
@@ -272,7 +223,7 @@ describe("AgentSession advisor provider-options parity", () => {
 
 	it("propagates the advisor's own provider session id via metadata.user_id, distinct from the main agent", async () => {
 		// Regression for #6625: the separately constructed advisor Agent had no
-		// metadata resolver, so its outbound Anthropic request omitted the
+		// metadata resolver, so its outbound request omitted the
 		// `metadata.user_id` session identity that AgentSession installs for the
 		// main/subagent agents — custom proxies saw advisor traffic with no
 		// stable session id to route or attribute on.
@@ -292,7 +243,7 @@ describe("AgentSession advisor provider-options parity", () => {
 			advisorTools: [],
 			advisorStreamFn: captureStreamFn,
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		const advisor = session.getAdvisorAgent();
@@ -308,9 +259,9 @@ describe("AgentSession advisor provider-options parity", () => {
 		expect(metadataSessionId(opts)).toBe(advisor.sessionId);
 
 		// Distinct from the main agent's session identity (both non-empty).
-		expect(metadataSessionId({ metadata: mainAgent.metadataForProvider("anthropic") })).toBeTruthy();
+		expect(metadataSessionId({ metadata: mainAgent.metadataForProvider("github-copilot") })).toBeTruthy();
 		expect(metadataSessionId(opts)).not.toBe(
-			metadataSessionId({ metadata: mainAgent.metadataForProvider("anthropic") }),
+			metadataSessionId({ metadata: mainAgent.metadataForProvider("github-copilot") }),
 		);
 	});
 
@@ -331,7 +282,7 @@ describe("AgentSession advisor provider-options parity", () => {
 			advisorTools: [],
 			advisorStreamFn: captureStreamFn,
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		const advisor = session.getAdvisorAgent();
@@ -373,7 +324,7 @@ describe("AgentSession advisor provider-options parity", () => {
 			advisorTools: [],
 			advisorStreamFn: captureStreamFn,
 		});
-		session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 
 		const advisor = session.getAdvisorAgent();
@@ -399,7 +350,7 @@ describe("AgentSession advisor provider-options parity", () => {
 		const pooledStorage = createInMemoryAuthStorage();
 		try {
 			await pooledStorage.credentials.set(
-				"anthropic",
+				"github-copilot",
 				["a", "b", "c"].map(suffix => ({
 					type: "oauth" as const,
 					access: `access-${suffix}`,
@@ -407,16 +358,15 @@ describe("AgentSession advisor provider-options parity", () => {
 					expires: Date.now() + 60 * 60_000,
 					accountId: `account-${suffix}`,
 					email: `${suffix}@example.com`,
-					orgId: `org-${suffix}`,
 				})),
 			);
-			pooledStorage.keys.setRuntime("anthropic", "runtime-key");
+			pooledStorage.keys.setRuntime("github-copilot", "runtime-key");
 			const mainAgent = new Agent({
 				initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
 			});
 			const accountPoolScope = new SessionAccountPoolScope(
 				pooledStorage,
-				{ anthropic: ["email:c@example.com|org:org-c"] },
+				{ "github-copilot": ["account:account-c"] },
 				sessionManager.getSessionId(),
 			);
 			session = new AgentSession({
@@ -427,7 +377,7 @@ describe("AgentSession advisor provider-options parity", () => {
 				advisorTools: [],
 				accountPoolScope,
 			});
-			session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+			session.settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 			expect(session.setAdvisorEnabled(true)).toBe(true);
 
 			const advisor = session.getAdvisorAgent();
@@ -437,14 +387,17 @@ describe("AgentSession advisor provider-options parity", () => {
 			if (!getApiKey || !advisorProviderSessionId || !mainProviderSessionId) {
 				throw new Error("Expected advisor resolver and provider session ids");
 			}
-			expect(await resolveApiKeyOnce(await getApiKey(model))).toBe("access-c");
-			expect(await pooledStorage.keys.get("anthropic", advisorProviderSessionId)).toBe("access-c");
-			expect(await pooledStorage.keys.get("anthropic", mainProviderSessionId)).toBe("access-c");
+			// Copilot declares a structured API-key format: the key is the JSON-encoded credential.
+			const accessOf = (apiKey: string | undefined): string | undefined =>
+				apiKey === undefined ? undefined : JSON.parse(apiKey).token;
+			expect(accessOf(await resolveApiKeyOnce(await getApiKey(model)))).toBe("access-c");
+			expect(accessOf(await pooledStorage.keys.get("github-copilot", advisorProviderSessionId))).toBe("access-c");
+			expect(accessOf(await pooledStorage.keys.get("github-copilot", mainProviderSessionId))).toBe("access-c");
 
 			// Dispose lifts the pool from every provider session id the session restricted.
 			await session.dispose();
-			expect(await pooledStorage.keys.get("anthropic", advisorProviderSessionId)).toBe("runtime-key");
-			expect(await pooledStorage.keys.get("anthropic", mainProviderSessionId)).toBe("runtime-key");
+			expect(await pooledStorage.keys.get("github-copilot", advisorProviderSessionId)).toBe("runtime-key");
+			expect(await pooledStorage.keys.get("github-copilot", mainProviderSessionId)).toBe("runtime-key");
 		} finally {
 			await session.dispose();
 			pooledStorage.close();

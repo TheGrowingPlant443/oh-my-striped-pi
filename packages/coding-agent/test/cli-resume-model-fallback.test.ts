@@ -158,7 +158,7 @@ function loopbackModel(id: string) {
 
 describe("headless runtime session switch", () => {
 	/**
-	 * Two loopback providers under an isolated HOME: `local`, whose `local-model`
+	 * Two loopback providers under an isolated HOME: `company-local`, whose `local-model`
 	 * has been renamed to `renamed-model`, and `other`, the settings default.
 	 * Requests are recorded by provider and always fail, ending the turn.
 	 */
@@ -187,8 +187,8 @@ describe("headless runtime session switch", () => {
 			path.join(agentDir, "models.yml"),
 			JSON.stringify({
 				providers: {
-					local: {
-						baseUrl: `${server.url.origin}/local/v1`,
+					"company-local": {
+						baseUrl: `${server.url.origin}/company-local/v1`,
 						api: "openai-completions",
 						auth: "none",
 						models: [loopbackModel("renamed-model")],
@@ -298,14 +298,14 @@ describe("headless runtime session switch", () => {
 
 	test("fails open_session and switch_session on an unrestorable saved model and keeps serving", async () => {
 		await withRpcHost(async ({ requests, writeThread, request }) => {
-			const renamed = await writeThread("renamed", "local/local-model");
-			const current = await writeThread("current", "local/renamed-model");
+			const renamed = await writeThread("renamed", "company-local/local-model");
+			const current = await writeThread("current", "company-local/renamed-model");
 			const before = await request({ id: "state-before", type: "get_state" });
 
 			const opened = await request({ id: "open", type: "open_session", sessionDir: renamed.dir });
-			expect(opened).toMatchObject({ success: false, error: "Could not restore model local/local-model" });
+			expect(opened).toMatchObject({ success: false, error: "Could not restore model company-local/local-model" });
 			const switched = await request({ id: "switch", type: "switch_session", sessionPath: renamed.file });
-			expect(switched).toMatchObject({ success: false, error: "Could not restore model local/local-model" });
+			expect(switched).toMatchObject({ success: false, error: "Could not restore model company-local/local-model" });
 			const after = await request({ id: "state-after", type: "get_state" });
 			expect(after.data).toMatchObject({
 				sessionFile: before.data?.sessionFile,
@@ -318,35 +318,43 @@ describe("headless runtime session switch", () => {
 			const reopened = await request({ id: "open-current", type: "open_session", sessionDir: current.dir });
 			expect(reopened).toMatchObject({ success: true, data: { resumed: true, sessionFile: current.file } });
 			const state = await request({ id: "state-current", type: "get_state" });
-			expect(state.data).toMatchObject({ messageCount: 2, model: { provider: "local", id: "renamed-model" } });
+			expect(state.data).toMatchObject({
+				messageCount: 2,
+				model: { provider: "company-local", id: "renamed-model" },
+			});
 			expect(requests).toEqual([]);
 		});
 	}, 30_000);
 
 	test("binds open_session to an explicit model instead of the unrestorable saved one", async () => {
 		await withRpcHost(async ({ requests, writeThread, request, waitFor }) => {
-			const renamed = await writeThread("renamed", "local/local-model");
+			const renamed = await writeThread("renamed", "company-local/local-model");
 			const base = { type: "open_session", sessionDir: renamed.dir };
 
-			expect(await request({ ...base, id: "partial", provider: "local" })).toMatchObject({
+			expect(await request({ ...base, id: "partial", provider: "company-local" })).toMatchObject({
 				success: false,
 				error: "provider and modelId must be given together",
 			});
-			expect(await request({ ...base, id: "stale", provider: "local", modelId: "local-model" })).toMatchObject({
+			expect(
+				await request({ ...base, id: "stale", provider: "company-local", modelId: "local-model" }),
+			).toMatchObject({
 				success: false,
-				error: "Model not found: local/local-model",
+				error: "Model not found: company-local/local-model",
 			});
-			const opened = await request({ ...base, id: "open", provider: "local", modelId: "renamed-model" });
+			const opened = await request({ ...base, id: "open", provider: "company-local", modelId: "renamed-model" });
 			expect(opened).toMatchObject({
 				success: true,
 				data: { cancelled: false, resumed: true, sessionFile: renamed.file },
 			});
 			const state = await request({ id: "state", type: "get_state" });
-			expect(state.data).toMatchObject({ messageCount: 2, model: { provider: "local", id: "renamed-model" } });
+			expect(state.data).toMatchObject({
+				messageCount: 2,
+				model: { provider: "company-local", id: "renamed-model" },
+			});
 
 			await request({ id: "turn", type: "prompt", message: "What did I ask you to remember?" });
 			await waitFor("agent_end");
-			expect(requests.map(entry => entry.provider)).toEqual(["local"]);
+			expect(requests.map(entry => entry.provider)).toEqual(["company-local"]);
 			expect(requests[0]?.body).toContain("ZEBRA-42");
 		});
 	}, 30_000);

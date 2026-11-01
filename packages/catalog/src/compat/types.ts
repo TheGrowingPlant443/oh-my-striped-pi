@@ -627,6 +627,8 @@ export interface CompiledSeedModel {
 	id: string;
 	name: string;
 	api: Api;
+	int?: number;
+	tps?: number;
 	provider: string;
 	baseUrl: string;
 	reasoning: boolean;

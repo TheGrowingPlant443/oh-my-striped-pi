@@ -6,8 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, registerMockApi, type MockHandler } from "@oh-my-pi/pi-ai/providers/mock";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { createMockModel, type MockHandler } from "@oh-my-pi/pi-ai/providers/mock";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -50,7 +50,6 @@ beforeEach(async () => {
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
 	IrcBus.resetGlobalForTests();
-	registerMockApi(MOCK_API_SOURCE);
 	manager = new AsyncJobManager({ maxRunningJobs: 4 });
 	AsyncJobManager.setInstance(manager);
 });
@@ -109,6 +108,7 @@ async function spawnKeptAliveChild(options?: { handler?: MockHandler; structured
 	authStorage.keys.setRuntime("mock", "test-key");
 	const modelRegistry = new ModelRegistry(authStorage);
 	const mock = createMockModel({
+		provider: "mock",
 		handler:
 			options?.handler ??
 			(context => {
@@ -119,8 +119,12 @@ async function spawnKeptAliveChild(options?: { handler?: MockHandler; structured
 				return { content: [{ type: "toolCall", name: "yield", arguments: { type: "result", data } }] };
 			}),
 	});
-	const catalogAvailable = modelRegistry.getAvailable.bind(modelRegistry);
-	vi.spyOn(modelRegistry, "getAvailable").mockImplementation(kind => [mock, ...catalogAvailable(kind)]);
+	modelRegistry.registerProvider(mock.provider, {
+		api: mock.api,
+		baseUrl: mock.baseUrl,
+		models: [mock],
+	});
+	registerCustomApi(mock.api, mock.stream, MOCK_API_SOURCE);
 
 	const deliveries: string[] = [];
 	const firstDelivery = Promise.withResolvers<string>();

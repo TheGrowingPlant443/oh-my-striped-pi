@@ -17,7 +17,7 @@ const MODEL = buildModel({
 	id: "claude-haiku-5-5",
 	name: "Claude Haiku 5.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: false,
 	input: ["text", "image"],
@@ -44,7 +44,7 @@ function answer(text: string): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: MODEL.id,
 		usage: {
 			input: 0,
@@ -96,11 +96,11 @@ const rejection = (mimeType: string) => `${mimeType} attachments are not support
 
 describe("anthropic media Claude cannot read", () => {
 	it.each(["video/mp4", "application/pdf", "image/heic"])("fails the turn that attached %s", mimeType => {
-		expect(() => convertAnthropicMessages([withAttachment(mimeType)], MODEL, false)).toThrow(rejection(mimeType));
+		expect(() => convertAnthropicMessages([withAttachment(mimeType)], MODEL)).toThrow(rejection(mimeType));
 	});
 
 	it("still sends the image types Claude reads", () => {
-		const params = convertAnthropicMessages([withAttachment("image/jpg")], MODEL, false);
+		const params = convertAnthropicMessages([withAttachment("image/jpg")], MODEL);
 		expect(params.at(-1)?.content).toContainEqual({
 			type: "image",
 			source: { type: "base64", media_type: "image/jpeg", data: "AAAAIGZ0eXBpc29t" },
@@ -111,22 +111,21 @@ describe("anthropic media Claude cannot read", () => {
 		const params = convertAnthropicMessages(
 			[withAttachment("video/mp4"), answer("I can't see a video."), followUp()],
 			MODEL,
-			false,
 		);
 		expect(params[0]?.content).toContainEqual(omitted("video/mp4"));
 	});
 
 	it("fails a guided-goal kickoff that attached HEIC, first turn or later", () => {
-		expect(() => convertAnthropicMessages([kickoffWithAttachment("image/heic")], MODEL, false)).toThrow(
+		expect(() => convertAnthropicMessages([kickoffWithAttachment("image/heic")], MODEL)).toThrow(
 			rejection("image/heic"),
 		);
 		expect(() =>
-			convertAnthropicMessages([followUp(), answer("ok"), kickoffWithAttachment("image/heic")], MODEL, false),
+			convertAnthropicMessages([followUp(), answer("ok"), kickoffWithAttachment("image/heic")], MODEL),
 		).toThrow(rejection("image/heic"));
 	});
 
 	it("still fails the user's turn when a reminder follows it", () => {
-		expect(() => convertAnthropicMessages([withAttachment("image/heic"), reminder()], MODEL, false)).toThrow(
+		expect(() => convertAnthropicMessages([withAttachment("image/heic"), reminder()], MODEL)).toThrow(
 			rejection("image/heic"),
 		);
 	});
@@ -140,12 +139,12 @@ describe("anthropic media Claude cannot read", () => {
 			userInitiated: true,
 			timestamp: clock++,
 		};
-		const params = convertAnthropicMessages([withAttachment("image/heic"), failedReply(), resume], MODEL, false);
+		const params = convertAnthropicMessages([withAttachment("image/heic"), failedReply(), resume], MODEL);
 		expect(params[0]?.content).toContainEqual(omitted("image/heic"));
 	});
 
 	it("never fails a compaction request on an attachment", () => {
-		const params = convertAnthropicMessages([withAttachment("video/mp4")], MODEL, false, {
+		const params = convertAnthropicMessages([withAttachment("video/mp4")], MODEL, {
 			compactionRequest: { filesDueBefore: 0 },
 		});
 		expect(params[0]?.content).toContainEqual(omitted("video/mp4"));
@@ -165,7 +164,7 @@ describe("anthropic media Claude cannot read", () => {
 			isError: false,
 			timestamp: clock++,
 		};
-		const params = convertAnthropicMessages([followUp(), call, result], MODEL, false);
+		const params = convertAnthropicMessages([followUp(), call, result], MODEL);
 		expect(params.at(-1)?.content).toContainEqual(
 			expect.objectContaining({ type: "tool_result", content: [omitted("video/mp4")] }),
 		);

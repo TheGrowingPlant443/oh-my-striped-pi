@@ -14,27 +14,12 @@ import {
 	getStreamIdleTimeoutMs,
 	iterateWithIdleTimeout,
 } from "../utils/idle-iterator";
-import type * as BedrockProvider from "./amazon-bedrock";
-import type * as CursorProvider from "./cursor";
 
 type ProviderStream<TApi extends Api> = (
 	model: Model<TApi>,
 	context: Context,
 	options: OptionsForApi<TApi>,
 ) => AsyncIterable<AssistantMessageEvent>;
-
-let cursorStreamOverride: typeof CursorProvider.streamCursor | undefined;
-let bedrockStreamOverride: typeof BedrockProvider.streamBedrock | undefined;
-
-/** Install a host-supplied Bedrock transport in place of the built-in provider. */
-export function setBedrockProviderModule(module: Pick<typeof BedrockProvider, "streamBedrock">): void {
-	bedrockStreamOverride = module.streamBedrock;
-}
-
-/** Install a host-supplied Cursor transport in place of the built-in provider. */
-export function setCursorProviderModule(module: Pick<typeof CursorProvider, "streamCursor">): void {
-	cursorStreamOverride = module.streamCursor;
-}
 
 // ---------------------------------------------------------------------------
 // Stream forwarding / error helpers
@@ -75,22 +60,8 @@ interface StreamLimits {
 	 */
 	openAIIdleEnvFloorsFirstEvent?: boolean;
 }
-/**
- * Cloud Code Assist owns first-event detection because Antigravity can return
- * successful headers and then never emit an SSE event. Keeping the watchdog in
- * the provider lets it fail over before surfacing an error; the shared wrapper
- * still catches post-first-event stalls.
- */
-const GOOGLE_GEMINI_CLI_STREAM_LIMITS: StreamLimits = {
-	providerHandlesFirstEventTimeouts: true,
-};
-
 const PROVIDER_HANDLED_STREAM_TIMEOUTS: StreamLimits = {
 	providerHandlesStreamTimeouts: true,
-};
-
-const OPENAI_IDLE_FLOORED_STREAM_LIMITS: StreamLimits = {
-	openAIIdleEnvFloorsFirstEvent: true,
 };
 
 function forwardStream<TApi extends Api>(
@@ -239,39 +210,6 @@ export const streamAnthropic = createLazyProviderStream(
 	PROVIDER_HANDLED_STREAM_TIMEOUTS,
 );
 
-/** Stream Azure Responses with provider-owned timeout handling. */
-export const streamAzureOpenAIResponses = createLazyProviderStream(
-	() => import("./azure-openai-responses"),
-	mod => mod.streamAzureOpenAIResponses,
-	PROVIDER_HANDLED_STREAM_TIMEOUTS,
-);
-
-/** Stream Google's direct API through the shared watchdog. */
-export const streamGoogle = createLazyProviderStream(
-	() => import("./google"),
-	mod => mod.streamGoogle,
-);
-
-/** Stream Cloud Code Assist while retaining its first-event watchdog. */
-export const streamGoogleGeminiCli = createLazyProviderStream(
-	() => import("./google-gemini-cli"),
-	mod => mod.streamGoogleGeminiCli,
-	GOOGLE_GEMINI_CLI_STREAM_LIMITS,
-);
-
-/** Stream the Vertex API through the shared watchdog. */
-export const streamGoogleVertex = createLazyProviderStream(
-	() => import("./google-vertex"),
-	mod => mod.streamGoogleVertex,
-);
-
-/** Stream Codex with provider-owned timeout handling. */
-export const streamOpenAICodexResponses = createLazyProviderStream(
-	() => import("./openai-codex-responses"),
-	mod => mod.streamOpenAICodexResponses,
-	PROVIDER_HANDLED_STREAM_TIMEOUTS,
-);
-
 /** Stream Chat Completions with provider-owned timeout handling. */
 export const streamOpenAICompletions = createLazyProviderStream(
 	() => import("./openai-completions"),
@@ -286,37 +224,15 @@ export const streamOpenAIResponses = createLazyProviderStream(
 	PROVIDER_HANDLED_STREAM_TIMEOUTS,
 );
 
-/** Stream through the host Cursor transport when installed, otherwise the built-in transport. */
-export const streamCursor = createLazyProviderStream(
-	() => import("./cursor"),
-	(builtin): ProviderStream<"cursor-agent"> =>
-		(model, context, options) =>
-			(cursorStreamOverride ?? builtin.streamCursor)(model, context, options),
-);
-
-/** Stream Devin through the shared watchdog. */
-export const streamDevin = createLazyProviderStream(
-	() => import("./devin"),
-	mod => mod.streamDevin,
-);
-
-/** Stream Apple's on-device Foundation Model through the shared watchdog. */
-export const streamAppleFoundationModels = createLazyProviderStream(
-	() => import("./apple-foundation-models"),
-	mod => mod.streamAppleFoundationModels,
-);
-
-/** Stream Ollama with OpenAI-compatible idle timeout precedence. */
+/** Stream the native Ollama protocol with the local-server watchdog defaults. */
 export const streamOllama = createLazyProviderStream(
 	() => import("./ollama"),
 	mod => mod.streamOllama,
-	OPENAI_IDLE_FLOORED_STREAM_LIMITS,
+	{ openAIIdleEnvFloorsFirstEvent: true },
 );
 
-/** Stream through the host Bedrock transport when installed, otherwise the built-in transport. */
-export const streamBedrock = createLazyProviderStream(
-	() => import("./amazon-bedrock"),
-	(builtin): ProviderStream<"bedrock-converse-stream"> =>
-		(model, context, options) =>
-			(bedrockStreamOverride ?? builtin.streamBedrock)(model, context, options),
+/** Stream Apple's in-process on-device Foundation Models bridge. */
+export const streamAppleFoundationModels = createLazyProviderStream(
+	() => import("./apple-foundation-models"),
+	mod => mod.streamAppleFoundationModels,
 );

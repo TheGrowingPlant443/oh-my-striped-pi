@@ -16,7 +16,7 @@ export * from "./proxy";
 export * from "./replay-policy";
 // Run-level telemetry collector + aggregators
 export * from "./run-collector";
-// Tool definitions remembered for Anthropic inactive-tool re-declaration
+// Tool definitions remembered for inactive-tool re-declaration
 export * from "./sent-tool-definitions";
 // Speculative execution coordinator
 export * from "./speculative-execution";

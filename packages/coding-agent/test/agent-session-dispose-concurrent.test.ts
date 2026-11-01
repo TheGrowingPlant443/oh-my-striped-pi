@@ -6,7 +6,6 @@ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
 import { MnemopiSessionState, setMnemopiSessionState } from "@oh-my-pi/pi-coding-agent/mnemopi/state";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
@@ -28,7 +27,7 @@ describe("AgentSession concurrent disposal", () => {
 	beforeEach(() => {
 		tempDir = TempDir.createSync("@omp-dispose-concurrent-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -46,7 +45,7 @@ describe("AgentSession concurrent disposal", () => {
 		ownedAsyncJobManager?: AsyncJobManager,
 		options?: { agentId?: string; asyncJobManager?: AsyncJobManager },
 	): AgentSession {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!model) throw new Error("expected bundled model");
 		const mock = createMockModel({ handler: () => ({ content: ["ok"] }) });
 		const agent = new Agent({
@@ -143,7 +142,6 @@ describe("AgentSession concurrent disposal", () => {
 	it("starts independent writers together and closes persistence after their barrier", async () => {
 		const owned = new AsyncJobManager({ maxRunningJobs: 1, retentionMs: 1_000, onJobComplete: () => {} });
 		const asyncGate = Promise.withResolvers<void>();
-		const hindsightGate = Promise.withResolvers<void>();
 		const mnemopiGate = Promise.withResolvers<void>();
 		const asyncStarted = Promise.withResolvers<void>();
 		const order: string[] = [];
@@ -156,14 +154,6 @@ describe("AgentSession concurrent disposal", () => {
 		});
 
 		const current = createSession(owned);
-		const hindsight: HindsightSessionState = Object.create(HindsightSessionState.prototype);
-		vi.spyOn(hindsight, "flushRetainQueue").mockImplementation(async () => {
-			order.push("hindsight:start");
-			await hindsightGate.promise;
-			order.push("hindsight:end");
-		});
-		vi.spyOn(hindsight, "dispose").mockImplementation(() => {});
-		current.setHindsightSessionState(hindsight);
 
 		const mnemopi: MnemopiSessionState = Object.create(MnemopiSessionState.prototype);
 		vi.spyOn(mnemopi, "dispose").mockImplementation(async () => {
@@ -183,15 +173,12 @@ describe("AgentSession concurrent disposal", () => {
 		try {
 			await asyncStarted.promise;
 			await Promise.resolve();
-			expect(order).toContain("hindsight:start");
 			expect(order).toContain("mnemopi:start");
 			expect(order).not.toContain("async:end");
-			expect(order).not.toContain("hindsight:end");
 			expect(order).not.toContain("mnemopi:end");
 			expect(persistenceClosed).toBe(false);
 		} finally {
 			asyncGate.resolve();
-			hindsightGate.resolve();
 			mnemopiGate.resolve();
 		}
 		await dispose;
@@ -199,7 +186,6 @@ describe("AgentSession concurrent disposal", () => {
 
 		const closeAt = order.indexOf("session:close");
 		expect(closeAt).toBeGreaterThan(order.indexOf("async:end"));
-		expect(closeAt).toBeGreaterThan(order.indexOf("hindsight:end"));
 		expect(closeAt).toBeGreaterThan(order.indexOf("mnemopi:end"));
 	});
 

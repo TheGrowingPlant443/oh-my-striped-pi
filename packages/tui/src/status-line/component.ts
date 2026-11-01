@@ -1,10 +1,6 @@
 import * as path from "node:path";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, UsageLimit, UsageReport } from "@oh-my-pi/pi-ai";
-import {
-	getAntigravityCounterKeyForModel,
-	scopeAntigravityLimitsForModel,
-} from "@oh-my-pi/pi-ai/usage/google-antigravity";
 import { getNextTimeBasedPricingTransition } from "@oh-my-pi/pi-catalog/models";
 import type { Model, ModelCost } from "@oh-my-pi/pi-catalog/types";
 import type { VcsGitRepo, VcsRepo } from "@oh-my-pi/pi-natives";
@@ -30,13 +26,7 @@ import { getSessionAccentAnsi, getSessionAccentHex } from "../theme/session-colo
 import { sanitizeHookStatusText, sanitizeStatusText } from "../chrome/shared";
 import { getThemeEpoch, theme } from "../theme";
 import { type CompactionBoundaries, EMPTY_STRING_PARTS, getToolSchemaMetadataRevision } from "./context-usage";
-import {
-	type CodexResetFireworksEvent,
-	type CodexResetUsageSnapshot,
-	detectCodexResetFireworks,
-} from "../overlays/codex-reset-fireworks";
 import { canReuseCachedPr, createPrCacheContext, isSamePrCacheContext, type PrCacheContext } from "./git-utils";
-import { summarizeUsageResetCredits } from "../overlays/usage-display";
 import { getPreset } from "./presets";
 import { describeSegment, renderSegment, type SegmentContext } from "./segments";
 import type { TspMeterMark, TspProps } from "@oh-my-pi/pi-wire";
@@ -57,7 +47,6 @@ import type {
 	StatusLineSegmentOptions,
 	StatusLineSeparatorStyle,
 	StatusLineSettings,
-	StatusResetExpiry,
 } from "./types";
 
 /** Sparkline cells the ANSI jobs segment draws after the freshest widget's headline. */
@@ -163,22 +152,9 @@ const BRAND_FADE_FRAME_MS = 40;
  * no other component is requesting renders. */
 const ACTIVE_WINDOW_REPAINT_MS = 250;
 
-/**
- * Providers whose subscription quota is a single monthly bucket, so their
- * `monthly`/`30d` window is the one the usage segment must show. Providers that
- * merely report a monthly side-counter (GitHub Copilot's premium requests) stay
- * out: their monthly row is not the session quota.
- */
-const MONTHLY_SUBSCRIPTION_PROVIDERS: Record<string, true> = {
-	"alibaba-token-plan": true,
-	cursor: true,
-	"opencode-go": true,
-};
-
 /** A displayable limit after provider, account, model, and window filtering. */
 interface UsageWindowCandidate {
-	id?: string;
-	windowClass: "5h" | "daily" | "7d" | "monthly";
+	windowClass: "5h" | "daily" | "7d";
 	fraction: number;
 	resetsAt?: number;
 }
@@ -192,32 +168,6 @@ interface UsageScopeGroup {
 
 function normalizeUsageScopeValue(value: unknown): string | undefined {
 	return typeof value === "string" && value.trim() ? value.trim().toLowerCase() : undefined;
-}
-
-/**
- * Fireworks are stateful, so their report match must be stricter than the
- * status display's fallback matching: every known credential identifier must
- * be present and equal or a workspace sibling can mutate this account's
- * baseline.
- */
-function reportMatchesExactIdentity(report: UsageReport, identity: OAuthAccountIdentity | undefined): boolean {
-	if (!identity) return false;
-	const accountId = normalizeUsageScopeValue(identity.accountId);
-	const email = normalizeUsageScopeValue(identity.email);
-	const projectId = normalizeUsageScopeValue(identity.projectId);
-	const orgId = normalizeUsageScopeValue(identity.orgId);
-	if (!accountId && !email && !projectId && !orgId) return false;
-
-	const metadata = report.metadata ?? {};
-	const reportAccountId =
-		normalizeUsageScopeValue(metadata.accountId) ?? normalizeUsageScopeValue(metadata.account_id);
-	const reportProjectId =
-		normalizeUsageScopeValue(metadata.projectId) ?? normalizeUsageScopeValue(metadata.project_id);
-	if (accountId && reportAccountId !== accountId) return false;
-	if (email && normalizeUsageScopeValue(metadata.email) !== email) return false;
-	if (projectId && reportProjectId !== projectId) return false;
-	if (orgId && normalizeUsageScopeValue(metadata.orgId) !== orgId) return false;
-	return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -448,7 +398,6 @@ class StatusLineExternalInputs {
 	isStreaming: boolean | undefined = undefined;
 	isAutoThinking: boolean | undefined = undefined;
 	isFastModeActive = false;
-	anthropicSlowModeLabel: string | undefined = undefined;
 	compactionSpeculation: unknown = undefined;
 	/** The freshest running job widget's view (stable identity while its data is unchanged). */
 	jobWidgetRef: unknown = undefined;
@@ -755,7 +704,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	 */
 	#vibeWorkerTokenRate: (() => number | null) | null = null;
 	#collabStatus: CollabStatus | null = null;
-	#streamStatus: { viewers: number } | null = null;
 	#recording = false;
 	#focusedAgentId: string | undefined;
 	#activeRepoCache: ActiveRepoCache | undefined;
@@ -799,15 +747,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		fiveHour?: { percent: number; resetMinutes?: number };
 		daily?: { percent: number; resetMinutes?: number };
 		sevenDay?: { percent: number; resetHours?: number };
-		monthly?: { percent: number; resetHours?: number };
-		resetCredits?: {
-			bankedCount: number;
-			redeemableCount: number;
-			expiryHours?: number;
-			expired?: boolean;
-			unavailableReason?: string;
-			expiring?: StatusResetExpiry;
-		};
 	} | null = null;
 	#cachedUsageContextKey: string | null = null;
 	#usageFetchedAt = 0;
@@ -817,9 +756,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	// until a newer request has applied.
 	#usageRefreshSequence = 0;
 	#latestAppliedUsageRefreshSequence = 0;
-	#codexResetSnapshots = new Map<string, CodexResetUsageSnapshot>();
-	#onCodexResetFireworks: ((event: CodexResetFireworksEvent) => void) | undefined;
-	#onResetExpiryNotice: ((notice: string) => void) | undefined;
 	// Context-usage memo. The status line redraws on every agent event, so the
 	// hot path must not recompute context tokens unless an input changed.
 	// `getContextUsage()` anchors on the last assistant's real prompt-token
@@ -1016,7 +952,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	 */
 	setSubagentHubHint(_hint: string | undefined): void {}
 
-	/** Active subagent count as currently displayed (collab state mirroring). */
+	/** Active subagent count as currently displayed. */
 	get subagentCount(): number {
 		return this.#subagentCount;
 	}
@@ -1039,7 +975,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	/**
 	 * Reset the currently-attached session's active-time accumulators so
 	 * the `time_spent` segment starts from zero. Called from `/clear`,
-	 * fresh-session, and joined-collab paths; both the completed
+	 * and fresh-session paths; both the completed
 	 * accumulator and any in-flight window are dropped, so a reset
 	 * mid-turn ignores the running window (the matching `markActivityEnd`
 	 * will see an idle meter and no-op).
@@ -1217,27 +1153,11 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		this.#invalidateStatusLineRenderCache();
 	}
 
-	setStreamStatus(status: { viewers: number } | null): void {
-		if (this.#streamStatus?.viewers === status?.viewers) return;
-		this.#streamStatus = status;
-		this.#invalidateStatusLineRenderCache();
-	}
-
 	/** Toggle the `● REC` badge shown while `/record` captures the screen. */
 	setRecording(recording: boolean): void {
 		if (this.#recording === recording) return;
 		this.#recording = recording;
 		this.#invalidateStatusLineRenderCache();
-	}
-
-	/** Set the callback that presents detected Codex reset celebrations, or clear it with `undefined`. */
-	setCodexResetFireworksHandler(handler: ((event: CodexResetFireworksEvent) => void) | undefined): void {
-		this.#onCodexResetFireworks = handler;
-	}
-
-	/** Set the callback that presents pool-wide saved-reset expiry warnings, or clear it with `undefined`. */
-	setResetExpiryNoticeHandler(handler: ((notice: string) => void) | undefined): void {
-		this.#onResetExpiryNotice = handler;
 	}
 
 	setHookStatus(key: string, text: string | undefined): void {
@@ -1311,9 +1231,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		this.#clearUsageStartTimer();
 		this.#unwatchNativeRendering?.();
 		this.#unwatchNativeRendering = undefined;
-		this.#onCodexResetFireworks = undefined;
-		this.#onResetExpiryNotice = undefined;
-		this.#codexResetSnapshots.clear();
 		this.#retireGitWatcher();
 	}
 
@@ -2096,8 +2013,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			modelId: activeModelId,
 			identity: activeIdentity,
 		});
-		const resetSnapshot =
-			activeProvider === "openai-codex" ? this.#normalizeCodexResetSnapshot(reports, activeIdentity) : null;
 		const usageChanged = this.#cachedUsage !== normalized;
 		this.#cachedUsage = normalized;
 		this.#usageFetchedAt = Date.now();
@@ -2107,37 +2022,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			this.#invalidateStatusLineRenderCache();
 			this.#onBranchChange?.();
 		}
-		this.#noticeResetExpiry(session, reports);
-		if (!resetSnapshot) return;
-		const contextKey = this.#formatUsageContextKey(activeProvider, activeIdentity);
-		const previous = this.#codexResetSnapshots.get(contextKey);
-		this.#codexResetSnapshots.set(contextKey, resetSnapshot);
-		if (!previous || !this.host.codexResetFireworksEnabled()) return;
-		const event = detectCodexResetFireworks(previous, resetSnapshot);
-		if (event) this.#onCodexResetFireworks?.(event);
-	}
-
-	#noticeResetExpiry(session: TSession, reports: unknown): void {
-		// A focused subagent's view is not a conversation the user started; leave the warning for their own.
-		if (
-			this.#focusedAgentId !== undefined ||
-			!this.#onResetExpiryNotice ||
-			!this.host.resetExpiryNotice ||
-			!Array.isArray(reports)
-		) {
-			return;
-		}
-		// fetchUsageReports supplies normalized rows; keep only entries shaped like reports.
-		const usageReports = reports.filter(
-			(report): report is UsageReport =>
-				!!report &&
-				typeof report === "object" &&
-				"provider" in report &&
-				"limits" in report &&
-				Array.isArray(report.limits),
-		);
-		const notice = this.host.resetExpiryNotice(session, usageReports, Date.now());
-		if (notice) this.#onResetExpiryNotice(notice);
 	}
 
 	#observeLateUsageRefresh(session: TSession, reportsPromise: Promise<unknown>, sequence: number): void {
@@ -2165,72 +2049,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		}
 	}
 
-	#normalizeCodexResetSnapshot(
-		reports: unknown,
-		activeIdentity: OAuthAccountIdentity | undefined,
-	): CodexResetUsageSnapshot | null {
-		if (!Array.isArray(reports)) return null;
-		let matchingReport: UsageReport | undefined;
-		for (const report of reports) {
-			if (!report || typeof report !== "object") continue;
-			if (
-				!("provider" in report) ||
-				report.provider !== "openai-codex" ||
-				!("limits" in report) ||
-				!Array.isArray(report.limits)
-			) {
-				continue;
-			}
-			// The report boundary above validates the fields this extractor iterates;
-			// optional metadata and credit fields are narrowed again before use.
-			const usageReport = report as UsageReport;
-			if (!reportMatchesExactIdentity(usageReport, activeIdentity)) continue;
-			matchingReport = usageReport;
-			break;
-		}
-		if (!matchingReport) return null;
-
-		const plan =
-			typeof matchingReport.metadata?.planType === "string" && matchingReport.metadata.planType
-				? matchingReport.metadata.planType
-				: undefined;
-		let sevenDay: CodexResetUsageSnapshot["sevenDay"];
-		let sevenDayTier: string | undefined;
-		for (const limit of matchingReport.limits) {
-			if (!limit || typeof limit !== "object") continue;
-			const candidate = limit as {
-				scope?: { windowId?: string; tier?: string };
-				window?: { resetsAt?: number };
-				amount?: { usedFraction?: number };
-			};
-			const fraction = candidate.amount?.usedFraction;
-			if (candidate.scope?.windowId !== "7d" || typeof fraction !== "number" || !Number.isFinite(fraction)) {
-				continue;
-			}
-			const tier =
-				typeof candidate.scope?.tier === "string" && candidate.scope.tier ? candidate.scope.tier : undefined;
-			if (sevenDay && (sevenDayTier === undefined || tier)) continue;
-			const resetsAt = candidate.window?.resetsAt;
-			sevenDay = {
-				percent: fraction * 100,
-				resetsAt: typeof resetsAt === "number" && Number.isFinite(resetsAt) ? resetsAt : undefined,
-				tier,
-				plan,
-			};
-			sevenDayTier = tier;
-		}
-
-		const fetchedAt = matchingReport.fetchedAt;
-		const availableCount = matchingReport.resetCredits?.availableCount;
-		const observedAt = typeof fetchedAt === "number" && Number.isFinite(fetchedAt) ? fetchedAt : undefined;
-		const savedResets =
-			typeof availableCount === "number" && Number.isFinite(availableCount)
-				? Math.max(0, Math.trunc(availableCount))
-				: undefined;
-		if (!sevenDay && savedResets === undefined) return null;
-		return { observedAt, sevenDay, savedResets };
-	}
-
 	#normalizeUsageReports(
 		reports: unknown,
 		context: { provider?: string; modelId?: string; identity?: OAuthAccountIdentity },
@@ -2239,24 +2057,10 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		fiveHour?: { percent: number; resetMinutes?: number };
 		daily?: { percent: number; resetMinutes?: number };
 		sevenDay?: { percent: number; resetHours?: number };
-		monthly?: { percent: number; resetHours?: number };
-		resetCredits?: {
-			bankedCount: number;
-			redeemableCount: number;
-			expiryHours?: number;
-			expired?: boolean;
-			unavailableReason?: string;
-			expiring?: StatusResetExpiry;
-		};
 	} | null {
 		if (!Array.isArray(reports)) return null;
 		const now = Date.now();
-		const resetReports: UsageReport[] = [];
 		const activeModelId = normalizeUsageScopeValue(context.modelId);
-		const activeAntigravityCounter =
-			context.provider === "google-antigravity" ? getAntigravityCounterKeyForModel(context.modelId) : undefined;
-		const monthlySubscriptionProvider =
-			context.provider !== undefined && MONTHLY_SUBSCRIPTION_PROVIDERS[context.provider] === true;
 		const scopeGroups = new Map<string, UsageScopeGroup>();
 		for (const report of reports) {
 			if (!report || typeof report !== "object") continue;
@@ -2267,16 +2071,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			// fetchUsageReports supplies normalized rows; the guards above protect
 			// the unknown session boundary before the account matcher reads metadata.
 			const usageReport = report as UsageReport;
-			if (
-				usageReport.resetCredits &&
-				(!context.identity || reportMatchesExactIdentity(usageReport, context.identity))
-			) {
-				resetReports.push(usageReport);
-			}
-			const limits =
-				provider === "google-antigravity" && activeAntigravityCounter
-					? scopeAntigravityLimitsForModel(usageReport, context)
-					: reportLimits;
+			const limits = reportLimits;
 			for (const limit of limits) {
 				if (
 					!limit ||
@@ -2317,17 +2112,14 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 									: durationMs !== undefined && Math.abs(durationMs - 7 * 86_400_000) <= 60_000
 										? "7d"
 										: undefined;
-				const windowClass =
-					subscriptionWindow ??
-					(monthlySubscriptionProvider && (windowId === "monthly" || windowId === "30d") ? "monthly" : undefined);
+				const windowClass = subscriptionWindow;
 				if (!windowClass) continue;
 
 				const modelId = normalizeUsageScopeValue("modelId" in scope ? scope.modelId : undefined);
 				if (modelId && modelId !== activeModelId) continue;
 				const rawTier = "tier" in scope ? scope.tier : undefined;
 				const rawPlanType = usageReport.metadata?.planType;
-				// Scoped tiers (Claude Fable, Codex Spark) win; plan-wide tiers
-				// (Z.AI `pro`, Codex `pro`) label otherwise-untiered windows.
+				// Scoped tiers override the account's plan label.
 				const tier =
 					(typeof rawTier === "string" && rawTier.trim() ? rawTier.trim() : undefined) ??
 					(typeof rawPlanType === "string" && rawPlanType.trim() ? rawPlanType.trim() : undefined);
@@ -2336,10 +2128,8 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 				// Exact-model groups outrank provider-wide groups; within either
 				// specificity, untiered limits preserve the historical preference.
 				const priority = modelId ? (normalizedTier ? 1 : 0) : normalizedTier ? 3 : 2;
-				const id = "id" in limit && typeof limit.id === "string" ? limit.id : undefined;
 				const resetValue = window && "resetsAt" in window ? window.resetsAt : undefined;
 				const displayCandidate: UsageWindowCandidate = {
-					id,
 					windowClass,
 					fraction,
 					resetsAt: typeof resetValue === "number" ? resetValue : undefined,
@@ -2357,52 +2147,11 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		for (const group of scopeGroups.values()) {
 			if (!selectedGroup || group.priority < selectedGroup.priority) selectedGroup = group;
 		}
-		const resetReport =
-			resetReports.length === 1
-				? resetReports[0]
-				: context.identity
-					? resetReports.find(report => reportMatchesExactIdentity(report, context.identity))
-					: undefined;
-		const resetSummary = summarizeUsageResetCredits(resetReport?.resetCredits, now);
-		const expiring =
-			resetSummary && resetSummary.bankedCount > 0 && resetReport
-				? this.host.classifyResetExpiry?.(resetReport, now)
-				: undefined;
-		// The highlighted countdown is the warned reset's, not an earlier one that is not worth warning about.
-		const resetExpiryMs = expiring
-			? expiring.expiresAtMs - now
-			: resetSummary?.soonestExpiry
-				? Date.parse(resetSummary.soonestExpiry) - now
-				: undefined;
-		const resetCredits =
-			resetSummary && resetSummary.bankedCount > 0
-				? {
-						bankedCount: resetSummary.bankedCount,
-						redeemableCount: resetSummary.redeemableCount,
-						expiryHours:
-							resetExpiryMs !== undefined && resetExpiryMs > 0
-								? Math.max(1, Math.ceil(resetExpiryMs / 3_600_000))
-								: undefined,
-						expired: resetExpiryMs !== undefined && resetExpiryMs <= 0,
-						unavailableReason: resetSummary.unavailableReason,
-						expiring,
-					}
-				: undefined;
-		if (!selectedGroup) return resetCredits ? { resetCredits } : null;
+		if (!selectedGroup) return null;
 
 		let fiveHour: { percent: number; resetMinutes?: number } | undefined;
 		let daily: { percent: number; resetMinutes?: number } | undefined;
 		let sevenDay: { percent: number; resetHours?: number } | undefined;
-		let monthly: { percent: number; resetHours?: number } | undefined;
-		let monthlyPriority = Number.POSITIVE_INFINITY;
-		const cursorMonthlyPriority = (limitId: unknown): number => {
-			// When /auth/usage and /api/usage-summary are merged, prefer the personal
-			// dashboard rails over legacy per-model request fractions.
-			if (limitId === "cursor:usd:individual-auto") return 0;
-			if (limitId === "cursor:usd:individual-plan" || limitId === "cursor:usd:individual-overall") return 1;
-			if (typeof limitId === "string" && limitId.startsWith("cursor:usd:individual-")) return 2;
-			return 3;
-		};
 		for (const candidate of selectedGroup.candidates) {
 			if (candidate.windowClass === "5h" && !fiveHour) {
 				fiveHour = {
@@ -2431,22 +2180,9 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 							: undefined,
 				};
 			}
-			if (candidate.windowClass === "monthly") {
-				const priority = cursorMonthlyPriority(candidate.id);
-				if (priority < monthlyPriority) {
-					monthly = {
-						percent: candidate.fraction * 100,
-						resetHours:
-							typeof candidate.resetsAt === "number"
-								? Math.max(0, Math.round((candidate.resetsAt - now) / 3_600_000))
-								: undefined,
-					};
-					monthlyPriority = priority;
-				}
-			}
 		}
-		if (!fiveHour && !daily && !sevenDay && !monthly && !resetCredits) return null;
-		return { tier: selectedGroup.tier, fiveHour, daily, sevenDay, monthly, resetCredits };
+		if (!fiveHour && !daily && !sevenDay) return null;
+		return { tier: selectedGroup.tier, fiveHour, daily, sevenDay };
 	}
 
 	/**
@@ -2457,7 +2193,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 	 * last assistant's real prompt-token count — so the bar matches the provider
 	 * and the `/context` panel — and reports `null` while that count is unknown
 	 * (right after compaction, before the next response). Exposed (non-private)
-	 * for unit tests and the collab host's state broadcast.
+	 * for unit tests.
 	 */
 	getCachedContextBreakdown(): { usedTokens: number; contextWindow: number } {
 		const messages = this.session.messages ?? EMPTY_MESSAGES;
@@ -2612,7 +2348,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			vibeMode: this.#vibeModeStatus,
 			vim: this.#vimStatus,
 			collab: this.#collabStatus,
-			stream: this.#streamStatus,
 			recording: this.#recording,
 			usageStats,
 			contextPercent,
@@ -2793,10 +2528,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 		target.isAutoThinking = this.session.isAutoThinking;
 		target.isFastModeActive =
 			typeof this.session.isFastModeActive === "function" ? this.session.isFastModeActive() : false;
-		target.anthropicSlowModeLabel =
-			typeof this.session.getAnthropicSlowModeLabel === "function"
-				? this.session.getAnthropicSlowModeLabel()
-				: undefined;
 		target.compactionSpeculation = this.session.compactionSpeculation;
 		target.jobWidgetRef = this.#latestJobWidget()?.view;
 	}
@@ -2857,7 +2588,6 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 			left.isStreaming === right.isStreaming &&
 			left.isAutoThinking === right.isAutoThinking &&
 			left.isFastModeActive === right.isFastModeActive &&
-			left.anthropicSlowModeLabel === right.anthropicSlowModeLabel &&
 			left.compactionSpeculation === right.compactionSpeculation &&
 			left.jobWidgetRef === right.jobWidgetRef
 		);
@@ -3188,7 +2918,7 @@ export class StatusLineComponent<TSession extends StatusLineSession = StatusLine
 				// Preserve the current working directory as long as possible. The
 				// previous right-to-left pop could collapse a normal-width bar to
 				// just the model segment, hiding the path before less-critical left
-				// segments such as model/mode/collab were removed.
+				// segments such as model/mode were removed.
 				for (let i = leftSegIds.length - 1; i >= 0; i--) {
 					if (leftSegIds[i] !== "path") return i;
 				}

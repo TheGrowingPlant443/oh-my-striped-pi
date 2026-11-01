@@ -1,14 +1,36 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import { Agent, type StreamFn, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Context, FetchImpl, Message, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
+import {
+	type Context,
+	Effort,
+	type FetchImpl,
+	type Message,
+	type Model,
+	type ProviderSessionState,
+} from "@oh-my-pi/pi-ai";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 
-const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+const responseSpec: ModelSpec<"openai-responses"> = {
+	id: "company-responses",
+	name: "Company Responses",
+	provider: "company-responses",
+	api: "openai-responses",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	compat: { supportsStrictMode: true },
+};
+const model = buildModel(responseSpec);
 
 function response(id: string): Response {
 	const events = [
@@ -107,7 +129,7 @@ describe("one-shot side request state", () => {
 		};
 		const mainReply = await streamOpenAIResponses(model, mainContext, mainOptions).result();
 		const sideReply = await session.runEphemeralTurn({ promptText: "Side question", conversationKey: "topic" });
-		const state = session.providerSessionState.get("openai-responses:openai") as ResponsesState;
+		const state = session.providerSessionState.get(`openai-responses:${model.provider}`) as ResponsesState;
 		expect(state.chains.size).toBe(2);
 		expect((await session.runEphemeralTurn({ promptText: "One-shot question" })).replyText).toBe("Answer");
 		expect(state.chains.size).toBe(2);
@@ -156,7 +178,7 @@ describe("one-shot side request state", () => {
 		try {
 			await entered.promise;
 			expect((await session.runEphemeralTurn({ promptText: "Fast question" })).replyText).toBe("Answer");
-			const state = session.providerSessionState.get("openai-responses:openai") as ResponsesState;
+			const state = session.providerSessionState.get(`openai-responses:${model.provider}`) as ResponsesState;
 			expect(state.chains.size).toBe(1);
 			finish.resolve();
 			expect((await pending).replyText).toBe("Answer");
@@ -206,7 +228,7 @@ describe("one-shot side request state", () => {
 			expect((await session.runEphemeralTurn({ promptText })).replyText).toBe("Answer");
 		}
 		expect(strictFlags).toEqual([true, undefined, undefined]);
-		const state = session.providerSessionState.get("openai-responses:openai") as ResponsesState;
+		const state = session.providerSessionState.get(`openai-responses:${model.provider}`) as ResponsesState;
 		expect(state.chains.size).toBe(0);
 	});
 
@@ -249,12 +271,16 @@ describe("one-shot side request state", () => {
 		await expect(turn).rejects.toThrow(
 			failure === "transport error" ? "Invalid side request" : failure === "abort" ? /abort/i : "Delivery failed",
 		);
-		const state = session.providerSessionState.get("openai-responses:openai") as ResponsesState;
+		const state = session.providerSessionState.get(`openai-responses:${model.provider}`) as ResponsesState;
 		expect(state.chains.size).toBe(0);
 	});
 
 	it("replays the main conversation's effort updates on side requests and minimizes effort as one more update", async () => {
-		const astra = getBundledModel("openai", "gpt-6-astra") as Model<"openai-responses">;
+		const astra = buildModel({
+			...responseSpec,
+			id: "company-effort-updates",
+			compat: { ...responseSpec.compat, supportsConfigurationUpdate: true },
+		});
 		const bodies: ResponsesRequest[] = [];
 		const fetch: FetchImpl = async (_url, init) => {
 			bodies.push(responsesRequest.assert(JSON.parse(String(init?.body))));

@@ -1,35 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import { convertCodexResponsesMessages } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import type { ResponseInput } from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
 import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
 import type { Context, Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
 const genericModel = buildModel({
-	id: "moonshotai/kimi-k3",
-	name: "Kimi K3",
+	id: "gpt-4o",
+	name: "GPT-4o",
 	api: "openai-responses",
-	provider: "openrouter",
-	baseUrl: "https://openrouter.ai/api/v1",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text", "image"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 128_000,
 	maxTokens: 16_000,
-});
-
-const codexModel = buildModel({
-	id: "gpt-5.5",
-	name: "Codex Test",
-	api: "openai-codex-responses",
-	provider: "openai-codex",
-	baseUrl: "https://chatgpt.com/backend-api/codex/responses",
-	reasoning: true,
-	input: ["text", "image"],
-	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 200_000,
-	maxTokens: 100_000,
-	compat: { supportsImageDetailOriginal: true },
 });
 
 const zeroUsage = {
@@ -129,12 +114,6 @@ describe("parallel Responses tool-result images", () => {
 			strictResponsesPairing: true,
 			supportsImageDetailOriginal: true,
 		});
-
-		expectOrderedToolResults(items);
-	});
-
-	it("encodes Codex Responses images inside their tool outputs", () => {
-		const items = convertCodexResponsesMessages(codexModel, makeContext(codexModel));
 
 		expectOrderedToolResults(items);
 	});

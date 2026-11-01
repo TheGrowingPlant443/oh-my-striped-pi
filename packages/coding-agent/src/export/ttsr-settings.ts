@@ -32,7 +32,7 @@ export const cfgTtsrJudge = register({
 			{
 				value: "auto",
 				label: "Auto",
-				description: "Judge only when the judge role resolves to a native TypeSafe jev model",
+				description: "Judge only when the judge role resolves first to a configured native judgment model",
 			},
 			{ value: "on", label: "On", description: "Always judge, whichever model the judge role resolves to" },
 			{ value: "off", label: "Off", description: "Never judge; question rules stay inactive" },

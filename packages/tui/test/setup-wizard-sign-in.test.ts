@@ -34,7 +34,7 @@ const pickerCx: DescribeContext = {
 type Login = (provider: OAuthProviderId, callbacks: OAuthLoginCallbacks) => Promise<void>;
 
 /** A scene host over a credential store where a finished `login` signs the provider in. */
-function sceneHost(login: Login) {
+function sceneHost(login: Login, disabledProviders: string[] = []) {
 	const signedIn = new Set<string>();
 	const state = {
 		focus: undefined as (Component & { pasteText?(text: string): void }) | undefined,
@@ -56,11 +56,10 @@ function sceneHost(login: Login) {
 	const host = {
 		ctx: {
 			authStorage,
-			disabledProviders: [],
+			disabledProviders,
 			refreshProvider: async (provider: string) => {
 				state.refreshed.push(provider);
 			},
-			captureBrowserSession: async () => "",
 			openInBrowser(): void {},
 		},
 		requestRender(): void {},
@@ -93,6 +92,54 @@ function signInTo(scene: SignInScene, provider: string): void {
 }
 
 describe("SignInScene", () => {
+	it("lists Local, GitHub Copilot and self-hosted backends; Local never logs in", () => {
+		const login = vi.fn(async () => {});
+		const { host } = sceneHost(login);
+		const scene = new SignInScene(host);
+		try {
+			const sheet = providerSheet(scene)!;
+			expect(sheet.props.items?.map(item => [item.id, item.label])).toEqual([
+				["local", "Local"],
+				["github-copilot", "GitHub Copilot"],
+				["ollama", "Ollama (Local OpenAI-compatible)"],
+				["llama.cpp", "llama.cpp (Local OpenAI-compatible)"],
+				["lm-studio", "LM Studio (Local OpenAI-compatible)"],
+				["vllm", "vLLM (Local OpenAI-compatible)"],
+				["litellm", "LiteLLM"],
+			]);
+			expect(sheet.props.items?.[0]?.detail).toContain("No login required");
+			const terminal = Bun.stripANSI(scene.render(120).join("\n"));
+			expect(terminal).toContain("Local");
+			expect(terminal).toContain("GitHub Copilot");
+			expect(terminal).not.toContain("Other providers");
+			scene.handleInput("\x1b[A");
+			scene.handleInput("\r");
+			expect(login).not.toHaveBeenCalled();
+			expect(Bun.stripANSI(scene.render(120).join("\n"))).toContain("Local models need no login");
+		} finally {
+			scene.dispose();
+		}
+	});
+
+	it("honors disabled providers without offering Local as a login", () => {
+		const { host } = sceneHost(async () => {}, ["github-copilot"]);
+		const scene = new SignInScene(host);
+		try {
+			expect(providerSheet(scene)?.props.items?.map(item => item.id)).toEqual([
+				"local",
+				"ollama",
+				"llama.cpp",
+				"lm-studio",
+				"vllm",
+				"litellm",
+			]);
+			scene.handleInput("\r");
+			expect(providerSheet(scene)).toBeDefined();
+		} finally {
+			scene.dispose();
+		}
+	});
+
 	it("Enter on a provider starts its login in the focused dialog; paste reaches the masked field", async () => {
 		const secret = `sk-${crypto.randomUUID()}`;
 		const answered = Promise.withResolvers<string>();
@@ -104,8 +151,8 @@ describe("SignInScene", () => {
 		});
 		const scene = new SignInScene(host);
 		try {
-			signInTo(scene, "anthropic");
-			expect(providers).toEqual(["anthropic"]);
+			signInTo(scene, "github-copilot");
+			expect(providers).toEqual(["github-copilot"]);
 			expect(providerSheet(scene)).toBeUndefined();
 			// Enhanced paste targets the focused component's `pasteText`.
 			state.focus?.pasteText?.(secret);
@@ -123,14 +170,14 @@ describe("SignInScene", () => {
 		});
 		const scene = new SignInScene(host);
 		try {
-			expect(providerSheet(scene)?.props.items?.find(item => item.id === "anthropic")?.dot).toBe("muted");
-			signInTo(scene, "anthropic");
+			expect(providerSheet(scene)?.props.items?.find(item => item.id === "github-copilot")?.dot).toBe("muted");
+			signInTo(scene, "github-copilot");
 			await state.restored.promise;
-			expect(state.refreshed).toEqual(["anthropic"]);
+			expect(state.refreshed).toEqual(["github-copilot"]);
 			expect(state.focus).toBeUndefined();
 			const sheet = providerSheet(scene)!;
-			expect(sheet.props.selected).toBe("anthropic");
-			expect(sheet.props.items?.find(item => item.id === "anthropic")?.dot).toBe("success");
+			expect(sheet.props.selected).toBe("github-copilot");
+			expect(sheet.props.items?.find(item => item.id === "github-copilot")?.dot).toBe("success");
 		} finally {
 			scene.dispose();
 		}
@@ -150,7 +197,7 @@ describe("SignInScene", () => {
 		});
 		const scene = new SignInScene(host);
 		try {
-			signInTo(scene, "anthropic");
+			signInTo(scene, "github-copilot");
 			state.focus?.handleInput?.("\x1b");
 			expect(state.focus).toBeUndefined();
 			// The aborted flow settles after the list is back; drain its rejection before reading the sheet.
@@ -169,7 +216,7 @@ describe("SignInScene", () => {
 		});
 		const scene = new SignInScene(host);
 		try {
-			signInTo(scene, "anthropic");
+			signInTo(scene, "github-copilot");
 			await state.restored.promise;
 			expect(JSON.stringify(providerSheet(scene)?.props.strip?.label)).toContain("token exchange failed");
 		} finally {
@@ -260,7 +307,7 @@ describe("fullscreen setup sign-in cursor", () => {
 				const afterDissolve = performance.now() + 1000;
 				vi.spyOn(performance, "now").mockReturnValue(afterDissolve);
 				await scheduler.settle(terminal);
-				for (const char of "anthropic") terminal.sendInput(char);
+				for (const char of "github-copilot") terminal.sendInput(char);
 				terminal.sendInput("\r");
 				await scheduler.settle(terminal);
 				const prompt = tui.getFocused();

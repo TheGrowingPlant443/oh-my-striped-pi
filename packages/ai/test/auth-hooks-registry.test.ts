@@ -4,12 +4,8 @@ import { HOOKS } from "../src/registry/hooks";
 import { PROVIDER_REGISTRY } from "../src/registry/registry";
 
 const TABLE_FOR_KIND: Record<string, keyof typeof HOOKS> = {
-	env: "env",
-	headers: "headers",
-	value: "value",
 	login: "login",
 	refresh: "refresh",
-	"after-exchange": "afterExchange",
 };
 
 describe("auth rules ↔ hook registry", () => {
@@ -19,7 +15,7 @@ describe("auth rules ↔ hook registry", () => {
 		for (const kind in referenced) {
 			const table = HOOKS[TABLE_FOR_KIND[kind]];
 			for (const name of referenced[kind]) {
-				if (!(name in table)) missing.push(`${kind}:${name}`);
+				if (!table || !(name in table)) missing.push(`${kind}:${name}`);
 			}
 		}
 		expect(missing).toEqual([]);
@@ -40,7 +36,7 @@ describe("auth rules ↔ hook registry", () => {
 
 	test("every lazily loaded hook module resolves", async () => {
 		const failures: string[] = [];
-		for (const table of ["headers", "value", "login", "refresh", "afterExchange"] as const) {
+		for (const table of ["login", "refresh"] as const) {
 			for (const name in HOOKS[table]) {
 				try {
 					const hook = await HOOKS[table][name]();

@@ -55,7 +55,7 @@ describe("newSession() atomic boundary vs queued hidden steer", () => {
 	});
 
 	it("does not start an old-context turn from a queued steer during /new", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 		const secondCallStarted = Promise.withResolvers<void>();
 		const releaseSecondCall = Promise.withResolvers<void>();
 		let secondRequestMessages: string[] = [];
@@ -85,7 +85,7 @@ describe("newSession() atomic boundary vs queued hidden steer", () => {
 		const settings = Settings.isolated({ "compaction.enabled": false });
 		const authStorage = await AuthStorage.create(tempDir.join(`auth-${Snowflake.next()}.db`));
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		session = new AgentSession({ agent, sessionManager, settings, modelRegistry });
 

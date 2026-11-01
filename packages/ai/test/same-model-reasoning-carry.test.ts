@@ -8,22 +8,14 @@
  * provider-written summary. Everything else keeps today's demotion to visible
  * `<think>` text.
  *
- * Models are built from specs so the KDL rules, not baked rows, decide.
+ * Model lineage comes from KDL; native reasoning slots are explicit fixture capabilities.
  */
 import { describe, expect, it } from "bun:test";
-import { gunzipSync } from "node:zlib";
-import { streamDevin } from "@oh-my-pi/pi-ai/providers/devin";
 import { convertMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { stream } from "@oh-my-pi/pi-ai/stream";
 import type { Api, AssistantMessage, Message, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import {
-	GetChatMessageRequestSchema,
-	GetChatMessageResponseSchema,
-	GetUserJwtResponseSchema,
-} from "@oh-my-pi/pi-catalog/discovery/devin-proto";
-import { create, fromBinary, toBinary } from "@oh-my-pi/pi-catalog/discovery/protobuf";
 
 const TRACE = "Earlier reasoning: read foo.ts, then patch bar().";
 const THINK = `<think>\n${TRACE}\n</think>`;
@@ -62,24 +54,24 @@ function history(prior: AssistantMessage): Message[] {
 	];
 }
 
-function target<TApi extends Api>(
-	api: TApi,
-	provider: string,
-	id: string,
-	compat?: ModelSpec<TApi>["compat"],
-): Model<TApi> {
+function target<TApi extends Api>(api: TApi, id: string, compat?: ModelSpec<TApi>["compat"]): Model<TApi> {
 	return buildModel({
 		id,
 		name: id,
 		api,
-		provider,
-		baseUrl: "https://example.invalid/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 262_144,
 		maxTokens: 32_768,
-		...(compat && { compat }),
+		compat: {
+			...(api === "openai-completions"
+				? { thinkingFormat: "openai", replayReasoningContent: true, reasoningContentField: "reasoning_content" }
+				: { requiresReasoningContentForAllAssistantTurns: true }),
+			...compat,
+		},
 	} as ModelSpec<TApi>);
 }
 
@@ -95,15 +87,14 @@ function completionsAssistant(model: Model<"openai-completions">, messages: Mess
  * network call.
  */
 async function responsesAssistantItems(
-	model: Model<"openrouter">,
+	model: Model<"openai-responses">,
 	messages: Message[],
 	options: { filterReasoningHistory?: boolean } = {},
 ): Promise<unknown[]> {
 	const { promise, resolve } = Promise.withResolvers<unknown>();
 	const controller = new AbortController();
 	controller.abort();
-	// OpenRouter's default wire is the Responses transport.
-	const responsesModel = model as unknown as Model<"openai-responses">;
+	const responsesModel = model;
 	streamOpenAIResponses(
 		responsesModel,
 		{ messages },
@@ -127,31 +118,14 @@ async function responsesAssistantItems(
 	);
 }
 
-/** Captures the Cascade request omp's Devin provider sends, without a model call. */
-async function devinRequest(model: Model<"devin-agent">, messages: Message[]) {
-	const authPayload = toBinary(GetUserJwtResponseSchema, create(GetUserJwtResponseSchema, { userJwt: "jwt" }));
-	let requestPayload: Uint8Array | undefined;
-	const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
-		if (String(input).includes("GetUserJwt")) return new Response(authPayload);
-		requestPayload = new Uint8Array(init?.body as ArrayBuffer);
-		return new Response(new Uint8Array());
-	}) as typeof fetch;
-	await streamDevin(model, { messages }, { apiKey: "token", fetch: fetchImpl }).result();
-	if (!requestPayload) throw new Error("Devin chat request was not captured");
-	const view = new DataView(requestPayload.buffer, requestPayload.byteOffset, requestPayload.byteLength);
-	// Connect envelope: flag byte (bit 0 = gzip; small bodies go uncompressed), u32 length, message.
-	const body = requestPayload.subarray(5, 5 + view.getUint32(1, false));
-	return fromBinary(GetChatMessageRequestSchema, (requestPayload[0] & 1) !== 0 ? gunzipSync(body) : body);
-}
-
-const moonshotK3 = () => target("openai-completions", "moonshot", "kimi-k3");
-const openRouterK3 = () => target("openrouter", "openrouter", "moonshotai/kimi-k3");
-const factoryK3: Source = { provider: "factory-droid", api: "openai-completions", model: "kimi-k3" };
+const completionsK3 = () => target("openai-completions", "kimi-k3");
+const responsesK3 = () => target("openai-responses", "kimi-k3");
+const aliasedK3: Source = { provider: "github-copilot", api: "openai-completions", model: "moonshotai/kimi-k3" };
 const fieldSignature = { thinkingSignature: "reasoning_content" };
 
 describe("same-model reasoning carry", () => {
-	it("replays another K3 host's reasoning in Moonshot's reasoning_content", () => {
-		const wire = completionsAssistant(moonshotK3(), history(priorTurn(factoryK3, fieldSignature)));
+	it("replays an aliased K3 turn in Copilot completions reasoning_content", () => {
+		const wire = completionsAssistant(completionsK3(), history(priorTurn(aliasedK3, fieldSignature)));
 
 		expect(wire.reasoning_content).toBe(TRACE);
 		expect(wire.content).toBe("Patched.");
@@ -165,10 +139,10 @@ describe("same-model reasoning carry", () => {
 			content: [{ type: "reasoning_text", text: TRACE }],
 			summary: [],
 		});
-		const source: Source = { provider: "openrouter", api: "openrouter", model: "moonshotai/kimi-k3" };
+		const source: Source = { provider: "github-copilot", api: "openai-responses", model: "moonshotai/kimi-k3" };
 
 		const wire = completionsAssistant(
-			moonshotK3(),
+			completionsK3(),
 			history(priorTurn(source, { thinkingSignature: openRouterItem })),
 		);
 
@@ -176,8 +150,8 @@ describe("same-model reasoning carry", () => {
 		expect(wire.content).toBe("Patched.");
 	});
 
-	it("replays carried reasoning as an id-less plaintext item on a fresh OpenRouter Responses session", async () => {
-		const items = await responsesAssistantItems(openRouterK3(), history(priorTurn(factoryK3, fieldSignature)));
+	it("replays carried reasoning as an id-less plaintext item on a fresh Responses session", async () => {
+		const items = await responsesAssistantItems(responsesK3(), history(priorTurn(aliasedK3, fieldSignature)));
 
 		expect(items).toEqual([
 			{ type: "reasoning", summary: [], content: [{ type: "reasoning_text", text: TRACE }] },
@@ -191,76 +165,43 @@ describe("same-model reasoning carry", () => {
 	});
 
 	it("demotes instead of dropping when the request filters reasoning history", async () => {
-		const items = await responsesAssistantItems(openRouterK3(), history(priorTurn(factoryK3, fieldSignature)), {
+		const items = await responsesAssistantItems(responsesK3(), history(priorTurn(aliasedK3, fieldSignature)), {
 			filterReasoningHistory: true,
 		});
 
 		expect(JSON.stringify(items)).toContain(`"text":${JSON.stringify(THINK)}`);
 	});
 
-	it("sends carried reasoning in Devin's thinking field", async () => {
-		const request = await devinRequest(
-			target("devin-agent", "devin", "kimi-k3"),
-			history(priorTurn(factoryK3, fieldSignature)),
-		);
-
-		expect(request.chatMessagePrompts[1]).toMatchObject({ prompt: "Patched.", thinking: TRACE, signature: "" });
-	});
-
 	it("still demotes on a host whose encoder drops its own reasoning", () => {
 		// No flag makes this host's encoder write reasoning for its own turns,
 		// so it has no native slot to carry into either.
-		const noSlot = target("openai-completions", "custom-k3", "kimi-k3", {
+		const noSlot = target("openai-completions", "kimi-k3", {
 			thinkingFormat: "openai",
 			requiresReasoningContentForToolCalls: false,
+			replayReasoningContent: false,
 		});
-		const ownSource: Source = { provider: "custom-k3", api: "openai-completions", model: "kimi-k3" };
+		const ownSource: Source = { provider: "github-copilot", api: "openai-completions", model: "kimi-k3" };
 		expect(
 			completionsAssistant(noSlot, history(priorTurn(ownSource, fieldSignature))).reasoning_content,
 		).toBeUndefined();
 
-		const carried = completionsAssistant(noSlot, history(priorTurn(factoryK3, fieldSignature)));
+		const carried = completionsAssistant(noSlot, history(priorTurn(aliasedK3, fieldSignature)));
 
 		expect(carried.reasoning_content).toBeUndefined();
 		expect(carried.content).toBe(DEMOTED);
 	});
 
-	it("never carries reasoning from a host that opts out", () => {
-		const cursorK3: Source = { provider: "cursor", api: "cursor-agent", model: "kimi-k3" };
-
-		const wire = completionsAssistant(moonshotK3(), history(priorTurn(cursorK3)));
-
-		expect(wire.reasoning_content).not.toBe(TRACE);
-		expect(wire.content).toBe(DEMOTED);
-	});
-
-	it("never carries reasoning from modified weights that classify as the base model", async () => {
-		// Abliteration's Large is an abliterated GLM 5.2 and classifies as GLM 5.2.
-		const abliterated: Source = {
-			provider: "abliteration",
-			api: "openai-responses",
-			model: "abliterated-model-large",
-		};
-
-		const items = await responsesAssistantItems(
-			target("openrouter", "openrouter", "z-ai/glm-5.2"),
-			history(priorTurn(abliterated)),
-		);
-
-		expect(JSON.stringify(items)).toContain(`"text":${JSON.stringify(THINK)}`);
-	});
-
 	it("never carries a provider-written summary", () => {
-		const source: Source = { provider: "openrouter", api: "openrouter", model: "moonshotai/kimi-k3" };
+		const source: Source = { provider: "github-copilot", api: "openai-responses", model: "moonshotai/kimi-k3" };
 
-		const wire = completionsAssistant(moonshotK3(), history(priorTurn(source, { summary: true })));
+		const wire = completionsAssistant(completionsK3(), history(priorTurn(source, { summary: true })));
 
 		expect(wire.reasoning_content).not.toBe(TRACE);
 		expect(wire.content).toBe(DEMOTED);
 	});
 
 	describe("reasoning recorded before parsers confirmed the trace stays text", () => {
-		const source: Source = { provider: "openrouter", api: "openrouter", model: "moonshotai/kimi-k3" };
+		const source: Source = { provider: "github-copilot", api: "openai-responses", model: "moonshotai/kimi-k3" };
 		const summaryItem = {
 			id: "rs_legacy",
 			type: "reasoning",
@@ -273,7 +214,7 @@ describe("same-model reasoning carry", () => {
 				JSON.stringify(priorTurn(source, { ...unconfirmed, thinkingSignature: JSON.stringify(summaryItem) })),
 			) as AssistantMessage;
 
-			const wire = completionsAssistant(moonshotK3(), history(prior));
+			const wire = completionsAssistant(completionsK3(), history(prior));
 
 			expect(wire.reasoning_content).not.toBe(TRACE);
 			expect(wire.content).toBe(DEMOTED);
@@ -284,7 +225,7 @@ describe("same-model reasoning carry", () => {
 			prior.content[0] = { type: "thinking", thinking: TRACE, itemId: summaryItem.id };
 			prior.providerPayload = { type: "openaiResponsesHistory", items: [summaryItem] };
 
-			const wire = completionsAssistant(moonshotK3(), history(prior));
+			const wire = completionsAssistant(completionsK3(), history(prior));
 
 			expect(wire.content).toBe(DEMOTED);
 		});
@@ -293,53 +234,36 @@ describe("same-model reasoning carry", () => {
 			const prior = priorTurn(source, unconfirmed);
 			prior.providerPayload = { type: "openaiResponsesHistory", items: [summaryItem] };
 
-			const wire = completionsAssistant(moonshotK3(), history(prior));
+			const wire = completionsAssistant(completionsK3(), history(prior));
 
 			expect(wire.content).toBe(DEMOTED);
 		});
 
 		it("already reparented, with neither signature nor payload", () => {
-			const wire = completionsAssistant(moonshotK3(), history(priorTurn(source, unconfirmed)));
+			const wire = completionsAssistant(completionsK3(), history(priorTurn(source, unconfirmed)));
 
 			expect(wire.content).toBe(DEMOTED);
 		});
 	});
 
 	it("keeps an errored turn's reasoning as text on a Responses host", async () => {
-		const prior = priorTurn(factoryK3, fieldSignature);
+		const prior = priorTurn(aliasedK3, fieldSignature);
 		prior.stopReason = "error";
 
-		const items = await responsesAssistantItems(openRouterK3(), history(prior));
+		const items = await responsesAssistantItems(responsesK3(), history(prior));
 
 		expect(JSON.stringify(items)).toContain(`"text":${JSON.stringify(THINK)}`);
 	});
 
-	it("judges a routed turn by the model that actually served it", () => {
-		const devinK3: Source = { provider: "devin", api: "devin-agent", model: "kimi-k3" };
-		const servedElsewhere = { ...priorTurn(devinK3), upstreamModel: "MODEL_GOOGLE_GEMINI_3_PRO" };
-		const servedByK3 = { ...priorTurn(devinK3), upstreamModel: "kimi-k3" };
-
-		expect(completionsAssistant(moonshotK3(), history(servedElsewhere)).content).toBe(DEMOTED);
-		expect(completionsAssistant(moonshotK3(), history(servedByK3)).reasoning_content).toBe(TRACE);
-	});
-
-	it("carries the same DeepSeek revision between hosts", () => {
-		const source: Source = { provider: "openrouter", api: "openrouter", model: "deepseek/deepseek-v4-flash" };
-
-		const wire = completionsAssistant(
-			target("openai-completions", "deepseek", "deepseek-v4-flash"),
-			history(priorTurn(source, fieldSignature)),
-		);
-
-		expect(wire.reasoning_content).toBe(TRACE);
-		expect(wire.content).toBe("Patched.");
-	});
-
 	it("still demotes reasoning from a different revision of the family", () => {
-		const source: Source = { provider: "openrouter", api: "openrouter", model: "deepseek/deepseek-v4-flash" };
+		const source: Source = {
+			provider: "github-copilot",
+			api: "openai-responses",
+			model: "kimi-k3",
+		};
 
 		const wire = completionsAssistant(
-			target("openai-completions", "deepseek", "deepseek-v4.1-flash"),
+			target("openai-completions", "kimi-k2.7-code"),
 			history(priorTurn(source, fieldSignature)),
 		);
 
@@ -350,10 +274,10 @@ describe("same-model reasoning carry", () => {
 	it("keeps demoting a family that is not declared portable, even with a matching identity", async () => {
 		// gpt-5.6-sol and gpt-5.6-terra share class/family/revision; GPT reasoning
 		// reaches omp as summaries plus encrypted content, so it is not declared.
-		const terra: Source = { provider: "openai-codex", api: "openai-codex-responses", model: "gpt-5.6-terra" };
+		const terra: Source = { provider: "github-copilot", api: "openai-responses", model: "gpt-5.6-terra" };
 
 		const items = await responsesAssistantItems(
-			target("openrouter", "openrouter", "openai/gpt-5.6-sol"),
+			target("openai-responses", "openai/gpt-5.6-sol"),
 			history(priorTurn(terra)),
 		);
 		const wire = JSON.stringify(items);
@@ -364,7 +288,7 @@ describe("same-model reasoning carry", () => {
 });
 
 describe("Responses reasoning provenance is recorded at parse time", () => {
-	/** A turn streamed from OpenRouter's Responses wire through the public `stream()` path. */
+	/** A turn streamed from Copilot's Responses wire through the public `stream()` path. */
 	async function parseTurn(events: Record<string, unknown>[]): Promise<AssistantMessage> {
 		const all = [
 			{ type: "response.created", response: { id: "resp_1", status: "in_progress" } },
@@ -394,7 +318,7 @@ describe("Responses reasoning provenance is recorded at parse time", () => {
 			async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
 			{ preconnect: fetch.preconnect },
 		);
-		return stream(openRouterK3(), { messages: [] }, { apiKey: "test-key", fetch: fetchImpl }).result();
+		return stream(responsesK3(), { messages: [] }, { apiKey: "test-key", fetch: fetchImpl }).result();
 	}
 	const parseReasoning = async (events: Record<string, unknown>[]) => (await parseTurn(events)).content[0];
 	const done = (item: Record<string, unknown>) => ({
@@ -432,7 +356,7 @@ describe("Responses reasoning provenance is recorded at parse time", () => {
 	it("keeps a streamed summary out of the next host's reasoning field", async () => {
 		const prior = await parseTurn([delta("response.reasoning_summary_text.delta", TRACE), done({ summary: [] })]);
 
-		const wire = completionsAssistant(moonshotK3(), history(prior));
+		const wire = completionsAssistant(completionsK3(), history(prior));
 
 		expect(wire.reasoning_content).not.toBe(TRACE);
 		expect(wire.content).toBe(DEMOTED);
@@ -452,15 +376,15 @@ describe("Responses reasoning provenance is recorded at parse time", () => {
 	it("carries a parsed trace whose done item omits the text to another host", async () => {
 		const prior = await parseTurn([delta("response.reasoning_text.delta", TRACE), done({ summary: [] })]);
 
-		const wire = completionsAssistant(moonshotK3(), history(prior));
+		const wire = completionsAssistant(completionsK3(), history(prior));
 
 		expect(wire.reasoning_content).toBe(TRACE);
 		expect(wire.content).toBe("Patched.");
 	});
 });
 
-describe("chat-completions and Devin parsers confirm their reasoning as the trace", () => {
-	it("carries a Moonshot reasoning_content turn to OpenRouter", async () => {
+describe("chat-completions parsers confirm their reasoning as the trace", () => {
+	it("carries a completions reasoning_content turn to the Responses adapter", async () => {
 		const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
 			`data: ${JSON.stringify({ id: "c1", object: "chat.completion.chunk", created: 0, model: "kimi-k3", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
 		const body = [
@@ -473,35 +397,10 @@ describe("chat-completions and Devin parsers confirm their reasoning as the trac
 			async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
 			{ preconnect: fetch.preconnect },
 		);
-		const prior = await stream(moonshotK3(), { messages: [] }, { apiKey: "test-key", fetch: fetchImpl }).result();
+		const prior = await stream(completionsK3(), { messages: [] }, { apiKey: "test-key", fetch: fetchImpl }).result();
 
 		expect(prior.content[0]).toMatchObject({ type: "thinking", thinking: TRACE, summary: false });
-		const items = await responsesAssistantItems(openRouterK3(), history(prior));
+		const items = await responsesAssistantItems(responsesK3(), history(prior));
 		expect(items[0]).toEqual({ type: "reasoning", summary: [], content: [{ type: "reasoning_text", text: TRACE }] });
-	});
-
-	it("carries a Devin thinking turn to Moonshot", async () => {
-		const authPayload = toBinary(GetUserJwtResponseSchema, create(GetUserJwtResponseSchema, { userJwt: "jwt" }));
-		const frame = (fields: { deltaThinking?: string; deltaText?: string }) => {
-			const payload = toBinary(
-				GetChatMessageResponseSchema,
-				create(GetChatMessageResponseSchema, { messageId: "m1", ...fields }),
-			);
-			const out = new Uint8Array(5 + payload.length);
-			new DataView(out.buffer).setUint32(1, payload.length, false);
-			out.set(payload, 5);
-			return out;
-		};
-		const body = new Uint8Array([...frame({ deltaThinking: TRACE }), ...frame({ deltaText: "Patched." })]);
-		const fetchImpl = (async (input: string | URL | Request) =>
-			new Response(String(input).includes("GetUserJwt") ? authPayload : body)) as typeof fetch;
-		const prior = await streamDevin(
-			target("devin-agent", "devin", "kimi-k3"),
-			{ messages: [{ role: "user", content: "fix the bug", timestamp: 0 }] },
-			{ apiKey: "token", fetch: fetchImpl },
-		).result();
-
-		expect(prior.content[0]).toMatchObject({ type: "thinking", thinking: TRACE, summary: false });
-		expect(completionsAssistant(moonshotK3(), history(prior)).reasoning_content).toBe(TRACE);
 	});
 });

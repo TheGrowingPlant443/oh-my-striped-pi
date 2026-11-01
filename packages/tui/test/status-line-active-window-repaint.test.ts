@@ -19,7 +19,6 @@ function createHost(settings?: StatusLineSettings) {
 	return {
 		getSettings: () => settings ?? {},
 		gitEnabled: () => false,
-		codexResetFireworksEnabled: () => false,
 		getSettingsRevision: () => 0,
 		getSessionSettingsIdentity: () => null,
 		getSessionSettingsRevision: () => 0,

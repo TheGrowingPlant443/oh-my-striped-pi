@@ -31,8 +31,8 @@ describe("omp anonymize output", () => {
 		const assistant: Omit<AssistantMessage, "content" | "stopReason"> = {
 			role: "assistant",
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			timestamp: 1,
 			usage: {
 				input: 120,
@@ -84,9 +84,10 @@ describe("omp anonymize output", () => {
 			expect(collectPendingToolCalls(resumed.getBranch())).toContainEqual(
 				expect.objectContaining({ toolName: "edit", toolCallId: "toolu_02editabcdef" }),
 			);
-			const model = getBundledModel<"anthropic-messages">("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected bundled model");
-			const wire = convertAnthropicMessages(convertToLlm(resumed.buildSessionContext().messages), model, false);
+			const model = getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.5");
+			const wire = convertAnthropicMessages(convertToLlm(resumed.buildSessionContext().messages), model, {
+				serverSideFallbackEnabled: false,
+			});
 			const result = wire
 				.flatMap(message => (typeof message.content === "string" ? [] : message.content))
 				.find(block => block.type === "tool_result");

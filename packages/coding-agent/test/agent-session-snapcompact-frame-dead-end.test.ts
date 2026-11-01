@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { Agent, RESCUE_SHAKE_CONFIG } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { Model } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
@@ -16,6 +16,32 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { computeNonMessageTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
 import { getProjectAgentDir, TempDir } from "@oh-my-pi/pi-utils";
 import * as snapcompact from "@oh-my-pi/snapcompact";
+
+function companyModel(id = "claude-sonnet-4-5", stripImageInput = false): Model {
+	const shared = {
+		id,
+		name: "Company frame reader",
+		baseUrl: "https://models.company.invalid/v1",
+		reasoning: true,
+		input: ["text", "image"] as ("text" | "image")[],
+		imageCountBudget: 100,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 64_000,
+	};
+	// Only the chat-completions transport can strip images on the wire.
+	if (stripImageInput) {
+		return buildModel({
+			...shared,
+			provider: "company-completions",
+			api: "openai-completions",
+			compat: { stripImageInput },
+		});
+	}
+	return id.startsWith("gpt-")
+		? buildModel({ ...shared, provider: "company-responses", api: "openai-responses" })
+		: buildModel({ ...shared, provider: "company-anthropic", api: "anthropic-messages" });
+}
 
 /**
  * Regression test for the snapcompact frame dead-end.
@@ -42,9 +68,19 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("venice", "test-key");
+		authStorage.keys.setRuntime("company-anthropic", "test-key");
+		authStorage.keys.setRuntime("company-responses", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
+		// Auto-compaction only runs when the registry lists a usable model.
+		for (const models of [[companyModel()], [companyModel("gpt-5.5"), companyModel("gpt-5.4")]]) {
+			const [first] = models;
+			modelRegistry.registerProvider(first.provider, {
+				api: first.api,
+				apiKey: "test-key",
+				baseUrl: first.baseUrl,
+				models: models.map(model => ({ ...model, contextWindow: 200_000, maxTokens: 64_000 })),
+			});
+		}
 	});
 
 	const NOTICE_SOURCE = "compaction";
@@ -83,7 +119,7 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 		/** Seed a kept-recent entry between firstKeptEntryId and the archive —
 		 *  re-emitted by buildSessionContext, so the rescue budget must charge it. */
 		preArchiveKeptText?: string;
-		/** Bundled model to run on instead of Claude Sonnet 4.5. */
+		/** Private model to run on instead of Claude Sonnet 4.5. */
 		model?: Model;
 	}): Promise<void> {
 		tempDir = TempDir.createSync("@pi-snapcompact-frame-dead-end-");
@@ -126,10 +162,7 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 			);
 		}
 
-		const bundled = options.model ?? getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) {
-			throw new Error("Expected built-in anthropic model to exist");
-		}
+		const bundled = options.model ?? companyModel();
 		// Pin the window: threshold/band math below is tuned to 200k.
 		const model = {
 			...bundled,
@@ -226,9 +259,9 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 		return {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text: "Done." }],
-			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			api: session.model!.api,
+			provider: session.model!.provider,
+			model: session.model!.id,
 			stopReason: "stop" as const,
 			usage: {
 				input: 190000,
@@ -365,9 +398,8 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 
 	it("rebuilds at a billing-verified reader's own frame price", async () => {
 		// gpt-5.5's rule is billing-verified, gpt-5.4's is not; both bill a 1568px frame alike.
-		const verified = getBundledModel("openai", "gpt-5.5");
-		const unverified = getBundledModel("openai", "gpt-5.4");
-		if (!verified || !unverified) throw new Error("Expected bundled openai/gpt-5.5 and gpt-5.4");
+		const verified = companyModel("gpt-5.5");
+		const unverified = companyModel("gpt-5.4");
 		const price = snapcompact.resolveShape(verified).frameTokenEstimate;
 		expect(snapcompact.resolveShape(unverified).frameTokenEstimate).toBe(price);
 		expect(price).toBe(2882);
@@ -674,7 +706,7 @@ describe("AgentSession snapcompact frame dead-end rescue", () => {
 
 	it("skips the frame rescue when the active model's wire strips image input", async () => {
 		// Declares image input, so only the wire predicate tells it apart from a vision model.
-		await createSession({ frameCount: SEEDED_FRAME_COUNT, model: getBundledModel("venice", "deepseek-v4-1-flash") });
+		await createSession({ frameCount: SEEDED_FRAME_COUNT, model: companyModel("claude-sonnet-4-5", true) });
 		vi.spyOn(session.agent, "prompt").mockResolvedValue();
 		vi.spyOn(session.agent, "continue").mockResolvedValue();
 		vi.spyOn(session, "getContextUsage").mockReturnValue({ tokens: 190000, contextWindow: 200000, percent: 95 });

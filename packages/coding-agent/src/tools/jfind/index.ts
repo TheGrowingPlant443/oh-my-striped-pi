@@ -45,10 +45,8 @@ const RANGES_SHOWN = 3;
 const FIND_TIMEOUT_MS = 20_000;
 
 /**
- * Resolve `find.enabled` for a session: `auto` enables `find` only when the
- * judge role is backed by a native System One model ({@link hasNativeJudge})
- * rather than a prompted small model. Gates tool creation and the `find` hints
- * in sibling tool prompts.
+ * Resolve `find.enabled`: `auto` requires a native judgment model first in the
+ * judge role; explicit `on` also permits prompted local or chat models.
  */
 export function isFindEnabled(session: ToolSession): boolean {
 	const mode = cfgFindEnabled.get(session.settings);

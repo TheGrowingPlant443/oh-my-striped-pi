@@ -13,6 +13,9 @@
 import { logger } from "@oh-my-pi/pi-utils";
 import type { AuthStorage } from "../auth-storage";
 import { isDefinitiveOAuthFailure } from "../error/auth-classify";
+import { isMcpCredentialProvider } from "../auth/provider-policy";
+import { getProviderDefinition } from "../registry";
+import { getOAuthProvider } from "../registry/oauth";
 import { DEFAULT_REFRESH_INTERVAL_MS, DEFAULT_REFRESH_SKEW_MS } from "./types";
 
 export interface AuthBrokerRefresherOptions {
@@ -92,6 +95,12 @@ export class AuthBrokerRefresher {
 			const deadline = now + this.#refreshSkewMs;
 			const targets: number[] = [];
 			for (const entry of snapshot.credentials) {
+				if (
+					!isMcpCredentialProvider(entry.provider) &&
+					!getProviderDefinition(entry.provider)?.refreshToken &&
+					!getOAuthProvider(entry.provider)?.refreshToken
+				)
+					continue;
 				if (entry.credential.type !== "oauth") continue;
 				const expires = entry.credential.expires;
 				if (typeof expires !== "number" || !Number.isFinite(expires)) continue;

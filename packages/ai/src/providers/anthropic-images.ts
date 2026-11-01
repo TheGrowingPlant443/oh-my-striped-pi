@@ -157,9 +157,7 @@ async function resizeAnthropicImageBlock(block: ImageContent, caps: AnthropicIma
 		const data = Buffer.from(best.buffer).toString("base64");
 		// An image inside the pixel cap is only worth replacing if it shrank.
 		if (!overDimension && data.length >= block.data.length) return block;
-		// The rebuilt block carries no `url` or `providerFile`: those reference
-		// the original bytes, and Anthropic validates a referenced image after
-		// fetching it, so keeping either would resend the oversized copy.
+		// Drop the URL mirror so the resized bytes, not the oversized original, reach the wire.
 		return {
 			type: "image",
 			data,
@@ -225,19 +223,19 @@ async function resizeAnthropicImageMessage(
  */
 export async function prepareAnthropicImageContext(
 	context: Context,
-	model: Model<"anthropic-messages"> | Model<"google-gemini-cli">,
+	model: Model<"anthropic-messages">,
 ): Promise<Context> {
 	if (!model.input.includes("image")) return context;
 	const imageCount = countAnthropicImageBlocks(context.messages);
 	if (imageCount === 0) return context;
 	// Many images share one request size budget, so they get the tighter cap.
 	// A smaller set only has to clear the host's per-image limit.
-	const hostMaxDimension = model.compat.maxImageDimension ?? ANTHROPIC_MAX_IMAGE_DIMENSION;
+	const hostMaxDimension = model.compat?.maxImageDimension ?? ANTHROPIC_MAX_IMAGE_DIMENSION;
 	const maxDimension =
 		imageCount > ANTHROPIC_MANY_IMAGE_THRESHOLD
 			? Math.min(ANTHROPIC_MANY_IMAGE_MAX_DIMENSION, hostMaxDimension)
 			: hostMaxDimension;
-	const maxPayloadBytes = model.compat.maxImagePayloadBytes ?? ANTHROPIC_MAX_IMAGE_PAYLOAD_BYTES;
+	const maxPayloadBytes = model.compat?.maxImagePayloadBytes ?? ANTHROPIC_MAX_IMAGE_PAYLOAD_BYTES;
 	const caps: AnthropicImageCaps = {
 		maxDimension,
 		payloadBudget: Math.floor(maxPayloadBytes * ANTHROPIC_IMAGE_PAYLOAD_HEADROOM),

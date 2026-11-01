@@ -81,6 +81,7 @@ export class TanCommandController {
 		const thinkingLevel = session.configuredThinkingLevel();
 		const systemPrompt = [...session.systemPrompt];
 		// The copied prompt carries the parent's memory recall; the clone inherits it as delivered.
+		const parentHindsightSessionState = session.getHindsightSessionState?.();
 		const parentMnemopiSessionState = session.getMnemopiSessionState?.();
 		const toolNames = session.getEnabledToolNames();
 		const activeToolNames = session.getActiveToolNames();
@@ -191,6 +192,7 @@ export class TanCommandController {
 								preloadedExtensionPaths: parentExtensionPaths?.length ? [...parentExtensionPaths] : undefined,
 								extensionRoots: () => parentExtensionRoots,
 								localProtocolOptions,
+								parentHindsightSessionState,
 								parentMnemopiSessionState,
 							});
 							clone = created.session;

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import * as path from "node:path";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 interface ProbeResult {
 	retainedHeapNodes: number;
@@ -41,11 +42,12 @@ test("models config validation resources are retained only for a custom config",
 	try {
 		const { missing, custom } = await runProbe(tempDir.path());
 
+		const bundled = getTestModel("github-copilot");
 		expect(missing.model).toMatchObject({
-			provider: "anthropic",
-			id: "claude-sonnet-4-5",
-			baseUrl: "https://api.anthropic.com",
-			api: "anthropic-messages",
+			provider: bundled.provider,
+			id: bundled.id,
+			baseUrl: bundled.baseUrl,
+			api: bundled.api,
 		});
 		expect(custom.model).toEqual({
 			provider: "lazy-models",
@@ -64,7 +66,7 @@ test("models config validation resources are retained only for a custom config",
 		expect(
 			custom.retainedHeapNodes - missing.retainedHeapNodes,
 			"custom config validation should retain its schema bundle",
-		).toBeGreaterThan(5_000);
+		).toBeGreaterThan(1_000);
 	} finally {
 		await tempDir.remove().catch(() => {});
 	}

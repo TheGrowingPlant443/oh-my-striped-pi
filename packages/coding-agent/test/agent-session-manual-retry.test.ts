@@ -30,7 +30,7 @@ describe("AgentSession manual retry", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-manual-retry-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -47,9 +47,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("removes the failed assistant turn and continues with a fresh attempt", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const mock = createMockModel({
@@ -89,9 +89,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("returns false when the trailing assistant turn succeeded", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const mock = createMockModel({
@@ -124,9 +124,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("retries past synthetic tool results left by a mid-tool-call stream stall", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		// First turn stalls mid-tool-call: the assistant emits a `write` tool call
@@ -183,9 +183,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("reports an aborted tool-call tail only when the failed turn ended on a tool call", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const mock = createMockModel({ responses: [] });
@@ -260,9 +260,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("re-executes the aborted tool call instead of re-issuing it via the model", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const toolSchema = type({ value: type("string") });
@@ -355,9 +355,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("retries an aborted tool-call turn past a background-job result folded in after the interrupt", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const toolSchema = type({ question: type("string") });
@@ -455,9 +455,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("retries a persisted failed turn after rebuilding provider context", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const mock = createMockModel({
@@ -547,9 +547,9 @@ describe("AgentSession manual retry", () => {
 	});
 
 	it("lets an idle aside start a turn after the user resumes an interrupted run with retry", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected bundled Anthropic test model to exist");
+			throw new Error("Expected retained Copilot test model");
 		}
 
 		const toolSchema = type({});

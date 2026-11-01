@@ -8,7 +8,6 @@ import {
 	SKILL_PROMPT_MESSAGE_TYPE,
 	wrapSteeringForModel,
 } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { COLLAB_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-wire";
 
 function expectAttribution(message: Message | undefined, expected: "user" | "agent" | undefined): void {
 	expect(message).toBeDefined();
@@ -378,36 +377,6 @@ describe("wrapSteeringForModel", () => {
 		expect(rewrapped).not.toBe(wrapped);
 		expect(getUserText(rewrapped)).toContain("edited in place");
 		expect(getUserText(rewrapped)).not.toContain("first draft");
-	});
-
-	it("presents user-attributed collab prompts as wrapped user turns on every conversion path", () => {
-		const message: AgentMessage = {
-			role: "custom",
-			customType: COLLAB_PROMPT_MESSAGE_TYPE,
-			content: "Reply with exactly PONG",
-			display: true,
-			details: { from: "guest" },
-			attribution: "user",
-			timestamp: 1,
-		};
-
-		const directlyConverted = convertToLlm([message]);
-		const wrapped = wrapSteeringForModel([message]);
-		const primaryProviderMessages = convertToLlm(wrapped);
-
-		expect(directlyConverted).toHaveLength(1);
-		expect(directlyConverted[0]?.role).toBe("user");
-		expect(getUserText(directlyConverted[0])).toContain("<system-notice>");
-		expect(getUserText(directlyConverted[0])).toContain("Reply with exactly PONG");
-		expect(wrapped[0]?.role).toBe("user");
-		expect(getUserText(wrapped[0])).toContain("<system-notice>");
-		expect(getUserText(wrapped[0])).toContain("Reply with exactly PONG");
-		expect(primaryProviderMessages).toHaveLength(1);
-		expect(primaryProviderMessages[0]?.role).toBe("user");
-		expect(message).toMatchObject({
-			role: "custom",
-			details: { from: "guest" },
-		});
 	});
 
 	it("wraps buried steering messages too so wire bytes stay stable across turns", () => {

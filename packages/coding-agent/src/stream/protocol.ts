@@ -1,32 +1,13 @@
-/**
- * Local protocol between an interactive session and the `omp stream` process
- * in the same working directory.
- *
- * Transport: newline-delimited JSON over the native IPC endpoint at
- * {@link streamSocketEndpoint}. The streamer assigns each connected session a
- * wire pane id and forwards the session's frames as `StreamPaneFrame`s; the
- * session never learns about other panes or the stream server.
- *
- * Rows are already normalized and redacted when they cross this socket (see
- * `paint-encoder.ts`); the streamer is a pure multiplexer. The same screen
- * frames are persisted by session recordings (`recording.ts`).
- */
-import { STREAM_HISTORY_LIMIT, type StreamChatMessage, type StreamRow } from "@oh-my-pi/pi-wire";
+/** Screen frames persisted by local session recordings. */
+import { STREAM_HISTORY_LIMIT, type StreamRow } from "@oh-my-pi/pi-wire";
 
-export const STREAM_LOCAL_PROTO = 1;
-
-/** Session → streamer. `hello` is the first frame on the socket. */
-export type StreamSessionFrame =
-	| { t: "hello"; proto: number; sessionId: string; title: string; cols: number; rows: number }
+/** Screen-content frames stored in a recording. */
+export type StreamScreenFrame =
 	| { t: "resize"; cols: number; rows: number }
 	| { t: "history"; rows: StreamRow[] }
 	| { t: "viewport"; rows: StreamRow[] }
 	| { t: "patch"; ops: [index: number, row: StreamRow][]; rows: number }
-	| { t: "reset" }
-	| { t: "paused"; paused: boolean };
-
-/** Screen-content frames: everything a session emits after `hello` except the pause flag. */
-export type StreamScreenFrame = Exclude<StreamSessionFrame, { t: "hello" } | { t: "paused" }>;
+	| { t: "reset" };
 
 /** Materialized screen of one session: bounded scrollback plus the live viewport. */
 export interface StreamScreen {
@@ -36,21 +17,7 @@ export interface StreamScreen {
 	viewport: StreamRow[];
 }
 
-/** Streamer → session. `welcome` answers `hello`; `bye` precedes an orderly close. */
-export type StreamStreamerFrame =
-	| { t: "welcome"; proto: number; channel: string; url: string }
-	| { t: "viewers"; n: number }
-	| { t: "chat"; msg: StreamChatMessage }
-	| { t: "bye"; reason: string };
-
-/** Longest line the streamer accepts from a session; a peer exceeding it is dropped. */
-export const MAX_LOCAL_LINE_BYTES = 4 * 1024 * 1024;
-
-/**
- * Apply one screen frame to a materialized screen. Shared by the streamer's
- * reconnect-replay state and recording playback so both reconstruct identical
- * screens from the same frame sequence.
- */
+/** Apply one recorded screen frame to the materialized playback screen. */
 export function applyScreenFrame(screen: StreamScreen, frame: StreamScreenFrame): void {
 	switch (frame.t) {
 		case "resize":
@@ -90,20 +57,11 @@ function fitViewport(viewport: StreamRow[], rows: number): void {
 	while (viewport.length < rows) viewport.push("");
 }
 
-/** Structural validation of an untrusted session frame (socket peer or recording file). */
-export function isSessionFrame(value: unknown): value is StreamSessionFrame {
+/** Structural validation of an untrusted recording frame. */
+export function isScreenFrame(value: unknown): value is StreamScreenFrame {
 	if (!value || typeof value !== "object" || !("t" in value) || typeof value.t !== "string") return false;
 	const frame = value as Record<string, unknown>;
 	switch (frame.t) {
-		case "hello":
-			return (
-				typeof frame.proto === "number" &&
-				Number.isInteger(frame.proto) &&
-				typeof frame.sessionId === "string" &&
-				typeof frame.title === "string" &&
-				isDimension(frame.cols) &&
-				isDimension(frame.rows)
-			);
 		case "resize":
 			return isDimension(frame.cols) && isDimension(frame.rows);
 		case "history":
@@ -124,8 +82,6 @@ export function isSessionFrame(value: unknown): value is StreamSessionFrame {
 			);
 		case "reset":
 			return true;
-		case "paused":
-			return typeof frame.paused === "boolean";
 		default:
 			return false;
 	}

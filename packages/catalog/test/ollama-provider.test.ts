@@ -13,6 +13,27 @@ interface OllamaRequestBody {
 }
 
 describe("ollama local provider discovery", () => {
+	test("authenticates native discovery and metadata on a configured company endpoint", async () => {
+		const requested: string[] = [];
+		const fetchMock: FetchImpl = async (input, init) => {
+			const url = String(input);
+			requested.push(url);
+			expect(new Headers(init?.headers).get("authorization")).toBe("Bearer company-key");
+			if (url.endsWith("/v1/models")) return new Response(null, { status: 404 });
+			if (url.endsWith("/api/tags")) return Response.json({ models: [{ model: "local-code" }] });
+			if (url.endsWith("/api/show"))
+				return Response.json({ capabilities: ["completion"], model_info: { "llama.context_length": 32768 } });
+			throw new Error(`Unexpected request: ${url}`);
+		};
+		const options = ollamaModelManagerOptions({
+			baseUrl: "https://ollama.company.example",
+			apiKey: "company-key",
+			fetch: fetchMock,
+		});
+		const models = await options.fetchDynamicModels?.();
+		expect(models?.[0]).toMatchObject({ id: "local-code", provider: "ollama", contextWindow: 32768 });
+		expect(requested).toHaveLength(3);
+	});
 	test("applies /api/show context and thinking capabilities to OpenAI-compatible local models", async () => {
 		const fetchMock: FetchImpl = vi.fn(async (input, init) => {
 			const url = String(input);

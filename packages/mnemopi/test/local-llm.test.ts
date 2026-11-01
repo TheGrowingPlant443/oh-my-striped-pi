@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { FetchImpl } from "@oh-my-pi/pi-ai";
 import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import {
 	CallableLlmBackend,
@@ -8,7 +7,6 @@ import {
 } from "@oh-my-pi/pi-mnemopi/core/llm-backends";
 import {
 	buildHostPrompt,
-	callRemoteLlm,
 	chunkMemoriesByBudget,
 	cleanOutput,
 	complete,
@@ -54,72 +52,38 @@ afterEach(() => {
 registerMockApi();
 
 describe("local LLM TypeScript port", () => {
-	it("reports remote availability and calls OpenAI-compatible HTTP", async () => {
-		process.env.MNEMOPI_LLM_BASE_URL = "http://local-llm/v1";
-		process.env.MNEMOPI_LLM_API_KEY = "sk-test";
-		process.env.MNEMOPI_LLM_MODEL = "test-model";
-		let auth = "";
-		let model = "";
-		const fetchMock: FetchImpl = async (_input, init?) => {
-			auth = new Headers(init?.headers).get("authorization") ?? "";
-			model = (JSON.parse(String(init?.body)) as { model: string }).model;
-			return new Response(JSON.stringify({ choices: [{ message: { content: "Remote summary." } }] }), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
-		};
-
-		expect(llmAvailable()).toBe(true);
-		expect(await callRemoteLlm("Test prompt", 0.2, { fetch: fetchMock })).toBe("Remote summary.");
-		expect(auth).toBe("Bearer sk-test");
-		expect(model).toBe("test-model");
+	it("reports unavailable without an injected model or host backend", async () => {
+		process.env.MNEMOPI_HOST_LLM_ENABLED = "false";
+		expect(llmAvailable()).toBe(false);
+		expect(await complete("Test prompt")).toBeNull();
 	});
 
-	it("removes leading reasoning blocks from remote summaries", async () => {
-		process.env.MNEMOPI_LLM_BASE_URL = "http://reasoning-llm/v1";
-		const fetchMock: FetchImpl = async () =>
-			new Response(
-				JSON.stringify({
-					choices: [
-						{
-							message: {
-								content:
-									"<think>\nThe user requested a one-sentence summary.\n</think>\nMnemopi uses multilingual-e5-large.",
-							},
-						},
-					],
-				}),
-				{ status: 200, headers: { "Content-Type": "application/json" } },
-			);
-
-		expect(await summarizeMemories(["Mnemopi uses multilingual-e5-large."], "", { fetch: fetchMock })).toBe(
-			"Mnemopi uses multilingual-e5-large.",
+	it("removes leading reasoning blocks from injected summaries", async () => {
+		const summary = await withMnemopiRuntimeOptions(
+			{
+				llm: {
+					complete: () =>
+						"<think>\nThe user requested a one-sentence summary.\n</think>\nMnemopi uses multilingual-e5-large.",
+				},
+			},
+			() => summarizeMemories(["Mnemopi uses multilingual-e5-large."]),
 		);
+		expect(summary).toBe("Mnemopi uses multilingual-e5-large.");
 	});
 
 	it("preserves a literal think tag that follows real content", () => {
 		expect(cleanOutput("The XML tag is <think>keep</think>")).toBe("The XML tag is <think>keep</think>");
 	});
 
-	it("uses host backend before remote and skips remote on host miss", async () => {
+	it("uses the host backend and returns null on host miss", async () => {
 		process.env.MNEMOPI_LLM_ENABLED = "true";
 		process.env.MNEMOPI_HOST_LLM_ENABLED = "true";
-		process.env.MNEMOPI_LLM_BASE_URL = "http://remote/v1";
-		let calls = 0;
-		const fetchMock: FetchImpl = async () => {
-			calls += 1;
-			return new Response(JSON.stringify({ choices: [{ message: { content: "Remote summary." } }] }), {
-				status: 200,
-			});
-		};
-
 		setHostLlmBackend(new CallableLlmBackend("host", () => "Host summary."));
-		expect(await summarizeMemories(["Memory one"], "", { fetch: fetchMock })).toBe("Host summary.");
-		expect(calls).toBe(0);
+		expect(llmAvailable()).toBe(true);
+		expect(await summarizeMemories(["Memory one"])).toBe("Host summary.");
 
 		setHostLlmBackend(new CallableLlmBackend("host", () => null));
-		expect(await summarizeMemories(["Memory one"], "", { fetch: fetchMock })).toBeNull();
-		expect(calls).toBe(0);
+		expect(await summarizeMemories(["Memory one"])).toBeNull();
 	});
 
 	it("renders host sleep prompt override without chat-template tokens", () => {
@@ -142,24 +106,15 @@ describe("local LLM TypeScript port", () => {
 		expect(localChunks).toHaveLength(0);
 	});
 
-	it("uses a constructor-scoped completion function instead of remote URL settings", async () => {
+	it("uses a constructor-scoped completion function", async () => {
 		process.env.MNEMOPI_LLM_ENABLED = "true";
-		process.env.MNEMOPI_LLM_BASE_URL = "http://remote.example/v1";
-		let fetchCalls = 0;
-		const fetchMock: FetchImpl = async () => {
-			fetchCalls += 1;
-			throw new Error("remote should not be called");
-		};
 		const memory = new Mnemopi({
 			dbPath: tempDbPath(),
 			llm: async (prompt, opts) => `fn:${prompt}:${opts?.maxTokens ?? 0}`,
 		});
 		try {
-			const text = await withMnemopiRuntimeOptions(memory.runtimeOptions, () =>
-				complete("hello", 0.3, { fetch: fetchMock }),
-			);
+			const text = await withMnemopiRuntimeOptions(memory.runtimeOptions, () => complete("hello", 0.3));
 			expect(text).toBe("fn:hello:2048");
-			expect(fetchCalls).toBe(0);
 		} finally {
 			memory.close();
 		}
@@ -178,21 +133,39 @@ describe("local LLM TypeScript port", () => {
 		}
 	});
 
-	it("lets llm:false override remote environment defaults", async () => {
-		process.env.MNEMOPI_LLM_ENABLED = "true";
-		process.env.MNEMOPI_LLM_BASE_URL = "http://remote.example/v1";
-		let fetchCalls = 0;
-		const fetchMock: FetchImpl = async () => {
-			fetchCalls += 1;
-			throw new Error("remote should not be called");
+	it("honors enabled:false for injected models and completions", async () => {
+		let calls = 0;
+		const model = createMockModel({
+			handler: () => {
+				calls += 1;
+				return { content: ["Must not be called"] };
+			},
+		});
+		const complete = () => {
+			calls += 1;
+			return "Must not be called";
 		};
+		for (const llm of [{ model }, { complete }]) {
+			const memory = new Mnemopi({ dbPath: tempDbPath(), llm: { ...llm, enabled: false } });
+			try {
+				const result = await withMnemopiRuntimeOptions(memory.runtimeOptions, () => summarizeMemories(["hello"]));
+				expect(result).toBeNull();
+				expect(withMnemopiRuntimeOptions(memory.runtimeOptions, llmAvailable)).toBe(false);
+			} finally {
+				memory.close();
+			}
+		}
+		expect(calls).toBe(0);
+	});
+
+	it("lets llm:false disable the host backend", async () => {
+		process.env.MNEMOPI_LLM_ENABLED = "true";
+		process.env.MNEMOPI_HOST_LLM_ENABLED = "true";
+		setHostLlmBackend(new CallableLlmBackend("host", () => "Must not be called"));
 		const memory = new Mnemopi({ dbPath: tempDbPath(), llm: false });
 		try {
-			const text = await withMnemopiRuntimeOptions(memory.runtimeOptions, () =>
-				complete("hello", 0.3, { fetch: fetchMock }),
-			);
+			const text = await withMnemopiRuntimeOptions(memory.runtimeOptions, () => complete("hello", 0.3));
 			expect(text).toBeNull();
-			expect(fetchCalls).toBe(0);
 		} finally {
 			memory.close();
 		}

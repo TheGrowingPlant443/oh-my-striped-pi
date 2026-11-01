@@ -22,7 +22,7 @@ describe("classifier-cot-extraction", () => {
 	it("is set for Claude on every host and unset for GPT", () => {
 		const claude = [
 			spec("anthropic", "anthropic-messages", "claude-sonnet-4-5"),
-			spec("amazon-bedrock", "bedrock-converse-stream", "us.anthropic.claude-opus-4-1-20250805-v1:0"),
+			spec("github-copilot", "anthropic-messages", "us.anthropic.claude-opus-4-1-20250805-v1:0"),
 			spec("openrouter", "openai-completions", "anthropic/claude-opus-4.5"),
 		];
 		for (const model of claude) {

@@ -3,6 +3,8 @@ import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import * as AIError from "@oh-my-pi/pi-ai/error";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -10,10 +12,38 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
-import { getTestModel } from "./helpers/model-fixtures";
 import { assistantMsg, userMsg } from "./utilities";
 
 import { cfgRetryBaseDelayMs, cfgRetryEnabled, cfgRetryMaxRetries } from "@oh-my-pi/pi-coding-agent/session/settings";
+
+const remoteModelSpec = {
+	id: "gpt-5",
+	name: "Private native fallback fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true },
+} satisfies ModelSpec<"openai-responses">;
+
+const summaryModelSpec = {
+	id: "claude-sonnet-4-5",
+	name: "Private cross-provider fallback fixture",
+	api: "anthropic-messages",
+	provider: "anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 16_384,
+	compat: { supportsServerCompaction: false },
+	remoteCompaction: { enabled: false },
+} satisfies ModelSpec<"anthropic-messages">;
 
 describe("issue #986 compaction auth fallback", () => {
 	let tempDir: TempDir;
@@ -35,22 +65,11 @@ describe("issue #986 compaction auth fallback", () => {
 	});
 
 	async function createSession(options?: { fallbackModelRole?: string; configureFallbackAuth?: boolean }) {
-		const bundledCurrentModel = getTestModel(
-			"openai-codex",
-			model => model.api === "openai-codex-responses" && model.input.includes("text"),
-		);
-		const currentModel = {
-			...bundledCurrentModel,
-			remoteCompaction: {
-				...bundledCurrentModel.remoteCompaction,
-				enabled: true,
-				endpoint: "https://compact.example/v1/responses/compact",
-			},
-		};
-		const fallbackModel = getTestModel(
-			"anthropic",
-			model => model.api === "anthropic-messages" && model.input.includes("text"),
-		);
+		const currentModel = buildModel({
+			...remoteModelSpec,
+			remoteCompaction: { enabled: true, endpoint: "https://compact.company.invalid/v1/responses/compact" },
+		});
+		const fallbackModel = buildModel(summaryModelSpec);
 		const settings = Settings.isolated({
 			"compaction.keepRecentTokens": 1,
 			"compaction.methodOrder": ["remote", "soft"],
@@ -74,6 +93,12 @@ describe("issue #986 compaction auth fallback", () => {
 			authStorage.keys.setRuntime(fallbackModel.provider, "anthropic-token");
 		}
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider(summaryModelSpec.provider, {
+			apiKey: "test-key",
+			api: summaryModelSpec.api,
+			baseUrl: summaryModelSpec.baseUrl,
+			models: [summaryModelSpec],
+		});
 
 		session = new AgentSession({
 			agent,
@@ -101,37 +126,13 @@ describe("issue #986 compaction auth fallback", () => {
 		sameProviderNativeEnabled?: boolean;
 		includeSoftFallback?: boolean;
 	}) {
-		const currentModel = getTestModel(
-			"openai",
-			model =>
-				model.api === "openai-responses" &&
-				model.input.includes("text") &&
-				(model.contextWindow ?? 0) > 0 &&
-				compactionModule.shouldUseProviderNativeCompaction(model, {
-					remoteEnabled: true,
-					remoteStreamingV2Enabled: true,
-				}),
-		);
-		const sameProviderBase = getTestModel(
-			"openai",
-			model =>
-				model.id !== currentModel.id &&
-				model.api === "openai-responses" &&
-				(model.requestModelId ?? model.id) !== (currentModel.requestModelId ?? currentModel.id) &&
-				model.input.includes("text") &&
-				compactionModule.shouldUseProviderNativeCompaction(model, {
-					remoteEnabled: true,
-					remoteStreamingV2Enabled: true,
-				}),
-		);
+		const currentModel = buildModel(remoteModelSpec);
+		const sameProviderBase = buildModel({ ...remoteModelSpec, id: "gpt-5-mini" });
 		const sameProviderModel =
 			options?.sameProviderNativeEnabled === false
 				? { ...sameProviderBase, remoteCompaction: { ...sameProviderBase.remoteCompaction, enabled: false } }
 				: sameProviderBase;
-		const crossProviderModel = getTestModel(
-			"anthropic",
-			model => model.api === "anthropic-messages" && model.input.includes("text"),
-		);
+		const crossProviderModel = buildModel(summaryModelSpec);
 
 		const settings = Settings.isolated({
 			"compaction.autoContinue": false,
@@ -149,6 +150,21 @@ describe("issue #986 compaction auth fallback", () => {
 		authStorage.keys.setRuntime(currentModel.provider, "openai-token");
 		authStorage.keys.setRuntime(crossProviderModel.provider, "anthropic-token");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider(remoteModelSpec.provider, {
+			apiKey: "test-key",
+			api: remoteModelSpec.api,
+			baseUrl: remoteModelSpec.baseUrl,
+			models: [
+				remoteModelSpec,
+				{ ...remoteModelSpec, id: sameProviderModel.id, remoteCompaction: sameProviderModel.remoteCompaction },
+			],
+		});
+		modelRegistry.registerProvider(summaryModelSpec.provider, {
+			apiKey: "test-key",
+			api: summaryModelSpec.api,
+			baseUrl: summaryModelSpec.baseUrl,
+			models: [summaryModelSpec],
+		});
 		session = new AgentSession({
 			agent,
 			sessionManager: SessionManager.inMemory(),

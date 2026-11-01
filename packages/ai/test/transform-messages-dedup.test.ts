@@ -15,7 +15,7 @@ function makeModel(): Model<"openai-responses"> {
 		api: "openai-responses",
 		name: "GPT Test",
 		id: "gpt-test",
-		provider: "openai",
+		provider: "github-copilot",
 		baseUrl: "https://api.openai.com/v1",
 		contextWindow: 8192,
 		maxTokens: 2048,
@@ -30,7 +30,7 @@ function assistantWithCall(id: string): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "toolCall", id, name: "read", arguments: { path: "a" } }],
 		api: "openai-responses",
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-test",
 		usage: {
 			input: 0,

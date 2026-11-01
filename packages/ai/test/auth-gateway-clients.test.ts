@@ -12,7 +12,7 @@ import {
 } from "@oh-my-pi/pi-ai/auth-gateway";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { createMockModel, type MockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
 import type { Api, Model } from "@oh-my-pi/pi-ai/types";
 
@@ -21,8 +21,8 @@ const CI_TOKEN = "ci-token";
 const CI_CLIENT: AuthGatewayClient = {
 	name: "ci",
 	tokenSha256: hashAuthGatewayToken(CI_TOKEN),
-	models: ["mock/granted"],
-	accounts: { mock: ["account:acc-b"] },
+	models: ["local/granted"],
+	accounts: { local: ["account:acc-b"] },
 };
 
 function oauthAccount(suffix: string) {
@@ -45,7 +45,7 @@ describe("auth-gateway scoped clients", () => {
 		registerMockApi();
 		dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-clients-"));
 		storage = new AuthStorage(await SqliteAuthCredentialStore.open(path.join(dir, "auth.db")));
-		await storage.credentials.set("mock", [
+		await storage.credentials.set("local", [
 			oauthAccount("a"),
 			oauthAccount("b"),
 			{ type: "api_key", key: "stored-key" },
@@ -70,7 +70,7 @@ describe("auth-gateway scoped clients", () => {
 	 * a bare id the first listed model of that id the caller accepts.
 	 */
 	function boot(
-		models: MockModel[],
+		models: Model<Api>[],
 		clients: readonly AuthGatewayClient[] | undefined,
 		bearerTokens = [GATEWAY_TOKEN],
 	): AuthGatewayServerHandle {
@@ -87,6 +87,18 @@ describe("auth-gateway scoped clients", () => {
 			},
 			listModels: () => byKey.values(),
 			clients,
+			fetch: async () =>
+				new Response(
+					`data: ${JSON.stringify({
+						id: "chat-test",
+						object: "chat.completion.chunk",
+						created: 1,
+						model: "free",
+						choices: [{ index: 0, delta: { role: "assistant", content: "unbound" }, finish_reason: "stop" }],
+						usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+					})}\n\ndata: [DONE]\n\n`,
+					{ headers: { "Content-Type": "text/event-stream" } },
+				),
 			version: "test",
 		});
 		return gateway;
@@ -119,7 +131,7 @@ describe("auth-gateway scoped clients", () => {
 	it("serves a client only from its bound account, never a sibling account or API key", async () => {
 		let accountBExhausted = false;
 		const granted = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "granted",
 			handler: (_context, options) => {
 				if (accountBExhausted && options?.apiKey === "access-b") {
@@ -130,46 +142,54 @@ describe("auth-gateway scoped clients", () => {
 		});
 		boot([granted], [CI_CLIENT]);
 
-		const served = await chat(CI_TOKEN, "mock/granted", "conversation-1");
+		const served = await chat(CI_TOKEN, "local/granted", "conversation-1");
 		expect(served.status).toBe(200);
 		expect(await answer(served)).toBe("served:access-b");
 
 		accountBExhausted = true;
 		granted.reset();
-		const exhausted = await chat(CI_TOKEN, "mock/granted", "conversation-2");
+		const exhausted = await chat(CI_TOKEN, "local/granted", "conversation-2");
 		expect(exhausted.status).toBe(429);
 		expect(granted.calls.map(call => call.options?.apiKey)).toEqual(["access-b"]);
 
 		// The gateway token keeps today's behavior: recovery moves to another credential.
-		const unscoped = await chat(GATEWAY_TOKEN, "mock/granted", "conversation-3");
+		const unscoped = await chat(GATEWAY_TOKEN, "local/granted", "conversation-3");
 		expect(unscoped.status).toBe(200);
 		expect(await answer(unscoped)).not.toBe("served:access-b");
 	});
 
 	it("refuses models outside a client's grants before any credential lookup", async () => {
 		// Listed first, so a bare `shared` resolves here for unscoped callers.
-		const decoy = createMockModel({ provider: "alpha", id: "shared" });
-		const granted = createMockModel({ provider: "mock", id: "granted", handler: { content: ["ok"] } });
+		const decoy = {
+			...createMockModel({ id: "shared" }),
+			provider: "github-copilot",
+			api: "openai-completions" as const,
+		};
+		const granted = createMockModel({ provider: "local", id: "granted", handler: { content: ["ok"] } });
 		const shared = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "shared",
 			handler: (_context, options) => ({ content: [`shared:${options?.apiKey}`] }),
 		});
-		const other = createMockModel({ provider: "mock", id: "other", handler: { content: ["refused"] } });
+		const other = createMockModel({ provider: "local", id: "other", handler: { content: ["refused"] } });
 		// An aggregator-style id that spells another provider's qualified id.
-		const lookalike = createMockModel({ provider: "mock", id: "alpha/shared", handler: { content: ["lookalike"] } });
+		const lookalike = createMockModel({
+			provider: "local",
+			id: "github-copilot/shared",
+			handler: { content: ["lookalike"] },
+		});
 		boot(
 			[decoy, granted, shared, other, lookalike],
-			[{ ...CI_CLIENT, models: ["mock/granted", "mock/shared", "mock/alpha/shared"] }],
+			[{ ...CI_CLIENT, models: ["local/granted", "local/shared", "local/github-copilot/shared"] }],
 		);
 		const lookups = vi.spyOn(storage.keys, "getWithCredential");
 
-		const refused = await chat(CI_TOKEN, "mock/other");
+		const refused = await chat(CI_TOKEN, "local/other");
 		expect(refused.status).toBe(404);
 		expect(other.calls).toHaveLength(0);
 		expect(lookups).not.toHaveBeenCalled();
 		// A refused provider-qualified id is never reread as another provider's bare id.
-		expect((await chat(CI_TOKEN, "alpha/shared")).status).toBe(404);
+		expect((await chat(CI_TOKEN, "github-copilot/shared")).status).toBe(404);
 		expect(lookalike.calls).toHaveLength(0);
 
 		const bare = await chat(CI_TOKEN, "shared");
@@ -178,42 +198,76 @@ describe("auth-gateway scoped clients", () => {
 		expect(decoy.calls).toHaveLength(0);
 
 		const listed = (await (await get(CI_TOKEN, "/v1/models")).json()) as { data: Array<{ id: string }> };
-		expect(listed.data.map(row => row.id)).toEqual(["mock/granted", "mock/shared", "mock/alpha/shared"]);
+		expect(listed.data.map(row => row.id)).toEqual(["local/granted", "local/shared", "local/github-copilot/shared"]);
 		expect((await get(CI_TOKEN, "/v1/usage")).status).toBe(403);
 		expect((await get(CI_TOKEN, "/v1/credentials/check")).status).toBe(403);
 	});
 
 	it("refuses every provider its accounts omit, even without a models list", async () => {
-		const unbound = createMockModel({ provider: "alpha", id: "free", handler: { content: ["unbound"] } });
+		const unbound = {
+			...createMockModel({ id: "free" }),
+			provider: "github-copilot",
+			api: "openai-completions" as const,
+		};
 		const bound = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "granted",
 			handler: (_context, options) => ({ content: [`served:${options?.apiKey}`] }),
 		});
-		await storage.credentials.set("alpha", [{ type: "api_key", key: "alpha-key" }]);
+		await storage.credentials.set("github-copilot", [{ type: "api_key", key: "copilot-key" }]);
 		boot([unbound, bound], [{ name: "ci", tokenSha256: CI_CLIENT.tokenSha256, accounts: CI_CLIENT.accounts }]);
 
-		expect((await chat(CI_TOKEN, "alpha/free")).status).toBe(404);
+		expect((await chat(CI_TOKEN, "github-copilot/free")).status).toBe(404);
 		expect(unbound.calls).toHaveLength(0);
-		expect(await answer(await chat(CI_TOKEN, "mock/granted"))).toBe("served:access-b");
+		expect(await answer(await chat(CI_TOKEN, "local/granted"))).toBe("served:access-b");
 		const listed = (await (await get(CI_TOKEN, "/v1/models")).json()) as { data: Array<{ id: string }> };
-		expect(listed.data.map(row => row.id)).toEqual(["mock/granted"]);
+		expect(listed.data.map(row => row.id)).toEqual(["local/granted"]);
 		// The gateway token still reaches the unbound provider.
-		expect(await answer(await chat(GATEWAY_TOKEN, "alpha/free"))).toBe("unbound");
+		expect(await answer(await chat(GATEWAY_TOKEN, "github-copilot/free"))).toBe("unbound");
+	});
+
+	it.each([
+		["/v1/messages", "anthropic-messages"],
+		["/v1/chat/completions", "openai-completions"],
+		["/v1/responses", "openai-responses"],
+	] as const)("stamps replay history with the resolved local target through %s", async (route, api) => {
+		const mock = createMockModel({ id: "resolved", handler: { content: ["ok"] } });
+		const handle = boot([mock], undefined);
+		const history = [
+			{ role: "user", content: "hi" },
+			{ role: "assistant", content: "prior answer" },
+			{ role: "user", content: "continue" },
+		];
+		const response = await fetch(`${handle.url}${route}`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${GATEWAY_TOKEN}`, "Content-Type": "application/json" },
+			body: JSON.stringify({
+				model: "local/resolved",
+				...(route === "/v1/responses" ? { input: history } : { messages: history, max_tokens: 64 }),
+				stream: false,
+			}),
+		});
+		expect(response.status).toBe(200);
+		expect(mock.calls).toHaveLength(1);
+		expect(mock.calls[0]?.context.messages.find(message => message.role === "assistant")).toMatchObject({
+			provider: "local",
+			model: "resolved",
+			api,
+		});
 	});
 
 	it("keeps bearer auth on for an empty table and refuses a removed client's token", async () => {
-		const granted = createMockModel({ provider: "mock", id: "granted", handler: { content: ["ok"] } });
+		const granted = createMockModel({ provider: "local", id: "granted", handler: { content: ["ok"] } });
 		const handle = boot([granted], [], []);
 		expect((await fetch(`${handle.url}/v1/models`)).status).toBe(401);
 
 		handle.setClients([CI_CLIENT]);
-		expect((await chat(CI_TOKEN, "mock/granted")).status).toBe(200);
+		expect((await chat(CI_TOKEN, "local/granted")).status).toBe(200);
 		// A client's token anywhere but Authorization is refused, like the gateway token.
 		expect((await get(CI_TOKEN, `/v1/models?key=${CI_TOKEN}`)).status).toBe(400);
 
 		handle.setClients([]);
-		expect((await chat(CI_TOKEN, "mock/granted")).status).toBe(401);
+		expect((await chat(CI_TOKEN, "local/granted")).status).toBe(401);
 		expect(() =>
 			handle.setClients([
 				{ name: "impostor", tokenSha256: hashAuthGatewayToken(CI_TOKEN).toUpperCase() },
@@ -234,7 +288,7 @@ describe("auth-gateway scoped clients", () => {
 			const entered = Promise.withResolvers<void>();
 			const proceed = Promise.withResolvers<void>();
 			const granted = createMockModel({
-				provider: "mock",
+				provider: "local",
 				id: "granted",
 				handler: async (_context, options) => {
 					if (options?.apiKey === "access-a") {
@@ -245,9 +299,9 @@ describe("auth-gateway scoped clients", () => {
 					return { content: [`served:${options?.apiKey}`] };
 				},
 			});
-			const handle = boot([granted], [{ ...CI_CLIENT, accounts: { mock: ["account:acc-a"] } }]);
+			const handle = boot([granted], [{ ...CI_CLIENT, accounts: { local: ["account:acc-a"] } }]);
 
-			const inFlight = chat(CI_TOKEN, "mock/granted", undefined, stream);
+			const inFlight = chat(CI_TOKEN, "local/granted", undefined, stream);
 			await entered.promise;
 			// The name moves to a new token bound to account b while the old token's request waits to retry.
 			handle.setClients([{ ...CI_CLIENT, tokenSha256: hashAuthGatewayToken("ci-token-2") }]);
@@ -257,8 +311,8 @@ describe("auth-gateway scoped clients", () => {
 			if (stream) expect(await old.text()).toContain("Usage limit reached");
 			else expect(old.status).toBe(429);
 			expect(granted.calls.map(call => call.options?.apiKey)).toEqual(["access-a"]);
-			expect((await chat(CI_TOKEN, "mock/granted")).status).toBe(401);
-			expect(await answer(await chat("ci-token-2", "mock/granted"))).toBe("served:access-b");
+			expect((await chat(CI_TOKEN, "local/granted")).status).toBe(401);
+			expect(await answer(await chat("ci-token-2", "local/granted"))).toBe("served:access-b");
 		},
 	);
 
@@ -267,7 +321,7 @@ describe("auth-gateway scoped clients", () => {
 		const entered = Promise.withResolvers<void>();
 		const proceed = Promise.withResolvers<void>();
 		const granted = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "granted",
 			handler: async () => {
 				entered.resolve();
@@ -277,15 +331,15 @@ describe("auth-gateway scoped clients", () => {
 		});
 		const handle = boot([granted], [CI_CLIENT]);
 		const accountA = storage.credentials
-			.list("mock")
+			.list("local")
 			.find(row => row.credential.type === "oauth" && row.credential.accountId === "acc-a");
 		if (!accountA) throw new Error("account a is not stored");
 		// CI_CLIENT is bound to account b, so account a is refused while its restriction holds.
 		const restricted = (call: number): boolean =>
-			!storage.sessions.permits("mock", restrict.mock.calls[call]?.[1] ?? "", accountA.id);
+			!storage.sessions.permits("local", restrict.mock.calls[call]?.[1] ?? "", accountA.id);
 		expect(restricted(0)).toBe(true);
 
-		const inFlight = chat(CI_TOKEN, "mock/granted");
+		const inFlight = chat(CI_TOKEN, "local/granted");
 		await entered.promise;
 		handle.setClients([]);
 		expect(restricted(0)).toBe(true);
@@ -303,7 +357,7 @@ describe("auth-gateway scoped clients", () => {
 	it("never shares retained provider state between clients", async () => {
 		const states: unknown[] = [];
 		const granted = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "granted",
 			handler: (_context, options) => {
 				states.push(options?.providerSessionState);
@@ -313,7 +367,7 @@ describe("auth-gateway scoped clients", () => {
 		boot([granted], [CI_CLIENT, { name: "ops", tokenSha256: hashAuthGatewayToken("ops-token") }]);
 
 		for (const token of [CI_TOKEN, "ops-token", GATEWAY_TOKEN, CI_TOKEN]) {
-			expect((await chat(token, "mock/granted", "same-key")).status).toBe(200);
+			expect((await chat(token, "local/granted", "same-key")).status).toBe(200);
 		}
 		expect(new Set(states).size).toBe(3);
 		expect(states[3]).toBe(states[0]);
@@ -325,24 +379,30 @@ describe("parseAuthGatewayClients", () => {
 
 	it.each([
 		["text that is not JSON", "{", "not valid JSON"],
-		["a misspelled field", { ci: { tokenSha256: digest, model: ["mock/granted"] } }, 'unknown field "model"'],
+		["a misspelled field", { ci: { tokenSha256: digest, model: ["local/granted"] } }, 'unknown field "model"'],
 		["a truncated digest", { ci: { tokenSha256: digest.slice(1) } }, "64 hex digits"],
-		["a glob inside a model id", { ci: { tokenSha256: digest, models: ["mock/gran*"] } }, '"provider/*"'],
-		["whitespace inside a grant", { ci: { tokenSha256: digest, models: ["mock /granted"] } }, '"provider/*"'],
+		["a glob inside a model id", { ci: { tokenSha256: digest, models: ["local/gran*"] } }, '"provider/*"'],
+		["whitespace inside a grant", { ci: { tokenSha256: digest, models: ["local /granted"] } }, '"provider/*"'],
 		[
-			"an account provider id with surrounding whitespace, which would leave mock unbound",
-			{ ci: { tokenSha256: digest, accounts: { "mock ": ["account:acc-b"] } } },
+			"an account provider id with surrounding whitespace, which would leave local unbound",
+			{ ci: { tokenSha256: digest, accounts: { "local ": ["account:acc-b"] } } },
 			"provider id",
 		],
 		[
 			"identity keys that are not a list",
-			{ ci: { tokenSha256: digest, accounts: { mock: "account:acc-b" } } },
+			{ ci: { tokenSha256: digest, accounts: { local: "account:acc-b" } } },
 			"list",
 		],
 		[
 			"a model grant for a provider its accounts do not bind",
-			{ ci: { tokenSha256: digest, models: ["mock/granted", "alpha/*"], accounts: { mock: ["account:acc-b"] } } },
-			'grants provider "alpha"',
+			{
+				ci: {
+					tokenSha256: digest,
+					models: ["local/granted", "github-copilot/*"],
+					accounts: { local: ["account:acc-b"] },
+				},
+			},
+			'grants provider "github-copilot"',
 		],
 		[
 			"two clients with one token",

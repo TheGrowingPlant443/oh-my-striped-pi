@@ -5,9 +5,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
+import { Effort, type Model } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import type { ModelKind } from "@oh-my-pi/pi-catalog/types";
 import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -23,6 +22,7 @@ import type { TUI } from "@oh-my-pi/pi-tui";
 
 import { cfgCycleOrder, cfgModelPresets } from "@oh-my-pi/pi-coding-agent/config/model-settings";
 import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function normalize(lines: readonly string[]): string {
 	return stripVTControlCharacters(lines.join("\n")).replace(/\s+/g, " ").trim();
@@ -281,8 +281,7 @@ describe("ModelHub", () => {
 		});
 
 		test("tags the selected model's roles in the detail line, including custom roles", () => {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected bundled model anthropic/claude-sonnet-4-5");
+			const model = getTestModel("github-copilot", model => model.id === "claude-sonnet-4.5");
 			const settings = Settings.isolated({
 				cycleOrder: ["smol", "custom-fast", "default"],
 				modelRoles: {
@@ -304,13 +303,13 @@ describe("ModelHub", () => {
 
 		test("list rows carry no role chips; only the selected model's detail line is tagged", () => {
 			const settings = Settings.isolated({});
-			const haiku = makeModel("test", "claude-haiku-4.5");
-			const codex = makeModel("test", "gpt-5.1-codex");
+			const haiku = getTestModel("github-copilot", model => model.id === "claude-haiku-4.5");
+			const codex = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const { hub } = createHub({ models: [codex, haiku], scoped: true, settings });
 			installTestTheme();
 
 			const rendered = normalize(hub.render(220));
-			// Auto-selection tags smol → haiku and slow → codex, but only the
+			// Auto-selection tags smol → haiku and slow → gpt, but only the
 			// selected model's chips render (in the detail line). With row
 			// chips both would appear at once.
 			const hollow = ["○ smol", "○ slow"].filter(chip => rendered.includes(chip));
@@ -319,8 +318,7 @@ describe("ModelHub", () => {
 		});
 
 		test("roles view reflects auto thinking from defaultThinkingLevel and :auto suffixes", () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const settings = Settings.isolated({
 				defaultThinkingLevel: AUTO_THINKING,
 				modelRoles: {
@@ -341,9 +339,8 @@ describe("ModelHub", () => {
 		});
 		test("thinking-only edits preserve the model and scope from the persisted role layer", () => {
 			// Reasoning models: `t` only opens a strip where a level can apply.
-			const storedModel = getBundledModel("openai", "gpt-5.5");
-			const effectiveModel = getBundledModel("openai", "gpt-5.6");
-			if (!storedModel || !effectiveModel) throw new Error("Expected bundled OpenAI models");
+			const storedModel = getTestModel("github-copilot", model => model.id === "gpt-5.5");
+			const effectiveModel = getTestModel("github-copilot", model => model.id === "gpt-5.4");
 			const settings = Settings.isolated({ modelRoleStorage: "project" });
 			settings.setModelRole("default", `${storedModel.provider}/${storedModel.id}`);
 			settings.overrideModelRoles({ default: `${effectiveModel.provider}/${effectiveModel.id}` });
@@ -740,8 +737,7 @@ describe("ModelHub", () => {
 
 	describe("assignment strips", () => {
 		test("Enter opens the role strip; assigning fires onAssign and opens the thinking strip", () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const { hub, onAssign } = createHub({ models: [model], scoped: true });
 			installTestTheme();
 
@@ -759,7 +755,7 @@ describe("ModelHub", () => {
 			expect(call?.[0]).toBe(model);
 			expect(call?.[1]).toBe("default");
 			expect(call?.[2]).toBe(ThinkingLevel.Inherit);
-			expect(call?.[3]).toBe("openai/gpt-5.5");
+			expect(call?.[3]).toBe(`${model.provider}/${model.id}`);
 			expect(call?.[4]).toBe("global");
 
 			// The thinking strip follows immediately, scoped to the model's
@@ -811,8 +807,20 @@ describe("ModelHub", () => {
 		test("a reasoner without an effort ladder keeps the always-on levels", () => {
 			// `thinking: undefined` means "no dial", not "no thinking": off and
 			// auto still change what the model does, so the strip must open.
-			const model = getBundledModel("xai", "grok-code-fast-1");
-			if (!model) throw new Error("Expected bundled model xai/grok-code-fast-1");
+			const model = buildModel({
+				id: "always-on-reasoner",
+				name: "Always-on reasoner",
+				api: "openai-completions",
+				provider: "company-hub",
+				baseUrl: "https://inference.company.example/v1",
+				reasoning: true,
+				// No reviewed effort ladder for this endpoint: trust only what the spec declares.
+				compat: { trustExplicitThinkingOnly: true },
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 128_000,
+				maxTokens: 4096,
+			});
 			const { hub } = createHub({ models: [model], scoped: true });
 			installTestTheme();
 
@@ -826,8 +834,7 @@ describe("ModelHub", () => {
 			expect(thinking).not.toContain("high");
 		});
 		test("awaits an async default assignment and does not recommit its preselected thinking", async () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const assignment = Promise.withResolvers<boolean>();
 			const onAssign = vi.fn(() => assignment.promise);
 			const { hub } = createHub({ models: [model], scoped: true, callbacks: { onAssign } });
@@ -850,8 +857,7 @@ describe("ModelHub", () => {
 			expect(onAssign).toHaveBeenCalledTimes(1);
 		});
 		test("does not open thinking controls when an async assignment is rejected", async () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const assignment = Promise.withResolvers<boolean>();
 			const onAssign = vi.fn(() => assignment.promise);
 			const { hub } = createHub({ models: [model], scoped: true, callbacks: { onAssign } });
@@ -867,8 +873,7 @@ describe("ModelHub", () => {
 			expect(footerLine(hub.render(220))).not.toContain("inherit");
 		});
 		test("hides thinking chips while a changed level is being applied", async () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const thinking = Promise.withResolvers<boolean>();
 			let assignments = 0;
 			const onAssign = vi.fn(() => (++assignments === 1 ? true : thinking.promise));
@@ -930,7 +935,7 @@ describe("ModelHub", () => {
 			expect(onAssign).not.toHaveBeenCalled();
 		});
 		test("overlay tombstones do not hide stored scoped default assignments", async () => {
-			const model = makeModel("test", "claude-haiku-4.5");
+			const model = getTestModel("github-copilot", model => model.id === "claude-haiku-4.5");
 			const selector = `${model.provider}/${model.id}`;
 			const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-model-hub-"));
 			const cwd = path.join(root, "project");
@@ -992,7 +997,7 @@ describe("ModelHub", () => {
 		});
 
 		test("auto-selected roles remain assignable when the selected scope has no stored role", () => {
-			const model = makeModel("test", "claude-haiku-4.5");
+			const model = getTestModel("github-copilot", model => model.id === "claude-haiku-4.5");
 			const settings = Settings.isolated({ modelRoleStorage: "project" });
 			const { hub, onAssign, onUnassign } = createHub({ models: [model], scoped: true, settings });
 			expect(normalize(hub.render(220))).toContain("○ smol");
@@ -1009,11 +1014,8 @@ describe("ModelHub", () => {
 		});
 
 		test("global assignments preserve thinking from the global role instead of the project override", () => {
-			const configuredModel = getBundledModel("openai", "gpt-5.5");
-			const targetModel = getBundledModel("openai", "gpt-5.6");
-			if (!configuredModel || !targetModel) {
-				throw new Error("Expected bundled OpenAI models for scoped thinking test");
-			}
+			const configuredModel = getTestModel("github-copilot", model => model.id === "gpt-5.5");
+			const targetModel = getTestModel("github-copilot", model => model.id === "gpt-5.4");
 			const selector = `${configuredModel.provider}/${configuredModel.id}`;
 			const settings = Settings.isolated({ modelRoleStorage: "project" });
 			settings.setModelRole("smol", `${selector}:low,missing/unavailable:high`);
@@ -1034,11 +1036,8 @@ describe("ModelHub", () => {
 			expect(onAssign).toHaveBeenCalledTimes(1);
 		});
 		test("project-scope alias falls back to the global role when the project role is absent", () => {
-			const configuredModel = getBundledModel("openai", "gpt-5.5");
-			const targetModel = getBundledModel("openai", "gpt-5.6");
-			if (!configuredModel || !targetModel) {
-				throw new Error("Expected bundled OpenAI models for project alias fallback test");
-			}
+			const configuredModel = getTestModel("github-copilot", model => model.id === "gpt-5.5");
+			const targetModel = getTestModel("github-copilot", model => model.id === "gpt-5.4");
 			const selector = `${configuredModel.provider}/${configuredModel.id}`;
 			const settings = Settings.isolated({ modelRoleStorage: "project" });
 			// Global smol selects a concrete model with :low plus an unavailable
@@ -1056,27 +1055,41 @@ describe("ModelHub", () => {
 			// smol fallback (:low), not built-in priority defaults (Inherit).
 			const assignHub = createHub({ models: [configuredModel, targetModel], scoped: true, settings });
 			assignHub.hub.handleInput("\t"); // Sidebar → model list.
-			assignHub.hub.handleInput(DOWN); // gpt-5.5 → gpt-5.6.
-			assignHub.hub.handleInput("\n"); // Open the role strip for gpt-5.6.
+			assignHub.hub.handleInput(DOWN); // Configured model → assignment target.
+			assignHub.hub.handleInput("\n"); // Open the role strip for the target.
 			assignHub.hub.handleInput("\n"); // Assign to "project default" (first chip).
 			expect(assignHub.onAssign).toHaveBeenCalledTimes(1);
 			expect(assignHub.onAssign.mock.calls[0]?.[1]).toBe("default");
 			expect(assignHub.onAssign.mock.calls[0]?.[2]).toBe(ThinkingLevel.Low);
 			expect(assignHub.onAssign.mock.calls[0]?.[4]).toBe("project");
 
-			// Chip classification: on gpt-5.5, the project default chip is
-			// "assigned here" because @smol falls back to global smol → gpt-5.5.
+			// The configured model's project default chip is "assigned here"
+			// because @smol falls back to the global smol.
 			const classifyHub = createHub({ models: [configuredModel, targetModel], scoped: true, settings });
 			classifyHub.hub.handleInput("\t"); // Sidebar → model list.
-			classifyHub.hub.handleInput("\n"); // Open the role strip for gpt-5.5.
+			classifyHub.hub.handleInput("\n"); // Open the role strip for the configured model.
 			classifyHub.hub.handleInput("\n"); // Select "project default" (first chip).
 			expect(classifyHub.onUnassign).toHaveBeenCalledWith("default", "project");
 			expect(classifyHub.onAssign).not.toHaveBeenCalled();
 		});
 
-		test("renders max as a real final tier on max-capable models (gpt-5.6)", () => {
-			const model = getBundledModel("openai", "gpt-5.6");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.6");
+		test("renders max as a real final tier on max-capable models", () => {
+			const model = buildModel({
+				id: "max-reasoner",
+				name: "Max reasoner",
+				api: "openai-responses",
+				provider: "company-hub",
+				baseUrl: "https://inference.company.example/v1",
+				reasoning: true,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 128_000,
+				maxTokens: 4096,
+				thinking: {
+					mode: "effort",
+					efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max],
+				},
+			});
 			const { hub } = createHub({ models: [model], scoped: true });
 			installTestTheme();
 
@@ -1384,8 +1397,7 @@ describe("ModelHub", () => {
 		});
 
 		test("t on a fallback entry sets an explicit effort suffix", () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const selector = `${model.provider}/${model.id}`;
 			const settings = Settings.isolated({ "retry.fallbackChains": { default: [selector] } });
 			const { hub, onFallbackChainChange } = createHub({ models: [model], scoped: true, settings });
@@ -1407,8 +1419,7 @@ describe("ModelHub", () => {
 		});
 
 		test("t on a suffixed fallback entry clears back to inherit", () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const selector = `${model.provider}/${model.id}`;
 			const settings = Settings.isolated({ "retry.fallbackChains": { default: [`${selector}:off`] } });
 			const { hub, onFallbackChainChange } = createHub({ models: [model], scoped: true, settings });
@@ -1510,15 +1521,15 @@ describe("ModelHub", () => {
 		});
 
 		test("t on a case-variant entry resolves through the registry and saves canonically", () => {
-			const model = getBundledModel("openai", "gpt-5.5");
-			if (!model) throw new Error("Expected bundled model openai/gpt-5.5");
+			const model = getTestModel("github-copilot", model => model.id === "gpt-5.5");
 			const selector = `${model.provider}/${model.id}`;
-			const settings = Settings.isolated({ "retry.fallbackChains": { default: ["OpenAI/GPT-5.5"] } });
+			const variant = `${model.provider}/${model.id}`.toUpperCase();
+			const settings = Settings.isolated({ "retry.fallbackChains": { default: [variant] } });
 			const { hub, onFallbackChainChange } = createHub({ models: [model], scoped: true, settings });
 
 			enterRolesView(hub);
 			hub.handleInput(DOWN); // default → its fallback entry
-			expect(normalize(hub.render(220))).toContain("↳ OpenAI/GPT-5.5");
+			expect(normalize(hub.render(220))).toContain(`↳ ${variant}`);
 			expect(footerLine(hub.render(220))).toContain("t thinking");
 
 			hub.handleInput("t");
@@ -1844,20 +1855,19 @@ describe("ModelHub", () => {
 
 	describe("locked providers", () => {
 		test("catalog providers without credentials appear locked and forward to login", () => {
-			const anthropicModel = makeModel("anthropic", "claude-locked-test");
+			const copilotModel = getTestModel("github-copilot");
 			const { hub, onLoginRequest } = createHub({
-				models: [anthropicModel],
+				models: [copilotModel],
 				registry: { getAvailable: () => [] },
 			});
 			installTestTheme();
 
-			hub.handleInput(DOWN); // All models → locked anthropic (separator skipped)
+			hub.handleInput(DOWN); // All models → locked Copilot (separator skipped).
 			const rendered = normalize(hub.render(220));
-			expect(rendered).toContain("anthropic has no credentials configured");
-			expect(rendered).toContain("claude-locked-test");
+			expect(rendered).toContain(copilotModel.id);
 
 			hub.handleInput("\n");
-			expect(onLoginRequest).toHaveBeenCalledWith("anthropic");
+			expect(onLoginRequest).toHaveBeenCalledWith("github-copilot");
 		});
 	});
 });

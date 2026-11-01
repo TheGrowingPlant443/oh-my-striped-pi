@@ -31,8 +31,8 @@ describe("auth-gateway non-streaming thinking-loop retries", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-thinking-loop-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
-		const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 		for (let i = 0; i < 4; i++) {
 			mock.push({ content: [{ type: "thinking", thinking: loopThinking() }, "Unreachable cooked answer."] });
 		}
@@ -72,8 +72,8 @@ describe("auth-gateway non-streaming thinking-loop retries", () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-thinking-loop-err-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openrouter", "test-key");
-		const mock = createMockModel({ provider: "openrouter", id: "google/gemini-3.5-flash" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ provider: "local", id: "google/gemini-3.5-flash" });
 		mock.push({ throw: "upstream exploded" });
 		const handle = startAuthGateway({
 			bind: "127.0.0.1:0",
@@ -111,7 +111,7 @@ describe("auth-gateway auth retry", () => {
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-quota-rotation-"));
 		const store = await SqliteAuthCredentialStore.open(path.join(dir, "auth.db"));
 		const storage = new AuthStorage(store);
-		await storage.credentials.set("mock", [
+		await storage.credentials.set("local", [
 			{ type: "api_key", key: "quota-key" },
 			{ type: "api_key", key: "healthy-key" },
 		]);
@@ -119,7 +119,7 @@ describe("auth-gateway auth retry", () => {
 		const invalidateSpy = spyOn(storage.limits, "invalidateMatching");
 		let attempt = 0;
 		const mock = createMockModel({
-			provider: "mock",
+			provider: "local",
 			id: "gateway-quota-model",
 			handler: (_context, options) => {
 				attempt += 1;
@@ -166,12 +166,12 @@ describe("auth-gateway auth retry", () => {
 				throw new Error("expected usage-limit mark call");
 			}
 			const [usageLimitProvider, usageLimitSessionId, usageLimitOptions] = usageLimitCall;
-			expect(usageLimitProvider).toBe("mock");
+			expect(usageLimitProvider).toBe("local");
 			expect(usageLimitSessionId).toBe("gw-quota-rotation");
 			expect(usageLimitOptions?.apiKey).toBe(failedKey);
 			expect(invalidateSpy.mock.calls).toHaveLength(0);
-			expect(store.listAuthCredentials("mock")).toHaveLength(2);
-			expect(await storage.keys.get("mock", "gw-quota-rotation")).toBe(retriedKey);
+			expect(store.listAuthCredentials("local")).toHaveLength(2);
+			expect(await storage.keys.get("local", "gw-quota-rotation")).toBe(retriedKey);
 		} finally {
 			markUsageLimitSpy.mockRestore();
 			invalidateSpy.mockRestore();

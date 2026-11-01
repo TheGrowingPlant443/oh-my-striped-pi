@@ -110,7 +110,7 @@ describe("AgentSession plan-mode convergence", () => {
 	beforeAll(async () => {
 		authDir = TempDir.createSync("@pi-plan-converge-auth-");
 		authStorage = await AuthStorage.create(authDir.join("auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, authDir.join("models.yml"));
 	});
 
@@ -144,8 +144,8 @@ describe("AgentSession plan-mode convergence", () => {
 			deviceOnlyWrite?: boolean;
 		},
 	): Promise<PlanHarness> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected retained Copilot test model");
 
 		const askTool = makeTool("ask");
 		const writeTool = makeTool("write");
@@ -249,7 +249,7 @@ describe("AgentSession plan-mode convergence", () => {
 				},
 			],
 		});
-		harness.session.settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		harness.session.settings.setModelRole("advisor", "github-copilot/claude-sonnet-4.5");
 		expect(harness.session.setAdvisorEnabled(true)).toBe(true);
 		const advisor = harness.session.getAdvisorAgent();
 		if (!advisor) throw new Error("Expected advisor agent to be live");

@@ -1,5 +1,5 @@
 import { type NarrowContext, type } from "@oh-my-pi/omptype";
-import { MODEL_KINDS, RUNNER_API_KINDS } from "@oh-my-pi/pi-catalog/types";
+import { MODEL_KINDS } from "@oh-my-pi/pi-catalog/types";
 import { once } from "@oh-my-pi/pi-utils";
 
 function validateMaxContextWindow(
@@ -28,16 +28,6 @@ function validateImageCountBudget(value: { imageCountBudget?: number }, ctx: Nar
 }
 
 export const getModelsConfigSchemaBundle = once(() => {
-	const OpenRouterRoutingSchema = type({
-		"only?": "string[]",
-		"order?": "string[]",
-	});
-
-	const VercelGatewayRoutingSchema = type({
-		"only?": "string[]",
-		"order?": "string[]",
-	});
-
 	const ReasoningEffortMapSchema = type({
 		"minimal?": "string",
 		"low?": "string",
@@ -70,8 +60,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"disableReasoningWithTools?": "boolean",
 		"thinkingFormat?": '"openai" | "openrouter" | "zai" | "qwen" | "qwen-chat-template"',
 		"qwenTemplateReasoningEffort?": "boolean",
-		"openRouterRouting?": OpenRouterRoutingSchema,
-		"vercelGatewayRouting?": VercelGatewayRoutingSchema,
 		"extraBody?": { "[string]": "unknown" },
 		"cacheControlFormat?": '"anthropic"',
 		"supportsStrictMode?": "boolean",
@@ -94,7 +82,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"allowAnthropicHeaderOverrides?": "boolean",
 		"requiresToolResultId?": "boolean",
 		"replayUnsignedThinking?": "boolean",
-		"bedrockMessagesApi?": "boolean",
 		"requiresThinkingPresence?": "boolean",
 	} as const;
 
@@ -105,28 +92,14 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"whenThinking?": OpenAICompatFieldsSchema,
 	});
 
-	const BedrockCompatSchema = type({
-		"promptCacheMode?": '"none" | "automatic" | "explicit"',
-		"supportsLongPromptCacheRetention?": "boolean",
-		"promptCacheMinimumTokens?": "number >= 0",
-		"promptCacheMaximumCheckpoints?": "number >= 0",
-		"supportsThinkingBindingControls?": "boolean",
-	});
+	const ApiCompatSchema = OpenAICompatSchema;
 
-	// Provider-level overrides can target bundled models whose API is not repeated
-	// in models.yml, so preserve the sparse compat shape for each supported API.
-	const ApiCompatSchema = OpenAICompatSchema.and(BedrockCompatSchema);
-
-	const ApiSchema = type(
-		'"openai-completions" | "openai-responses" | "openai-codex-responses" | "azure-openai-responses" | "anthropic-messages" | "bedrock-converse-stream" | "google-generative-ai" | "google-gemini-cli" | "google-vertex" | "openrouter-decisions" | "openai-decisions" | "workers-ai-systemone" | "typesafe"',
-	);
+	const ApiSchema = type("string > 0");
 
 	// Models may also name a runner API (web search is built in). `validateProviderConfiguration`
 	// checks that `kind` matches the api's kind. `search` is left out with `web-search`: no api
 	// a models.yml entry can name serves it.
-	const ModelApiSchema = ApiSchema.or(
-		type.enumerated(...Object.keys(RUNNER_API_KINDS).filter(api => api !== "web-search")),
-	);
+	const ModelApiSchema = ApiSchema;
 	const ModelKindSchema = type.enumerated(...MODEL_KINDS.filter(kind => kind !== "search"));
 
 	const EffortSchema = type('"minimal" | "low" | "medium" | "high" | "xhigh" | "max"');
@@ -239,7 +212,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"maxContextWindow?": "number",
 		"maxTokens?": "number",
 		"omitMaxOutputTokens?": "boolean",
-		"preferWebsockets?": "boolean",
 		"headers?": { "[string]": "string" },
 		"compat?": ApiCompatSchema,
 		"contextPromotionTarget?": "string",
@@ -299,7 +271,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"maxContextWindow?": "number",
 		"maxTokens?": "number",
 		"omitMaxOutputTokens?": "boolean",
-		"preferWebsockets?": "boolean",
 		"headers?": { "[string]": "string" },
 		"compat?": ApiCompatSchema,
 		"contextPromotionTarget?": "string",
@@ -343,11 +314,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		 * the bundled catalog reference alone — for endpoints whose advertised
 		 * levels do not match what the route actually accepts.
 		 *
-		 * Only the discovery types that read `/v1/models` rows accept it. LiteLLM
-		 * is rejected rather than accepted-and-ignored: its authoritative
-		 * reasoning metadata comes from `/model_group/info`, so the flag would
-		 * apply only on the `/v1/models` fallback and silently do nothing the rest
-		 * of the time.
 		 */
 		"advertisedReasoning?": "boolean",
 	}).narrow((value, ctx) => {
@@ -386,21 +352,6 @@ export const getModelsConfigSchemaBundle = once(() => {
 		"models?": ModelDefinitionSchema.array(),
 		"modelOverrides?": { "[string]": ModelOverrideSchema },
 		"disableStrictTools?": "boolean",
-		/**
-		 * Amazon Bedrock Guardrail id or ARN attached to every Converse request under
-		 * this provider. Required by accounts that gate `bedrock:InvokeModel*` on the
-		 * `bedrock:GuardrailIdentifier` condition key.
-		 */
-		"guardrailIdentifier?": "string",
-		/** Bedrock guardrail version (defaults to `"DRAFT"` when a guardrail is set). */
-		"guardrailVersion?": "string",
-		/** Bedrock guardrail trace verbosity. */
-		"guardrailTrace?": '"enabled" | "disabled" | "enabled_full"',
-		/**
-		 * Bedrock invocation-log tags attached to every Converse request under this
-		 * provider (max 16 entries; keys/values limited to `[a-zA-Z0-9\s:_@$#=/+,-.]`).
-		 */
-		"requestMetadata?": { "[string]": "string" },
 		/**
 		 * Streaming transport override. When set to `"pi-native"`, omp dispatches
 		 * every model under this provider via the auth-gateway's

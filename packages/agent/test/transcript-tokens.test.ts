@@ -26,8 +26,8 @@ function assistant(text: string, overrides: Partial<AssistantMessage> = {}): Ass
 	return {
 		role: "assistant",
 		content: [{ type: "text", text }],
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock-model",
 		usage: usage(),
 		stopReason: "stop",

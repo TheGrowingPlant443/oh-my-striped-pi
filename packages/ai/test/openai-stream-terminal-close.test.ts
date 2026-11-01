@@ -18,10 +18,10 @@ import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 const completionsModel = {
-	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
+	...(getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">),
 	api: "openai-completions",
 } satisfies Model<"openai-completions">;
-const responsesModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+const responsesModel = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 
 function baseContext(): Context {
 	return {

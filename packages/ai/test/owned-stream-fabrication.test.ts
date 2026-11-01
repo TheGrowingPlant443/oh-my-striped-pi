@@ -30,8 +30,8 @@ function makeAssistant(content: AssistantMessage["content"]): AssistantMessage {
 	return {
 		role: "assistant",
 		content,
-		api: "mock",
-		provider: "mock",
+		api: "openai-completions",
+		provider: "github-copilot",
 		model: "mock-model",
 		usage,
 		stopReason: "stop",

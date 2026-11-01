@@ -30,7 +30,6 @@ function captureAnthropicPayload(model: Model<"anthropic-messages">): Promise<un
 	const { promise, resolve } = Promise.withResolvers<unknown>();
 	streamAnthropic(model, testContext, {
 		apiKey: "ghu_test_copilot_token",
-		isOAuth: false,
 		reasoning: Effort.High,
 		thinkingEnabled: true,
 		signal: createAbortedSignal(),

@@ -1,9 +1,9 @@
 import type { UsageLimit, UsageReport } from "@oh-my-pi/pi-ai";
 import { sanitizeText } from "@oh-my-pi/pi-utils";
 import type { OAuthAccountIdentity } from "../../session/auth-storage";
-import { collapseSharedUsageReports, summarizeUsageResetCredits } from "@oh-my-pi/pi-tui/overlays/usage-display";
+import { collapseSharedUsageReports } from "@oh-my-pi/pi-tui/overlays/usage-display";
 import type { SlashCommandRuntime } from "../types";
-import { formatCodexUsageReportLabel, reportMatchesActiveAccount } from "./active-oauth-account";
+import { reportMatchesActiveAccount } from "./active-oauth-account";
 import { formatCoarseDuration, formatProviderName, renderAsciiBar } from "@oh-my-pi/pi-tui/chrome/format";
 
 function formatWindowSuffix(label: string, windowLabel: string | undefined): string {
@@ -32,12 +32,10 @@ function formatUsageReportAccount(
 	limit: UsageLimit,
 	index: number,
 ): string {
-	const codex = report.provider === "openai-codex";
 	const metaOrgName = report.metadata?.orgName;
 	const metaOrgId = report.metadata?.orgId;
 	const org = typeof metaOrgName === "string" && metaOrgName ? metaOrgName : metaOrgId;
 	const label = (identity: string, includeOrg: boolean): string => {
-		if (codex) return formatCodexUsageReportLabel(report, peers, identity);
 		return includeOrg && typeof org === "string" && org && org !== identity ? `${identity} (${org})` : identity;
 	};
 	const email = report.metadata?.email;
@@ -57,7 +55,7 @@ function renderUsageReports(
 	resolveActiveAccount?: (provider: string) => OAuthAccountIdentity | undefined,
 	usageModelSelectors: readonly string[] = [],
 ): string {
-	const displayReports = collapseSharedUsageReports(reports);
+	const displayReports = collapseSharedUsageReports(reports.filter(report => report.provider === "github-copilot"));
 	const latestFetchedAt = Math.max(...displayReports.map(report => report.fetchedAt ?? 0));
 	const lines = [`Usage${latestFetchedAt ? ` (${formatCoarseDuration(nowMs - latestFetchedAt)} ago)` : ""}`];
 	const grouped = new Map<string, UsageReport[]>();
@@ -83,51 +81,9 @@ function renderUsageReports(
 			lines.push(`  ${sanitizeText(note.replace(/[\r\n]+/g, " ").replace(/\t/g, "  "))}`);
 		for (const report of providerReports) {
 			const inUse = reportMatchesActiveAccount(report, activeAccount);
-			const resets = summarizeUsageResetCredits(report.resetCredits, nowMs);
-			if (resets && resets.bankedCount > 0) {
-				const resetIdentity =
-					typeof report.metadata?.email === "string"
-						? report.metadata.email
-						: typeof report.metadata?.accountId === "string"
-							? report.metadata.accountId
-							: "account";
-				let resetLabel: string;
-				if (report.provider === "openai-codex") {
-					resetLabel = formatCodexUsageReportLabel(report, providerReports, resetIdentity);
-				} else {
-					const orgName = report.metadata?.orgName;
-					const orgId = report.metadata?.orgId;
-					const org =
-						typeof orgName === "string" && orgName ? orgName : typeof orgId === "string" ? orgId : undefined;
-					const raw = org && org !== resetIdentity ? `${resetIdentity} (${org})` : resetIdentity;
-					resetLabel = sanitizeText(raw.replace(/[\r\n\t]+/g, " "));
-				}
-				const availability =
-					resets.redeemableCount === resets.bankedCount ? "available" : `${resets.redeemableCount} usable now`;
-				lines.push(
-					`- ${resetLabel}: ${resets.bankedCount} saved rate-limit reset${resets.bankedCount === 1 ? "" : "s"} — ${availability} — /usage reset to spend`,
-				);
-				if (resets.soonestExpiry) {
-					const expiryMs = Date.parse(resets.soonestExpiry);
-					const remaining = expiryMs - nowMs;
-					if (remaining > 0) {
-						lines.push(
-							`  soonest expires in ${formatCoarseDuration(remaining)} (${resets.soonestExpiry.slice(0, 10)})`,
-						);
-					} else {
-						lines.push(`  expired (${resets.soonestExpiry.slice(0, 10)})`);
-					}
-				}
-				if (resets.redeemableCount === 0 && resets.unavailableReason) {
-					const reason = sanitizeText(resets.unavailableReason.replace(/[\r\n\t]+/g, " "));
-					lines.push(`  unavailable: ${reason}`);
-				}
-			}
 			if (report.limits.length === 0) {
 				const email = typeof report.metadata?.email === "string" ? report.metadata.email : "account";
-				const label =
-					report.provider === "openai-codex" ? formatCodexUsageReportLabel(report, providerReports, email) : email;
-				lines.push(`- ${label}: no limits reported`);
+				lines.push(`- ${email}: no limits reported`);
 				continue;
 			}
 			for (let index = 0; index < report.limits.length; index++) {

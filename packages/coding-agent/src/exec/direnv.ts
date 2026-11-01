@@ -176,13 +176,7 @@ async function findEnvrcCached(startDir: string): Promise<string | null> {
 
 /** direnv computes its diff relative to the spawning env; strip any inherited
  *  direnv state so it loads the target `.envrc` from a clean baseline. */
-// Filtered parent-env baseline, versioned against live Bun.env: production
-// code DOES mutate Bun.env mid-process (deferred MCP discovery sets
-// EXA_API_KEY in sdk.ts after the session is usable), so a permanently
-// cached baseline would spawn direnv with stale values. Key cheaply on size
-// + a rolling checksum; a mismatch rebuilds. DIRENV_* values are stripped
-// (direnv diffs relative to the spawning env), so they are excluded from
-// both the checksum and the output.
+// Runtime Bun.env changes invalidate the baseline; DIRENV_* is excluded from both checksum and output.
 let cleanSpawnEnvCache: { size: number; checksum: number; env: Record<string, string> } | undefined;
 
 function envChecksum(): { size: number; checksum: number } {

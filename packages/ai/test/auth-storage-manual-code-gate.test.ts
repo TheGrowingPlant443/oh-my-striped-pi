@@ -1,15 +1,15 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
 import type { OAuthLoginCallbacks, OAuthProviderInterface } from "@oh-my-pi/pi-ai/registry/oauth/types";
 
 const TEST_SOURCE = "manual-code-gate-test";
 
-// A custom (extension) OAuth provider is, by construction, NOT in
-// PASTE_CODE_LOGIN_PROVIDERS (that set is built from the static built-in
-// registry's `pasteCodeFlow` flags). It therefore exercises the loopback path:
-// AuthStorage.oauth.login must NOT synthesize a default manual-code prompt for it.
+// Capture controller forwarding without running the retained Copilot device flow.
 function registerCapturingLoopbackProvider(id: string): { received: () => OAuthLoginCallbacks | undefined } {
 	let captured: OAuthLoginCallbacks | undefined;
 	const provider: OAuthProviderInterface = {
@@ -23,7 +23,7 @@ function registerCapturingLoopbackProvider(id: string): { received: () => OAuthL
 			return "";
 		},
 	};
-	registerOAuthProvider(provider);
+	mockOAuthProvider(provider);
 	return { received: () => captured };
 }
 
@@ -38,15 +38,15 @@ describe("AuthStorage.oauth.login default manual-code prompt gating", () => {
 	});
 
 	afterEach(() => {
-		unregisterOAuthProviders(TEST_SOURCE);
+		resetOAuthMocks(TEST_SOURCE);
 		vi.restoreAllMocks();
 		store.close();
 	});
 
 	it("does NOT synthesize a default manual-code prompt for a loopback provider", async () => {
-		const capture = registerCapturingLoopbackProvider("loopback-capture-provider");
+		const capture = registerCapturingLoopbackProvider("github-copilot");
 
-		await storage.oauth.login("loopback-capture-provider", {
+		await storage.oauth.login("github-copilot", {
 			onAuth: () => {},
 			onPrompt: async () => "should-not-be-called",
 		});
@@ -60,10 +60,10 @@ describe("AuthStorage.oauth.login default manual-code prompt gating", () => {
 	});
 
 	it("honors an explicit caller-supplied manual-code prompt for a loopback provider (escape hatch)", async () => {
-		const capture = registerCapturingLoopbackProvider("loopback-explicit-provider");
+		const capture = registerCapturingLoopbackProvider("github-copilot");
 		const explicit = async () => "explicit-code";
 
-		await storage.oauth.login("loopback-explicit-provider", {
+		await storage.oauth.login("github-copilot", {
 			onAuth: () => {},
 			onPrompt: async () => "unused",
 			onManualCodeInput: explicit,
@@ -71,37 +71,5 @@ describe("AuthStorage.oauth.login default manual-code prompt gating", () => {
 
 		const forwarded = capture.received();
 		expect(forwarded?.onManualCodeInput).toBe(explicit);
-	});
-
-	it("synthesizes a default manual-code prompt for a paste-code provider when the caller omits one", async () => {
-		let authUrl = "";
-		let promptMessage = "";
-		const fetchImpl = vi.fn(
-			async () =>
-				new Response(
-					JSON.stringify({
-						access_token: "access-token",
-						refresh_token: "refresh-token",
-						expires_in: 3600,
-						created_at: 1000,
-					}),
-					{ status: 200, headers: { "Content-Type": "application/json" } },
-				),
-		);
-
-		await storage.oauth.login("gitlab-duo-agent", {
-			onAuth: info => {
-				authUrl = info.url;
-			},
-			onPrompt: async prompt => {
-				promptMessage = prompt.message;
-				const state = new URL(authUrl).searchParams.get("state");
-				return `vscode://gitlab.gitlab-workflow/authentication?code=manual-code&state=${state}`;
-			},
-			fetch: fetchImpl,
-		});
-
-		expect(promptMessage).not.toBe("");
-		expect(fetchImpl).toHaveBeenCalledTimes(1);
 	});
 });

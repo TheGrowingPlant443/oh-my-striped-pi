@@ -14,7 +14,7 @@ Programmatic usage of omp-coding-agent via `createAgentSession()`.
 | `06-hooks.ts`              | Logging, blocking, result modification         |
 | `07-context-files.ts`      | AGENTS.md context files                        |
 | `08-slash-commands.ts`     | File-based slash commands                      |
-| `09-api-keys-and-oauth.ts` | API key resolution, OAuth config               |
+| `09-api-keys-and-oauth.ts` | Copilot auth storage and runtime credentials   |
 | `10-settings.ts`           | Override compaction, retry, terminal settings  |
 | `11-sessions.ts`           | In-memory, persistent, continue, list sessions |
 | `12-full-control.ts`       | Replace everything, no discovery               |
@@ -57,7 +57,7 @@ const modelRegistry = discoverModels(authStorage);
 const { session } = await createAgentSession({ authStorage, modelRegistry });
 
 // Custom model
-const model = getModel("anthropic", "claude-opus-4-5");
+const model = getModel("github-copilot", "gpt-5.5");
 const { session } = await createAgentSession({ model, thinkingLevel: "high", authStorage, modelRegistry });
 
 // Modify prompt
@@ -79,7 +79,7 @@ const { session } = await createAgentSession({
 
 // Full control
 const customAuth = await AuthStorage.create("/my/app/agent.db");
-customAuth.keys.setRuntime("anthropic", Bun.env.MY_KEY!);
+customAuth.keys.setRuntime("github-copilot", Bun.env.COPILOT_GITHUB_TOKEN!);
 const customRegistry = new ModelRegistry(customAuth);
 
 const { session } = await createAgentSession({
@@ -95,6 +95,9 @@ const { session } = await createAgentSession({
 	slashCommands: [],
 	sessionManager: SessionManager.inMemory(),
 });
+
+// Only github-copilot and literal local tiny/TTS/STT workers are supported.
+// Removed persisted provider selectors fail rather than silently choosing Copilot.
 
 // Run prompts
 session.subscribe(event => {

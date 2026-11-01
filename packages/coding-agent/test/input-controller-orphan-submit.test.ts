@@ -168,10 +168,10 @@ describe("InputController orphaned submit", () => {
 		let session: AgentSession | undefined;
 		let authStorage: AuthStorage | undefined;
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Expected built-in anthropic model to exist");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			if (!model) throw new Error("Expected built-in Copilot model to exist");
 			authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-			authStorage.keys.setRuntime("anthropic", "test-key");
+			authStorage.keys.setRuntime("github-copilot", "test-key");
 			const agent = new Agent({
 				initialState: {
 					model,

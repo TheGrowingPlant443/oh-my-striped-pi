@@ -30,7 +30,7 @@ describe("AgentSession computer display hold per turn", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-computer-turn-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -91,8 +91,7 @@ describe("AgentSession computer display hold per turn", () => {
 		releases.length = 0;
 		resumes.length = 0;
 		steps.length = 0;
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		const mock = createMockModel({ responses });
 		const agent = new Agent({
 			getApiKey: () => "test-key",

@@ -70,16 +70,10 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 			modelsPath,
 			[
 				"providers:",
-				"  my-provider:",
+				"  github-copilot:",
 				`    baseUrl: ${baseUrl}`,
 				"    api: openai-completions",
 				"    apiKey: MY_API_KEY",
-				"    discovery:",
-				"      type: openai-models-list",
-				"  unrelated-provider:",
-				`    baseUrl: ${unrelatedBaseUrl}`,
-				"    api: openai-completions",
-				"    auth: none",
 				"    discovery:",
 				"      type: openai-models-list",
 				"",
@@ -91,8 +85,7 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 	function registry(): ModelRegistry {
 		const authStorage = createInMemoryAuthStorage();
 		authStoragesToClose.push(authStorage);
-		authStorage.keys.setRuntime("my-provider", "test-provider-key");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-provider-key");
 		return new ModelRegistry(authStorage, writeDiscoveryConfig(), {
 			fetch: mockDiscovery(["some-model"]),
 		});
@@ -102,11 +95,11 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 		const modelRegistry = registry();
 		const settings = Settings.isolated();
 		cfgPrewalkEnabled.set(settings, true);
-		settings.setModelRole("smol", "my-provider/some-model");
+		settings.setModelRole("smol", "github-copilot/some-model");
 
 		const options = await buildSessionOptions(parseArgs([]), [], SessionManager.inMemory(), modelRegistry, settings);
 
-		expect(options.prewalk?.target.provider).toBe("my-provider");
+		expect(options.prewalk?.target.provider).toBe("github-copilot");
 		expect(options.prewalk?.target.id).toBe("some-model");
 		expect(requestedUrls).not.toContain(`${unrelatedBaseUrl}/models`);
 	});
@@ -116,25 +109,25 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 		const settings = Settings.isolated();
 
 		const options = await buildSessionOptions(
-			parseArgs(["--prewalk-into", "my-provider/some-model"]),
+			parseArgs(["--prewalk-into", "github-copilot/some-model"]),
 			[],
 			SessionManager.inMemory(),
 			modelRegistry,
 			settings,
 		);
 
-		expect(options.prewalk?.target.provider).toBe("my-provider");
+		expect(options.prewalk?.target.provider).toBe("github-copilot");
 		expect(options.prewalk?.target.id).toBe("some-model");
 		expect(requestedUrls).not.toContain(`${unrelatedBaseUrl}/models`);
 	});
 
 	test("checks an earlier discovery-backed fallback before a later static model", async () => {
 		const modelRegistry = registry();
-		const fallbackModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!fallbackModel) throw new Error("expected claude-sonnet-4-5 to be bundled");
+		const fallbackModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+		if (!fallbackModel) throw new Error("expected Copilot GPT-5.6 Sol to be bundled");
 
 		const settings = Settings.isolated();
-		settings.setModelRole("default", `my-provider/some-model,${fallbackModel.provider}/${fallbackModel.id}`);
+		settings.setModelRole("default", `github-copilot/some-model,${fallbackModel.provider}/${fallbackModel.id}`);
 
 		const options = await buildSessionOptions(
 			parseArgs(["--prewalk-into", "@default"]),
@@ -144,16 +137,16 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 			settings,
 		);
 
-		expect(options.prewalk?.target.provider).toBe("my-provider");
+		expect(options.prewalk?.target.provider).toBe("github-copilot");
 		expect(options.prewalk?.target.id).toBe("some-model");
 		expect(requestedUrls).toContain(`${baseUrl}/models`);
 		expect(requestedUrls).not.toContain(`${unrelatedBaseUrl}/models`);
 	});
 
-	test("continues discovery through ordered fallback providers", async () => {
+	test("continues through ordered discovery-backed fallback models", async () => {
 		const modelRegistry = registry();
 		const settings = Settings.isolated();
-		settings.setModelRole("default", "my-provider/missing,unrelated-provider/unrelated-model");
+		settings.setModelRole("default", "github-copilot/missing,github-copilot/some-model");
 
 		const options = await buildSessionOptions(
 			parseArgs(["--prewalk-into", "@default"]),
@@ -163,10 +156,10 @@ describe("issue #11820 prewalk into a models.yml discovery provider target", () 
 			settings,
 		);
 
-		expect(options.prewalk?.target.provider).toBe("unrelated-provider");
-		expect(options.prewalk?.target.id).toBe("unrelated-model");
+		expect(options.prewalk?.target.provider).toBe("github-copilot");
+		expect(options.prewalk?.target.id).toBe("some-model");
 		expect(requestedUrls).toContain(`${baseUrl}/models`);
-		expect(requestedUrls).toContain(`${unrelatedBaseUrl}/models`);
+		expect(requestedUrls).not.toContain(`${unrelatedBaseUrl}/models`);
 	});
 
 	test("does not probe discovery providers for an unqualified missing target", async () => {

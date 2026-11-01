@@ -13,6 +13,8 @@ import type { AuthApiKeyOptions, AuthStorage } from "../auth-storage";
 import * as AIError from "../error";
 import { classifyGatewayError, type GatewayErrorClassification } from "../error/gateway";
 import { isUsageLimitOutcome } from "../error/rate-limit";
+import { NO_AUTH_SENTINEL } from "../auth-retry";
+import { getProviderDefinition } from "../registry";
 import type { Api, FetchImpl, Model, Usage } from "../types";
 import type { ClientUsageIdentity } from "../usage";
 import { extractProviderRetryHint } from "../utils/retry-after";
@@ -42,6 +44,8 @@ export type ModelResolver = (modelId: string, options?: ModelResolveOptions) => 
 export interface AuthGatewayRouteOptions {
 	/** Source of credentials: broker-backed for `serve`, the CLI's own for `stdio`. */
 	storage: AuthStorage;
+	/** Resolve configured no-auth mode only after storage has no credential; scoped storage failures never fall back. */
+	getApiKeyWithCredential?: AuthStorage["keys"]["getWithCredential"];
 	/**
 	 * Resolve a client-requested model id to a pi-ai Model. Caller supplies
 	 * this from a ModelRegistry (lives in `coding-agent` to avoid an inverse
@@ -63,7 +67,10 @@ export interface AuthGatewayRouteOptions {
 }
 
 /** The route options a request's credential lookups read. */
-export type AuthGatewayCredentialOptions = Pick<AuthGatewayRouteOptions, "storage" | "client">;
+export type AuthGatewayCredentialOptions = Pick<
+	AuthGatewayRouteOptions,
+	"storage" | "client" | "getApiKeyWithCredential"
+>;
 
 /** The HTTP server's options: the routes' plus its listener and inbound auth. */
 export interface AuthGatewayBootOptions extends AuthGatewayServerOptions, AuthGatewayRouteOptions {}
@@ -123,6 +130,14 @@ export async function resolveGatewayApiKey(
 	signal: AbortSignal,
 	peer: string,
 ): Promise<ResolvedApiKey | GatewayErrorClassification> {
+	if (
+		model.api !== "apple-foundation-models" &&
+		model.api !== "local-inference" &&
+		!model.baseUrl?.trim() &&
+		model.provider !== "github-copilot"
+	) {
+		return { status: 400, type: "invalid_request_error", message: `${model.api} requires an explicit base URL` };
+	}
 	let apiKey: ResolvedApiKey | undefined;
 	try {
 		apiKey = await opts.storage.keys.getWithCredential(
@@ -130,12 +145,20 @@ export async function resolveGatewayApiKey(
 			gatewayCredentialSessionId(opts, model, sessionId),
 			modelKeyOptions(model, signal),
 		);
+		if (!apiKey && opts.getApiKeyWithCredential) {
+			apiKey = await opts.getApiKeyWithCredential(
+				model.provider,
+				gatewayCredentialSessionId(opts, model, sessionId),
+				modelKeyOptions(model, signal),
+			);
+		}
 	} catch (error) {
 		const classified = classifyGatewayError(error);
 		logger.warn("auth-gateway getApiKey threw", { provider: model.provider, peer, error: classified.message });
 		return classified;
 	}
 	if (apiKey) return apiKey;
+	if (getProviderDefinition(model.provider)?.allowsMissingApiKey) return { apiKey: NO_AUTH_SENTINEL };
 	return {
 		status: 401,
 		type: "authentication_error",
@@ -213,9 +236,9 @@ async function refreshGatewayApiKeyAfterAuthError(
 	return storage.keys.getWithCredential(provider, sessionId, modelKeyOptions(model, signal));
 }
 
-/** Model-scoped key options: usage ranking by model id, routing to accounts discovery saw serve it. */
+/** Model-scoped key options for usage ranking. */
 function modelKeyOptions(model: Model<Api>, signal: AbortSignal): AuthApiKeyOptions {
-	return { modelId: model.id, accountIds: model.accountAccess && Object.keys(model.accountAccess), signal };
+	return { modelId: model.id, signal };
 }
 
 /**

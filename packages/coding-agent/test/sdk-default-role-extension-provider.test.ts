@@ -1,19 +1,8 @@
-/**
- * Regression: issue #3569.
- *
- * `modelRoles.default` set to a model from an extension-registered provider was
- * ignored on fresh interactive launches (no `-c`/`--resume`, no `--model`).
- * Extensions register their providers AFTER the SDK's early `defaultRoleSpec`
- * resolution, so the role-pointed model wasn't visible there. The post-extension
- * fallback then went straight to `pickDefaultAvailableModel`, which prefers a
- * bundled provider's default (e.g. `openai/gpt-5.5` when `OPENAI_API_KEY` is set)
- * over the configured default role.
- */
+/** Extension-provided Copilot models participate in configured default resolution. */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession, type ExtensionFactory } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -42,7 +31,7 @@ describe("issue #3569 fresh launch default role from extension provider", () => 
 	});
 
 	const providerExtension: ExtensionFactory = pi => {
-		pi.registerProvider("runtime-provider", {
+		pi.registerProvider("github-copilot", {
 			baseUrl: "https://runtime.example.com/v1",
 			apiKey: "RUNTIME_KEY",
 			api: "openai-completions",
@@ -60,22 +49,14 @@ describe("issue #3569 fresh launch default role from extension provider", () => 
 		});
 	};
 
-	test("honors modelRoles.default pointing at an extension model when a bundled provider key is present", async () => {
-		const bundledOpenAiDefault = getBundledModel("openai", "gpt-5.5");
-		if (!bundledOpenAiDefault) {
-			throw new Error("Expected bundled OpenAI GPT-5.5 default");
-		}
-
+	test("honors modelRoles.default pointing at an extension model over bundled defaults", async () => {
 		const authStorage = createInMemoryAuthStorage();
 		authStoragesToClose.push(authStorage);
-		// Mirrors the reporter's environment: `OPENAI_API_KEY` is configured for a
-		// bundled provider whose `pickDefaultAvailableModel` entry would otherwise
-		// win the startup fallback.
-		authStorage.keys.setRuntime("openai", "test-openai-key");
+		authStorage.keys.setRuntime("github-copilot", "test-copilot-key");
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
 
 		const settings = Settings.isolated();
-		settings.setModelRole("default", "runtime-provider/runtime-model");
+		settings.setModelRole("default", "github-copilot/runtime-model");
 
 		const { session } = await createAgentSession({
 			cwd: tempDir,
@@ -99,7 +80,7 @@ describe("issue #3569 fresh launch default role from extension provider", () => 
 		});
 
 		try {
-			expect(session.model?.provider).toBe("runtime-provider");
+			expect(session.model?.provider).toBe("github-copilot");
 			expect(session.model?.id).toBe("runtime-model");
 		} finally {
 			await session.dispose();

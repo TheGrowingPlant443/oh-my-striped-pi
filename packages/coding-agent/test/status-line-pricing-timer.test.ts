@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { StatusLineComponent } from "@oh-my-pi/pi-tui/status-line";
@@ -21,7 +21,30 @@ afterEach(() => {
 });
 
 function fixture() {
-	const model: Model = getBundledModel("deepseek", "deepseek-v4-flash");
+	const model = buildModel({
+		id: "tariff-model",
+		name: "Company tariff model",
+		provider: "company-tariff",
+		api: "openai-completions",
+		baseUrl: "https://inference.company.example/v1",
+		reasoning: false,
+		input: ["text"],
+		contextWindow: 128000,
+		maxTokens: 8192,
+		cost: {
+			input: 1,
+			output: 2,
+			cacheRead: 0,
+			cacheWrite: 0,
+			timeBased: {
+				offPeakMultiplier: 0.5,
+				peakWindows: [
+					{ weekdays: [0, 1, 2, 3, 4, 5, 6], startMinute: 0, endMinute: 240 },
+					{ weekdays: [0, 1, 2, 3, 4, 5, 6], startMinute: 360, endMinute: 1440 },
+				],
+			},
+		},
+	});
 	const state: { model: Model; messages: [] } = { model, messages: [] };
 	const session = {
 		state,
@@ -69,7 +92,7 @@ function fixture() {
 		render: () => stripVTControlCharacters(component.renderBottomBar(80, "full")),
 		useFlatModel: () => {
 			const { timeBased: _schedule, ...cost } = model.cost;
-			state.model = { ...model, provider: "openrouter", cost };
+			state.model = { ...model, cost };
 			component.invalidate();
 		},
 	};

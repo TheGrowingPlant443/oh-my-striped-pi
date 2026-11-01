@@ -10,30 +10,28 @@ interface CapturedPayload {
 	reasoning_effort?: string;
 }
 
-type RouteApi = "openai-completions" | "openrouter";
+type RouteApi = "openai-completions" | "openai-responses";
 
 const context: Context = {
 	messages: [{ role: "user", content: "hello", timestamp: Date.now() }],
 };
 
-function fixture<TApi extends RouteApi>(api: TApi, provider: string, baseUrl: string, id: string): Model<TApi> {
-	return buildModel({
-		id,
-		name: id,
-		api,
-		provider,
-		baseUrl,
-		reasoning: true,
-		thinking: {
-			mode: "effort",
-			efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High],
-		},
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 400_000,
-		maxTokens: 128_000,
-	} as ModelSpec<TApi>);
-}
+const fixture = {
+	id: "gpt-5.1",
+	name: "gpt-5.1",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
+	reasoning: true,
+	compat: { supportsReasoningParams: true, reasoningDisableMode: "omit" },
+	thinking: {
+		mode: "effort",
+		efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High],
+	},
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 400_000,
+	maxTokens: 128_000,
+} satisfies Omit<ModelSpec<"openai-completions">, "api">;
 
 async function capturePayload<TApi extends RouteApi>(
 	model: Model<TApi>,
@@ -56,8 +54,8 @@ async function capturePayload<TApi extends RouteApi>(
 	return captured;
 }
 
-const chatCompletions = fixture("openai-completions", "openai", "https://api.openai.com/v1", "gpt-5.1");
-const openRouter = fixture("openrouter", "openrouter", "https://openrouter.ai/api/v1", "openai/gpt-5.1");
+const chatCompletions = buildModel<"openai-completions">({ ...fixture, api: "openai-completions" });
+const responses = buildModel<"openai-responses">({ ...fixture, api: "openai-responses" });
 
 describe("OpenAI route reasoning disablement", () => {
 	it("drops reasoning effort on a forced-off chat-completions request", async () => {
@@ -71,11 +69,11 @@ describe("OpenAI route reasoning disablement", () => {
 		expect(forcedOff.reasoning_effort).toBeUndefined();
 	});
 
-	it("sends effort none for a forced-off OpenRouter responses request", async () => {
-		const active = await capturePayload(openRouter, { reasoning: Effort.Medium });
+	it("sends effort none for a forced-off Copilot Responses request", async () => {
+		const active = await capturePayload(responses, { reasoning: Effort.Medium });
 		expect(active.reasoning?.effort).toBe(Effort.Medium);
 
-		const forcedOff = await capturePayload(openRouter, { reasoning: Effort.Medium, forceReasoningOff: true });
+		const forcedOff = await capturePayload(responses, { reasoning: Effort.Medium, forceReasoningOff: true });
 		expect(forcedOff.reasoning).toEqual({ effort: "none" });
 	});
 });

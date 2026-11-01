@@ -48,6 +48,9 @@ export async function handleEmbeddings(
 		);
 	}
 
+	if (!model.baseUrl?.trim())
+		return embeddings.formatError(400, "invalid_request_error", "Model requires an explicit base URL");
+
 	const client = resolveClientIdentity(req.headers);
 	const sessionId = deterministicUuid(`embeddings\u0000${model.provider}/${model.id}`);
 	const apiKey = await resolveGatewayApiKey(bootOpts, model, sessionId, controller.signal, peer);

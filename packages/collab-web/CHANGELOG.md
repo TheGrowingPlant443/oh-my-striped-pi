@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The shared session viewer is bundled into self-contained HTML exports without remote scripts or automatic remote-image loads.
+- Private/local collaboration requires configured endpoints; automatic hosting is off by default.
+
+### Removed
+
+- Removed public relay/browser URL fallbacks, hosted analytics and QA-specific rendering while retaining private/local collaboration.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

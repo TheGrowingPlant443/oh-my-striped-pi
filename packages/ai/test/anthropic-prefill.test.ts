@@ -12,7 +12,7 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
 describe("Anthropic assistant-prefill fallback", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -33,7 +33,7 @@ describe("Anthropic assistant-prefill fallback", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "{" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: {
 				input: 0,
@@ -47,7 +47,7 @@ describe("Anthropic assistant-prefill fallback", () => {
 			timestamp: Date.now(),
 		};
 
-		const params = convertAnthropicMessages([user, assistantPrefill], model, false);
+		const params = convertAnthropicMessages([user, assistantPrefill], model);
 		expect(params.at(-1)?.role).toBe("user");
 		expect(params.at(-1)?.content).toBe("Continue.");
 	});
@@ -57,7 +57,7 @@ describe("Anthropic assistant-prefill fallback", () => {
 			role: "assistant",
 			content: [{ type: "text", text }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: {
 				input: 0,
@@ -83,7 +83,6 @@ describe("Anthropic assistant-prefill fallback", () => {
 				{ role: "user", content: "thanks", timestamp: Date.now() },
 			],
 			model,
-			false,
 		);
 
 		expect(params.map(p => p.role)).toEqual(["user", "assistant", "user", "assistant", "user"]);
@@ -98,7 +97,7 @@ describe("Anthropic assistant-prefill fallback", () => {
 					role: "assistant",
 					content: [{ type: "text", text: "hello" }],
 					api: "anthropic-messages",
-					provider: "anthropic",
+					provider: "github-copilot",
 					model: model.id,
 					usage: {
 						input: 0,
@@ -114,7 +113,6 @@ describe("Anthropic assistant-prefill fallback", () => {
 				{ role: "user", content: "what now?", timestamp: Date.now() },
 			],
 			model,
-			false,
 		);
 		expect(params.at(-1)?.role).toBe("user");
 		expect(params.at(-1)?.content).toBe("what now?");
@@ -124,7 +122,7 @@ describe("Anthropic assistant-prefill fallback", () => {
 it("replays signed and redacted thinking only when the serving credential matches or is unknown", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -147,7 +145,7 @@ it("replays signed and redacted thinking only when the serving credential matche
 			{ type: "text", text: "Final answer" },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		usage: {
 			input: 0,
@@ -161,7 +159,7 @@ it("replays signed and redacted thinking only when the serving credential matche
 		timestamp: Date.now(),
 	};
 
-	const params = convertAnthropicMessages([user, assistant], model, false);
+	const params = convertAnthropicMessages([user, assistant], model);
 	const assistantParam = params.find(m => m.role === "assistant");
 	expect(assistantParam).toBeDefined();
 	expect(Array.isArray(assistantParam?.content)).toBe(true);
@@ -174,7 +172,7 @@ it("replays signed and redacted thinking only when the serving credential matche
 	// opaque redacted sibling, even on the latest assistant turn.
 	const signedByFirst = { ...assistant, credentialId: 1 };
 	const replayBlocks = (credentialId: number | undefined, message: AssistantMessage = signedByFirst) => {
-		const replay = convertAnthropicMessages([user, message], model, false, { credentialId });
+		const replay = convertAnthropicMessages([user, message], model, { credentialId });
 		const turn = replay.find(param => param.role === "assistant");
 		return Array.isArray(turn?.content) ? turn.content : [];
 	};
@@ -191,7 +189,7 @@ it("replays signed and redacted thinking only when the serving credential matche
 it("preserves latest Anthropic thinking blocks even when model id changes", () => {
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -214,7 +212,7 @@ it("preserves latest Anthropic thinking blocks even when model id changes", () =
 			{ type: "text", text: "Answer" },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-sonnet-4-6-20251201",
 		usage: {
 			input: 0,
@@ -247,7 +245,7 @@ it("preserves a completed thinking signature on an aborted turn interrupted duri
 	// empty makes Anthropic reject the request with 400 "Invalid `signature` in `thinking` block".
 	const model: Model<"anthropic-messages"> = buildModel({
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		id: "claude-3-5-sonnet-20241022",
 		name: "Claude 3.5 Sonnet",
 		baseUrl: "https://api.anthropic.com",
@@ -264,7 +262,7 @@ it("preserves a completed thinking signature on an aborted turn interrupted duri
 			{ type: "text", text: "partial answer" },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		usage: {
 			input: 0,

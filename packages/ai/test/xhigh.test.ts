@@ -2,7 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { stream } from "@oh-my-pi/pi-ai/stream";
 import type { Context, Model } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { e2eApiKey } from "./oauth";
+import { resolveApiKey } from "./oauth";
+
+const githubCopilotToken = await resolveApiKey("github-copilot");
 
 function makeContext(): Context {
 	return {
@@ -16,12 +18,11 @@ function makeContext(): Context {
 	};
 }
 
-describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("xhigh reasoning", () => {
-	describe("codex-max (supports xhigh)", () => {
-		// Note: codex models only support the responses API, not chat completions
+describe.skipIf(!githubCopilotToken)("Copilot xhigh reasoning", () => {
+	describe("gpt-5.4 (supports xhigh)", () => {
 		it("should work with openai-responses", async () => {
-			const model = getBundledModel("openai", "gpt-5.1-codex-max");
-			const s = stream(model, makeContext(), { reasoning: "xhigh" });
+			const model = getBundledModel("github-copilot", "gpt-5.4");
+			const s = stream(model, makeContext(), { reasoning: "xhigh", apiKey: githubCopilotToken });
 			let hasThinking = false;
 
 			for await (const event of s) {
@@ -39,8 +40,8 @@ describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("xhigh reasoning", () => {
 
 	describe("gpt-5-mini (does not support xhigh)", () => {
 		it("should error with openai-responses when using xhigh", async () => {
-			const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
-			const s = stream(model, makeContext(), { reasoning: "xhigh" });
+			const model = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
+			const s = stream(model, makeContext(), { reasoning: "xhigh", apiKey: githubCopilotToken });
 
 			for await (const _ of s) {
 				// drain events
@@ -53,10 +54,10 @@ describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("xhigh reasoning", () => {
 
 		it("should error with openai-completions when using xhigh", async () => {
 			const model: Model<"openai-completions"> = {
-				...(getBundledModel("openai", "gpt-5-mini") as Model<"openai-completions">),
+				...(getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-completions">),
 				api: "openai-completions",
 			};
-			const s = stream(model, makeContext(), { reasoning: "xhigh" });
+			const s = stream(model, makeContext(), { reasoning: "xhigh", apiKey: githubCopilotToken });
 
 			for await (const _ of s) {
 				// drain events

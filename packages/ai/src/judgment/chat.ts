@@ -1,6 +1,6 @@
 /**
- * {@link TextBackend} over a chat model: the bridge that lets any smol/tiny
- * LLM serve {@link TextJudge} when no native judgment provider is configured.
+ * {@link TextBackend} over a chat model: the bridge that lets a retained model
+ * serve {@link TextJudge}.
  */
 import { type } from "@oh-my-pi/omptype";
 import * as AIError from "../error";

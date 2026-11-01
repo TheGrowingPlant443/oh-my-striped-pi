@@ -321,14 +321,19 @@ describe("plugin --dry-run beyond install, uninstall and link", () => {
 		expect(await snapshotTree(root)).toEqual(before);
 	});
 
-	test("update --plugins --check reports plugin upgrades and changes no plugin state", async () => {
-		const before = await snapshotTree(root);
+	for (const flags of [
+		["--plugins", "--check"],
+		["-l", "-c"],
+	]) {
+		test(`update ${flags.join(" ")} reports plugin upgrades and changes no plugin state`, async () => {
+			const before = await snapshotTree(root);
 
-		await new Update(["--plugins", "--check"], CLI_CONFIG).run();
+			await new Update(flags, CLI_CONFIG).run();
 
-		expect(logged()).toContain(UPGRADE_PREVIEW);
-		expect(await snapshotTree(root)).toEqual(before);
-	});
+			expect(logged()).toContain(UPGRADE_PREVIEW);
+			expect(await snapshotTree(root)).toEqual(before);
+		});
+	}
 
 	test("install <npm-pkg> --dry-run does not create the plugins package.json", async () => {
 		await fs.rm(path.join(pluginsDir, "package.json"));

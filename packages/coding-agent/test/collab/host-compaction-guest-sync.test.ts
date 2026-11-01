@@ -158,10 +158,10 @@ beforeAll(() => {
 	refreshDirsFromEnv();
 	installInMemoryRelay();
 	authStorage = createInMemoryAuthStorage();
-	authStorage.keys.setRuntime("anthropic", "test-key");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
 	modelRegistry = new ModelRegistry(authStorage);
-	const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!bundled) throw new Error("expected bundled anthropic model");
+	const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+	if (!bundled) throw new Error("Expected bundled Copilot model");
 	model = bundled;
 });
 

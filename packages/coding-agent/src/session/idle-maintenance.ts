@@ -301,9 +301,9 @@ export class IdleMaintenance {
 	}
 
 	/**
-	 * A never-expiring prompt cache (logged-in Codex) stays warm across any idle
-	 * gap, so idle compaction would only discard it and force a cold prefix on
-	 * the next turn. Threshold compaction still runs.
+	 * A never-expiring prompt cache stays warm across any idle gap, so idle
+	 * compaction would discard it and force a cold prefix on the next turn.
+	 * Threshold compaction still runs.
 	 */
 	#promptCachePersistent(): boolean {
 		const model = this.#session.model;

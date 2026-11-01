@@ -12,17 +12,16 @@ export default class Usage extends Command {
 		action: Args.string({
 			description: "Optional subcommand to execute",
 			required: false,
-			options: ["invalidate", "clients", "accounts", "reset"],
-		}),
-		target: Args.string({
-			description: "Saved reset to spend with `reset`: <provider>/<credential id> as `omp usage reset` lists it",
-			required: false,
+			options: ["invalidate", "clients", "accounts"],
 		}),
 	};
 
 	static flags = {
 		json: Flags.boolean({ char: "j", description: "Output usage reports as JSON", default: false }),
-		provider: Flags.string({ char: "p", description: "Only show usage for this provider id (e.g. anthropic)" }),
+		provider: Flags.string({
+			char: "p",
+			description: "Only show usage for this provider id",
+		}),
 		redact: Flags.boolean({
 			char: "r",
 			description: "Redact account emails/ids (shortest unique prefix) for sharing screenshots",
@@ -45,16 +44,14 @@ export default class Usage extends Command {
 
 	static examples = [
 		"# Detailed per-account usage breakdown across all providers\n  omp usage",
-		"# Only Anthropic accounts\n  omp usage --provider anthropic",
+		"# Only GitHub Copilot accounts\n  omp usage --provider github-copilot",
 		"# Redact account identifiers for screenshots\n  omp usage --redact",
 		"# Machine-readable output\n  omp usage --json",
 		"# Usage-limit trend over the last 30 days\n  omp usage --history --days 30",
 		"# Per-client token burn (which machine/app spent what) over the last 30 days\n  omp usage clients --days 30",
 		"# OAuth identity keys for task.agentAccountPools (no tokens)\n  omp usage accounts",
-		"# Saved Codex and Claude rate-limit resets per account, with each account's credential id\n  omp usage reset",
-		"# Spend one saved reset on a listed account\n  omp usage reset codex/3",
 		"# Invalidate cached usage reports for all providers\n  omp usage invalidate",
-		"# Invalidate cached usage reports for a specific provider\n  omp usage invalidate --provider anthropic",
+		"# Invalidate cached usage reports for GitHub Copilot\n  omp usage invalidate --provider github-copilot",
 	];
 
 	async run(): Promise<void> {
@@ -63,7 +60,6 @@ export default class Usage extends Command {
 			action: args.action,
 			json: flags.json,
 			provider: flags.provider,
-			target: args.target,
 			redact: flags.redact,
 			history: flags.history,
 			days: flags.days,

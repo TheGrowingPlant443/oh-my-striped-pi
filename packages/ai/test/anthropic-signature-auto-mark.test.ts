@@ -11,33 +11,28 @@ import type {
 } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
-/**
- * Regression for #4297 — the anthropic-messages transport auto-heals the very
- * first `400 Invalid signature in thinking block` from an unmarked custom
- * signing proxy: demote every unsigned thinking block in the request, retry
- * once, and pin the (baseUrl, modelId) as signing in the session state so
- * subsequent turns skip the demotion round-trip.
- */
+/** An explicit unsigned-wire override still learns a signing rejection per session. */
 
 const model: Model<"anthropic-messages"> = buildModel({
-	id: "cf-anthropic/claude-opus-4-8",
-	name: "Claude Opus 4.8 via cloudflared",
+	id: "claude-opus-4.8",
+	name: "Claude Opus 4.8 with unsigned-wire overrides",
 	api: "anthropic-messages",
-	provider: "cf-anthropic",
-	baseUrl: "https://opencode.cloudflare.dev/anthropic",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 200_000,
 	maxTokens: 8_192,
+	compat: { signingEndpoint: false, replayUnsignedThinking: true },
 });
 
 const prefixModel: Model<"anthropic-messages"> = buildModel({
 	id: "claude-fable-5-1",
 	name: "Claude Fable 5.1",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -55,8 +50,8 @@ const priorTurnContext: Context = {
 				{ type: "text", text: "The README covers the CLI." },
 			],
 			api: "anthropic-messages",
-			provider: "cf-anthropic",
-			model: "cf-anthropic/claude-opus-4-8",
+			provider: "github-copilot",
+			model: "claude-opus-4.8",
 			usage: {
 				input: 0,
 				output: 0,
@@ -82,7 +77,7 @@ const prefixBoundContext: Context = {
 				{ type: "text", text: "I inspected it." },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: prefixModel.id,
 			usage: {
 				input: 0,

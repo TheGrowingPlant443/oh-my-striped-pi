@@ -3,7 +3,7 @@ import { streamSimple } from "@oh-my-pi/pi-ai/stream";
 import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
-const baseModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-responses">;
+const baseModel = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 
 function mockSseFetch(): { fetchMock: FetchImpl; captured: Record<string, unknown> } {
 	const captured: Record<string, unknown> = {};

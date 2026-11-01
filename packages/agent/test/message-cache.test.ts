@@ -38,7 +38,7 @@ function settledAssistant(text: string): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "bench",
 		usage: usage(120),
 		stopReason: "stop",

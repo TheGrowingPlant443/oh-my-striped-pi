@@ -208,10 +208,7 @@ describe("rebuildScopedModels after login", () => {
 
 		expect(session.scopedModels.map(entry => entry.model.id)).toEqual(["a", "b"]);
 		expect(ctx.session.model).toBe(active);
-
-		// An OAuth alias refreshes the provider its credential is stored under.
-		await createSetupHost(ctx as unknown as InteractiveModeContext).refreshProvider("openai-codex-device");
-		expect(refreshed).toEqual(["prov", "openai-codex"]);
+		expect(refreshed).toEqual(["prov"]);
 	});
 });
 

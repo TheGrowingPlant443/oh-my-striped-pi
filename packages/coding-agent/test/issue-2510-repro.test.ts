@@ -10,6 +10,7 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 /**
  * Issue #2510 — `/plan` only cycled between `plan` and `plan_paused`, never
@@ -35,8 +36,7 @@ describe("issue #2510 — /plan toggles plan → plan_paused → none", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const defaultModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!defaultModel) throw new Error("Expected claude-sonnet-4-5 in registry");
+		const defaultModel = getTestModel("github-copilot");
 
 		session = new AgentSession({
 			agent: new Agent({

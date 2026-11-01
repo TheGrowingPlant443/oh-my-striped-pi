@@ -60,8 +60,8 @@ function createAssistantResponse(text: string) {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text }],
 		api: "anthropic-messages" as const,
-		provider: "anthropic" as const,
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot" as const,
+		model: "claude-sonnet-4.5",
 		usage: {
 			input: 0,
 			output: 0,
@@ -92,8 +92,8 @@ function emitHighUsageTurn(session: AgentSession): void {
 		role: "assistant" as const,
 		content: [{ type: "text" as const, text: "Done." }],
 		api: "anthropic-messages" as const,
-		provider: "anthropic" as const,
-		model: "claude-sonnet-4-5",
+		provider: "github-copilot" as const,
+		model: "claude-sonnet-4.5",
 		stopReason: "stop" as const,
 		usage: {
 			input: 190_000,
@@ -119,7 +119,7 @@ describe("AgentSession approved-plan reference re-injection after compaction (is
 	beforeAll(async () => {
 		fixtureDir = TempDir.createSync("@pi-agent-session-plan-ref-compaction-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir.path(), "models.yml"));
 	});
 
@@ -147,12 +147,9 @@ describe("AgentSession approved-plan reference re-injection after compaction (is
 			resolve: (call: ObservedPromptCall) => void;
 		}> = [];
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected claude-sonnet-4-5 model to exist");
-		// Pin the context window so the fixed 191k high-usage turn stays above the
-		// compaction threshold across catalog regenerations: claude-sonnet-4-5's
-		// bundled window grew to 1M, which a 191k turn no longer trips. Mirrors
-		// agent-session-eager-compaction / -auto-compaction-queue.
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!bundled) throw new Error("Expected claude-sonnet-4.5 model to exist");
+		// Pin the window so the fixed 191k turn trips compaction across catalog regenerations.
 		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
 
 		const settings = Settings.isolated({

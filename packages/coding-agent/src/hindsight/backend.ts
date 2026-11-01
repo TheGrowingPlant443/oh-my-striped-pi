@@ -17,7 +17,7 @@ import type { AgentSession } from "../session/agent-session";
 import { type BankScope, computeBankScope } from "./bank";
 import { createHindsightClient } from "./client";
 import { type HindsightConfig, isHindsightConfigured, loadHindsightConfig } from "./config";
-import { type HindsightMessage, hasSubstantiveContent } from "./content";
+import { type MemoryMessage as HindsightMessage, hasSubstantiveContent } from "../memory-backend/content";
 import { HindsightSessionState } from "./state";
 
 import { cfgMemoryBackend } from "../memory-backend/settings";
@@ -73,7 +73,8 @@ export const hindsightBackend: MemoryBackend = {
 			return;
 		}
 
-		await installPrimaryState(session, settings, new Set());
+		const inherited = options.parentHindsightSessionState;
+		await installPrimaryState(session, settings, new Set(), inherited?.aliasOf ?? inherited);
 	},
 
 	async buildDeveloperInstructions(_agentDir, _cwd, settings, session): Promise<string | undefined> {
@@ -206,7 +207,7 @@ function schedulePrimaryStateRebuild(session: AgentSession): PrimaryRebuildTask 
  * has settled, re-raising the last failure. Serves live `hindsight.*` edits
  * (via `hindsightBackend.applySettings`) and the cwd rebind.
  */
-async function awaitPrimaryStateRebuild(session: AgentSession): Promise<void> {
+export async function awaitPrimaryStateRebuild(session: AgentSession): Promise<void> {
 	let task: PrimaryRebuildTask | undefined = schedulePrimaryStateRebuild(session);
 	while (task) {
 		await task.completion;
@@ -214,39 +215,6 @@ async function awaitPrimaryStateRebuild(session: AgentSession): Promise<void> {
 		// A settings edit that landed while we waited installs a fresh task; the
 		// rebuild is not done until the last one has settled.
 		task = primaryRebuildTasks.get(session);
-	}
-}
-
-/**
- * Finish the memory rebind that a cwd move started, before the move reports
- * success. The settings reload may already have started a backend switch or a
- * rebuild for changed `hindsight.*` values: let it settle first, so the rebind
- * never judges a half-switched runtime, then redo the destination's own
- * transition and re-raise its failure instead of letting a half-rebound
- * session look like a completed move.
- *
- * The rebuild is also requested here rather than only awaited, because the
- * bank scope derives from the cwd itself: a move between projects with
- * identical settings changes no setting, yet must still re-route the bank.
- */
-export async function rebindMemoryBackendForCwd(session: AgentSession): Promise<void> {
-	if (!session.memoryEnabled) return;
-	await session.settleMemoryBackend();
-	// Other backends have no Hindsight rebuild path. Reapply them on an
-	// explicit cwd move, but let an in-flight Hindsight transition finish (or
-	// fail) rather than retrying a partially torn-down backend outside its task.
-	if (!session.getHindsightSessionState() && !primaryRebuildTasks.has(session)) {
-		// The manager already has the new cwd, and this may also be rollback
-		// from a destination that never committed. Drain existing writes without
-		// capturing the transcript under either transient scope.
-		await session.applyMemoryBackend({ retainMnemopi: false });
-	}
-
-	await awaitPrimaryStateRebuild(session);
-
-	// Startup is best-effort, but a move must not commit an unusable memory backend.
-	if (cfgMemoryBackend.get(session.settings) === "mnemopi" && !session.getMnemopiSessionState()) {
-		throw new Error("Mnemopi backend failed to initialise for the destination cwd.");
 	}
 }
 
@@ -262,6 +230,7 @@ async function installPrimaryState(
 	session: AgentSession,
 	settings: Settings,
 	banksSet: Set<string>,
+	inherited?: HindsightSessionState,
 ): Promise<HindsightSessionState | undefined> {
 	const sessionId = session.sessionId;
 	if (!sessionId) return undefined;
@@ -300,8 +269,12 @@ async function installPrimaryState(
 		session,
 		banksSet,
 		lastRetainedTurn: 0,
-		hasRecalledForFirstTurn: false,
+		hasRecalledForFirstTurn: inherited?.hasRecalledForFirstTurn ?? false,
 	});
+	// A top-level copied-prompt fork owns its writes but keeps the delivered prompt snapshot.
+	state.lastRecallSnippet = inherited?.lastRecallSnippet;
+	state.mentalModelsSnippet = inherited?.mentalModelsSnippet;
+	state.mentalModelsLoadedAt = inherited?.mentalModelsLoadedAt;
 
 	const displaced = session.setHindsightSessionState(state);
 	if (displaced && displaced !== previous) {
@@ -315,7 +288,7 @@ async function installPrimaryState(
 	// turn races and is covered in `beforeAgentStartPrompt` via
 	// `mentalModelsLoadPromise`. Subsequent turns see the populated cache
 	// because `runMentalModelLoad` calls `refreshBaseSystemPrompt`.
-	if (config.mentalModelsEnabled) {
+	if (config.mentalModelsEnabled && !inherited) {
 		state.mentalModelsLoadPromise = state.runMentalModelLoad(scope).catch(err => {
 			logger.debug("Hindsight: mental-model bootstrap failed", { bankId: state.bankId, error: String(err) });
 		});

@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { AuthStorage } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { initializeWithSettings } from "@oh-my-pi/pi-coding-agent/discovery";
@@ -13,6 +12,7 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 
 import { cfgAdvisorEnabled } from "@oh-my-pi/pi-coding-agent/advisor/settings";
 import { cfgDisabledExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/settings";
+import { getTestModel } from "./helpers/model-fixtures";
 
 const INITIAL_CONTEXT = "reload-context-initial-marker";
 const UPDATED_CONTEXT = "reload-context-updated-marker";
@@ -24,9 +24,9 @@ async function createContextSession(
 	options: { advisor?: boolean } = {},
 ): Promise<{ session: AgentSession; authStorage: AuthStorage; sessionManager: SessionManager }> {
 	const authStorage = await AuthStorage.create(`${cwd}/auth.db`);
-	const model = getBundledModel("openai", "gpt-4o-mini");
+	const model = getTestModel("github-copilot");
 	if (options.advisor) {
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		cfgAdvisorEnabled.set(settings, true);
 		settings.setModelRole("advisor", `${model.provider}/${model.id}`);
 	}

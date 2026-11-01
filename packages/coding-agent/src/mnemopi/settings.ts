@@ -198,19 +198,21 @@ export const cfgMnemopiEmbeddingModel = register({
 
 export const cfgMnemopiEmbeddingApiUrl = register({
 	id: "mnemopi.embeddingApiUrl",
+	env: "MNEMOPI_EMBEDDING_API_URL",
 	type: "string",
 	default: undefined,
 	ui: {
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi Embedding API URL",
-		description: "Optional OpenAI-compatible embedding endpoint passed to Mnemopi",
+		description: "Explicit private OpenAI-compatible embedding endpoint; unset uses local FastEmbed",
 		condition: "mnemopiActive",
 	},
 });
 
 export const cfgMnemopiEmbeddingApiKey = register({
 	id: "mnemopi.embeddingApiKey",
+	env: "MNEMOPI_EMBEDDING_API_KEY",
 	type: "string",
 	credential: true,
 	default: undefined,
@@ -218,7 +220,7 @@ export const cfgMnemopiEmbeddingApiKey = register({
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi Embedding API Key",
-		description: "Optional embedding API key passed to Mnemopi",
+		description: "Optional bearer token for the configured private embedding endpoint",
 		condition: "mnemopiActive",
 	},
 });
@@ -232,36 +234,37 @@ export const cfgMnemopiLlmMode = register({
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi LLM Mode",
-		description:
-			"Use no LLM, the online tiny model (the TINY role from /models, else @smol), or a remote OpenAI-compatible endpoint",
+		description: "Use no LLM, the managed memory model role, or an explicitly configured private endpoint",
 		condition: "mnemopiActive",
 		options: [
 			{ value: "none", label: "None", description: "Disable Mnemopi LLM-backed extraction" },
 			{
 				value: "smol",
-				label: "Online (tiny)",
-				description: "Use the online tiny model (the TINY role from /models, else @smol)",
+				label: "Managed model",
+				description: "Use the memory role selected in /models",
 			},
-			{ value: "remote", label: "Remote", description: "Use the Mnemopi remote LLM settings below" },
+			{ value: "remote", label: "Private endpoint", description: "Use the explicit Mnemopi LLM endpoint and model" },
 		],
 	},
 });
 
 export const cfgMnemopiLlmBaseUrl = register({
 	id: "mnemopi.llmBaseUrl",
+	env: "MNEMOPI_LLM_BASE_URL",
 	type: "string",
 	default: undefined,
 	ui: {
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi LLM Base URL",
-		description: "Optional OpenAI-compatible LLM endpoint for Mnemopi remote mode",
+		description: "Explicit private OpenAI-compatible LLM endpoint for remote mode",
 		condition: "mnemopiActive",
 	},
 });
 
 export const cfgMnemopiLlmApiKey = register({
 	id: "mnemopi.llmApiKey",
+	env: "MNEMOPI_LLM_API_KEY",
 	type: "string",
 	credential: true,
 	default: undefined,
@@ -269,20 +272,21 @@ export const cfgMnemopiLlmApiKey = register({
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi LLM API Key",
-		description: "Optional LLM API key for Mnemopi remote mode",
+		description: "Optional bearer token for the configured private LLM endpoint",
 		condition: "mnemopiActive",
 	},
 });
 
 export const cfgMnemopiLlmModel = register({
 	id: "mnemopi.llmModel",
+	env: "MNEMOPI_LLM_MODEL",
 	type: "string",
 	default: undefined,
 	ui: {
 		tab: "memory",
 		group: "Mnemopi",
 		label: "Mnemopi LLM Model",
-		description: "Optional LLM model name for Mnemopi remote mode",
+		description: "Model served by the configured private LLM endpoint",
 		condition: "mnemopiActive",
 	},
 });

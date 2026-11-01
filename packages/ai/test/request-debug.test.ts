@@ -291,8 +291,8 @@ function debugModel(): Model {
 	return buildModel({
 		id: "debug-model",
 		name: "Debug Model",
-		api: "req-debug-test",
-		provider: "test",
+		api: "local-inference",
+		provider: "local",
 		baseUrl: "https://provider.test",
 		reasoning: false,
 		input: ["text"],
@@ -304,7 +304,7 @@ function debugModel(): Model {
 
 /** Custom API whose only side effect is one POST through `options.fetch`. */
 function registerDebugApi(): void {
-	registerCustomApi("req-debug-test", (_model, _context, options) => {
+	registerCustomApi("local-inference", (_model, _context, options) => {
 		const events = new AssistantMessageEventStream();
 		void (async () => {
 			const fetchImpl = options?.fetch;
@@ -318,8 +318,8 @@ function registerDebugApi(): void {
 			const message: AssistantMessage = {
 				role: "assistant",
 				content: [{ type: "text", text: "done" }],
-				provider: "test",
-				api: "req-debug-test",
+				provider: "local",
+				api: "local-inference",
 				model: "debug-model",
 				usage: {
 					input: 0,

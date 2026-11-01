@@ -13,6 +13,7 @@ export const cfgSharpshooterModel = register({
 		group: "Sharpshooter",
 		label: "Sharpshooter Model",
 		description: "Model selector for extraction/consolidation, empty = smol role",
+		condition: "sharpshooterActive",
 	},
 });
 

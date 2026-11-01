@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Snapcompact frames stay embedded locally instead of being published through a remote frame sink.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -10,8 +10,6 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { TempDir } from "@oh-my-pi/pi-utils";
 
 import { cfgWorkspaceAdditionalDirectories } from "@oh-my-pi/pi-coding-agent/session/context-settings";
-
-registerMockApi();
 
 /**
  * Contract: when `/add-dir` (or `addWorkspaceDirectory` + `refreshBaseSystemPrompt`)
@@ -25,7 +23,7 @@ describe("workspace directories in the system prompt", () => {
 		const dir = TempDir.createSync("@ws-prompt-add-");
 		const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 		try {
-			auth.keys.setRuntime("mock", "test-key");
+			auth.keys.setRuntime("local", "test-key");
 			const extraDir = path.join(dir.path(), "extra-root");
 			fs.mkdirSync(extraDir, { recursive: true });
 			const laterDir = path.join(dir.path(), "later-root");
@@ -54,6 +52,7 @@ describe("workspace directories in the system prompt", () => {
 				rules: [],
 				contextFiles: [],
 			});
+			session.agent.streamFn = mockModel.stream;
 			try {
 				// Sanity: the seed dir is present in the sessionManager state.
 				expect(sessionManager.getAdditionalDirectories()).toEqual([extraDir]);
@@ -89,7 +88,7 @@ describe("workspace directories in the system prompt", () => {
 		const dir = TempDir.createSync("@ws-setting-live-");
 		const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 		try {
-			auth.keys.setRuntime("mock", "test-key");
+			auth.keys.setRuntime("local", "test-key");
 			const cliDir = path.join(dir.path(), "cli-root");
 			const settingDir = path.join(dir.path(), "setting-root");
 			fs.mkdirSync(cliDir, { recursive: true });
@@ -118,6 +117,7 @@ describe("workspace directories in the system prompt", () => {
 				rules: [],
 				contextFiles: [],
 			});
+			session.agent.streamFn = mockModel.stream;
 			const lastSystemPrompt = async (): Promise<string> => {
 				await session.prompt("noop");
 				return (mockModel.calls?.at(-1)?.context?.systemPrompt as string[] | undefined)?.join("\n") ?? "";

@@ -174,8 +174,6 @@ export const PYTHON_HTTP2_STREAM_RESET_PATTERN = /<StreamReset stream_id:\d+, er
 /** Python h11/httpx EOF while reading an HTTP/1.1 chunked response body. */
 export const PYTHON_HTTP_INCOMPLETE_CHUNK_PATTERN =
 	/peer closed connection without sending complete message body \(incomplete chunked read\)/;
-/** reqwest body-frame failures forwarded by the Codex HTTP proxy. */
-export const CODEX_HTTP_BODY_READ_ERROR_PATTERN = /\btransport error reading codex response body\b/i;
 
 const RESPONSES_REQUEST_BODY_READ_TIMEOUT_PATTERN = /\btimed out reading request body\b/i;
 
@@ -195,25 +193,6 @@ export function isResponsesRequestBodyReadTimeout(message: {
 		message.api === "openai-responses" &&
 		message.requestBodyReadTimeoutFullReplay === true &&
 		isRequestBodyReadTimeout(message.errorStatus, message.errorMessage)
-	);
-}
-
-/**
- * Codex code for the experimental native turn lane refusing a mid-response
- * `response.steer`; the server then drops the in-flight response and closes
- * the socket.
- */
-export const CODEX_NATIVE_LANE_STEER_REJECTED_CODE = "unsupported_native_inflight_message";
-
-/**
- * A Codex turn the native turn lane dropped because omp steered it. The
- * rejection answers our own `response.steer`, not the model's health: the
- * provider stops steering the session, so the same model replays cleanly.
- */
-export function isCodexSteerRejection(message: { api?: Api; errorMessage?: string }): boolean {
-	return (
-		message.api === "openai-codex-responses" &&
-		message.errorMessage?.includes(`code=${CODEX_NATIVE_LANE_STEER_REJECTED_CODE}`) === true
 	);
 }
 
@@ -240,8 +219,8 @@ export const ANTHROPIC_ACCOUNT_POLICY_PATTERN =
 	/\b(?:oauth_not_allowed_for_organization|permission_error)\b|\bOAuth authentication is currently not allowed for this organization\b/i;
 
 /** Whether an error message represents an Anthropic account-scoped permission/policy denial. */
-export function isAnthropicAccountPolicyText(text: string, provider?: string, statusArg?: number): boolean {
-	if (provider !== undefined && provider !== "anthropic") return false;
+export function isAnthropicAccountPolicyText(text: string, api?: Api, statusArg?: number): boolean {
+	if (api !== undefined && api !== "anthropic-messages") return false;
 	const statusCandidate = statusArg ?? (text ? status({ message: text }) : undefined);
 	if (statusCandidate !== undefined && statusCandidate !== 403) return false;
 	return ANTHROPIC_ACCOUNT_POLICY_PATTERN.test(text);
@@ -259,9 +238,6 @@ export function isImmutableLatestThinkingText(text: string): boolean {
 	return IMMUTABLE_LATEST_THINKING_PATTERN.test(text);
 }
 
-const CODEX_CHATGPT_ACCOUNT_MODEL_POLICY_PATTERN =
-	/\bThe ['"]([^'"\r\n]+)['"] model is not supported when using Codex with a ChatGPT account\./i;
-const CODEX_CHATGPT_ACCOUNT_MODEL_MAX_LENGTH = 256;
 const CURSOR_PLAN_POLICY_MARKER_PATTERN = /\bERROR_RATE_LIMITED_CHANGEABLE\b/i;
 const CURSOR_PLAN_POLICY_PATTERN = /\bNamed models unavailable\b|\bModel unavailable on\b|\bFree plans can only use\b/i;
 
@@ -269,32 +245,6 @@ function isCursorPlanPolicyText(text: string): boolean {
 	return CURSOR_PLAN_POLICY_MARKER_PATTERN.test(text) && CURSOR_PLAN_POLICY_PATTERN.test(text);
 }
 
-function normalizeCodexChatGPTAccountPolicyModel(modelId: string | undefined): string | undefined {
-	if (typeof modelId !== "string") return undefined;
-	const separator = modelId.lastIndexOf("/");
-	const bareModelId = (separator === -1 ? modelId : modelId.slice(separator + 1)).trim().toLowerCase();
-	if (!bareModelId || bareModelId.length > CODEX_CHATGPT_ACCOUNT_MODEL_MAX_LENGTH || bareModelId.includes("\0")) {
-		return undefined;
-	}
-	return bareModelId;
-}
-
-function codexChatGPTAccountPolicyModelFromText(text: string): string | undefined {
-	const modelId = CODEX_CHATGPT_ACCOUNT_MODEL_POLICY_PATTERN.exec(text)?.[1]?.trim();
-	return normalizeCodexChatGPTAccountPolicyModel(modelId) === undefined ? undefined : modelId;
-}
-
-function isCodexChatGPTAccountPolicyText(
-	text: string,
-	provider: string | undefined,
-	modelId: string | undefined,
-): boolean {
-	if (provider !== "openai-codex") return false;
-	const deniedModel = codexChatGPTAccountPolicyModelFromText(text);
-	const deniedIdentity = normalizeCodexChatGPTAccountPolicyModel(deniedModel);
-	const requestedIdentity = normalizeCodexChatGPTAccountPolicyModel(modelId);
-	return deniedIdentity !== undefined && deniedIdentity === requestedIdentity;
-}
 const STALE_RESPONSE_ITEM_PATTERNS = [/\bItem with id ['"][^'"]+['"] not found\.?/i, /previous[ _]?response/i] as const;
 const STALE_RESPONSE_ITEM_DETAIL_PATTERN = /not[ _]?found|invalid|expired|stale|zero[ _-]?data[ _-]?retention/i;
 /**
@@ -642,7 +592,6 @@ function classifyText(
 	priorTokenOverflowEvidence = false,
 	api?: Api,
 	provider?: string,
-	modelId?: string,
 ): number {
 	let kinds = 0;
 	if (errorMessage) {
@@ -656,12 +605,11 @@ function classifyText(
 
 		if (
 			ACCOUNT_POLICY_PATTERN.test(errorMessage) ||
-			isCodexChatGPTAccountPolicyText(errorMessage, provider, modelId) ||
 			(provider === "cursor" && isCursorPlanPolicyText(errorMessage))
 		) {
 			kinds |= Flag.AccountPolicy | Flag.ContentBlocked;
 		}
-		if (isAnthropicAccountPolicyText(errorMessage, provider, statusClean)) {
+		if (isAnthropicAccountPolicyText(errorMessage, api, statusClean)) {
 			kinds |= Flag.AccountPolicy;
 		}
 		if (isAuthFailureText(errorMessage)) kinds |= Flag.AuthFailed;
@@ -698,19 +646,14 @@ function classifyText(
 		if (!isTerminalClientErrorStatus(statusClean)) {
 			if (isTimeoutText(errorMessage)) kinds |= Flag.Transient | Flag.Timeout;
 			else if (isTransientErrorText(errorMessage)) kinds |= Flag.Transient;
-			// A stream truncation, transport-level stream drop, or forwarded Codex
-			// HTTP body-read failure may not match TRANSIENT_TRANSPORT_PATTERN. Flag
-			// it explicitly so AIError.retriable and the turn-recovery layer treat it
+			// Stream truncations and transport-level stream drops may not match
+			// TRANSIENT_TRANSPORT_PATTERN. Flag them explicitly so the turn-recovery layer treats them
 			// as retryable, matching the provider retry path. Separate `if` (not
 			// chained onto the else-if) so a timeout whose text also reads as a
 			// truncation keeps Flag.Timeout alongside Flag.Transient. The string arm
 			// applies the strict STREAM_PARSE_DIAGNOSTIC_PATTERN, per the rationale
 			// on isTransientStreamParseError.
-			if (
-				isTransientStreamParseError(errorMessage) ||
-				isTransientStreamDropError(errorMessage) ||
-				CODEX_HTTP_BODY_READ_ERROR_PATTERN.test(errorMessage)
-			) {
+			if (isTransientStreamParseError(errorMessage) || isTransientStreamDropError(errorMessage)) {
 				kinds |= Flag.Transient;
 			}
 		}
@@ -719,12 +662,9 @@ function classifyText(
 		// not match TRANSIENT_TRANSPORT_PATTERN, so flag it explicitly to keep
 		// AIError.retriable from treating the temporary cap as terminal.
 		if (reason === "CONCURRENT_LIMIT") kinds |= Flag.Transient;
-		if ((api === "openai-responses" || api === "openai-codex-responses") && isStaleResponsesText(errorMessage)) {
+		if (api === "openai-responses" && isStaleResponsesText(errorMessage)) {
 			kinds |= Flag.StaleResponsesItem;
 		}
-		// Retryable like the provider's own classification of the code, so a
-		// message reclassified from its text alone still retries.
-		if (isCodexSteerRejection({ api, errorMessage })) kinds |= Flag.Transient;
 
 		// Fireworks mid-generation NaN 400 is a model-side decode fault, not a bad
 		// request; a byte-identical replay succeeds, so treat it as transient.
@@ -787,19 +727,6 @@ export function classify(error: unknown, api?: Api): number {
 		} else if (link instanceof AnthropicConnectionTimeoutError) {
 			kinds |= Flag.Timeout | Flag.Transient;
 		} else if (link instanceof AnthropicConnectionError) {
-			kinds |= Flag.Transient;
-		} else if (
-			typeof link === "object" &&
-			"name" in link &&
-			(link as { name: string }).name === "CodexWebSocketTransportError"
-		) {
-			kinds |= Flag.Transient;
-		} else if (
-			link instanceof Error &&
-			link.name === "CodexProviderStreamError" &&
-			"retryable" in link &&
-			(link as { retryable: unknown }).retryable === true
-		) {
 			kinds |= Flag.Transient;
 		} else if (link instanceof ProviderHttpError) {
 			let linkKinds = 0;
@@ -875,36 +802,6 @@ export function isUsageLimit(error: unknown, api?: Api): boolean {
 /** Whether an upstream rejection is an account-scoped policy denial worth retrying with a sibling credential. */
 export function isAccountPolicyError(error: unknown, api?: Api): boolean {
 	return is(classify(error, api), Flag.AccountPolicy);
-}
-
-/**
- * Model id from Codex's exact ChatGPT-account entitlement denial. Generic
- * unsupported-model invalid requests deliberately do not match.
- */
-export function codexChatGPTAccountPolicyModel(error: unknown, depth = 0): string | undefined {
-	if (depth > 6) return undefined;
-	if (typeof error === "string") return codexChatGPTAccountPolicyModelFromText(error);
-	if (!error || typeof error !== "object") return undefined;
-	const errorMessage =
-		"errorMessage" in error && typeof error.errorMessage === "string" ? error.errorMessage : undefined;
-	const message = "message" in error && typeof error.message === "string" ? error.message : undefined;
-	const direct =
-		(errorMessage ? codexChatGPTAccountPolicyModelFromText(errorMessage) : undefined) ??
-		(message ? codexChatGPTAccountPolicyModelFromText(message) : undefined);
-	if (direct !== undefined) return direct;
-	return "cause" in error ? codexChatGPTAccountPolicyModel(error.cause, depth + 1) : undefined;
-}
-
-/** Whether the exact Codex entitlement denial applies to this provider and requested model. */
-export function isCodexChatGPTAccountPolicyError(
-	error: unknown,
-	provider: string,
-	modelId: string | undefined,
-): boolean {
-	const deniedModel = codexChatGPTAccountPolicyModel(error);
-	const deniedIdentity = normalizeCodexChatGPTAccountPolicyModel(deniedModel);
-	const requestedIdentity = normalizeCodexChatGPTAccountPolicyModel(modelId);
-	return provider === "openai-codex" && deniedIdentity !== undefined && deniedIdentity === requestedIdentity;
 }
 
 /** Whether Cursor returned a non-retryable plan entitlement denial for this account. */
@@ -1009,7 +906,6 @@ export function classifyMessage(message: {
 		existingOverflowOnly,
 		message.api,
 		message.provider,
-		message.model,
 	);
 
 	let kinds = ((existingId ?? 0) | textId) & KIND_MASK;

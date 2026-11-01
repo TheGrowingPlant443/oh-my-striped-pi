@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -5,24 +9,13 @@ import * as path from "node:path";
 import { resolvedApiKeyBearer, withAuth } from "@oh-my-pi/pi-ai";
 import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
 import type { CredentialRankingStrategy, UsageProvider } from "@oh-my-pi/pi-ai/usage";
 import { removeWithRetries } from "../../utils/src/temp";
 import { OAuthRefresher } from "../src/auth/refresh";
 
-const PROVIDER = "unit-rotate-oauth";
+const PROVIDER = "github-copilot";
 const SOURCE = "auth-storage-force-refresh-rotate-test";
 
-const CODEX_PROVIDER = "openai-codex";
-const DAYBREAK_MODEL = "gpt-daybreak-blue-latest";
-const CODEX_CHATGPT_MODEL_DENIAL =
-	"The 'gpt-daybreak-blue-latest' model is not supported when using Codex with a ChatGPT account. (code=invalid_request_error)";
-const CURSOR_PROVIDER = "cursor";
-const CURSOR_MODEL = "cursor-grok-4.6";
-const CURSOR_PLAN_DENIAL =
-	'Connect error resource_exhausted: Error [details: {"error":"ERROR_RATE_LIMITED_CHANGEABLE","details":{"title":"Named models unavailable","detail":"Free plans can only use Auto."}}]';
 function farExpiry(): number {
 	return Date.now() + 60 * 60_000;
 }
@@ -58,7 +51,7 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		unregisterOAuthProviders(SOURCE);
+		resetOAuthMocks(SOURCE);
 		store?.close();
 		store = undefined;
 		authStorage = undefined;
@@ -69,7 +62,7 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 	});
 
 	function registerProvider(onRefresh?: () => void, nextAccess?: () => string): void {
-		registerOAuthProvider({
+		mockOAuthProvider({
 			id: PROVIDER,
 			name: "Rotate Unit",
 			sourceId: SOURCE,
@@ -633,151 +626,6 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 		expect(await authStorage.keys.get(PROVIDER, "cyber-policy")).not.toBe(first);
 	});
 
-	test("Codex ChatGPT model denial blocks only that model and rotates to a sibling", async () => {
-		if (!store) throw new Error("test setup failed");
-		const codexStorage = new AuthStorage(store, { usageProviderResolver: () => undefined });
-		vi.spyOn(oauthUtils, "getOAuthApiKey").mockImplementation(async (_provider, credentials) => {
-			const credential = credentials[CODEX_PROVIDER] as OAuthCredentials | undefined;
-			if (!credential) return null;
-			return { apiKey: credential.access, newCredentials: credential };
-		});
-		await codexStorage.credentials.set(CODEX_PROVIDER, [
-			{
-				type: "oauth",
-				access: "daybreak-denied",
-				refresh: "ref-A",
-				expires: farExpiry(),
-				accountId: "account-A",
-			},
-			{
-				type: "oauth",
-				access: "daybreak-sibling",
-				refresh: "ref-B",
-				expires: farExpiry(),
-				accountId: "account-B",
-			},
-		]);
-
-		const sessionId = "daybreak-model-policy";
-		const first = await codexStorage.keys.get(CODEX_PROVIDER, sessionId, { modelId: DAYBREAK_MODEL });
-		expect(first).toBe("daybreak-denied");
-		const denial = new ProviderHttpError(CODEX_CHATGPT_MODEL_DENIAL, 400, {
-			code: "invalid_request_error",
-		});
-		expect(
-			await codexStorage.limits.rotate(CODEX_PROVIDER, sessionId, {
-				error: denial,
-				apiKey: first,
-			}),
-		).toEqual({ switched: false });
-		expect(
-			await codexStorage.limits.rotate(CODEX_PROVIDER, sessionId, {
-				error: denial,
-				modelId: "gpt-5.3-codex",
-				apiKey: first,
-			}),
-		).toEqual({ switched: false });
-		expect(await codexStorage.keys.get(CODEX_PROVIDER, sessionId, { modelId: DAYBREAK_MODEL })).toBe(first);
-		const usageLimitSpy = vi.spyOn(codexStorage.limits, "markReached");
-		const rotated = await codexStorage.limits.rotate(CODEX_PROVIDER, sessionId, {
-			error: denial,
-			modelId: DAYBREAK_MODEL,
-			apiKey: first,
-		});
-
-		expect(rotated.switched).toBe(true);
-		expect(usageLimitSpy).not.toHaveBeenCalled();
-		expect(await codexStorage.keys.get(CODEX_PROVIDER, sessionId, { modelId: DAYBREAK_MODEL })).toBe(
-			"daybreak-sibling",
-		);
-
-		const deniedRow = store
-			.listAuthCredentials(CODEX_PROVIDER)
-			.find(row => row.credential.type === "oauth" && row.credential.access === "daybreak-denied");
-		if (!deniedRow) throw new Error("denied credential row missing");
-		const modelBlock = store.getCredentialBlock?.(
-			deniedRow.id,
-			`${CODEX_PROVIDER}:oauth`,
-			"model-policy:gpt-daybreak-blue-latest",
-		);
-		expect(typeof modelBlock).toBe("number");
-		expect(store.getCredentialBlock?.(deniedRow.id, `${CODEX_PROVIDER}:oauth`, "chat")).toBeUndefined();
-		expect(store.getCredentialBlock?.(deniedRow.id, `${CODEX_PROVIDER}:oauth`, "")).toBeUndefined();
-
-		const otherModelStorage = new AuthStorage(store, { usageProviderResolver: () => undefined });
-		await otherModelStorage.credentials.reload();
-		expect(
-			await otherModelStorage.keys.get(CODEX_PROVIDER, "other-codex-model", {
-				modelId: "gpt-5.3-codex",
-			}),
-		).toBe("daybreak-denied");
-	});
-
-	test("Cursor plan denial blocks only that model and rotates to a sibling", async () => {
-		if (!store) throw new Error("test setup failed");
-		const cursorStorage = new AuthStorage(store, { usageProviderResolver: () => undefined });
-		vi.spyOn(oauthUtils, "getOAuthApiKey").mockImplementation(async (_provider, credentials) => {
-			const credential = credentials[CURSOR_PROVIDER];
-			if (!credential) return null;
-			return { apiKey: credential.access, newCredentials: credential };
-		});
-		await cursorStorage.credentials.set(CURSOR_PROVIDER, [
-			{
-				type: "oauth",
-				access: "cursor-plan-denied",
-				refresh: "ref-A",
-				expires: farExpiry(),
-				accountId: "account-A",
-			},
-			{
-				type: "oauth",
-				access: "cursor-plan-sibling",
-				refresh: "ref-B",
-				expires: farExpiry(),
-				accountId: "account-B",
-			},
-		]);
-
-		const sessionId = "cursor-model-policy";
-		const first = await cursorStorage.keys.get(CURSOR_PROVIDER, sessionId, { modelId: CURSOR_MODEL });
-		expect(first).toBe("cursor-plan-denied");
-		const usageLimitSpy = vi.spyOn(cursorStorage.limits, "markReached");
-		const rotated = await cursorStorage.limits.rotate(CURSOR_PROVIDER, sessionId, {
-			error: new Error(CURSOR_PLAN_DENIAL),
-			modelId: CURSOR_MODEL,
-			apiKey: first,
-		});
-
-		expect(rotated.switched).toBe(true);
-		expect(usageLimitSpy).not.toHaveBeenCalled();
-		expect(await cursorStorage.keys.get(CURSOR_PROVIDER, sessionId, { modelId: CURSOR_MODEL })).toBe(
-			"cursor-plan-sibling",
-		);
-
-		const deniedRow = store
-			.listAuthCredentials(CURSOR_PROVIDER)
-			.find(row => row.credential.type === "oauth" && row.credential.access === "cursor-plan-denied");
-		if (!deniedRow) throw new Error("denied credential row missing");
-		const modelBlock = store.getCredentialBlock?.(
-			deniedRow.id,
-			`${CURSOR_PROVIDER}:oauth`,
-			"model-policy:cursor-grok-4.6",
-		);
-		expect(typeof modelBlock).toBe("number");
-		expect(store.getCredentialBlock?.(deniedRow.id, `${CURSOR_PROVIDER}:oauth`, "")).toBeUndefined();
-
-		const otherModelStorage = new AuthStorage(store, { usageProviderResolver: () => undefined });
-		await otherModelStorage.credentials.reload();
-		const otherModelSelections = new Set<string>();
-		for (let index = 0; index < 6; index += 1) {
-			const selected = await otherModelStorage.keys.get(CURSOR_PROVIDER, `cursor-included-model-${index}`, {
-				modelId: "composer-2.5",
-			});
-			if (selected) otherModelSelections.add(selected);
-		}
-		expect(otherModelSelections.has("cursor-plan-denied")).toBe(true);
-	});
-
 	test("rotateSessionCredential treats structured usage codes as quota blocks despite generic messages", async () => {
 		if (!authStorage) throw new Error("test setup failed");
 		registerProvider();
@@ -998,41 +846,53 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 
 	test("organization denial rotates past a concurrently refreshed account after quota exhaustion", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		await authStorage.credentials.set("anthropic", [
-			{ type: "oauth", access: "quota-access", refresh: "quota-refresh", expires: farExpiry(), orgId: "quota-org" },
+		await authStorage.credentials.set("github-copilot", [
+			{
+				type: "oauth",
+				access: "quota-access",
+				refresh: "quota-refresh",
+				expires: farExpiry(),
+				accountId: "quota-account",
+			},
 			{
 				type: "oauth",
 				access: "denied-access",
 				refresh: "denied-refresh",
 				expires: farExpiry(),
-				orgId: "denied-org",
+				accountId: "denied-account",
 			},
 			{
 				type: "oauth",
 				access: "healthy-access",
 				refresh: "healthy-refresh",
 				expires: farExpiry(),
-				orgId: "healthy-org",
+				accountId: "healthy-account",
 			},
 		]);
 
 		const sessionId = "sess-anthropic-policy-refresh";
-		const quotaKey = await authStorage.keys.get("anthropic", sessionId);
-		expect(quotaKey).toBe("quota-access");
-		await authStorage.limits.rotate("anthropic", sessionId, {
+		const quotaKey = await authStorage.keys.get("github-copilot", sessionId);
+		if (quotaKey === undefined) throw new Error("expected selected quota OAuth bearer");
+		const poolKeys = ["quota-access", "denied-access", "healthy-access"];
+		expect(poolKeys).toContain(quotaKey);
+		await authStorage.limits.rotate("github-copilot", sessionId, {
 			error: usageLimitError(),
 			apiKey: quotaKey,
 		});
-		const deniedKey = await authStorage.keys.get("anthropic", sessionId);
-		expect(deniedKey).toBe("denied-access");
+		const deniedKey = await authStorage.keys.get("github-copilot", sessionId);
+		if (deniedKey === undefined) throw new Error("expected selected denied OAuth bearer");
+		expect(poolKeys).toContain(deniedKey);
+		expect(deniedKey).not.toBe(quotaKey);
+		const healthyKey = poolKeys.find(key => key !== quotaKey && key !== deniedKey);
+		if (healthyKey === undefined) throw new Error("expected remaining healthy OAuth bearer");
 		const deniedRow = store
-			.listAuthCredentials("anthropic")
+			.listAuthCredentials("github-copilot")
 			.find(row => row.credential.type === "oauth" && row.credential.access === deniedKey);
 		if (deniedRow?.credential.type !== "oauth") throw new Error("expected denied OAuth credential");
 		store.updateAuthCredential(deniedRow.id, { ...deniedRow.credential, access: "denied-refreshed" });
 		await authStorage.credentials.reload();
 
-		const switched = await authStorage.limits.rotate("anthropic", sessionId, {
+		const switched = await authStorage.limits.rotate("github-copilot", sessionId, {
 			error: new ProviderHttpError("OAuth authentication is currently not allowed for this organization.", 403, {
 				code: "oauth_not_allowed_for_organization",
 			}),
@@ -1040,19 +900,20 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 		});
 
 		expect(switched.switched).toBe(true);
-		expect(await authStorage.keys.get("anthropic", sessionId)).toBe("healthy-access");
+		expect(await authStorage.keys.get("github-copilot", sessionId)).toBe(healthyKey);
 	});
 
 	test("organization policy denials soft-block a matching Anthropic bearer", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		await authStorage.credentials.set("anthropic", [
-			{ type: "oauth", access: "token-org-1", refresh: "ref-1", expires: farExpiry(), orgId: "org-1" },
-			{ type: "oauth", access: "token-org-2", refresh: "ref-2", expires: farExpiry(), orgId: "org-2" },
+		await authStorage.credentials.set("github-copilot", [
+			{ type: "oauth", access: "token-org-1", refresh: "ref-1", expires: farExpiry(), accountId: "account-1" },
+			{ type: "oauth", access: "token-org-2", refresh: "ref-2", expires: farExpiry(), accountId: "account-2" },
 		]);
 
 		const sessionId = "sess-anthropic-oauth-denial";
-		const firstKey = await authStorage.keys.get("anthropic", sessionId);
-		expect(firstKey).toBe("token-org-1");
+		const firstKey = await authStorage.keys.get("github-copilot", sessionId);
+		if (firstKey === undefined) throw new Error("expected selected organization OAuth bearer");
+		expect(["token-org-1", "token-org-2"]).toContain(firstKey);
 
 		const errorText =
 			'403 {"type":"error","error":{"type":"permission_error","message":"OAuth authentication is currently not allowed for this organization.","details":{"error_code":"oauth_not_allowed_for_organization"}},"request_id":"req_011CfDQosvzzsyor4jWjLsz8"}';
@@ -1060,19 +921,19 @@ describe("AuthStorage forceRefresh + rotateSessionCredential", () => {
 			code: "oauth_not_allowed_for_organization",
 		});
 
-		const switched = await authStorage.limits.rotate("anthropic", sessionId, {
+		const switched = await authStorage.limits.rotate("github-copilot", sessionId, {
 			error: anthropicError,
 			apiKey: firstKey,
 		});
 		expect(switched.switched).toBe(true);
 
-		const secondKey = await authStorage.keys.get("anthropic", sessionId);
-		expect(secondKey).toBe("token-org-2");
+		const secondKey = await authStorage.keys.get("github-copilot", sessionId);
+		expect(secondKey).toBe(firstKey === "token-org-1" ? "token-org-2" : "token-org-1");
 
-		const storedRows = store.listAuthCredentials("anthropic");
+		const storedRows = store.listAuthCredentials("github-copilot");
 		expect(storedRows).toHaveLength(2);
 
-		const secondSwitched = await authStorage.limits.rotate("anthropic", sessionId, {
+		const secondSwitched = await authStorage.limits.rotate("github-copilot", sessionId, {
 			error: anthropicError,
 			apiKey: secondKey,
 		});

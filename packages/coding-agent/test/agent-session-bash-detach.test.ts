@@ -138,10 +138,9 @@ describe("BashTool through AgentSession runs children in their own session (e2e)
 		await Settings.init({ inMemory: true, cwd: tempDir });
 
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected claude-sonnet-4-5 to be bundled");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
 		const settings = Settings.isolated({

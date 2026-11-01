@@ -15,9 +15,6 @@ export type {
 	OAuthAccountIdentity,
 	OAuthAccountSummary,
 	OAuthCredential,
-	ResetCreditAccountStatus,
-	ResetCreditRedeemOutcome,
-	ResetCreditTarget,
 	StoredAuthCredential,
 } from "@oh-my-pi/pi-ai";
 export { AuthStorage, REMOTE_REFRESH_SENTINEL, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";

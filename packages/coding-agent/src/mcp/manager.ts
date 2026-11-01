@@ -200,8 +200,6 @@ export interface MCPLoadResult {
 	errors: Map<string, string>;
 	/** Connected server names */
 	connectedServers: string[];
-	/** Extracted Exa API keys from filtered MCP servers */
-	exaApiKeys: string[];
 }
 
 /** Readiness of configured MCP servers after the initial tool handshake. */
@@ -218,8 +216,6 @@ export interface MCPStartupStatus {
 export interface MCPDiscoverOptions {
 	/** Whether to load project-level config (default: true) */
 	enableProjectConfig?: boolean;
-	/** Whether to filter out Exa MCP servers (default: true) */
-	filterExa?: boolean;
 	/** Whether to filter out browser MCP servers when the built-in browser capability is enabled (default: false) */
 	filterBrowser?: boolean;
 	/** Session-local extension roots for post-startup rediscovery (explicit + mode + configured). */
@@ -655,7 +651,6 @@ export class MCPManager {
 		try {
 			loadedConfigs = await this.loadConfigs(this.cwd, {
 				enableProjectConfig: options?.enableProjectConfig,
-				filterExa: options?.filterExa,
 				filterBrowser: options?.filterBrowser,
 				extensionRoots: options?.extensionRoots,
 			});
@@ -666,10 +661,8 @@ export class MCPManager {
 			this.#emitConnectionStatus({ type: "failed", serverName: ".mcp.json", error: message });
 			throw error;
 		}
-		const { configs, exaApiKeys, sources } = loadedConfigs;
-		const result = await this.connectServers(configs, sources, options?.onStatus, options?.startupTimeoutMs);
-		result.exaApiKeys = exaApiKeys;
-		return result;
+		const { configs, sources } = loadedConfigs;
+		return this.connectServers(configs, sources, options?.onStatus, options?.startupTimeoutMs);
 	}
 
 	/**
@@ -702,7 +695,6 @@ export class MCPManager {
 		this.#discoverOptions = { ...options, enableProjectConfig: enabled };
 		const loaded = await this.loadConfigs(this.cwd, {
 			enableProjectConfig: enabled,
-			filterExa: options.filterExa,
 			filterBrowser: options.filterBrowser,
 			extensionRoots: options.extensionRoots,
 		});
@@ -736,7 +728,6 @@ export class MCPManager {
 		const options = this.#discoverOptions;
 		const loaded = await this.loadConfigs(this.cwd, {
 			enableProjectConfig: options?.enableProjectConfig,
-			filterExa: options?.filterExa,
 			filterBrowser: false,
 			extensionRoots: options?.extensionRoots,
 		});
@@ -1049,7 +1040,6 @@ export class MCPManager {
 			tools: this.#tools,
 			errors,
 			connectedServers: Array.from(connectedServers),
-			exaApiKeys: [], // Will be populated by discoverAndConnect
 		};
 	}
 

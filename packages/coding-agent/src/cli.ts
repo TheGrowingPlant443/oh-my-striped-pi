@@ -30,7 +30,6 @@ import {
 import { declareWorkerHostEntry, installWorkerInbox, isWorkerHostSelector } from "@oh-my-pi/pi-utils/worker-host";
 import { extractProfileFlags } from "./cli/profile-bootstrap";
 import {
-	BLOB_BROKER_WORKER_ARG,
 	COMPUTER_WORKER_ARG,
 	DAEMON_BROKER_WORKER_ARG,
 	IDA_HOST_WORKER_ARG,
@@ -152,7 +151,6 @@ async function runSmokeTest(): Promise<void> {
 	const { smokeTestDaemonBroker } = await import("./launch/client");
 	const { smokeTestLspMux } = await import("./lsp/mux/daemon");
 	const { smokeTestIdaHost } = await import("./ida/client");
-	const { smokeTestBlobBroker } = await import("./blob-broker/daemon");
 	const { smokeTestTerminalOutputWorker } = await import("./launch/terminal-output-worker-client");
 	const { smokeTestTextPredictDaemon } = await import("./predict/client");
 	await smokeTestSyncWorker();
@@ -180,7 +178,6 @@ async function runSmokeTest(): Promise<void> {
 	await smokeTestDaemonBroker();
 	await smokeTestLspMux();
 	await smokeTestIdaHost();
-	await smokeTestBlobBroker();
 	await smokeTestTerminalOutputWorker();
 	await smokeTestTextPredictDaemon();
 	process.stdout.write("smoke-test: ok\n");
@@ -314,11 +311,6 @@ async function runWorkerEntrypoint(arg: string | undefined): Promise<boolean> {
 	if (arg === IDA_HOST_WORKER_ARG) {
 		const { startIdaHostFromEnvironment } = await import("./ida/host");
 		await startIdaHostFromEnvironment();
-		return true;
-	}
-	if (arg === BLOB_BROKER_WORKER_ARG) {
-		const { startBlobBrokerFromEnvironment } = await import("./blob-broker/server");
-		await startBlobBrokerFromEnvironment();
 		return true;
 	}
 	if (arg === TEXT_PREDICT_WORKER_ARG) {

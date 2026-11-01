@@ -11,9 +11,8 @@ import {
 /**
  * Per-provider fallback overrides on the stream-watchdog helpers.
  *
- * These are the gear that lets `google-gemini-cli` widen its first-event floor
- * beyond the 100s global default without forcing every other provider to wait
- * just as long. Tests pin the precedence contract callers depend on:
+ * Retained transports can widen their first-event floor without forcing every
+ * other request to wait just as long. Tests pin the precedence contract:
  * caller option > env var > per-provider fallback > base default.
  */
 

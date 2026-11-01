@@ -16,13 +16,7 @@ import {
 import { gatewayResponseHeaders, json, resolveClientIdentity } from "../http";
 
 function isGatewayImageApi(api: string): boolean {
-	return (
-		api === "openai-images" ||
-		api === "openrouter-images" ||
-		api === "google-generative-ai" ||
-		api === "google-gemini-cli" ||
-		api === "factory-droid-agent"
-	);
+	return api === "openai-images";
 }
 
 async function handleImages(
@@ -62,13 +56,6 @@ async function handleImages(
 	if (!model) {
 		return imagesServer.formatError(404, "invalid_request_error", `Unknown model: ${parsed.modelId}`);
 	}
-	if (model.api === "openai-responses" || model.api === "openai-codex-responses") {
-		return imagesServer.formatError(
-			400,
-			"invalid_request_error",
-			`Model ${parsed.modelId} requires a hosted image carrier, which the auth gateway cannot resolve`,
-		);
-	}
 	if (!isGatewayImageApi(model.api)) {
 		return imagesServer.formatError(
 			400,
@@ -76,6 +63,9 @@ async function handleImages(
 			`Model ${parsed.modelId} does not support image generation`,
 		);
 	}
+
+	if (!model.baseUrl?.trim())
+		return imagesServer.formatError(400, "invalid_request_error", "Model requires an explicit base URL");
 
 	const client = resolveClientIdentity(req.headers);
 	const sessionId = deterministicUuid(`images\u0000${model.provider}/${model.id}`);

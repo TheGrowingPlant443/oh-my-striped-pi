@@ -10,13 +10,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import {
-	hindsightBackend,
-	rebindMemoryBackendForCwd,
-	reloadMentalModelsForSession,
-} from "@oh-my-pi/pi-coding-agent/hindsight/backend";
+import { hindsightBackend, reloadMentalModelsForSession } from "@oh-my-pi/pi-coding-agent/hindsight/backend";
 import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
 import { HindsightRetainQueue, type HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
+import { rebindMemoryBackendForCwd } from "@oh-my-pi/pi-coding-agent/memory-backend/runtime";
 import type { AgentSessionEventListener } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 
 import {
@@ -194,6 +191,62 @@ describe("hindsightBackend.start", () => {
 		expect(subState?.unsubscribe).toBeUndefined();
 		// hasRecalledForFirstTurn=true suppresses beforeAgentStartPrompt auto-recall on the sub.
 		expect(subState?.hasRecalledForFirstTurn).toBe(true);
+	});
+
+	it("gives copied-prompt top-level forks independent writes and the already-delivered frozen snapshot", async () => {
+		const list = vi.spyOn(HindsightApi.prototype, "listMentalModels").mockResolvedValue({
+			items: [{ id: "conventions", bank_id: "omp", name: "Conventions", content: "Use the private cluster" }],
+		});
+		vi.spyOn(HindsightApi.prototype, "createBank").mockResolvedValue({});
+		const recall = vi
+			.spyOn(HindsightApi.prototype, "recall")
+			.mockResolvedValue({ results: [{ text: "Delivered memory" }] });
+		const retain = vi.spyOn(HindsightApi.prototype, "retainBatch").mockResolvedValue({});
+		const settings = Settings.isolated({
+			"memory.backend": "hindsight",
+			"hindsight.mentalModelsEnabled": true,
+			"hindsight.mentalModelAutoSeed": false,
+			"hindsight.autoRetain": false,
+		});
+		const parent = makeFakeSession({ sessionId: "copy-parent", settings });
+		const child = makeFakeSession({ sessionId: "copy-child", settings });
+		try {
+			await hindsightBackend.start({
+				session: parent as never,
+				settings,
+				modelRegistry: {} as never,
+				agentDir: "/tmp",
+				taskDepth: 0,
+			});
+			const inherited = parent.getHindsightSessionState()!;
+			await inherited.mentalModelsLoadPromise;
+			const preparation = await hindsightBackend.beforeAgentStartPrompt?.(parent as never, "What did we decide?");
+			expect(preparation?.commit()).toBe(true);
+			await hindsightBackend.start({
+				session: child as never,
+				settings,
+				modelRegistry: {} as never,
+				agentDir: "/tmp",
+				taskDepth: 0,
+				parentHindsightSessionState: inherited,
+			});
+			const forked = child.getHindsightSessionState()!;
+			expect(forked).not.toBe(inherited);
+			expect(forked.aliasOf).toBeUndefined();
+			expect(forked.lastRecallSnippet).toBe(inherited.lastRecallSnippet);
+			expect(forked.mentalModelsSnippet).toBe(inherited.mentalModelsSnippet);
+			expect(forked.mentalModelsLoadPromise).toBeUndefined();
+			expect(await hindsightBackend.beforeAgentStartPrompt?.(child as never, "Follow up")).toBeUndefined();
+			expect(list).toHaveBeenCalledTimes(1);
+			expect(recall).toHaveBeenCalledTimes(1);
+			forked.enqueueRetain("Child decision");
+			await forked.flushRetainQueue();
+			expect(retain.mock.calls[0]?.[1][0]?.metadata).toEqual({ session_id: "copy-child" });
+			expect(inherited.retainQueue.depth).toBe(0);
+		} finally {
+			child.getHindsightSessionState()?.dispose();
+			parent.getHindsightSessionState()?.dispose();
+		}
 	});
 
 	it("returns silently for subagent runs when no primary state has been registered", async () => {
@@ -1096,11 +1149,11 @@ describe("hindsightBackend cwd rebind", () => {
 			cfgHindsightBankId.set(settings, "destination");
 			const edit = hindsightBackend.applySettings!(session as never, ["hindsight.bankId"]);
 			await parked.promise;
-			// Requested while the doomed attempt is still in flight, so it
-			// coalesces onto the same task; the retry clears the failure for both.
+			// Queue the retry synchronously; cwd rebind awaits backend settlement first.
+			const retry = hindsightBackend.applySettings!(session as never, ["hindsight.bankId"]);
 			const move = rebindMemoryBackendForCwd(session as never);
 			gate.resolve();
-			await Promise.all([edit, move]);
+			await Promise.all([edit, retry, move]);
 
 			expect(session.getHindsightSessionState()?.bankId).toBe("destination");
 		} finally {

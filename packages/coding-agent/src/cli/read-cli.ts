@@ -18,11 +18,9 @@ import { MCPManager } from "../mcp/manager";
 import { discoverAuthStorage, loadCliExtensionProviders } from "../sdk";
 import type { AuthStorage } from "../session/auth-storage";
 import type { ToolSession } from "../tools";
-import { parseReadUrlTarget } from "../tools/fetch";
 import { wrapToolWithMetaNotice } from "../tools/output-meta";
 import { ReadTool, splitImageQuestionTarget } from "../tools/read";
 import { renderError } from "../tools/tool-errors";
-import { parseXUrl } from "../web/x";
 
 import { cfgDisabledExtensions, cfgExtensions, cfgSkills } from "../extensibility/settings";
 import { cfgMcpEnableProjectConfig } from "../mcp/settings";
@@ -82,7 +80,6 @@ export async function runReadCommand(cmd: ReadCommandArgs): Promise<void> {
 			authStorage ??= await discoverAuthStorage(undefined, { settings });
 			const result = await discoverAndLoadMCPTools(cwd, {
 				enableProjectConfig: cfgMcpEnableProjectConfig.get(settings),
-				filterExa: true,
 				// `omp read` has no Eval prelude, so browser MCP remains available.
 				filterBrowser: false,
 				cacheStorage: settings.getStorage(),
@@ -93,15 +90,8 @@ export async function runReadCommand(cmd: ReadCommandArgs): Promise<void> {
 			return mcpManager;
 		});
 
-		// `read <image>?q=<question>` delegates to a vision model, and X URLs read
-		// through Grok's X tools; both need a model registry to resolve models and
-		// fetch credentials. The lightweight session above omits it (other reads
-		// never touch a model), so build one on demand — otherwise image questions
-		// abort with "Model registry is unavailable for image questions." before
-		// resolving anything (issue #11338), and X reads report missing xAI
-		// credentials.
-		const urlTarget = parseReadUrlTarget(cmd.path);
-		if (splitImageQuestionTarget(cmd.path).question || (urlTarget && parseXUrl(urlTarget.path))) {
+		// Image questions delegate to a vision model; ordinary URL reads need no model credentials.
+		if (splitImageQuestionTarget(cmd.path).question) {
 			authStorage ??= await discoverAuthStorage(undefined, { settings });
 			const modelRegistry = new ModelRegistry(authStorage);
 			await modelRegistry.hydrateCredentialScopedModelCaches();

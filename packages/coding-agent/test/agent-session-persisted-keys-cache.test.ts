@@ -37,9 +37,9 @@ describe("AgentSession persistence-keys cache", () => {
 		fs.mkdirSync(tempDir, { recursive: true });
 
 		const tools: AgentTool[] = [];
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("bundled model claude-sonnet-4-5 not found");
+			throw new Error("Expected retained Copilot test model");
 		}
 		const agent = new Agent({
 			getApiKey: () => "fake-key",

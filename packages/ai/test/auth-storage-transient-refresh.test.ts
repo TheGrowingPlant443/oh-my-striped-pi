@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 /**
  * A transient OAuth refresh failure (network blip, timeout) must not read as
  * "no credential configured" on the request path: `MissingApiKeyError` is
@@ -46,56 +50,56 @@ describe("AuthStorage transient OAuth refresh failure", () => {
 
 	it("rejects request resolution with a retryable error and keeps the credential", async () => {
 		const auth = await open();
-		await auth.credentials.set("anthropic", [expiredOAuth()]);
+		await auth.credentials.set("github-copilot", [expiredOAuth()]);
 		const refresh = vi
 			.spyOn(oauthUtils, "refreshOAuthToken")
 			.mockRejectedValueOnce(new Error("fetch failed: ECONNRESET"))
 			.mockResolvedValue({ access: "fresh-access", refresh: "refresh-2", expires: Date.now() + 3_600_000 });
 
-		const error = await auth.keys.getWithCredential("anthropic", "session").catch((err: unknown) => err);
+		const error = await auth.keys.getWithCredential("github-copilot", "session").catch((err: unknown) => err);
 		expect(error).toBeInstanceOf(AIError.OAuthRefreshUnavailableError);
 		expect(AIError.retriable(AIError.classify(error))).toBe(true);
-		expect(auth.credentials.has("anthropic")).toBe(true);
+		expect(auth.credentials.has("github-copilot")).toBe(true);
 
-		expect((await auth.keys.getWithCredential("anthropic", "session"))?.apiKey).toBe("fresh-access");
+		expect((await auth.keys.getWithCredential("github-copilot", "session"))?.apiKey).toBe("fresh-access");
 		expect(refresh).toHaveBeenCalledTimes(2);
 	});
 
 	it("lets availability probes treat a transient refresh failure as unavailable", async () => {
 		const auth = await open();
-		await auth.credentials.set("anthropic", [expiredOAuth()]);
+		await auth.credentials.set("github-copilot", [expiredOAuth()]);
 		vi.spyOn(oauthUtils, "refreshOAuthToken").mockRejectedValue(new Error("fetch failed: ECONNRESET"));
 
-		expect(await auth.keys.get("anthropic", "session")).toBeUndefined();
-		expect(auth.credentials.has("anthropic")).toBe(true);
+		expect(await auth.keys.get("github-copilot", "session")).toBeUndefined();
+		expect(auth.credentials.has("github-copilot")).toBe(true);
 	});
 
 	it("surfaces the refresh failure for a session restricted to its account pool", async () => {
 		const auth = await open();
-		await auth.credentials.set("anthropic", [{ ...expiredOAuth(), accountId: "acc-a" }]);
-		auth.sessions.restrict("anthropic", "child", ["account:acc-a"]);
+		await auth.credentials.set("github-copilot", [{ ...expiredOAuth(), accountId: "acc-a" }]);
+		auth.sessions.restrict("github-copilot", "child", ["account:acc-a"]);
 		vi.spyOn(oauthUtils, "refreshOAuthToken").mockRejectedValue(new Error("fetch failed: ECONNRESET"));
 
-		const error = await auth.keys.getWithCredential("anthropic", "child").catch((err: unknown) => err);
+		const error = await auth.keys.getWithCredential("github-copilot", "child").catch((err: unknown) => err);
 		expect(error).toBeInstanceOf(AIError.OAuthRefreshUnavailableError);
 	});
 
 	it("still falls back to a stored API key when OAuth refresh fails transiently", async () => {
 		const auth = await open();
-		await auth.credentials.set("anthropic", [expiredOAuth(), { type: "api_key", key: "sk-fallback" }]);
+		await auth.credentials.set("github-copilot", [expiredOAuth(), { type: "api_key", key: "sk-fallback" }]);
 		vi.spyOn(oauthUtils, "refreshOAuthToken").mockRejectedValue(new Error("fetch failed: ECONNRESET"));
 
-		expect((await auth.keys.getWithCredential("anthropic", "session"))?.apiKey).toBe("sk-fallback");
+		expect((await auth.keys.getWithCredential("github-copilot", "session"))?.apiKey).toBe("sk-fallback");
 	});
 
 	it("reports no key after a definitive refresh failure disables the only credential", async () => {
 		const auth = await open();
-		await auth.credentials.set("anthropic", [expiredOAuth()]);
+		await auth.credentials.set("github-copilot", [expiredOAuth()]);
 		vi.spyOn(oauthUtils, "refreshOAuthToken").mockRejectedValue(
 			new Error('HTTP 400 invalid_grant {"error":"invalid_grant"}'),
 		);
 
-		expect(await auth.keys.getWithCredential("anthropic", "session")).toBeUndefined();
-		expect(auth.credentials.has("anthropic")).toBe(false);
+		expect(await auth.keys.getWithCredential("github-copilot", "session")).toBeUndefined();
+		expect(auth.credentials.has("github-copilot")).toBe(false);
 	});
 });

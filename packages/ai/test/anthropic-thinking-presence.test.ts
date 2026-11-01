@@ -10,36 +10,21 @@ import type {
 } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
-/**
- * Regression: DeepSeek's Anthropic endpoint rejects a thinking-mode request when
- * an assistant turn inside the CURRENT turn carries no `thinking` block —
- * "The `content[].thinking` in the thinking mode must be passed back to the
- * API." A gateway model group whose primary upstream is lax (it can answer a
- * thinking-mode turn with no reasoning at all) and whose fallback is that strict
- * endpoint inherits the stricter contract.
- *
- * Proven against https://api.deepseek.com/anthropic/v1/messages:
- * - a thinking-less assistant turn after the last user text → 400;
- * - appending one user prompt past it → 200 (the window, not the whole history);
- * - an unsigned `thinking` block with non-blank text restores 200 through litellm
- *   (a blank one is dropped by the adapter's body normalization);
- * - a thinking-less turn before the last user text is accepted as-is;
- * - `redacted_thinking` is rejected outright ("unknown variant"), so it can never
- *   stand in for a `thinking` block.
- */
+/** Explicit thinking-presence and unsigned-wire overrides pad only the active tool loop. */
 const PLACEHOLDER = "(no reasoning was returned for this turn)";
 const strictCompat = {
 	requiresThinkingPresence: true,
 	replayUnsignedThinking: true,
+	signingEndpoint: false,
 } satisfies ModelSpec<"anthropic-messages">["compat"];
 
 function makeModel(compat?: ModelSpec<"anthropic-messages">["compat"]): Model<"anthropic-messages"> {
 	const spec: ModelSpec<"anthropic-messages"> = {
 		api: "anthropic-messages",
-		provider: "litellm",
-		id: "deepseek-v4.1-flash",
-		name: "DeepSeek V4.1 Flash",
-		baseUrl: "https://llm.example.com",
+		provider: "github-copilot",
+		id: "claude-sonnet-4.5",
+		name: "Claude Sonnet 4.5",
+		baseUrl: "https://api.githubcopilot.com",
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		maxTokens: 8_192,
@@ -62,8 +47,8 @@ function makeAssistant(
 		role: "assistant",
 		content,
 		api: "anthropic-messages",
-		provider: "litellm",
-		model: "deepseek-v4.1-flash",
+		provider: "github-copilot",
+		model: "claude-sonnet-4.5",
 		usage: {
 			input: 0,
 			output: 0,
@@ -105,7 +90,7 @@ function assistantBlocks(
 	model: Model<"anthropic-messages">,
 	thinkingEnabled: boolean,
 ): WireBlock[][] {
-	const params = convertAnthropicMessages(messages, model, false, { thinkingEnabled });
+	const params = convertAnthropicMessages(messages, model, { thinkingEnabled });
 	const turns: WireBlock[][] = [];
 	for (const param of params) {
 		if (param.role !== "assistant") continue;
@@ -115,7 +100,7 @@ function assistantBlocks(
 	return turns;
 }
 
-describe("Anthropic thinking-presence replay (DeepSeek strict validator)", () => {
+describe("Anthropic thinking-presence compatibility overrides", () => {
 	it("pads a thinking-less turn that the current request answers", () => {
 		const turns = assistantBlocks(
 			[makeUser("list files"), makeAssistant([readCall("call_a")]), makeToolResult("call_a")],

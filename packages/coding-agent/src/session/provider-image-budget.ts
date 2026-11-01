@@ -10,14 +10,11 @@ import type {
 	ToolResultProviderMetadata,
 	UserMessage,
 } from "@oh-my-pi/pi-ai";
-import { reachesBudgetedHost } from "@oh-my-pi/pi-ai";
 import { decodeDataUri } from "@oh-my-pi/pi-ai/providers/openai-data-uri";
-import { resolveFactoryDroidPolicy } from "@oh-my-pi/pi-catalog/compat/factory-droid";
 import { resolveInlineImageByteBudget, resolveRequestBodyByteLimit } from "@oh-my-pi/pi-catalog/compat/request-size";
 import { isRecord } from "@oh-my-pi/pi-utils";
 import { LRUCache } from "@oh-my-pi/pi-utils/lru";
 import { capFrameDataBytes, frameDataBytesBudget, providerImageBudget } from "@oh-my-pi/snapcompact";
-import { supportsRemoteImageUrls } from "../blob-broker/context-images";
 import { imageDecodeFailureReason } from "@oh-my-pi/pi-tui/chat/image-loading";
 
 const IMAGE_OMISSION: TextContent = {
@@ -30,6 +27,16 @@ const IMAGE_OMISSION: TextContent = {
  * request fields (model, limits, thinking, stream). Reserved before protecting images against a body limit.
  */
 const REQUEST_ENVELOPE_BYTES = 64_000;
+
+/** Whether the image's URL is sent instead of its inline bytes. */
+function supportsRemoteImageUrls(model: Model): boolean {
+	return (
+		model.input.includes("image") &&
+		(model.api === "openai-responses" ||
+			model.api === "openai-completions" ||
+			(model.api === "anthropic-messages" && model.provider === "github-copilot"))
+	);
+}
 
 /**
  * Images the clamp below is actually able to remove, and therefore the only
@@ -70,27 +77,8 @@ function inlineImageBytes(image: ImageContent, model: Model): number {
 }
 
 /**
- * Whether `model`'s request sends a computer result's `providerMetadata.screenshot` in place of its content image.
- * The Responses wire does (`appendResponsesToolResultMessages`: a `computer_call_output`, or an assistant note quoting
- * it on a model without native computer use), except Codex without native computer use, which unrolls the result to its
- * content. Every other wire sends only the content. Factory Droid sends each model over its registry wire.
- */
-function sendsComputerScreenshotMetadata(model: Model): boolean {
-	const api = model.api === "factory-droid-agent" ? resolveFactoryDroidPolicy(model)?.wire : model.api;
-	switch (api) {
-		case "openai-responses":
-		case "azure-openai-responses":
-			return true;
-		case "openai-codex-responses":
-			return model.supportsComputerUse === true;
-		default:
-			return false;
-	}
-}
-
-/**
  * Inline bytes of a computer result's `providerMetadata.screenshot` on a route that sends it in place of the result's
- * content ({@link sendsComputerScreenshotMetadata}), or `undefined` where the route sends the content. On such a route
+ * content, or `undefined` where the route sends the content. On such a route
  * the result's content images never travel, and a `file_id` screenshot costs nothing.
  */
 function sentScreenshotBytes(message: Message, metadataWire: boolean): number | undefined {
@@ -117,7 +105,7 @@ interface ImageBudgetState {
 	inlineBytes: number;
 	byteBudget: number;
 	model: Model;
-	/** {@link sendsComputerScreenshotMetadata} for `model`. */
+	/** Whether the Responses route sends the metadata screenshot instead of content. */
 	metadataWire: boolean;
 	/** Messages whose images the byte clamp must not evict. */
 	kept?: ReadonlySet<Message>;
@@ -210,7 +198,7 @@ function clampImages(context: Context, state: ImageBudgetState): Context {
  */
 export function clampProviderContextImages(context: Context, model: Model): Context {
 	if (!model.input.includes("image")) return context;
-	const metadataWire = sendsComputerScreenshotMetadata(model);
+	const metadataWire = model.api === "openai-responses";
 	const totalImages = countImages(context, metadataWire);
 	const remainingDrops = totalImages - providerImageBudget(model);
 	if (remainingDrops <= 0) return context;
@@ -258,14 +246,13 @@ function newestImageMessages(
 
 /**
  * Drops oldest inline image blocks so their base64 fits the deployment's request-body budget.
- * Runs after URL/provider-file decoration: blocks the provider receives as references carry no inline bytes.
+ * Blocks sent as URL references carry no inline bytes.
  */
 export function clampProviderContextImageBytes(context: Context, model: Model): Context {
 	if (!model.input.includes("image")) return context;
-	const budgetedHost = reachesBudgetedHost(model);
-	const byteBudget = resolveInlineImageByteBudget(model, budgetedHost);
+	const byteBudget = resolveInlineImageByteBudget(model);
 	if (byteBudget === undefined) return context;
-	const metadataWire = sendsComputerScreenshotMetadata(model);
+	const metadataWire = model.api === "openai-responses";
 	let inlineBytes = 0;
 	// Assistant images are model outputs no serializer replays (see countImages): never charged or reserved.
 	let unsentBytes = 0;
@@ -279,7 +266,7 @@ export function clampProviderContextImageBytes(context: Context, model: Model): 
 		}
 	}
 	if (inlineBytes <= byteBudget) return context;
-	const bodyLimit = resolveRequestBodyByteLimit(model, budgetedHost);
+	const bodyLimit = resolveRequestBodyByteLimit(model);
 	// Text, tools and the system prompt ride in the same body, as UTF-8: only what they leave may hold protected
 	// images. Base64 is ASCII, so its characters are its bytes. Never sent: tool-result `details` (UI-only) and
 	// another provider's native payload (assistant turns, compaction summaries), which this request does not replay.
@@ -345,54 +332,11 @@ async function unreadableImageReason(image: ImageContent): Promise<string | null
 }
 
 /**
- * True when this block's inline `data` is what actually travels on the wire.
- *
- * An `ImageContent` may legitimately carry EMPTY `data` beside an external
- * reference, and it is the reference — never those bytes — that the provider
- * receives. Provider-file references displace inline bytes only on an API that
- * understands that provider's reference shape; another API falls back to data.
- * Two producers make the empty reference-backed shape:
- *   - `openai-responses-server.ts` `functionOutputContent()` represents a
- *     native `input_image` URL / file id as `{ data: "", url }` or
- *     `{ data: "", providerFile }`;
- *   - `blob-broker/service.ts` `frameSink` publishes lazy snapcompact frames as
- *     `{ data: "", url }` whose PNG renders only when a provider fetches it —
- *     and `SnapcompactInlineTransformer` runs BEFORE this guard in `sdk.ts`, so
- *     those placeholders are already reference-shaped when we see them.
- * `openai-shared.ts` `convertResponsesInputImage()` prefers `providerFile`, then
- * `url`, and only falls back to `data:<mime>;base64,<data>`. Decoding a
- * reference-backed block would therefore destroy a perfectly good image over
- * bytes the provider is never sent.
+ * True when this block's inline `data` travels on the wire. Published image
+ * URLs can carry empty data because the provider fetches the image itself.
+ * Decode only inline bytes, matching the route's URL support.
  */
 function sendsInlineImageBytes(image: ImageContent, model: Model): boolean {
-	const reference = image.providerFile;
-	if (reference) {
-		switch (reference.provider) {
-			case "openai":
-				if (
-					reference.id &&
-					(model.api === "openai-responses" ||
-						model.api === "openai-codex-responses" ||
-						model.api === "azure-openai-responses")
-				) {
-					return false;
-				}
-				break;
-			case "anthropic":
-				if (reference.id && model.api === "anthropic-messages") return false;
-				break;
-			case "google":
-				if (
-					reference.uri &&
-					(model.api === "google-generative-ai" ||
-						model.api === "google-gemini-cli" ||
-						model.api === "google-vertex")
-				) {
-					return false;
-				}
-				break;
-		}
-	}
 	if (image.url && supportsRemoteImageUrls(model)) return false;
 	return true;
 }

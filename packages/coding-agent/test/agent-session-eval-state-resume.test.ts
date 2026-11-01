@@ -61,10 +61,9 @@ function appendEval(manager: SessionManager, id: string): void {
  */
 it("keeps the previous process's request as the resumed request prefix", async () => {
 	auth = await AuthStorage.create(":memory:");
-	auth.keys.setRuntime("anthropic", "test-key");
+	auth.keys.setRuntime("github-copilot", "test-key");
 	const registry = new ModelRegistry(auth);
-	const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!bundled) throw new Error("Expected bundled model");
+	const bundled = getBundledModel("github-copilot", "claude-sonnet-4.6");
 	const sessionDir = path.join(temp.path(), "sessions");
 	const seed = SessionManager.create(temp.path(), sessionDir);
 	seed.appendMessage({ role: "user", content: "use eval", timestamp: Date.now() });

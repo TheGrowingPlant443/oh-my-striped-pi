@@ -39,8 +39,8 @@ import {
 const MODEL: Model = buildModel({
 	id: "mock-model",
 	name: "mock-model",
-	api: "mock",
-	provider: "mock",
+	api: "local-inference",
+	provider: "local",
 	baseUrl: "mock://",
 	reasoning: false,
 	input: ["text"],
@@ -82,8 +82,8 @@ function makeAssistantMessage(text: string, usage: Usage = makeUsage()): Assista
 	return {
 		role: "assistant",
 		content: [{ type: "text", text }],
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock-model",
 		usage,
 		stopReason: "stop",

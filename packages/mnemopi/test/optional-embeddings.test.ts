@@ -3,7 +3,6 @@ import {
 	available,
 	embed,
 	embedQuery,
-	getEmbeddingApiCallCountForTests,
 	resetEmbeddingProviderForTests,
 	setEmbeddingProviderForTests,
 	setLocalModelInitializerForTests,
@@ -11,19 +10,8 @@ import {
 import { Mnemopi } from "@oh-my-pi/pi-mnemopi/core/memory";
 import { withMnemopiRuntimeOptions } from "@oh-my-pi/pi-mnemopi/core/runtime-options";
 import { getFastembedCacheDir } from "@oh-my-pi/pi-utils";
-import packageJson from "../package.json" with { type: "json" };
 
-const ENV_KEYS = [
-	"NODE_ENV",
-	"BUN_ENV",
-	"MNEMOPI_NO_EMBEDDINGS",
-	"MNEMOPI_EMBEDDING_MODEL",
-	"MNEMOPI_EMBEDDING_API_URL",
-	"MNEMOPI_EMBEDDING_API_KEY",
-	"OPENROUTER_BASE_URL",
-	"OPENROUTER_API_KEY",
-	"OPENAI_API_KEY",
-] as const;
+const ENV_KEYS = ["NODE_ENV", "BUN_ENV", "MNEMOPI_NO_EMBEDDINGS", "MNEMOPI_EMBEDDING_MODEL"] as const;
 
 type EnvKey = (typeof ENV_KEYS)[number];
 
@@ -125,49 +113,6 @@ describe("optional embeddings", () => {
 		});
 	});
 
-	it("calls an OpenAI-compatible custom embeddings endpoint without requiring an API key", async () => {
-		let requests = 0;
-		const server = Bun.serve({
-			port: 0,
-			fetch: async request => {
-				requests += 1;
-				expect(request.headers.get("content-type")).toBe("application/json");
-				expect(request.headers.get("user-agent")).toBe(`omp/${packageJson.version}`);
-				expect(request.headers.get("http-referer")).toBe("https://omp.sh/");
-				expect(request.headers.get("x-openrouter-title")).toBe("omp");
-				expect(request.headers.get("x-openrouter-categories")).toBe("cli-agent");
-				expect(request.headers.get("x-title")).toBeNull();
-				expect(request.headers.get("authorization")).toBeNull();
-				expect(new URL(request.url).pathname).toBe("/embeddings");
-				const payload = (await request.json()) as { model: string; input: string[] };
-				expect(payload.model).toBe("openai/text-embedding-3-small");
-				return Response.json({
-					data: payload.input.map((text, index) => ({ embedding: [text.length, index + 1] })),
-				});
-			},
-		});
-
-		try {
-			await withEnv(
-				{
-					MNEMOPI_NO_EMBEDDINGS: undefined,
-					MNEMOPI_EMBEDDING_MODEL: "openai/text-embedding-3-small",
-					MNEMOPI_EMBEDDING_API_URL: server.url.toString().replace(/\/+$/, ""),
-					MNEMOPI_EMBEDDING_API_KEY: undefined,
-					OPENROUTER_API_KEY: undefined,
-					OPENAI_API_KEY: undefined,
-				},
-				async () => {
-					expect(await available()).toBe(true);
-					expect(await embed(["hi", "world"])).toEqual([new Float32Array([2, 1]), new Float32Array([5, 2])]);
-					expect(getEmbeddingApiCallCountForTests()).toBe(1);
-				},
-			);
-			expect(requests).toBe(1);
-		} finally {
-			server.stop(true);
-		}
-	});
 	it("flattens async batches into one matrix", async () => {
 		await withEnv({ MNEMOPI_NO_EMBEDDINGS: undefined }, async () => {
 			setEmbeddingProviderForTests({
@@ -208,10 +153,6 @@ describe("optional embeddings", () => {
 				BUN_ENV: undefined,
 				MNEMOPI_NO_EMBEDDINGS: undefined,
 				MNEMOPI_EMBEDDING_MODEL: "BAAI/bge-small-en-v1.5",
-				MNEMOPI_EMBEDDING_API_URL: undefined,
-				OPENROUTER_BASE_URL: undefined,
-				OPENROUTER_API_KEY: undefined,
-				OPENAI_API_KEY: undefined,
 			},
 			async () => {
 				let initCalls = 0;

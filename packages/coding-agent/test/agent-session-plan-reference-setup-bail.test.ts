@@ -89,7 +89,7 @@ describe("AgentSession plan-reference delivery tracking (issue #4094)", () => {
 	beforeAll(async () => {
 		fixtureDir = TempDir.createSync("@pi-agent-session-plan-ref-setup-bail-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir.path(), "models.yml"));
 	});
 
@@ -113,8 +113,8 @@ describe("AgentSession plan-reference delivery tracking (issue #4094)", () => {
 	async function createHarness(): Promise<Harness> {
 		const observedCalls: ObservedPromptCall[] = [];
 
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!bundled) throw new Error("Expected retained Copilot test model");
 		const model = { ...bundled, contextWindow: 200_000, maxTokens: 64_000 };
 
 		const settings = Settings.isolated({

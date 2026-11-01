@@ -4,7 +4,6 @@ import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentTool, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { CustomToolAdapter } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/wrapper";
 import { DeferredMCPTool } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
@@ -16,6 +15,7 @@ import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage
 import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { getRestorableSessionModels } from "@oh-my-pi/pi-coding-agent/session/session-context";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 import {
 	cfgPrewalkEnabled,
 	cfgRetryBaseDelayMs,
@@ -47,8 +47,28 @@ describe("AgentSession prewalk", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-prewalk-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-prewalk", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider("company-prewalk", {
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid",
+			apiKey: "test-key",
+			models: ["claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4-6"].map(id =>
+				toProviderModelConfig({
+					id,
+					name: id,
+					provider: "company-prewalk",
+					api: "anthropic-messages",
+					baseUrl: "https://models.company.invalid",
+					reasoning: true,
+					thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+					input: ["text", "image"],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 200_000,
+					maxTokens: 64_000,
+				}),
+			),
+		});
 	});
 
 	afterEach(async () => {
@@ -64,8 +84,8 @@ describe("AgentSession prewalk", () => {
 	});
 
 	function modelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
-		if (!model) throw new Error(`Expected bundled model ${id}`);
+		const model = modelRegistry.find("company-prewalk", id);
+		if (!model) throw new Error(`Expected configured prewalk model ${id}`);
 		return model;
 	}
 
@@ -140,7 +160,7 @@ describe("AgentSession prewalk", () => {
 			"prewalk.enabled": options.enabled ?? true,
 		});
 		// Resolution must honor role fallback lists and the target effort suffix.
-		settings.setModelRole("smol", `anthropic/missing-model,${target.provider}/${target.id}:low`);
+		settings.setModelRole("smol", `company-prewalk/missing-model,${target.provider}/${target.id}:low`);
 		const mock = createMockModel({ responses });
 		const requested: string[] = [];
 		const nudges: string[][] = [];
@@ -400,7 +420,6 @@ describe("AgentSession prewalk", () => {
 			session: created.session,
 			sessionManager: created.session.sessionManager,
 			settings: created.settings,
-			collabGuest: false,
 			showStatus: vi.fn(),
 			editor: { setText: vi.fn() },
 			refreshSlashCommandState: vi.fn(),
@@ -1290,7 +1309,6 @@ describe("AgentSession prewalk", () => {
 			session,
 			sessionManager,
 			settings,
-			collabGuest: false,
 			showStatus,
 			editor: { setText: vi.fn() },
 			refreshSlashCommandState: vi.fn(),
@@ -1371,7 +1389,7 @@ describe("AgentSession prewalk", () => {
 			},
 		});
 		const settings = Settings.isolated({ "compaction.enabled": false });
-		settings.setModelRole("default", `anthropic/missing-model,${primary.provider}/${primary.id}:medium`);
+		settings.setModelRole("default", `company-prewalk/missing-model,${primary.provider}/${primary.id}:medium`);
 		settings.setModelRole("smol", `${target.provider}/${target.id}:medium`);
 		const sessionManager = SessionManager.inMemory();
 		session = new AgentSession({
@@ -1393,7 +1411,6 @@ describe("AgentSession prewalk", () => {
 			session,
 			sessionManager,
 			settings,
-			collabGuest: false,
 			showStatus,
 			editor: { setText: vi.fn() },
 			refreshSlashCommandState: vi.fn(),

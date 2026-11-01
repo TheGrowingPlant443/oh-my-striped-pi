@@ -2,58 +2,13 @@ import { describe, expect, test } from "bun:test";
 import rules from "../src/compat/rules.json";
 import { getBundledModels, getBundledProviders } from "../src/models";
 
-/**
- * Providers referenced by rules that have no bundled catalog rows:
- * local runtimes, hosted-search facades, and routing-variant device peers.
- * Additions require a comment naming the runtime path that resolves them.
- */
-const RUNTIME_ONLY_PROVIDERS = new Set([
-	"kimi-search",
-	"ollama",
-	"siliconflow",
-	"zai-search",
-	"synthetic-search",
-	"llama.cpp",
-	"lm-studio",
-	"litellm",
-	"vllm",
-	"openai-codex-device",
-	// Public gateway discovery via charmHyperModelManagerOptions: every row,
-	// including its tariff and effort ladder, comes from the live /v1/models
-	// snapshot, so no rows are frozen into the bundled catalog.
-	"charm-hyper",
-	// Factory has no public model-listing endpoint. Its CLI roster is a
-	// `bundle="never"` KDL seed; factoryDroidModelManagerOptions serves it
-	// offline and narrows it by account flags/org policy live.
-	"factory-droid",
-	// Both SingularityAPI rosters are live and credential-scoped (one key sees
-	// only its own product's models — the pay-as-you-go catalog or the reserved
-	// lanes), so no rows are frozen into the bundled catalog.
-	"singularityapi-dev",
-	"singularityapi-tech",
-	// Clef judges are a `bundle="always"` KDL seed that
-	// cloudflareWorkersAiModelManagerOptions serves at runtime; the bundled
-	// catalog gains the rows at the next regeneration.
-	"cloudflare-workers-ai",
-	// User-configured LiteLLM proxy (models.yml provider or litellm auth flow;
-	// PROXY_OPENAI_COMPAT_PROVIDERS) that forwards upstream chat templates.
-	"litellm",
-	// User-configured models.yml provider pointing at
-	// https://inference-api.nousresearch.com/v1 (NousResearch inference API).
-	"nous",
-]);
-
 function collectReferencedProviders(): Map<string, string> {
 	const referenced = new Map<string, string>();
 	for (const rule of rules.cascade.rules) {
+		if (!rule.source.startsWith("providers/")) continue;
 		for (const provider of rule.providers ?? []) referenced.set(provider, rule.source);
 	}
 	const taxonomy = rules.taxonomy;
-	for (const cls of taxonomy.classes) {
-		for (const override of cls.overrides) {
-			if (override.provider) referenced.set(override.provider, `override ${override.id}`);
-		}
-	}
 	for (const lane of taxonomy.collapse.lanes) {
 		for (const provider of lane.providers) referenced.set(provider, `effort-lane ${lane.suffix}`);
 	}
@@ -88,10 +43,10 @@ function collectReferencedProviders(): Map<string, string> {
 
 describe("compat rules conformance", () => {
 	test("every referenced provider id is bundled or runtime-only", () => {
-		const known = new Set<string>(getBundledProviders());
+		const known = new Set<string>([...getBundledProviders(), ...rules.auth.providers.map(provider => provider.id)]);
 		const offenders: string[] = [];
 		for (const [provider, source] of collectReferencedProviders()) {
-			if (!known.has(provider) && !RUNTIME_ONLY_PROVIDERS.has(provider)) {
+			if (!known.has(provider)) {
 				offenders.push(`${provider} (${source})`);
 			}
 		}
@@ -99,9 +54,7 @@ describe("compat rules conformance", () => {
 	});
 
 	test('every bundle="always" seed row is bundled in the catalog', () => {
-		// bundledSeedRows() writes every bundle="always" seed row on each
-		// regeneration, so a missing row means the catalog was regenerated from
-		// a stale snapshot (#16610 lost web/deepseek that way in 18.12.2).
+		// The seed-only generator must include every always-bundled row.
 		const offenders: string[] = [];
 		for (const [provider, entry] of Object.entries(rules.providers)) {
 			if (entry.seed?.bundle !== "always") continue;

@@ -21,22 +21,6 @@ export async function runDoctorChecks(): Promise<DoctorCheck[]> {
 		});
 	}
 
-	// Check API keys
-	const apiKeys = [
-		{ name: "ANTHROPIC_API_KEY", description: "Anthropic API" },
-		{ name: "OPENAI_API_KEY", description: "OpenAI API" },
-		{ name: "EXA_API_KEY", description: "Exa search" },
-	];
-
-	for (const key of apiKeys) {
-		const hasKey = !!Bun.env[key.name];
-		checks.push({
-			name: key.name,
-			status: hasKey ? "ok" : "warning",
-			message: hasKey ? "Configured" : `Not set - ${key.description} unavailable`,
-		});
-	}
-
 	return checks;
 }
 

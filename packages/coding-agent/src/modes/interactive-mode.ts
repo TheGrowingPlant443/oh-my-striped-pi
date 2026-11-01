@@ -93,8 +93,6 @@ import type {
 } from "../extensibility/extensions";
 import type {
 	CompactOptions,
-	ExtensionLiveSession,
-	ExtensionLiveStartOptions,
 	ExtensionSessionModes,
 	PlanReviewChoice,
 	PlanReviewOption,
@@ -107,7 +105,7 @@ import type { Skill } from "../extensibility/skills";
 import type { FileSlashCommand } from "../extensibility/slash-commands";
 import { loadSlashCommands } from "../extensibility/slash-commands";
 import type { GoalModeState } from "../goals/state";
-import { rebindMemoryBackendForCwd } from "../hindsight/backend";
+import { rebindMemoryBackendForCwd } from "../memory-backend/runtime";
 import { copyLocalArtifacts, resolveLocalRoot } from "../internal-urls";
 import { hasNativeJudge } from "../judgment";
 import { LSP_STARTUP_EVENT_CHANNEL, type LspStartupEvent } from "../lsp/startup-events";
@@ -179,7 +177,6 @@ import { isMCPToolName } from "../tools/builtin-names";
 import type { LspStartupServerInfo } from "../tools";
 import { resolvePlanFilePath } from "../plan-mode/plan-files";
 import { resolveToCwd } from "../tools/path-utils";
-import { StreamPublisher } from "../stream/publisher";
 import { newRecordingPath, SessionRecorder } from "../stream/recording";
 import { StreamRedactor } from "../stream/redactor";
 import {
@@ -195,7 +192,6 @@ import {
 	TRUNCATE_LENGTHS,
 	truncateToWidth,
 } from "@oh-my-pi/pi-tui/render/render-utils";
-import { setAutoQaConsentHandler } from "../tools/report-tool-issue";
 import { type CfgApproval, type CfgChangeRequest, setCfgApprovalHost } from "../internal-urls/cfg-protocol";
 import {
 	createTodoHudStateData,
@@ -266,7 +262,6 @@ import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
 import { AttachmentChipsBand } from "@oh-my-pi/pi-tui/prompt/attachment-chips";
 import type { BashExecutionComponent } from "@oh-my-pi/pi-tui/chat/bash-execution";
 import { ChatBlock, type ChatBlockHost } from "@oh-my-pi/pi-tui/chrome/chat-block";
-import { CodexResetFireworksController } from "@oh-my-pi/pi-tui/overlays/codex-reset-fireworks";
 import { type ComposerNativeState, CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
 import { DynamicBorder } from "@oh-my-pi/pi-tui/chrome/dynamic-border";
 import { EditorTopGap } from "@oh-my-pi/pi-tui/prompt/editor-top-gap";
@@ -296,7 +291,6 @@ import { CommandController } from "./controllers/command-controller";
 import { EventController } from "./controllers/event-controller";
 import { ExtensionUiController } from "./controllers/extension-ui-controller";
 import { InputController } from "./controllers/input-controller";
-import { LiveCommandController } from "./controllers/live-command-controller";
 import { MCPCommandController } from "./controllers/mcp-command-controller";
 import { OmfgController } from "./controllers/omfg-controller";
 import { SelectorController } from "./controllers/selector-controller";
@@ -1711,7 +1705,6 @@ export class InteractiveMode implements InteractiveModeContext {
 	/** Owned room; use {@link collabController}.host for current-session reuse and links. */
 	collabHost?: CollabHost;
 	collabGuest?: CollabGuestLink;
-	#streamPublisher: StreamPublisher | undefined;
 	#recorder: SessionRecorder | undefined;
 	#recorderStarting = false;
 
@@ -1794,14 +1787,12 @@ export class InteractiveMode implements InteractiveModeContext {
 	mcpManager?: MCPManager;
 	readonly #toolUiContextSetter: (uiContext: ExtensionUIContext, hasUI: boolean) => void;
 
-	readonly #codexResetFireworksController: CodexResetFireworksController;
 	readonly #btwController: BtwController;
 	readonly #tanCommandController: TanCommandController;
 	readonly #omfgController: OmfgController;
 	readonly #cleanseController: CleanseCommandController;
 	readonly #commandController: CommandController;
 	readonly #todoCommandController: TodoCommandController;
-	readonly #liveCommandController: LiveCommandController;
 	readonly #eventController: EventController;
 	get eventController(): EventController {
 		return this.#eventController;
@@ -2051,7 +2042,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#toolUiContextSetter = setToolUIContext;
 		this.lspServers = lspServers;
 		this.mcpManager = mcpManager;
-		// An MCP sign-in can wait for the user mid-turn; like the auto-QA and cfg:// prompts below, it runs as a wait for
+		// An MCP sign-in can wait for the user mid-turn; like cfg:// prompts below, it runs as a wait for
 		// the user (AgentSession.waitForUser).
 		this.mcpManager?.setAuthHandler((serverName, challenge) =>
 			this.session.waitForUser(() => new MCPCommandController(this).handleMCPAuthChallenge(serverName, challenge)),
@@ -2213,11 +2204,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		// A TSP terminal has no status strip: the tab title carries the PR.
 		this.statusLine.onNativePullRequest = pr => setTerminalTitlePullRequest(pr?.number);
 		this.statusLine.setAutoCompactEnabled(session.autoCompactionEnabled);
-		this.#codexResetFireworksController = new CodexResetFireworksController(this);
-		this.statusLine.setCodexResetFireworksHandler(event => {
-			this.#codexResetFireworksController.show(event);
-		});
-		this.statusLine.setResetExpiryNoticeHandler(notice => this.showWarning(notice));
 		// Vibe worker tok/s aggregator — keeps the status-line render layer off
 		// the heavy vibe/task dependency graph. The director is often idle while
 		// workers stream, so without this the tok/s badge would show a stale
@@ -2244,7 +2230,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#eventController = new EventController(this);
 		this.#commandController = new CommandController(this);
 		this.#todoCommandController = new TodoCommandController(this);
-		this.#liveCommandController = new LiveCommandController(this);
 		this.#selectorController = new SelectorController(this);
 		this.#focusController = new SessionFocusController(this);
 		this.#inputController = new InputController(this);
@@ -2395,14 +2380,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		// FIRST and its dispose() would otherwise persist the generic "dispose".
 		this.#cleanupUnsubscribe = postmortem.register("session-teardown", reason => this.#signalTeardown!(reason));
 
-		// Wire the report_tool_issue consent gate to the Yes/No dialog popup.
-		// The handler is process-global — subagent tools (which can't reach
-		// `showHookSelector` on their own) resolve through this exact closure.
-		// `Settings.instance` is the disk-backed singleton; passing it explicitly
-		// guarantees the decision persists even when the prompt is triggered
-		// from a subagent whose own `Settings` is an in-memory snapshot.
-		setAutoQaConsentHandler(() => this.session.waitForUser(() => this.#promptAutoQaConsent()), Settings.instance);
-		// Same wiring for cfg:// writes: every settings change the agent makes is
+		// Wire cfg:// writes: every settings change the agent makes is
 		// confirmed here, and `/save` persists to disk. Subagents and headless
 		// sessions are refused by the handler before reaching this host. Changes
 		// to this session's settings get the settings panel's in-process side
@@ -2653,40 +2631,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		// TUI's multiplexer, output-backlog, and image safety gates.
 		this.ui.renderNow();
 
-		const streamCwd = this.sessionManager.getCwd();
-		this.#streamPublisher =
-			(await StreamPublisher.connectLazy({
-				cwd: streamCwd,
-				sessionId: this.sessionManager.getSessionId(),
-				title: path.basename(streamCwd),
-				tui: this.ui,
-				loadRedactor: () => StreamRedactor.load(streamCwd, cfgStreamRedactPatterns.get(this.settings)),
-				onStatus: status => {
-					this.statusLine.setStreamStatus(status);
-					this.ui.requestRender();
-				},
-				onChat: message => {
-					const chat = truncateToWidth(
-						replaceTabs(sanitizeText(`${message.name}: ${message.text}`)).replace(/[\r\n]+/g, " "),
-						TRUNCATE_LENGTHS.LINE,
-					);
-					this.showStatus(chat);
-				},
-			})) ?? undefined;
-		if (this.#streamPublisher) {
-			this.ui.renderNow();
-			// Live stream redaction follows `stream.redactPatterns` edits; only the
-			// newest edit's load applies, however the async loads interleave.
-			let redactorLoads = 0;
-			this.#eventBusUnsubscribers.push(
-				cfgStreamRedactPatterns.listen(this.settings, async patterns => {
-					const load = ++redactorLoads;
-					const redactor = await StreamRedactor.load(streamCwd, patterns);
-					if (load === redactorLoads) this.#streamPublisher?.setRedactor(redactor);
-				}),
-			);
-		}
-
 		// Prewarm the local tiny-title worker off the submit hot path: spawn it
 		// now, idle and unref'd, so the first submit reuses a live subprocess
 		// instead of paying spawn latency ahead of the first frame (issue #6462).
@@ -2730,7 +2674,6 @@ export class InteractiveMode implements InteractiveModeContext {
 
 		// Restore mode from session (e.g. plan mode on resume)
 		this.session.setSessionBeforeSwitchReconciler?.(async () => {
-			await this.#liveCommandController.stop();
 			await this.#quiesceVibeForSessionSwitch();
 		});
 		this.session.setSessionSwitchReconciler?.(() => this.#reconcileModeFromSession({ preserveActiveGoal: true }));
@@ -7712,70 +7655,8 @@ export class InteractiveMode implements InteractiveModeContext {
 	}
 
 	/**
-	 * Pool of consent-prompt variants. Each entry is `[headline, reassurance]`;
-	 * the second line always promises the same scope (tool name + confusion
-	 * details, never personal data) so users learn what they're consenting to
-	 * even as the top line rotates.
-	 *
-	 * Kept in-module rather than i18n'd because the whole charm is the tone
-	 * — translations would need to preserve it deliberately, not auto-render.
-	 */
-	static #AUTOQA_CONSENT_PROMPTS: ReadonlyArray<readonly [string, string]> = [
-		[
-			"🧾 Your agent drafted a strongly worded letter to one of its tools.",
-			"Mail it to the devs? Just the tool name + the grievance, nothing personal.",
-		],
-		[
-			"🕵️ Your agent caught a tool acting suspicious.",
-			"Tip off the devs? Tool name + the evidence, no personal info.",
-		],
-		[
-			"👻 Your agent swears one of its tools is haunted.",
-			"Call in the devs for an exorcism? Tool name + the spooky bit, nothing personal.",
-		],
-		["🫖 Your agent has tea about a tool.", "Spill it to the devs? Tool name + the tea, never anything personal."],
-		[
-			"🦆 Your agent explained a tool to its rubber duck. The duck is also confused.",
-			"Escalate past the duck to the devs? Tool name + the confusion, no personal info.",
-		],
-		[
-			"📟 Your agent is asking to speak to a tool's manager.",
-			"Put the call through to the devs? Tool name + the complaint, nothing personal.",
-		],
-		[
-			"🧂 Your agent is extremely salty about a tool.",
-			"Let it salt the devs' inbox? Tool name + what soured it, no personal info.",
-		],
-		[
-			"🐛 Your agent found a bug. A real one. In a tool.",
-			"Hand the specimen to the devs? Tool name + where it crawled out, nothing personal.",
-		],
-		[
-			"🍿 Your agent just watched a tool pull a plot twist nobody asked for.",
-			"Send the devs a spoiler? Tool name + what happened, never anything personal.",
-		],
-		[
-			"📉 Your agent's opinion of a tool just crashed.",
-			"Send the post-mortem to the devs? Tool name + what tanked it, no personal info.",
-		],
-	];
-
-	/**
-	 * Show the report_tool_issue consent popup (mirrored to writable `/collab` guests)
-	 * and return the user's decision.
-	 * Invoked by the process-global consent handler the tool dispatches to;
-	 * subagent invocations bubble up here through the shared module state.
-	 */
-	async #promptAutoQaConsent(): Promise<boolean | null> {
-		const pool = InteractiveMode.#AUTOQA_CONSENT_PROMPTS;
-		const [headline, body] = pool[Math.floor(Math.random() * pool.length)];
-		const choice = await this.#extensionUiController.showCollabAwareSelector(`${headline}\n${body}`, ["Yes", "No"]);
-		return choice === "Yes";
-	}
-
-	/**
-	 * Ask the user to approve one `cfg://` settings change; writable `/collab` guests get the
-	 * same prompt and the first answer wins. Dismissing the dialog denies it, as does
+	 * Ask the user to approve one `cfg://` settings change.
+	 * Dismissing the dialog denies it, as does
 	 * aborting the calling turn or stopping the mode. The wait honors `ask.timeout`
 	 * (seconds, 0 waits indefinitely); while a deadline is armed, any host
 	 * keypress restarts the countdown, and an unanswered prompt drops the write as `timeout`.
@@ -7825,8 +7706,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		// mutex deny on arrival instead of prompting a torn-down UI. `init`
 		// installs a fresh one.
 		this.#dialogLifetime.abort();
-		this.#streamPublisher?.dispose();
-		this.#streamPublisher = undefined;
 		void this.#recorder?.stop();
 		this.#recorder = undefined;
 		// Last chance to refresh the startup status placeholder for the next launch.
@@ -7841,7 +7720,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		// Stop the shared tool-spinner ticker: a live block missed by per-component
 		// stopAnimation would otherwise keep an 80ms interval pinning the process.
 		stopSharedSpinnerTicker();
-		this.#liveCommandController.dispose();
 		this.#clearJudgmentBatchProgress();
 		this.#downloadActivityHud.dispose();
 		this.#cancelTodoAutoClearTimer();
@@ -7865,7 +7743,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#agentRegistryUnsubscribe = undefined;
 		this.#agentRegistrySubscriptionTarget = undefined;
 		this.#eventController.dispose();
-		this.#codexResetFireworksController.dispose();
 		this.statusLine.dispose();
 		if (this.#resizeHandler) {
 			process.stdout.removeListener("resize", this.#resizeHandler);
@@ -7877,9 +7754,7 @@ export class InteractiveMode implements InteractiveModeContext {
 		if (this.#cleanupUnsubscribe) {
 			this.#cleanupUnsubscribe();
 		}
-		// Clear the process-global consent handler so it doesn't outlive this
-		// InteractiveMode instance (e.g. test harnesses, headless re-init).
-		setAutoQaConsentHandler(null, null);
+		// Clear the process-global cfg host when this mode stops.
 		setCfgApprovalHost(null);
 		this.#disposeImageBlobWriter?.();
 		this.#disposeImageBlobWriter = undefined;
@@ -7968,7 +7843,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.#cancelLoopAutoSubmit();
 		try {
 			await this.session.abort();
-			await this.#liveCommandController.stop();
 		} catch (err) {
 			this.showWarning(err instanceof Error ? err.message : String(err));
 		}
@@ -8073,14 +7947,11 @@ export class InteractiveMode implements InteractiveModeContext {
 			this.showStatus("Still closing… (flushing memory backend / network)");
 		}, STILL_CLOSING_DELAY_MS);
 		try {
-			this.#streamPublisher?.dispose();
-			this.#streamPublisher = undefined;
 			await this.#recorder?.stop();
 			this.#recorder = undefined;
 			// Guests get goodbye and the registry entry disappears before the
 			// session is disposed, under the same still-closing progress notice.
 			await this.collabController.shutdown("host exited");
-			await this.#liveCommandController.stop();
 			await this.#btwController.dispose();
 			this.#omfgController.dispose();
 			this.#cleanseController.dispose();
@@ -8620,10 +8491,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		this.setWorkingMessage(message);
 	}
 
-	showNewVersionNotification(newVersion: string): void {
-		this.#uiHelpers.showNewVersionNotification(newVersion);
-	}
-
 	clearEditor(): void {
 		this.#uiHelpers.clearEditor();
 	}
@@ -8765,10 +8632,6 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	handleDebugTranscriptCommand(): Promise<void> {
 		return this.#commandController.handleDebugTranscriptCommand();
-	}
-
-	handleShareCommand(): Promise<void> {
-		return this.#commandController.handleShareCommand();
 	}
 
 	handleTodoCommand(args: string): Promise<void> {
@@ -8943,13 +8806,8 @@ export class InteractiveMode implements InteractiveModeContext {
 		};
 	}
 
-	/** The speech-to-text controller, created on first use; undefined (after a warning) while live mode
-	 *  or a disabled STT rules dictation out. */
+	/** The speech-to-text controller, created on first use when STT is enabled. */
 	#readySTTController(): STTController | undefined {
-		if (this.#liveCommandController.active) {
-			this.showWarning("End live mode before using push-to-talk speech input.");
-			return undefined;
-		}
 		if (!cfgSttEnabled.get(settings)) {
 			this.showWarning("Speech-to-text is disabled. Enable it in settings: stt.enabled");
 			return undefined;
@@ -8994,9 +8852,7 @@ export class InteractiveMode implements InteractiveModeContext {
 			const elapsed = active.elapsedMs;
 			await active.stop();
 			this.statusLine.setRecording(false);
-			this.showStatus(
-				`Saved ${formatDuration(elapsed)} recording to ${active.path} · replay: omp play · share: omp clip`,
-			);
+			this.showStatus(`Saved ${formatDuration(elapsed)} recording to ${active.path} · replay: omp play`);
 			return;
 		}
 		if (this.#recorderStarting) return;
@@ -9017,31 +8873,6 @@ export class InteractiveMode implements InteractiveModeContext {
 		}
 		this.statusLine.setRecording(true);
 		this.showStatus(`Recording to ${this.#recorder.path} · /record again to stop`);
-	}
-
-	/** Why live mode cannot start right now, or `undefined` when it can. */
-	#liveStartBlocker(): string | undefined {
-		if (this.#dictationStarting || (this.#sttController && this.#sttController.state !== "idle")) {
-			return "Finish the current speech-to-text capture before starting live mode.";
-		}
-		return undefined;
-	}
-
-	/** Start or stop the Codex-backed realtime voice surface. */
-	async handleLiveCommand(): Promise<void> {
-		const blocker = this.#liveStartBlocker();
-		if (blocker) {
-			this.showWarning(blocker);
-			return;
-		}
-		await this.#liveCommandController.handleCommand();
-	}
-
-	/** Start a live session whose audio runs on an extension's own WebRTC peer. */
-	async startRemoteLive(options: ExtensionLiveStartOptions): Promise<ExtensionLiveSession> {
-		const blocker = this.#liveStartBlocker();
-		if (blocker) throw new Error(blocker);
-		return await this.#liveCommandController.startRemote(options);
 	}
 
 	async showDebugSelector(): Promise<void> {
@@ -9177,10 +9008,6 @@ export class InteractiveMode implements InteractiveModeContext {
 
 	showSessionPinSelector(): Promise<void> {
 		return this.#selectorController.showSessionPinSelector();
-	}
-
-	showResetUsageSelector(): Promise<void> {
-		return this.#selectorController.showResetUsageSelector();
 	}
 
 	async showProviderSetup(): Promise<void> {

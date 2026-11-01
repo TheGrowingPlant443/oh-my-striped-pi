@@ -18,6 +18,7 @@ import { BtwHistoryStore } from "@oh-my-pi/pi-coding-agent/session/btw-history";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
 import { TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function answer(text: string) {
 	const assistantMessage: AssistantMessage = {
@@ -66,8 +67,7 @@ describe("BTW session boundaries", () => {
 		await Settings.init({ inMemory: true, cwd: directory.path() });
 		auth = await AuthStorage.create(path.join(directory.path(), "auth.db"));
 		const registry = new ModelRegistry(auth);
-		const model = registry.find("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled model");
+		const model = getTestModel("github-copilot");
 		manager = SessionManager.create(directory.path(), directory.path());
 		manager.appendMessage({ role: "user", content: "Source session", timestamp: Date.now() });
 		await manager.ensureOnDisk();

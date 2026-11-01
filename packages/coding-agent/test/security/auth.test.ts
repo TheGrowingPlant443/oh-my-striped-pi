@@ -1,22 +1,23 @@
-import { describe, expect, test, vi } from "bun:test";
+import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AuthBrokerClient, RemoteAuthCredentialStore, startAuthBroker } from "@oh-my-pi/pi-ai/auth-broker";
 import type { ApiKeyResolver } from "@oh-my-pi/pi-ai/auth-retry";
-import * as oauthRegistry from "@oh-my-pi/pi-ai/registry/oauth";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
+import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { removeWithRetries } from "@oh-my-pi/pi-utils";
 import { createBrokerAuthStorage } from "../../src/cli/auth-broker-cli";
-import { createExactSecurityOAuthResolver, createSecurityAuthResolver, selectSecurityAuth } from "../../src/security";
+import { createExactSecurityOAuthResolver, selectSecurityAuth } from "../../src/security";
 import { AuthStorage, SqliteAuthCredentialStore } from "../../src/session/auth-storage";
 
 function model() {
-	const value = getBundledModel("openai-codex", "gpt-5.6-sol");
-	if (!value) throw new Error("Expected bundled Codex model");
+	const value = getBundledModel("github-copilot", "gpt-4o");
+	if (!value) throw new Error("Expected bundled Copilot model");
 	return value;
 }
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("exact security OAuth resolver", () => {
 	test("selects an explicit credential without account rotation", () => {
@@ -30,20 +31,8 @@ describe("exact security OAuth resolver", () => {
 			42,
 			"session-a",
 		);
-		expect(selected).toEqual({ provider: "openai-codex", credentialId: 42, accountId: "workspace-b" });
-		expect(listOAuthAccounts).toHaveBeenCalledWith("openai-codex", "session-a");
-	});
-
-	test("plans provider-owned authentication for recognized Bedrock routes without OAuth", () => {
-		const authStorage = { oauth: { accounts: vi.fn(() => []) } } as unknown as AuthStorage;
-		for (const [provider, modelId, api] of [
-			["amazon-bedrock", "us.anthropic.claude-opus-4-8", "bedrock-converse-stream"],
-			["bedrock-mantle", "openai.gpt-5.6-terra", "openai-responses"],
-		] as const) {
-			const bedrockModel = getBundledModel(provider, modelId);
-			if (!bedrockModel) throw new Error(`Expected bundled model ${provider}/${modelId}`);
-			expect(selectSecurityAuth(authStorage, bedrockModel)).toEqual({ provider, api });
-		}
+		expect(selected).toEqual({ provider: "github-copilot", credentialId: 42, accountId: "workspace-b" });
+		expect(listOAuthAccounts).toHaveBeenCalledWith("github-copilot", "session-a");
 	});
 
 	test("rejects unsupported provider-owned authentication routes", () => {
@@ -52,24 +41,8 @@ describe("exact security OAuth resolver", () => {
 			"require a stored OAuth account",
 		);
 		expect(() => selectSecurityAuth(authStorage, { provider: "amazon-bedrock", api: "openai-responses" })).toThrow(
-			"do not support provider authentication",
+			"require a stored OAuth account",
 		);
-	});
-
-	test("provider-owned resolver stays within the pinned provider and API", () => {
-		const bedrockModel = getBundledModel("amazon-bedrock", "us.anthropic.claude-opus-4-8");
-		const mantleModel = getBundledModel("bedrock-mantle", "openai.gpt-5.6-terra");
-		if (!bedrockModel || !mantleModel) throw new Error("Expected bundled Bedrock models");
-		const providerResolver = vi.fn(() => "provider-owned");
-		const resolver = createSecurityAuthResolver({
-			authStorage: {} as unknown as AuthStorage,
-			auth: { provider: bedrockModel.provider, api: bedrockModel.api },
-			providerResolver,
-		});
-		expect(resolver(bedrockModel)).toBe("provider-owned");
-		expect(() => resolver(mantleModel)).toThrow("provider mismatch");
-		expect(() => resolver({ ...bedrockModel, api: "openai-responses" })).toThrow("API mismatch");
-		expect(providerResolver).toHaveBeenCalledTimes(1);
 	});
 
 	test("resolves and refreshes only the pinned durable row", async () => {
@@ -82,7 +55,7 @@ describe("exact security OAuth resolver", () => {
 		const authStorage = { oauth: { accessById: getOAuthAccessByCredentialId } } as unknown as AuthStorage;
 		const resolver = createExactSecurityOAuthResolver({
 			authStorage,
-			account: { provider: "openai-codex", credentialId: 42, accountId: "workspace-a" },
+			account: { provider: "github-copilot", credentialId: 42, accountId: "workspace-a" },
 		});
 		const apiKey = resolver(model());
 		expect(typeof apiKey).toBe("function");
@@ -103,16 +76,18 @@ describe("exact security OAuth resolver", () => {
 		const authStorage = { oauth: { accessById: getOAuthAccessByCredentialId } } as unknown as AuthStorage;
 		const resolver = createExactSecurityOAuthResolver({
 			authStorage,
-			account: { provider: "openai-codex", credentialId: 42, accountId: "workspace-a" },
+			account: { provider: "github-copilot", credentialId: 42, accountId: "workspace-a" },
 		});
-		const wrongProviderModel = { ...model(), provider: "anthropic" } as unknown as Parameters<typeof resolver>[0];
+		const wrongProviderModel = { ...model(), provider: "local", api: "local-inference" } as Parameters<
+			typeof resolver
+		>[0];
 		expect(() => resolver(wrongProviderModel)).toThrow("provider mismatch");
 		expect(getOAuthAccessByCredentialId).not.toHaveBeenCalled();
 	});
 
 	test("fails closed when any durable account identity changes", async () => {
 		const account = {
-			provider: "openai-codex",
+			provider: "github-copilot",
 			credentialId: 42,
 			accountId: "workspace-a",
 			email: "owner@example.com",
@@ -162,7 +137,7 @@ describe("exact security OAuth resolver", () => {
 		} as unknown as AuthStorage;
 		const resolver = createExactSecurityOAuthResolver({
 			authStorage,
-			account: { provider: "openai-codex", credentialId: 42, accountId: "workspace-a" },
+			account: { provider: "github-copilot", credentialId: 42, accountId: "workspace-a" },
 		});
 		const exact = resolver(model()) as ApiKeyResolver;
 		let caught: unknown;
@@ -178,25 +153,36 @@ describe("exact security OAuth resolver", () => {
 		expect(caught.message).not.toContain("undefined");
 	});
 
-	test("a provider 401 reuses the auth broker's recent mint for the pinned row", async () => {
-		const provider = "unit-security-broker-recovery";
-		const sourceId = "security-auth-test";
-		registerOAuthProvider({
-			id: provider,
-			name: "Security Broker Recovery Unit",
-			sourceId,
-			async login() {
-				return { access: "login-access", refresh: "login-refresh", expires: Date.now() + 3_600_000 };
-			},
+	test("a disabled pinned credential fails without selecting a sibling", async () => {
+		const accessById = vi.fn(async () => ({
+			ok: false as const,
+			credentialId: 42,
+			accountId: "workspace-a",
+			error: "credential disabled",
+		}));
+		const accounts = vi.fn(() => [{ credentialId: 99, active: true, accountId: "workspace-b" }]);
+		const authStorage = { oauth: { accessById, accounts } } as unknown as AuthStorage;
+		const resolver = createExactSecurityOAuthResolver({
+			authStorage,
+			account: { provider: "github-copilot", credentialId: 42, accountId: "workspace-a" },
 		});
+		const exact = resolver(model()) as ApiKeyResolver;
+		await expect(exact({ lastChance: false, error: undefined })).rejects.toThrow("could not be resolved");
+		expect(await exact({ lastChance: true, error: new Error("401") })).toBeUndefined();
+		expect(accessById).toHaveBeenCalledTimes(1);
+		expect(accounts).not.toHaveBeenCalled();
+	});
+
+	test("a provider 401 reuses the auth broker's recent mint for the pinned row", async () => {
+		const provider = "github-copilot";
+		const definition = getProviderDefinition(provider);
+		if (!definition?.refreshToken) throw new Error("Expected built-in Copilot refresh hook");
 		// The broker's refresh handler exchanges tokens through the provider registry.
 		let mints = 0;
-		const exchange = vi
-			.spyOn(oauthRegistry, "refreshOAuthToken")
-			.mockImplementation(async (_provider, credential) => {
-				mints += 1;
-				return { ...credential, access: `access-${mints}`, expires: Date.now() + 3_600_000 };
-			});
+		const exchange = vi.spyOn(definition, "refreshToken").mockImplementation(async credential => {
+			mints += 1;
+			return { ...credential, access: `access-${mints}`, expires: Date.now() + 3_600_000 };
+		});
 		const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "security-broker-recovery-"));
 		const store = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 		await store.saveOAuth(provider, {
@@ -247,7 +233,6 @@ describe("exact security OAuth resolver", () => {
 			brokerStorage.close();
 			store.close();
 			exchange.mockRestore();
-			unregisterOAuthProviders(sourceId);
 			await removeWithRetries(tempDir);
 		}
 	});

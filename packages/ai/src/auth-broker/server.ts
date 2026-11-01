@@ -34,8 +34,6 @@ import type {
 	SnapshotStreamSnapshotEvent,
 } from "./types";
 import {
-	AUTH_BROKER_CAPABILITIES_HEADER,
-	AUTH_BROKER_CAPABILITY_CODEX_METER_BLOCK_SCOPES,
 	DEFAULT_AUTH_BROKER_BIND,
 	DEFAULT_REFRESH_INTERVAL_MS,
 	DEFAULT_REFRESH_SKEW_MS,
@@ -114,15 +112,6 @@ function isAuthorized(req: Request, tokens: ReadonlySet<string>): boolean {
 	return tokens.has(match[1].trim());
 }
 
-function supportsCodexMeterBlockScopes(req: Request): boolean {
-	const capabilities = req.headers.get(AUTH_BROKER_CAPABILITIES_HEADER);
-	return (
-		capabilities
-			?.split(",")
-			.some(capability => capability.trim() === AUTH_BROKER_CAPABILITY_CODEX_METER_BLOCK_SCOPES) ?? false
-	);
-}
-
 /**
  * Parse + validate a JSON request body against an ArkType schema. Returns a
  * `Response` (400) on parse/validation failure so handlers can early-return.
@@ -185,7 +174,6 @@ function snapshotHeaders(generation: number): Record<string, string> {
 	return {
 		ETag: `"${generation}"`,
 		"Cache-Control": "no-store",
-		Vary: AUTH_BROKER_CAPABILITIES_HEADER,
 	};
 }
 
@@ -328,46 +316,9 @@ function computeRotatesInMs(
 	return Math.max(0, rotatesAt - serverNowMs);
 }
 
-const CODEX_BLOCK_PROVIDER_KEY = "openai-codex:oauth";
-const CODEX_LEGACY_PROJECTED_BLOCK_SCOPES = new Set(["chat", "spark", "shared"]);
-
-/**
- * Older clients only consult the Codex `shared` scope. Keep SQLite canonical
- * state meter-scoped, but conservatively collapse those scopes on their wire
- * view so any active meter block remains visible to them.
- */
-function projectCredentialBlocksForLegacyClient(blocks: readonly CredentialBlockSnapshot[]): CredentialBlockSnapshot[] {
-	const projected: CredentialBlockSnapshot[] = [];
-	let shared: CredentialBlockSnapshot | undefined;
-	for (const block of blocks) {
-		if (
-			block.providerKey !== CODEX_BLOCK_PROVIDER_KEY ||
-			!CODEX_LEGACY_PROJECTED_BLOCK_SCOPES.has(block.blockScope)
-		) {
-			projected.push(block);
-			continue;
-		}
-		const updatedAtMs =
-			block.updatedAtMs === undefined
-				? shared?.updatedAtMs
-				: shared?.updatedAtMs === undefined
-					? block.updatedAtMs
-					: Math.max(shared.updatedAtMs, block.updatedAtMs);
-		shared = {
-			providerKey: CODEX_BLOCK_PROVIDER_KEY,
-			blockScope: "shared",
-			blockedUntilMs: Math.max(shared?.blockedUntilMs ?? 0, block.blockedUntilMs),
-			...(updatedAtMs !== undefined ? { updatedAtMs } : {}),
-		};
-	}
-	if (shared) projected.push(shared);
-	return projected;
-}
-
 function buildCredentialBlockGroups(
 	blocks: readonly StoredCredentialBlock[],
 	serverNowMs: number,
-	clientSupportsCodexMeterBlockScopes: boolean,
 ): Map<number, CredentialBlockSnapshot[]> {
 	const byCredentialId = new Map<number, CredentialBlockSnapshot[]>();
 	for (const block of blocks) {
@@ -385,12 +336,8 @@ function buildCredentialBlockGroups(
 			byCredentialId.set(block.credentialId, [snapshotBlock]);
 		}
 	}
-	for (const [credentialId, credentialBlocks] of byCredentialId) {
-		const projected = clientSupportsCodexMeterBlockScopes
-			? credentialBlocks
-			: projectCredentialBlocksForLegacyClient(credentialBlocks);
-		projected.sort(compareCredentialBlockSnapshots);
-		byCredentialId.set(credentialId, projected);
+	for (const credentialBlocks of byCredentialId.values()) {
+		credentialBlocks.sort(compareCredentialBlockSnapshots);
 	}
 	return byCredentialId;
 }
@@ -441,15 +388,14 @@ class SnapshotSource {
 		}
 	}
 
-	/** Wire snapshot for one client flavour, projected at the current server time. */
-	build(clientSupportsCodexMeterBlockScopes: boolean): SnapshotResponse {
+	/** Wire snapshot at the current server time. */
+	build(): SnapshotResponse {
 		const rows = this.#currentRows();
 		const serverNowMs = Date.now();
 		const { wire, nextSweepAt } = resolveRefresherSchedule(this.#refresher, serverNowMs);
 		const blocksByCredentialId = buildCredentialBlockGroups(
 			this.#storage.blocks.list(rows.credentials.map(entry => entry.id)),
 			serverNowMs,
-			clientSupportsCodexMeterBlockScopes,
 		);
 		const credentials: SnapshotEntry[] = rows.credentials.map(entry => {
 			const blocks = blocksByCredentialId.get(entry.id);
@@ -482,13 +428,12 @@ async function serveSnapshot(
 	peer: string,
 ): Promise<Response> {
 	await source.reload();
-	const clientSupportsCodexMeterBlockScopes = supportsCodexMeterBlockScopes(req);
 	let currentGeneration = source.generation;
 	const clientGeneration = parseGenerationTag(req.headers.get("if-none-match"));
 	const waitMs = parseWaitMs(url);
 
 	if (clientGeneration === undefined || currentGeneration !== clientGeneration || waitMs <= 0) {
-		const body = source.build(clientSupportsCodexMeterBlockScopes);
+		const body = source.build();
 		logger.info("auth-broker snapshot served", {
 			peer,
 			credentials: body.credentials.length,
@@ -508,7 +453,7 @@ async function serveSnapshot(
 	await source.reload();
 	currentGeneration = source.generation;
 	if (currentGeneration !== clientGeneration) {
-		const body = source.build(clientSupportsCodexMeterBlockScopes);
+		const body = source.build();
 		logger.info("auth-broker snapshot long-poll changed", {
 			peer,
 			credentials: body.credentials.length,
@@ -548,7 +493,6 @@ function sseEvent(event: string, body: unknown): Uint8Array {
 /** One open `GET /v1/snapshot/stream` connection, as seen by {@link SnapshotStreamHub}. */
 interface SnapshotStreamSubscriber {
 	readonly peer: string;
-	readonly codexMeterBlockScopes: boolean;
 	/** Fingerprint of the last entry frame sent per credential id. */
 	readonly sent: Map<number, string>;
 	lastGeneration: number;
@@ -557,9 +501,8 @@ interface SnapshotStreamSubscriber {
 }
 
 /**
- * One generation's snapshot for one client flavour, fingerprinted once and
- * encoded lazily so every connection sharing the flavour reuses the same
- * `entry` / `removed` frames.
+ * One generation's snapshot, fingerprinted once and encoded lazily so every
+ * connection reuses the same `entry` / `removed` frames.
  */
 class SnapshotStreamFrame {
 	readonly snapshot: SnapshotResponse;
@@ -638,8 +581,8 @@ function deliverStreamFrame(subscriber: SnapshotStreamSubscriber, frame: Snapsho
 
 /**
  * Fans generation bumps out to every open snapshot stream. A bump polls the
- * store once, builds one snapshot per client flavour, and fingerprints and
- * encodes each changed entry once; per-connection work is a fingerprint
+ * store once, builds one snapshot, and fingerprints and encodes each changed
+ * entry once; per-connection work is a fingerprint
  * compare plus an enqueue of the shared frame.
  */
 class SnapshotStreamHub {
@@ -703,13 +646,8 @@ class SnapshotStreamHub {
 	}
 
 	#fanOut(): void {
-		const frames = new Map<boolean, SnapshotStreamFrame>();
+		const frame = new SnapshotStreamFrame(this.#source.build());
 		for (const subscriber of Array.from(this.#subscribers)) {
-			let frame = frames.get(subscriber.codexMeterBlockScopes);
-			if (!frame) {
-				frame = new SnapshotStreamFrame(this.#source.build(subscriber.codexMeterBlockScopes));
-				frames.set(subscriber.codexMeterBlockScopes, frame);
-			}
 			deliverStreamFrame(subscriber, frame);
 		}
 	}
@@ -762,7 +700,6 @@ function serveSnapshotStream(
 
 	const subscriber: SnapshotStreamSubscriber = {
 		peer,
-		codexMeterBlockScopes: supportsCodexMeterBlockScopes(req),
 		sent: new Map(),
 		lastGeneration: -1,
 		write,
@@ -772,7 +709,7 @@ function serveSnapshotStream(
 		async start(c) {
 			controller = c;
 			await source.reload();
-			const initial = source.build(subscriber.codexMeterBlockScopes);
+			const initial = source.build();
 			subscriber.lastGeneration = initial.generation;
 			for (const entry of initial.credentials) subscriber.sent.set(entry.id, fingerprintEntry(entry));
 			const initialEvent: SnapshotStreamSnapshotEvent = { kind: "snapshot", ...initial };
@@ -800,7 +737,6 @@ function serveSnapshotStream(
 			"Cache-Control": "no-cache",
 			Connection: "keep-alive",
 			"X-Accel-Buffering": "no",
-			Vary: AUTH_BROKER_CAPABILITIES_HEADER,
 		},
 	});
 }

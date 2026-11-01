@@ -3,6 +3,8 @@ import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { Effort } from "@oh-my-pi/pi-ai";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import * as autoThinkingClassifier from "@oh-my-pi/pi-coding-agent/auto-thinking/classifier";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -13,8 +15,64 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { AUTO_THINKING, clampAutoThinkingEffort, resolveProvisionalAutoLevel } from "@oh-my-pi/pi-tui/thinking";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 import { cfgDefaultThinkingLevel } from "@oh-my-pi/pi-coding-agent/session/settings";
+
+const thinkingSpecs = (
+	[
+		{
+			id: "claude-sonnet-4-5",
+			thinking: { mode: "budget", efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High, Effort.XHigh] },
+		},
+		{
+			id: "claude-sonnet-4-6",
+			thinking: { mode: "anthropic-adaptive", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+		},
+		{
+			id: "claude-opus-4-5",
+			thinking: {
+				mode: "anthropic-budget-effort",
+				efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High, Effort.XHigh],
+			},
+		},
+		{
+			id: "claude-opus-4-7",
+			thinking: {
+				mode: "anthropic-adaptive",
+				efforts: [Effort.Low, Effort.Medium, Effort.High, Effort.XHigh, Effort.Max],
+			},
+		},
+	] satisfies Pick<ModelSpec<"anthropic-messages">, "id" | "thinking">[]
+).map(
+	spec =>
+		({
+			...spec,
+			name: spec.id,
+			api: "anthropic-messages",
+			provider: "company-thinking",
+			baseUrl: "https://thinking.company.invalid",
+			reasoning: true,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 64_000,
+		}) satisfies ModelSpec<"anthropic-messages">,
+);
+
+const temporarySpec: ModelSpec<"openai-completions"> = {
+	id: "company-temporary",
+	name: "Company temporary",
+	api: "openai-completions",
+	provider: "company-secondary",
+	baseUrl: "https://secondary.company.invalid/v1",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 16_000,
+};
 
 describe("AgentSession role model thinking behavior", () => {
 	let tempDir: TempDir;
@@ -27,9 +85,21 @@ describe("AgentSession role model thinking behavior", () => {
 	beforeAll(async () => {
 		fixtureDir = TempDir.createSync("@pi-role-thinking-fixture-");
 		authStorage = await AuthStorage.create(path.join(fixtureDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir.path(), "models.yml"));
+		modelRegistry.registerProvider("company-thinking", {
+			api: "anthropic-messages",
+			baseUrl: "https://thinking.company.invalid",
+			apiKey: "test-key",
+			models: thinkingSpecs,
+		});
+		modelRegistry.registerProvider(temporarySpec.provider, {
+			api: temporarySpec.api,
+			baseUrl: temporarySpec.baseUrl,
+			apiKey: "test-key",
+			models: [toProviderModelConfig(temporarySpec)],
+		});
 	});
 
 	beforeEach(() => {
@@ -50,8 +120,8 @@ describe("AgentSession role model thinking behavior", () => {
 	});
 
 	function getAnthropicModelOrThrow(id: string) {
-		const model = getBundledModel("anthropic", id);
-		if (!model) throw new Error(`Expected anthropic model ${id} to exist`);
+		const model = modelRegistry.find("company-thinking", id);
+		if (!model) throw new Error(`Expected configured thinking model ${id} to exist`);
 		return model;
 	}
 
@@ -71,7 +141,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: options.initialThinkingLevel,
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 		const runtimeApiKeys = options.runtimeApiKeys ?? {};
 		for (const provider in runtimeApiKeys) {
 			authStorage.keys.setRuntime(provider, runtimeApiKeys[provider]);
@@ -208,7 +278,7 @@ describe("AgentSession role model thinking behavior", () => {
 			initialModelId: defaultModel.id,
 			initialThinkingLevel: Effort.High,
 			modelRoles: {
-				default: "anthropic/nonexistent-model:off",
+				default: "company-thinking/nonexistent-model:off",
 			},
 		});
 
@@ -255,7 +325,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: undefined,
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 
 		sessionSettings = Settings.isolated();
 		session = new AgentSession({
@@ -282,7 +352,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: undefined,
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 
 		sessionSettings = Settings.isolated();
 		session = new AgentSession({
@@ -306,10 +376,10 @@ describe("AgentSession role model thinking behavior", () => {
 				systemPrompt: ["Test"],
 				tools: [],
 				messages: [],
-				thinkingLevel: Effort.High,
+				thinkingLevel: Effort.XHigh,
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 
 		sessionSettings = Settings.isolated();
 		session = new AgentSession({
@@ -356,7 +426,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: Effort.XHigh,
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 
 		sessionSettings = Settings.isolated();
 		session = new AgentSession({
@@ -511,7 +581,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: resolveProvisionalAutoLevel(model),
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 		const sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 		sessionSettings = Settings.isolated();
 		cfgDefaultThinkingLevel.set(sessionSettings, AUTO_THINKING);
@@ -554,7 +624,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: resolveProvisionalAutoLevel(model),
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 		const sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 		sessionSettings = Settings.isolated();
 		cfgDefaultThinkingLevel.set(sessionSettings, AUTO_THINKING);
@@ -574,7 +644,12 @@ describe("AgentSession role model thinking behavior", () => {
 		expect(session.isAutoThinking).toBe(false);
 		await session.prompt("Pinned concrete turn");
 		expect(classifierSpy).not.toHaveBeenCalled();
-		session.sessionManager.appendMessage(createAssistantMessage("done"));
+		session.sessionManager.appendMessage({
+			...createAssistantMessage("done"),
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
+		});
 
 		const sessionFile = session.sessionFile;
 		expect(sessionFile).toBeDefined();
@@ -597,7 +672,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: resolveProvisionalAutoLevel(model),
 			},
 		});
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-thinking", "test-key");
 		const sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 		sessionSettings = Settings.isolated();
 		cfgDefaultThinkingLevel.set(sessionSettings, AUTO_THINKING);
@@ -621,7 +696,12 @@ describe("AgentSession role model thinking behavior", () => {
 		session.setThinkingLevel(Effort.Medium, true);
 		expect(session.isAutoThinking).toBe(false);
 		expect(cfgDefaultThinkingLevel.get(sessionSettings)).toBe(Effort.Medium);
-		session.sessionManager.appendMessage(createAssistantMessage("done"));
+		session.sessionManager.appendMessage({
+			...createAssistantMessage("done"),
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
+		});
 
 		const sessionFile = session.sessionFile;
 		expect(sessionFile).toBeDefined();
@@ -743,8 +823,8 @@ describe("AgentSession role model thinking behavior", () => {
 	});
 
 	it("keeps auto effectively off for non-reasoning models", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini");
-		if (!model) throw new Error("Expected bundled gpt-4o-mini model");
+		const model = getBundledModel("github-copilot", "gpt-4o");
+		if (!model) throw new Error("Expected bundled Copilot non-reasoning model");
 		const agent = new Agent({
 			initialState: {
 				model,
@@ -754,7 +834,7 @@ describe("AgentSession role model thinking behavior", () => {
 				thinkingLevel: undefined,
 			},
 		});
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		sessionSettings = Settings.isolated();
 		cfgDefaultThinkingLevel.set(sessionSettings, AUTO_THINKING);
 		session = new AgentSession({
@@ -781,8 +861,7 @@ describe("AgentSession role model thinking behavior", () => {
 
 	it("applies matching role thinking to temporary model picks", async () => {
 		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const temporaryModel = getBundledModel("google-antigravity", "gemini-3.8-flash");
-		if (!temporaryModel) throw new Error("Expected google-antigravity model gemini-3.8-flash to exist");
+		const temporaryModel = buildModel(temporarySpec);
 
 		await createSession({
 			initialModelId: defaultModel.id,

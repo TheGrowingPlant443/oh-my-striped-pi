@@ -10,11 +10,9 @@ import { type MCPAuthHandler, MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/m
 import { ExtensionUiController } from "@oh-my-pi/pi-coding-agent/modes/controllers/extension-ui-controller";
 import { MCPCommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/mcp-command-controller";
 import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { __resetAutoQaConsentForTests, resolveAutoQaConsent } from "@oh-my-pi/pi-coding-agent/tools/report-tool-issue";
 import {
 	cfgMarketplaceAutoUpdate,
 	cfgStartupChangelogMode,
-	cfgStartupCheckUpdate,
 	cfgStartupSetupWizard,
 	cfgStartupShowSplash,
 } from "@oh-my-pi/pi-coding-agent/modes/settings";
@@ -74,7 +72,6 @@ describe("cfg:// approval prompt wiring", () => {
 		testSession = await createTestSession(
 			askTimeout === undefined ? {} : { settingsOverrides: { "ask.timeout": askTimeout } },
 		);
-		cfgStartupCheckUpdate.override(testSession.session.settings, false);
 		cfgStartupChangelogMode.override(testSession.session.settings, "hidden");
 		cfgStartupSetupWizard.override(testSession.session.settings, false);
 		cfgStartupShowSplash.override(testSession.session.settings, false);
@@ -179,8 +176,8 @@ describe("cfg:// approval prompt wiring", () => {
 		expect(seen).toEqual([undefined]);
 	}, 60_000);
 
-	it("runs the cfg://, auto-QA and MCP sign-in prompts as waits for the user", async () => {
-		const manager = new MCPManager(tmp, null, async () => ({ configs: {}, sources: {}, exaApiKeys: [] }));
+	it("runs the cfg:// and MCP sign-in prompts as waits for the user", async () => {
+		const manager = new MCPManager(tmp, null, async () => ({ configs: {}, sources: {} }));
 		const setAuthHandler = spyOn(manager, "setAuthHandler");
 		await startMode(undefined, manager);
 		const authHandler: MCPAuthHandler | undefined = setAuthHandler.mock.calls[0]?.[0];
@@ -189,11 +186,8 @@ describe("cfg:// approval prompt wiring", () => {
 
 		await driveWrite();
 		expect(waits).toHaveBeenCalledTimes(1);
-		await resolveAutoQaConsent(undefined);
-		expect(waits).toHaveBeenCalledTimes(2);
 		await authHandler!("server", { wwwAuthenticate: [] });
-		expect(waits).toHaveBeenCalledTimes(3);
-		__resetAutoQaConsentForTests();
+		expect(waits).toHaveBeenCalledTimes(2);
 	}, 60_000);
 
 	it("denies a pending approval when the calling turn aborts", async () => {

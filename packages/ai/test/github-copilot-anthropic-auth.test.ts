@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { buildAnthropicClientOptions, streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
 import type { Context, Model } from "@oh-my-pi/pi-ai/types";
-import { buildAnthropicUrl } from "@oh-my-pi/pi-ai/utils/anthropic-auth";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { COPILOT_API_HEADERS } from "@oh-my-pi/pi-catalog/wire/github-copilot";
 
@@ -22,20 +21,6 @@ function makeCopilotClaudeModel(): Model<"anthropic-messages"> {
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 128000,
 		maxTokens: 16000,
-	});
-}
-function makeOpenCodeGoQwen37Model(): Model<"anthropic-messages"> {
-	return buildModel({
-		id: "qwen3.7-max",
-		name: "Qwen3.7 Max",
-		api: "anthropic-messages",
-		provider: "opencode-go",
-		baseUrl: "https://opencode.ai/zen/go",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 1_000_000,
-		maxTokens: 65_536,
 	});
 }
 
@@ -71,28 +56,6 @@ describe("Anthropic Copilot auth config", () => {
 
 		expect(options.apiKey).toBeNull();
 		expect(options.defaultHeaders.Authorization).toBe(`Bearer ${token}`);
-	});
-
-	it("sends OpenCode Go Anthropic requests with X-Api-Key", async () => {
-		const requestedApiKeys: Array<string | null> = [];
-		const requestedAuthorizations: Array<string | null> = [];
-		const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-			requestedApiKeys.push(getRequestHeader(input, init, "X-Api-Key"));
-			requestedAuthorizations.push(getRequestHeader(input, init, "Authorization"));
-			return new Response(JSON.stringify({ error: { type: "authentication_error", message: "Unauthorized" } }), {
-				status: 401,
-				headers: { "Content-Type": "application/json" },
-			});
-		});
-
-		const result = await streamAnthropic(makeOpenCodeGoQwen37Model(), testContext, {
-			apiKey: "opencode_test_key",
-			fetch: fetchMock as unknown as typeof fetch,
-		}).result();
-
-		expect(result.stopReason).toBe("error");
-		expect(requestedApiKeys[0]).toBe("opencode_test_key");
-		expect(requestedAuthorizations[0]).toBeNull();
 	});
 
 	it("unwraps structured Copilot credentials before setting Authorization", () => {
@@ -140,23 +103,10 @@ describe("Anthropic Copilot auth config", () => {
 		}
 	});
 
-	it("does not set isOAuthToken for Copilot models", () => {
-		const model = makeCopilotClaudeModel();
-		const result = buildAnthropicClientOptions({
-			model,
-			apiKey: "ghu_test",
-			extraBetas: [],
-			stream: true,
-			dynamicHeaders: {},
-		});
-
-		expect(result.isOAuthToken).toBe(false);
-	});
-
 	it("normalizes trailing /v1 in anthropic base URLs", () => {
 		const model = {
 			...makeCopilotClaudeModel(),
-			provider: "custom-proxy",
+			provider: "github-copilot",
 			baseUrl: "http://127.0.0.1:8317/v1",
 		};
 		const result = buildAnthropicClientOptions({
@@ -203,16 +153,6 @@ describe("Anthropic Copilot auth config", () => {
 		const authKeys = Object.keys(result.defaultHeaders).filter(key => key.toLowerCase() === "authorization");
 		expect(authKeys).toHaveLength(1);
 		expect(result.defaultHeaders[authKeys[0]]).toBe("Bearer override");
-	});
-
-	it("builds anthropic auth URLs from the normalized service root", () => {
-		const url = buildAnthropicUrl({
-			apiKey: "test-key",
-			baseUrl: "http://127.0.0.1:8317/v1",
-			isOAuth: false,
-		});
-
-		expect(url).toBe("http://127.0.0.1:8317/v1/messages?beta=true");
 	});
 
 	it("forwards initiatorOverride to Copilot message requests", async () => {

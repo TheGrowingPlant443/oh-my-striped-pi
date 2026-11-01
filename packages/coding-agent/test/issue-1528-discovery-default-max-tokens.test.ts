@@ -40,7 +40,7 @@ describe("issue #1528 discovery maxTokens default", () => {
 			modelsPath,
 			[
 				"providers:",
-				"  deepseek-compat:",
+				"  github-copilot:",
 				"    baseUrl: https://api.example.com/v1",
 				"    apiKey: sk-test",
 				"    api: openai-completions",
@@ -62,9 +62,9 @@ describe("issue #1528 discovery maxTokens default", () => {
 		};
 
 		const registry = new ModelRegistry(authStorage, modelsPath, { fetch: fetchMock });
-		await registry.refreshProvider("deepseek-compat");
+		await registry.refreshProvider("github-copilot");
 
-		const model = registry.find("deepseek-compat", "vllm-lab-fork-a1");
+		const model = registry.find("github-copilot", "vllm-lab-fork-a1");
 		expect(model?.maxTokens).toBe(32_768);
 	});
 
@@ -73,7 +73,7 @@ describe("issue #1528 discovery maxTokens default", () => {
 			modelsPath,
 			[
 				"providers:",
-				"  newapi-proxy:",
+				"  github-copilot:",
 				"    baseUrl: https://proxy.example.com/v1",
 				"    apiKey: sk-test",
 				"    api: openai-completions",
@@ -97,9 +97,9 @@ describe("issue #1528 discovery maxTokens default", () => {
 		};
 
 		const registry = new ModelRegistry(authStorage, modelsPath, { fetch: fetchMock });
-		await registry.refreshProvider("newapi-proxy");
+		await registry.refreshProvider("github-copilot");
 
-		const model = registry.find("newapi-proxy", "newapi-private-openai-model");
+		const model = registry.find("github-copilot", "newapi-private-openai-model");
 		expect(model?.maxTokens).toBe(32_768);
 	});
 
@@ -113,7 +113,7 @@ describe("issue #1528 discovery maxTokens default", () => {
 			modelsPath,
 			[
 				"providers:",
-				"  newapi-proxy:",
+				"  github-copilot:",
 				"    baseUrl: https://proxy.example.com/v1",
 				"    apiKey: sk-test",
 				"    api: openai-completions",
@@ -140,15 +140,15 @@ describe("issue #1528 discovery maxTokens default", () => {
 		};
 
 		const registry = new ModelRegistry(authStorage, modelsPath, { fetch: fetchMock });
-		await registry.refreshProvider("newapi-proxy");
+		await registry.refreshProvider("github-copilot");
 
-		const sonnet = registry.find("newapi-proxy", "claude-3-5-sonnet");
+		const sonnet = registry.find("github-copilot", "claude-3-5-sonnet");
 		expect(sonnet?.api).toBe("anthropic-messages");
 		expect(sonnet?.maxTokens).toBe(8192);
 
 		// Dual-endpoint advertisements prefer the anthropic route in the proxy
 		// branch, so they also stay capped at 8K.
-		const haiku = registry.find("newapi-proxy", "claude-3-5-haiku");
+		const haiku = registry.find("github-copilot", "claude-3-5-haiku");
 		expect(haiku?.api).toBe("anthropic-messages");
 		expect(haiku?.maxTokens).toBe(8192);
 	});
@@ -163,7 +163,7 @@ describe("issue #1528 discovery maxTokens default", () => {
 			modelsPath,
 			[
 				"providers:",
-				"  third-party-anthropic:",
+				"  github-copilot:",
 				"    baseUrl: https://anthropic-reseller.example.com/v1",
 				"    apiKey: sk-test",
 				"    api: anthropic-messages",
@@ -185,9 +185,9 @@ describe("issue #1528 discovery maxTokens default", () => {
 		};
 
 		const registry = new ModelRegistry(authStorage, modelsPath, { fetch: fetchMock });
-		await registry.refreshProvider("third-party-anthropic");
+		await registry.refreshProvider("github-copilot");
 
-		const sonnet = registry.find("third-party-anthropic", "claude-3-5-sonnet");
+		const sonnet = registry.find("github-copilot", "claude-3-5-sonnet");
 		expect(sonnet?.api).toBe("anthropic-messages");
 		expect(sonnet?.maxTokens).toBe(8192);
 	});

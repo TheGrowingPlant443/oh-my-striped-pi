@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { AgentBusyError, type AgentTelemetryConfig, type Tracer } from "@oh-my-pi/pi-agent-core";
 import { type AssistantMessage, Effort } from "@oh-my-pi/pi-ai";
-import { kCursorExecResolved } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { ExtensionActions, LoadExtensionsResult } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -27,8 +26,8 @@ function createAssistantStopMessage(text: string): AssistantMessage {
 	return {
 		role: "assistant",
 		content: text ? [{ type: "text", text }] : [],
-		api: "openai-responses",
-		provider: "openai",
+		api: "local-inference",
+		provider: "local",
 		model: "mock",
 		usage: {
 			input: 0,
@@ -602,41 +601,6 @@ describe("runSubprocess yield reminders", () => {
 		expect(result.output).toBe(report);
 	});
 
-	it("returns only the text after Cursor's last server-resolved tool call", async () => {
-		const report = "## Result\nThe auth lookup is complete.";
-		const session = createMockSession(({ emit, state }) => {
-			const edit = {
-				type: "toolCall" as const,
-				id: "tool-edit",
-				name: "edit",
-				arguments: { path: "src/auth.ts" },
-				[kCursorExecResolved]: true as const,
-			};
-			const read = {
-				type: "toolCall" as const,
-				id: "tool-read",
-				name: "read",
-				arguments: { path: "src/auth.ts" },
-				[kCursorExecResolved]: true as const,
-			};
-			const final: AssistantMessage = {
-				...createAssistantStopMessage(""),
-				api: "cursor-agent",
-				provider: "cursor",
-				content: [{ type: "text", text: "Checking auth." }, edit, read, { type: "text", text: report }],
-			};
-			state.messages.push(final);
-			emit({ type: "message_end", message: final });
-			emit({ type: "agent_end", messages: [final] });
-		});
-		mockCreateAgentSession(session);
-
-		const result = await runSubprocess({ ...baseOptions, id: "subagent-cursor-final", structured: false });
-
-		expect(result.exitCode).toBe(0);
-		expect(result.output).toBe(report);
-	});
-
 	it("rejects prose after a locally runnable tool call in a stop turn", async () => {
 		const session = createMockSession(({ emit, state }) => {
 			const unfinished = createAssistantStopMessage("");
@@ -1124,13 +1088,13 @@ describe("runSubprocess yield reminders", () => {
 
 		const modelRegistry = {
 			refresh: async () => {},
-			getAvailable: () => [{ provider: "openai", id: "gpt-4o", name: "GPT-4o" }],
+			getAvailable: () => [{ provider: "github-copilot", id: "gpt-4o", name: "GPT-4o" }],
 		} as unknown as import("@oh-my-pi/pi-coding-agent/config/model-registry").ModelRegistry;
 
 		await runSubprocess({
 			...baseOptions,
 			id: "subagent-thinking-fallback",
-			modelOverride: "openai/gpt-4o",
+			modelOverride: "github-copilot/gpt-4o",
 			thinkingLevel: Effort.High,
 			modelRegistry,
 		});
@@ -1218,8 +1182,8 @@ describe("runSubprocess yield reminders", () => {
 		const result = await runSubprocess({ ...baseOptions, id: "subagent-provider-error" });
 
 		expect(result.exitCode).toBe(1);
-		expect(result.error).toBe("[openai/mock] Connect error invalid_argument: Error");
-		expect(result.stderr).toBe("[openai/mock] Connect error invalid_argument: Error");
+		expect(result.error).toBe("[local/mock] Connect error invalid_argument: Error");
+		expect(result.stderr).toBe("[local/mock] Connect error invalid_argument: Error");
 	});
 
 	it("surfaces the assistant abort message instead of 'Cancelled by caller' on an internal turn abort", async () => {

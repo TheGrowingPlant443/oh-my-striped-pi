@@ -4,12 +4,9 @@
 
 ### Breaking Changes
 
-- Moved Anthropic header and endpoint helpers, along with Codex session/transport inspection and OpenAI Responses replay/storage helpers, to dedicated provider modules. Update imports from the previous locations.
+- Removed built-in public SaaS provider/OAuth/usage and hosted auxiliary integrations while retaining Copilot, on-device, self-hosted and configured company protocols.
+- Generic HTTP clients now require explicit endpoints instead of falling back to public OpenAI URLs or borrowed environment keys.
 - Updated auth-gateway model resolvers to receive `ModelResolveOptions`, including the route's native API wire and the scoped client's accepted grants. Scoped client IDs no longer fall back to scanning all models; resolvers now select the best permitted candidate.
-
-### Added
-
-- Added mTLS support for Anthropic connections through the `CLAUDE_CODE_CLIENT_CERT` and `CLAUDE_CODE_CLIENT_KEY` environment variables.
 
 ### Changed
 
@@ -18,21 +15,20 @@
 
 ### Fixed
 
-- Fixed Mistral thinking-message replay requests that could be rejected by LiteLLM with a `422 extra_forbidden` error.
-- Added the `omp/<version>` User-Agent to native Judge API requests so omp usage is correctly identified in upstream statistics.
-- Preserved provider-supplied `Retry-After` delays for Codex capacity errors over WebSocket and SSE, preventing retries from occurring too early.
+- Gateway chat replay now preserves the resolved target's provider/model identity across wire protocols.
 - Improved provider-specific credential usage lookups so they no longer wait for unrelated providers, while preserving cache freshness, cancellation isolation, and complete aggregate reports. The corresponding server-side latency improvement requires an updated auth broker.
 - Added safe credential-usage prefetching during session setup without selecting, pinning, or advancing the OAuth account rotation.
 - Fixed cancelled OAuth refresh requests aborting the entire session, and ensured requests joining an existing refresh can still use the refreshed credential when the original request is cancelled.
-- Fixed Cursor models losing omp system-prompt context, including context files, skills, and rules, on subsequent turns or when earlier messages precede the active turn.
 - Fixed short-lived commands that refresh OAuth credentials, such as `omp token --force-refresh`, remaining open for several seconds after completing.
-- Fixed TypeSafe authentication when `TYPESAFE_BASE_URL` is configured by validating keys against the correct `/v1/models` endpoint.
 - Fixed forced tool calls on non-reasoning models causing an unhandled reasoning-effort error.
 - Fixed interrupted turns reporting a transport error instead of the caller-provided cancellation reason.
 - Fixed long-running pi-native turns being terminated before their first event by fetch or proxy timeouts by supporting keepalives and the configured first-event timeout.
 - Fixed pi-native clients crashing when the auth gateway reports an upstream failure during streaming.
-- Fixed Cursor turns failing after a mid-turn stream interruption when an automatic retry receives a zero-token provider error; retries now continue on the rotated conversation.
 - Corrected auth-gateway debug logs so they no longer claim a retry occurred when a usage-limit error was returned without retrying.
+
+### Removed
+
+- Removed retired hosted-provider reset APIs, cloud-only generation/judgment clients and Cursor execution hooks; generic private-endpoint clients and custom provider/OAuth registration remain.
 
 ## [18.13.3] - 2026-10-28
 

@@ -5,6 +5,7 @@ import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import { type Api, type Context, Effort, type Model, type SimpleStreamOptions } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { AUTO_PREWALK_TIMEOUT_MS, type PrewalkRoute } from "@oh-my-pi/pi-coding-agent/auto-prewalk/classifier";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -24,7 +25,7 @@ import { asGlobalFetch } from "./helpers/fetch-mock";
 /**
  * `prewalk.auto`: the native judge decides per user task whether to arm the
  * existing prewalk handoff from the active model. The judge is the real
- * TypeSafe client against a stubbed `fetch`, so the whole path — classifier,
+ * configured System One client against a stubbed `fetch`, so the whole path — classifier,
  * judge chain, coordinator, handoff — runs without network.
  */
 describe("AgentSession auto-prewalk", () => {
@@ -49,7 +50,7 @@ describe("AgentSession auto-prewalk", () => {
 	});
 
 	function modelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
+		const model = getBundledModel("github-copilot", id);
 		if (!model) throw new Error(`Expected bundled model ${id}`);
 		return model;
 	}
@@ -158,23 +159,40 @@ describe("AgentSession auto-prewalk", () => {
 	}
 
 	function createFixture(responses: MockResponse[], options: FixtureOptions = {}) {
-		const primary = modelOrThrow("claude-sonnet-4-5");
-		const target = modelOrThrow("claude-sonnet-4-6");
+		const primary = modelOrThrow("claude-sonnet-4.5");
+		const target = modelOrThrow("claude-sonnet-4.6");
+		const native = buildModel({
+			id: "openjev-company",
+			name: "Company judge",
+			provider: "company",
+			api: "typesafe",
+			baseUrl: "https://judge.company.example",
+			kind: "judge",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 8192,
+			maxTokens: 0,
+		});
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		if (options.judge !== false) authStorage.keys.setRuntime("typesafe", "ts-key");
-		// Only the credentials set here exist. Ambient provider keys (TYPESAFE_API_KEY, OPENROUTER_API_KEY, …) must
-		// neither conjure a native judge nor give the chain a fallback candidate that reaches the network.
-		const credentialed = options.judge === false ? ["anthropic"] : ["anthropic", "typesafe"];
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		if (options.judge !== false) authStorage.keys.setRuntime("company", "company-key");
+		// Only fixture credentials may make a model available; never borrow ambient keys.
+		const credentialed = options.judge === false ? ["github-copilot"] : ["github-copilot", "company"];
 		const source = authStorage.keys.source.bind(authStorage.keys);
 		vi.spyOn(authStorage.keys, "source").mockImplementation((provider, sourceOptions) =>
 			credentialed.includes(provider) ? source(provider, sourceOptions) : undefined,
 		);
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		const available = modelRegistry.getAvailable.bind(modelRegistry);
+		vi.spyOn(modelRegistry, "getAvailable").mockImplementation((kind = "chat") => {
+			const models = available(kind);
+			return options.judge !== false && (kind === "all" || kind === "judge") ? [...models, native] : models;
+		});
 		const settings = Settings.isolated({
 			"compaction.enabled": false,
 			"prewalk.enabled": false,
-			modelRoles: { judge: "typesafe/jev-1.14.0" },
+			modelRoles: { judge: "company/openjev-company" },
 			...(options.auto ? { "prewalk.auto": options.auto } : {}),
 			...(options.todoEager ? { "todo.eager": options.todoEager } : {}),
 		});
@@ -230,7 +248,6 @@ describe("AgentSession auto-prewalk", () => {
 			session: created,
 			sessionManager: created.sessionManager,
 			settings,
-			collabGuest: false,
 			showStatus: vi.fn(),
 			editor: { setText: vi.fn() },
 			refreshSlashCommandState: vi.fn(),
@@ -298,7 +315,9 @@ describe("AgentSession auto-prewalk", () => {
 			expect(f.notices.filter(message => message.startsWith("Prewalk: armed"))).toHaveLength(1);
 			expect(f.notices.some(message => message.startsWith("Auto-prewalk"))).toBe(false);
 			const usage = f.session.sessionManager.getBranch().filter(entry => entry.type === "model_usage");
-			expect(usage).toEqual([expect.objectContaining({ purpose: "auto-prewalk", role: "typesafe" })]);
+			expect(usage).toEqual([
+				expect.objectContaining({ purpose: "auto-prewalk", role: "judge", provider: "company" }),
+			]);
 		});
 
 		it.each([
@@ -562,7 +581,7 @@ describe("AgentSession auto-prewalk", () => {
 			stubJudge([PREWALK, DIRECT]);
 			const f = createFixture([...cycle(), done("two")], { auto: "on" });
 			await f.session.prompt("task one");
-			const manual = pick === "other" ? modelOrThrow("claude-opus-4-6") : f.target;
+			const manual = pick === "other" ? modelOrThrow("claude-opus-4.6") : f.target;
 			await f.session.setModel(manual);
 
 			await f.session.prompt("task two");
@@ -623,7 +642,7 @@ describe("AgentSession auto-prewalk", () => {
 	describe("manual control", () => {
 		it("leaves a configured arm untouched: no judgment, no retargeting", async () => {
 			const calls = stubJudge([PREWALK]);
-			const configured = modelOrThrow("claude-opus-4-6");
+			const configured = modelOrThrow("claude-opus-4.6");
 			const f = createFixture(cycle(), { auto: "on", startupArm: configured });
 
 			await f.session.prompt(TASK);

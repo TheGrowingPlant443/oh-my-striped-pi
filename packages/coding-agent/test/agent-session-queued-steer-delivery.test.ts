@@ -1,10 +1,9 @@
 /**
- * Contract: a custom message steered into a streaming session (the collab-host
- * and skill-prompt path: `promptCustomMessage(..., { streamingBehavior: "steer" })`)
+ * Contract: a custom message steered into a streaming session (including the
+ * skill-prompt path: `promptCustomMessage(..., { streamingBehavior: "steer" })`)
  * is always delivered — never silently stranded in the agent's steering queue.
  *
- * Two regression seams, both observed as "guest messages just disappear" in
- * collab sessions:
+ * Two regression seams where custom messages must not disappear:
  *  1. A steer landing at the run's yield boundary (after the stop-boundary
  *     dequeue) must force another turn instead of stranding.
  *  2. A steer landing while the prompt unwinds (isStreaming stays true through
@@ -32,7 +31,7 @@ import { tagImageAttachmentSource } from "@oh-my-pi/pi-tui/prompt/image-source";
 import { removeSyncWithRetries, Snowflake, withTimeout } from "@oh-my-pi/pi-utils";
 import manualContinuePrompt from "../src/prompts/system/manual-continue.md" with { type: "text" };
 
-const COLLAB_PROMPT_TYPE = "collab-prompt";
+const TEST_PROMPT_TYPE = "test-custom-prompt";
 const IMAGE_SOURCE_PATH = "/tmp/private-project/screenshot.png";
 /** A path-pasted image: its source path rides in a hidden `image-attachment` companion. */
 const PATH_PASTED_IMAGE = tagImageAttachmentSource(
@@ -62,7 +61,7 @@ describe("AgentSession queued steer delivery", () => {
 		fixtureDir = path.join(os.tmpdir(), `pi-steer-strand-fixture-${Snowflake.next()}`);
 		fs.mkdirSync(fixtureDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(fixtureDir, "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(fixtureDir, "models.yml"));
 	});
 
@@ -85,7 +84,7 @@ describe("AgentSession queued steer delivery", () => {
 		responses: MockHandler[],
 		promptTemplates: PromptTemplate[] = [],
 	): Promise<SteerHarness> {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6")!;
 		const mock = createMockModel({ responses });
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -100,13 +99,12 @@ describe("AgentSession queued steer delivery", () => {
 		return { session, sessionManager, mock };
 	}
 
-	function steerCollabPrompt(target: AgentSession, text: string): Promise<boolean> {
+	function steerCustomPrompt(target: AgentSession, text: string): Promise<boolean> {
 		return target.promptCustomMessage(
 			{
-				customType: COLLAB_PROMPT_TYPE,
+				customType: TEST_PROMPT_TYPE,
 				content: text,
 				display: true,
-				details: { from: "guest" },
 				attribution: "user",
 			},
 			{ streamingBehavior: "steer" },
@@ -132,23 +130,23 @@ describe("AgentSession queued steer delivery", () => {
 		return promise;
 	}
 
-	/** Resolves with the entry text when a collab-prompt entry is persisted. */
-	function nextCollabEntry(sessionManager: SessionManager): Promise<string> {
+	/** Resolves with the entry text when a test custom prompt is persisted. */
+	function nextCustomEntry(sessionManager: SessionManager): Promise<string> {
 		const { promise, resolve } = Promise.withResolvers<string>();
 		sessionManager.onEntryAppended = entry => {
-			if (entry.type === "custom_message" && entry.customType === COLLAB_PROMPT_TYPE) {
+			if (entry.type === "custom_message" && entry.customType === TEST_PROMPT_TYPE) {
 				resolve(typeof entry.content === "string" ? entry.content : JSON.stringify(entry.content));
 			}
 		};
 		return promise;
 	}
 
-	it("delivers a collab steer that lands at the run's yield boundary", async () => {
+	it("delivers a custom steer that lands at the run's yield boundary", async () => {
 		const { session, sessionManager, mock } = await createSession([
 			{ content: ["host answer"] },
-			{ content: ["ack guest"] },
+			{ content: ["ack custom prompt"] },
 		]);
-		const entryAppended = nextCollabEntry(sessionManager);
+		const entryAppended = nextCustomEntry(sessionManager);
 
 		let streamingAtInject: boolean | undefined;
 		let injected = false;
@@ -157,13 +155,13 @@ describe("AgentSession queued steer delivery", () => {
 			injected = true;
 			// The session is still mid-prompt here, so this takes the steer path.
 			streamingAtInject = session.isStreaming;
-			await steerCollabPrompt(session, "guest steer at yield");
+			await steerCustomPrompt(session, "custom steer at yield");
 		});
 
 		await session.prompt("hello");
 
 		expect(streamingAtInject).toBe(true);
-		expect(await entryAppended).toBe("guest steer at yield");
+		expect(await entryAppended).toBe("custom steer at yield");
 		expect(mock.calls.length).toBe(2);
 		expect(session.agent.hasQueuedMessages()).toBe(false);
 	});
@@ -265,9 +263,9 @@ describe("AgentSession queued steer delivery", () => {
 	it("drains a steer stranded in the agent queue when the session settles", async () => {
 		const { session, sessionManager, mock } = await createSession([
 			{ content: ["host answer"] },
-			{ content: ["ack guest"] },
+			{ content: ["ack custom prompt"] },
 		]);
-		const entryAppended = nextCollabEntry(sessionManager);
+		const entryAppended = nextCustomEntry(sessionManager);
 
 		// Inject from the wire agent_end subscriber: it fires synchronously while
 		// the session settles (#promptInFlightCount just hit 0), after the agent
@@ -281,10 +279,9 @@ describe("AgentSession queued steer delivery", () => {
 			if (agentEnds === 1) {
 				session.agent.steer({
 					role: "custom",
-					customType: COLLAB_PROMPT_TYPE,
-					content: "guest steer at settle",
+					customType: TEST_PROMPT_TYPE,
+					content: "custom steer at settle",
 					display: true,
-					details: { from: "guest" },
 					attribution: "user",
 					timestamp: Date.now(),
 				});
@@ -294,7 +291,7 @@ describe("AgentSession queued steer delivery", () => {
 		});
 
 		await session.prompt("hello");
-		expect(await entryAppended).toBe("guest steer at settle");
+		expect(await entryAppended).toBe("custom steer at settle");
 		await secondRunDone.promise;
 
 		expect(mock.calls.length).toBe(2);
@@ -1109,11 +1106,11 @@ describe("AgentSession queued steer delivery", () => {
 			};
 			const customPrompt: AgentMessage = {
 				role: "custom",
-				customType: COLLAB_PROMPT_TYPE,
-				content: "Expanded guest request",
+				customType: TEST_PROMPT_TYPE,
+				content: "Expanded custom request",
 				attribution: "user",
 				display: true,
-				details: { from: "guest", __queueChipText: "/guest request", nested: { preserve: true } },
+				details: { __queueChipText: "/custom request", nested: { preserve: true } },
 				timestamp: 12,
 			};
 			const otherCompanion: AgentMessage = { ...companion, content: "Other image description", timestamp: 13 };
@@ -1127,7 +1124,7 @@ describe("AgentSession queued steer delivery", () => {
 					[],
 					[videoNotice, keywordNotice, companion, imagePrompt, customPrompt, otherCompanion, otherPrompt],
 				);
-				promoted = [session.promoteQueuedMessage("[Image]"), session.promoteQueuedMessage("/guest request")];
+				promoted = [session.promoteQueuedMessage("[Image]"), session.promoteQueuedMessage("/custom request")];
 			});
 
 			await session.prompt("start");
@@ -1164,10 +1161,8 @@ describe("AgentSession queued steer delivery", () => {
 			expect(
 				sessionManager
 					.getEntries()
-					.filter(entry => entry.type === "custom_message" && entry.customType === COLLAB_PROMPT_TYPE),
-			).toMatchObject([
-				{ content: customPrompt.content, details: { from: "guest", nested: { preserve: true } }, display: true },
-			]);
+					.filter(entry => entry.type === "custom_message" && entry.customType === TEST_PROMPT_TYPE),
+			).toMatchObject([{ content: customPrompt.content, details: { nested: { preserve: true } }, display: true }]);
 			expect(session.agent.hasQueuedMessages()).toBe(false);
 		});
 

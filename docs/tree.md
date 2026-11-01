@@ -112,7 +112,7 @@ Same as `default`, plus hides `toolResult` messages.
 
 ### `user-only`
 
-User requests: ordinary user messages and user-invoked skill/collaboration custom prompts.
+User requests: ordinary user messages and user-invoked skill prompts.
 
 ### `labeled-only`
 
@@ -151,7 +151,7 @@ Assistant messages that contain only tool calls (no canonical text) are hidden i
 ### Selecting `custom_message`
 
 - Ordinary custom messages use the same parent-leaf rule and text prefill as user messages
-- User-invoked skill/collaboration custom prompts restore the original user draft and image attachments, using the parent-leaf rule
+- User-invoked skill prompts restore the original user draft and image attachments, using the parent-leaf rule
 - Agent/autoload `skill-prompt` injections are not editable; selecting one lands on that node like other non-user entries
 
 ### Selecting a past `ask` tool result

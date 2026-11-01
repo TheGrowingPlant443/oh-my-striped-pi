@@ -79,7 +79,7 @@ If prewalk is already armed, `/prewalk` leaves the existing target in place. `/p
 
 ## Auto-prewalk
 
-`prewalk.enabled` and `/prewalk` unconditionally arm a one-shot handoff. Auto-prewalk asks OMP's native judge, per task, whether prewalk is worthwhile, and arms the same handoff from the active model when it is. It is a prewalk-suitability check, not a difficulty rating or a general model router: it never picks a different planning model.
+`prewalk.enabled` and `/prewalk` unconditionally arm a one-shot handoff. Auto-prewalk asks the local or Copilot judge, per task, whether prewalk is worthwhile, and arms the same handoff from the active model when it is. It is a prewalk-suitability check, not a difficulty rating or a general model router: it never picks a different planning model.
 
 ```yaml
 prewalk:
@@ -102,7 +102,7 @@ Run `suggest` for a while to see how it judges your prompts, then set `auto: on`
 
 ### Requirements
 
-Auto-prewalk needs the `judge` model role to resolve first to a native judgment backend, the same condition as `find.enabled: auto`. It uses the existing judge-role provider support, including TypeSafe `jev`, OpenRouter, OpenAI Decisions, and Workers AI Clef. It relies on calibrated probabilities and never executes a prompted on-device or chat judge, even if the judge-role cache predates a login or discovery change. Without a native judge nothing is classified, and nothing is reported.
+Auto-prewalk needs the `judge` model role to resolve first to a configured native judgment backend, the same condition as `find.enabled: auto`. System One and compatible Decisions protocols are supported with explicit company endpoints. It relies on calibrated probabilities and never executes a prompted on-device or chat judge, even if the cached execution chain predates a credential or discovery change. Without a native judge nothing is classified, and nothing is reported.
 
 ### What it decides
 

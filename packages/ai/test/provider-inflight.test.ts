@@ -49,7 +49,7 @@ async function useIsolatedLimiterRoot(): Promise<void> {
 function limiterDir(provider: string): string {
 	return __providerInFlightForTesting.providerDir(provider);
 }
-function nextLimiterWait(provider = "tests"): Promise<void> {
+function nextLimiterWait(provider = "local"): Promise<void> {
 	const waiting = Promise.withResolvers<void>();
 	__providerInFlightForTesting.setWaitObserver(waitingProvider => {
 		if (waitingProvider === provider) waiting.resolve();
@@ -69,7 +69,7 @@ describe("provider in-flight request limits", () => {
 		let maxActive = 0;
 		let callIndex = 0;
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				callIndex++;
 				active++;
@@ -86,12 +86,12 @@ describe("provider in-flight request limits", () => {
 			},
 		});
 
-		const first = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const first = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		const firstResult = first.result();
 		await firstStarted.promise;
 
 		const secondWaiting = nextLimiterWait();
-		const second = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const second = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		await secondWaiting;
 
 		releaseFirst.resolve();
@@ -104,10 +104,10 @@ describe("provider in-flight request limits", () => {
 	});
 
 	test("holds a completions permit until a trailing [DONE] reaches the gateway", async () => {
-		configureProviderMaxInFlightRequests({ tests: 1 });
+		configureProviderMaxInFlightRequests({ "github-copilot": 1 });
 		const model: Model<"openai-completions"> = {
-			...getBundledModel<"openai-completions">("openai", "gpt-4o-mini"),
-			provider: "tests",
+			...getBundledModel<"openai-completions">("github-copilot", "gpt-4o"),
+			provider: "github-copilot",
 			api: "openai-completions",
 			baseUrl: "https://example.test/v1",
 		};
@@ -174,9 +174,9 @@ describe("provider in-flight request limits", () => {
 			await allowRemoval.promise;
 			await fs.rm(leasePath, { recursive: true, force: true });
 		});
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 
-		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		const terminalObserved = Promise.withResolvers<"done" | "error">();
 		const terminalObservation = (async () => {
 			for await (const event of stream) {
@@ -204,7 +204,7 @@ describe("provider in-flight request limits", () => {
 
 		expect(result.content).toEqual([{ type: "text", text: "reply" }]);
 		expect(terminalType).toBe("done");
-		const entries = await fs.readdir(limiterDir("tests"), { withFileTypes: true });
+		const entries = await fs.readdir(limiterDir("local"), { withFileTypes: true });
 		expect(entries.filter(entry => entry.isDirectory())).toHaveLength(0);
 	});
 
@@ -213,12 +213,12 @@ describe("provider in-flight request limits", () => {
 		__providerInFlightForTesting.setLeaseRemover(async () => {
 			throw Object.assign(new Error("simulated lease removal failure"), { code: "EBUSY" });
 		});
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 
-		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } }).result();
+		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } }).result();
 
 		expect(result.content).toEqual([{ type: "text", text: "reply" }]);
-		const entries = await fs.readdir(limiterDir("tests"), { withFileTypes: true });
+		const entries = await fs.readdir(limiterDir("local"), { withFileTypes: true });
 		expect(entries.filter(entry => entry.isDirectory())).toHaveLength(1);
 	});
 
@@ -228,13 +228,13 @@ describe("provider in-flight request limits", () => {
 			throw Object.assign(new Error("simulated lease removal failure"), { code: "EBUSY" });
 		});
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				throw new Error("PROVIDER-ORIGINAL-ERROR");
 			},
 		});
 
-		const outcome = await streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } })
+		const outcome = await streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } })
 			.result()
 			.then(
 				message => message.errorMessage ?? JSON.stringify(message.content),
@@ -265,7 +265,7 @@ describe("provider in-flight request limits", () => {
 			}
 		});
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				requestStarted.resolve();
 				await finishRequest.promise;
@@ -273,7 +273,7 @@ describe("provider in-flight request limits", () => {
 			},
 		});
 
-		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		const resultPromise = stream.result();
 		const keepAlive = setInterval(() => {}, 1_000);
 		try {
@@ -282,7 +282,7 @@ describe("provider in-flight request limits", () => {
 			finishRequest.resolve();
 			const result = await resultPromise;
 			expect(result.content).toEqual([{ type: "text", text: "reply" }]);
-			const entries = await fs.readdir(limiterDir("tests"), { withFileTypes: true });
+			const entries = await fs.readdir(limiterDir("local"), { withFileTypes: true });
 			expect(entries.filter(entry => entry.isDirectory())).toHaveLength(0);
 		} finally {
 			clearInterval(keepAlive);
@@ -292,7 +292,7 @@ describe("provider in-flight request limits", () => {
 		await heartbeatSettled.promise;
 
 		expect(heartbeatWrites).toBe(1);
-		const entries = await fs.readdir(limiterDir("tests"), { withFileTypes: true });
+		const entries = await fs.readdir(limiterDir("local"), { withFileTypes: true });
 		expect(entries.filter(entry => entry.isDirectory())).toHaveLength(0);
 	});
 
@@ -317,7 +317,7 @@ describe("provider in-flight request limits", () => {
 			throw Object.assign(new Error("simulated lease removal failure"), { code: "EBUSY" });
 		});
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				requestStarted.resolve();
 				await finishRequest.promise;
@@ -325,7 +325,7 @@ describe("provider in-flight request limits", () => {
 			},
 		});
 
-		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		const resultPromise = stream.result();
 		const keepAlive = setInterval(() => {}, 1_000);
 		let infoPath: string;
@@ -336,10 +336,10 @@ describe("provider in-flight request limits", () => {
 			finishRequest.resolve();
 			const result = await resultPromise;
 			expect(result.content).toEqual([{ type: "text", text: "reply" }]);
-			const entries = await fs.readdir(limiterDir("tests"), { withFileTypes: true });
+			const entries = await fs.readdir(limiterDir("local"), { withFileTypes: true });
 			const lease = entries.find(entry => entry.isDirectory());
 			if (!lease) throw new Error("Expected failed cleanup to leave a provider lease");
-			infoPath = path.join(limiterDir("tests"), lease.name, "info.json");
+			infoPath = path.join(limiterDir("local"), lease.name, "info.json");
 			infoBeforeLateHeartbeat = await Bun.file(infoPath).text();
 		} finally {
 			clearInterval(keepAlive);
@@ -357,7 +357,7 @@ describe("provider in-flight request limits", () => {
 		const releaseFirst = Promise.withResolvers<void>();
 		let callIndex = 0;
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				callIndex++;
 				if (callIndex === 1) {
@@ -368,13 +368,13 @@ describe("provider in-flight request limits", () => {
 			},
 		});
 
-		const first = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const first = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		const firstResult = first.result();
 		await firstStarted.promise;
 
 		const controller = new AbortController();
 		const second = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 		controller.abort(new Error("cancel queued request"));
@@ -389,7 +389,7 @@ describe("provider in-flight request limits", () => {
 
 	test("shares limits with leases created by another process", async () => {
 		registerMockApi();
-		const providerDir = limiterDir("tests");
+		const providerDir = limiterDir("local");
 		const externalLease = path.join(providerDir, "external");
 		await fs.mkdir(externalLease, { recursive: true });
 		await Bun.write(
@@ -398,10 +398,10 @@ describe("provider in-flight request limits", () => {
 		);
 
 		const controller = new AbortController();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		const waiting = nextLimiterWait();
 		const stream = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 
@@ -417,7 +417,7 @@ describe("provider in-flight request limits", () => {
 
 	test("does not signal waiters when no slot was freed", async () => {
 		registerMockApi();
-		const providerDir = limiterDir("tests");
+		const providerDir = limiterDir("local");
 		const externalLease = path.join(providerDir, "external");
 		await fs.mkdir(externalLease, { recursive: true });
 		await Bun.write(
@@ -426,10 +426,10 @@ describe("provider in-flight request limits", () => {
 		);
 
 		const controller = new AbortController();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		const waiting = nextLimiterWait();
 		const stream = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 
@@ -443,11 +443,11 @@ describe("provider in-flight request limits", () => {
 
 	test("does not signal waiters when acquiring a slot", async () => {
 		registerMockApi();
-		const providerDir = limiterDir("tests");
+		const providerDir = limiterDir("local");
 		const firstStarted = Promise.withResolvers<void>();
 		const releaseFirst = Promise.withResolvers<void>();
 		const mock = createMockModel({
-			provider: "tests",
+			provider: "local",
 			handler: async () => {
 				firstStarted.resolve();
 				await releaseFirst.promise;
@@ -455,7 +455,7 @@ describe("provider in-flight request limits", () => {
 			},
 		});
 
-		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } });
+		const stream = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } });
 		await firstStarted.promise;
 
 		expect(await Bun.file(path.join(providerDir, ".wakeup")).exists()).toBe(false);
@@ -467,7 +467,7 @@ describe("provider in-flight request limits", () => {
 
 	test("does not reap a live lock just because its timestamp is old", async () => {
 		registerMockApi();
-		const lockDir = __providerInFlightForTesting.lockDir("tests");
+		const lockDir = __providerInFlightForTesting.lockDir("local");
 		await fs.mkdir(lockDir, { recursive: true });
 		await Bun.write(
 			path.join(lockDir, "info.json"),
@@ -475,10 +475,10 @@ describe("provider in-flight request limits", () => {
 		);
 
 		const controller = new AbortController();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		const waiting = nextLimiterWait();
 		const stream = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 
@@ -492,7 +492,7 @@ describe("provider in-flight request limits", () => {
 
 	test("treats unreadable fresh lease info as active", async () => {
 		registerMockApi();
-		const providerDir = limiterDir("tests");
+		const providerDir = limiterDir("local");
 		const externalLease = path.join(providerDir, "partial-info");
 		await fs.mkdir(externalLease, { recursive: true });
 		const old = new Date(Date.now() - 60_000);
@@ -500,10 +500,10 @@ describe("provider in-flight request limits", () => {
 		await Bun.write(path.join(externalLease, "info.json"), "{");
 
 		const controller = new AbortController();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		const waiting = nextLimiterWait();
 		const stream = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 
@@ -516,13 +516,13 @@ describe("provider in-flight request limits", () => {
 	});
 
 	test("does not delete a fresh lock after observing a stale lock", async () => {
-		const lockDir = __providerInFlightForTesting.lockDir("tests");
+		const lockDir = __providerInFlightForTesting.lockDir("local");
 		await fs.mkdir(lockDir, { recursive: true });
 		await Bun.write(
 			path.join(lockDir, "info.json"),
 			JSON.stringify({ pid: 999999, timestamp: Date.now() - 60_000, token: "stale-lock" }),
 		);
-		const staleRelease = await __providerInFlightForTesting.captureStaleLockRelease("tests");
+		const staleRelease = await __providerInFlightForTesting.captureStaleLockRelease("local");
 		expect(staleRelease).not.toBeNull();
 
 		await fs.rm(lockDir, { recursive: true, force: true });
@@ -539,9 +539,9 @@ describe("provider in-flight request limits", () => {
 	});
 
 	test("does not delete a fresh lock after a write-failure cleanup observes an old lock", async () => {
-		const lockDir = __providerInFlightForTesting.lockDir("tests");
+		const lockDir = __providerInFlightForTesting.lockDir("local");
 		await fs.mkdir(lockDir, { recursive: true });
-		const staleCleanup = await __providerInFlightForTesting.captureLockDirRelease("tests");
+		const staleCleanup = await __providerInFlightForTesting.captureLockDirRelease("local");
 		expect(staleCleanup).not.toBeNull();
 
 		await fs.rm(lockDir, { recursive: true, force: true });
@@ -559,13 +559,13 @@ describe("provider in-flight request limits", () => {
 
 	test("retries when another process removes a newly created lock", async () => {
 		registerMockApi();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		__providerInFlightForTesting.setLockCreatedObserver(async lockDir => {
 			await fs.rm(lockDir, { recursive: true, force: true });
 			__providerInFlightForTesting.setLockCreatedObserver(undefined);
 		});
 
-		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } }).result();
+		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } }).result();
 
 		expect(result.content).toEqual([{ type: "text", text: "reply" }]);
 		expect(mock.calls).toHaveLength(1);
@@ -573,13 +573,13 @@ describe("provider in-flight request limits", () => {
 
 	test("retries when another process removes an identified lock before its info write", async () => {
 		registerMockApi();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		__providerInFlightForTesting.setLockIdentifiedObserver(async lockDir => {
 			await fs.rm(lockDir, { recursive: true, force: true });
 			__providerInFlightForTesting.setLockIdentifiedObserver(undefined);
 		});
 
-		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } }).result();
+		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } }).result();
 
 		expect(result.content).toEqual([{ type: "text", text: "reply" }]);
 		expect(mock.calls).toHaveLength(1);
@@ -596,9 +596,9 @@ describe("provider in-flight request limits", () => {
 			}
 			await fs.mkdir(lockDir);
 		});
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 
-		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } }).result();
+		const result = await streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } }).result();
 
 		expect(result.content).toEqual([{ type: "text", text: "reply" }]);
 		expect(mock.calls).toHaveLength(1);
@@ -614,10 +614,10 @@ describe("provider in-flight request limits", () => {
 			mkdirAttempts++;
 			throw Object.assign(new Error("simulated persistent lock mkdir denial"), { code: "EPERM" });
 		});
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 
 		const startedAt = Date.now();
-		const request = streamSimple(mock.model, context(), { maxInFlightRequests: { tests: 1 } }).result();
+		const request = streamSimple(mock.model, context(), { maxInFlightRequests: { local: 1 } }).result();
 		const outcome = await request.then(
 			() => undefined,
 			(error: unknown) => error as NodeJS.ErrnoException,
@@ -633,9 +633,9 @@ describe("provider in-flight request limits", () => {
 	test("does not dispatch when aborted immediately after slot acquisition", async () => {
 		registerMockApi();
 		const controller = new AbortController();
-		const mock = createMockModel({ provider: "tests", responses: [{ content: ["reply"] }] });
+		const mock = createMockModel({ provider: "local", responses: [{ content: ["reply"] }] });
 		const stream = streamSimple(mock.model, context(), {
-			maxInFlightRequests: { tests: 1 },
+			maxInFlightRequests: { local: 1 },
 			signal: controller.signal,
 		});
 

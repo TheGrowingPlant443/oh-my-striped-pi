@@ -40,8 +40,8 @@ describe("issue #8137 — inline /skill in mode-command prompts", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const defaultModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		if (!defaultModel) throw new Error("Expected claude-sonnet-4-5 in registry");
+		const defaultModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		if (!defaultModel) throw new Error("Expected claude-sonnet-4.5 in registry");
 
 		session = new AgentSession({
 			agent: new Agent({

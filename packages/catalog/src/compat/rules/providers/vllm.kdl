@@ -3,6 +3,7 @@
 provider "vllm" {
 	default-model "gpt-oss-20b"
 	env "VLLM_API_KEY"
+	allow-unauthenticated #true
 	discovery label="vLLM" allow-unauthenticated=#true
 
 	class "qwen" {

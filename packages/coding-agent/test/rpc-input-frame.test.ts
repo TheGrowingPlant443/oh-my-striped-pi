@@ -1,7 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { RpcHostToolBridge } from "@oh-my-pi/pi-coding-agent/modes/rpc/host-tools";
@@ -24,6 +23,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import * as imageLoading from "@oh-my-pi/pi-coding-agent/utils/image-loading";
+import { getTestModel } from "./helpers/model-fixtures";
 
 type OutputFrame = RpcResponse | object;
 
@@ -607,11 +607,10 @@ describe("RpcInputDispatcher", () => {
 
 	test("a prompt blocked on admission does not hold up abort (RPC queue must keep flowing during vision preprocessing)", async () => {
 		const authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
+		authStorage.keys.setRuntime(model.provider, "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		const sessionManager = SessionManager.inMemory();
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
 		const mock = createMockModel({ responses: [{ content: ["should not run before release"] }] });
 		const agent = new Agent({
 			getApiKey: () => "test-key",

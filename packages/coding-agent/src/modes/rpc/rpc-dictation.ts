@@ -34,7 +34,6 @@ export class RpcDictationBridge {
 			new STTController({
 				settings: current.settings,
 				registry: current.modelRegistry,
-				getSessionId: () => current.sessionId,
 			}),
 	) {
 		this.#session = session;

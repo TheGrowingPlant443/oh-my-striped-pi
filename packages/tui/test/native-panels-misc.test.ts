@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
+import { beforeAll, describe, expect, it, vi } from "bun:test";
 import type { ImageContent } from "@oh-my-pi/pi-ai";
 import { KeybindingsManager } from "../src/app-keybindings";
 import { MoveOverlay, type MoveOverlayResult } from "../src/overlays/move-overlay";
@@ -6,19 +6,12 @@ import { AnnotationOverlay } from "../src/overlays/annotation-overlay";
 import { AgentTranscriptViewer, type AgentTranscriptViewerDeps } from "../src/overlays/agent-transcript-viewer";
 import { BtwHistoryPanel } from "../src/overlays/btw-history-panel";
 import type { BtwHistoryRecord } from "../src/overlays/btw-history";
-import { CodexResetFireworksController } from "../src/overlays/codex-reset-fireworks";
-import { type Component, Input, type OverlayHandle, type TUI } from "../src/index";
+import { Input, type TUI } from "../src/index";
 import type { NativeChild, NativeNode, NativeUiEvent } from "../src/native/node";
-import { setNativeRendering } from "../src/native/state";
 import { initTheme, theme } from "../src/theme/theme";
 
 beforeAll(async () => {
 	await initTheme();
-});
-
-afterEach(() => {
-	setNativeRendering(false);
-	vi.useRealTimers();
 });
 
 function isNode(child: NativeChild): child is NativeNode {
@@ -420,29 +413,5 @@ describe("BtwHistoryPanel native events", () => {
 		const screen = Bun.stripANSI(history.render(80).join("\n"));
 		expect(screen).toContain("answer to only question");
 		expect(screen).not.toContain("switch pane");
-	});
-});
-
-describe("CodexResetFireworks under a native surface", () => {
-	it("does not run the frame repaint loop", () => {
-		vi.useFakeTimers();
-		setNativeRendering(true);
-		let renders = 0;
-		const handle: OverlayHandle = { hide: () => {}, setHidden: () => {}, isHidden: () => false };
-		const controller = new CodexResetFireworksController({
-			ui: {
-				showOverlay: (_component: Component) => handle,
-				setFocus: () => {},
-				requestRender: () => {
-					renders++;
-				},
-				terminal: { rows: 30 },
-			},
-		});
-		expect(controller.show({ kind: "unscheduled-weekly-reset" })).toBe(true);
-		vi.advanceTimersByTime(1_000);
-		controller.dispose();
-		// One paint to show the overlay; no 85ms frame ticks.
-		expect(renders).toBe(1);
 	});
 });

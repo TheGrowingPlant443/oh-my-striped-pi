@@ -12,7 +12,6 @@ import { refreshStoredManagedMcpOAuthCredential } from "../mcp/oauth-credentials
 import { isManagedMCPOAuthCredentialId, mcpOAuthCredentialProfile } from "../mcp/oauth-flow";
 import { discoverAuthStorage } from "../sdk";
 import type { AuthStorage } from "../session/auth-storage";
-import { getAvailableAuthMethods } from "../web/search/providers/perplexity-auth";
 
 async function resolveManagedMcpOAuthToken(
 	authStorage: AuthStorage,
@@ -50,7 +49,7 @@ export default class Token extends Command {
 	static description = commandHelp.description;
 	static args = {
 		provider: Args.string({
-			description: "Provider ID (e.g. anthropic, openai)",
+			description: "Provider ID or a managed MCP credential ID",
 			required: true,
 		}),
 	};
@@ -76,11 +75,11 @@ export default class Token extends Command {
 	};
 
 	static examples = [
-		"# Get API key for Anthropic\n  omp token anthropic",
+		"# Get the Copilot token\n  omp token github-copilot",
 		"# Get raw Copilot credential JSON\n  omp token github-copilot --raw",
-		"# Force refresh and get Gemini CLI token\n  omp token google-gemini-cli --force-refresh",
-		"# List Anthropic OAuth accounts\n  omp token anthropic --list",
-		"# Get the 2nd Anthropic OAuth account's token\n  omp token anthropic --account 2",
+		"# Force refresh the Copilot token\n  omp token github-copilot --force-refresh",
+		"# List Copilot OAuth accounts\n  omp token github-copilot --list",
+		"# Get the 2nd Copilot OAuth account's token\n  omp token github-copilot --account 2",
 	];
 
 	async run(): Promise<void> {
@@ -164,21 +163,11 @@ export default class Token extends Command {
 			// Resolve the API key / token
 			let apiKey: string | undefined;
 
-			if (provider === "perplexity") {
-				const methods = await getAvailableAuthMethods(authStorage, undefined, {
-					forceRefresh: flags["force-refresh"],
-				});
-				const printable = methods.find(m => m.type === "oauth" || m.type === "api_key");
-				if (printable) {
-					apiKey = printable.type === "oauth" ? printable.access.accessToken : printable.apiKey;
-				}
-			}
-
-			if (!apiKey && managedMcpOAuth) {
+			if (managedMcpOAuth) {
 				apiKey = await resolveManagedMcpOAuthToken(authStorage, provider, {
 					forceRefresh: flags["force-refresh"],
 				});
-			} else if (!apiKey) {
+			} else {
 				apiKey = await modelRegistry.getApiKeyForProvider(provider, undefined, {
 					forceRefresh: flags["force-refresh"],
 				});

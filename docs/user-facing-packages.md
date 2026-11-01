@@ -85,17 +85,16 @@ Sources: [`packages/browser-relay/README.md`](../packages/browser-relay/README.m
 - Security/limits: it binds loopback; use `--token` when local processes are untrusted. Chrome
   internal pages, DevTools, Web Store, extension pages, and tabs with DevTools open cannot attach.
 
-### `packages/collab-web` — browser client for collaborative sessions
+### `packages/collab-web` — self-contained HTML export viewer
 
-Sources: [`packages/collab-web/README.md`](../packages/collab-web/README.md), [`packages/collab-web/package.json`](../packages/collab-web/package.json), [`docs/collab.md`](./collab.md).
+Sources: [`packages/collab-web/README.md`](../packages/collab-web/README.md), [`packages/collab-web/package.json`](../packages/collab-web/package.json).
 
-- Package: private `@oh-my-pi/collab-web`; production client: <https://my.omp.sh/>.
-- Feature: browser guest UI for `/collab` sessions, including streaming transcript, tool cards,
-  subagent views, prompts, and host interruption.
-- Local paths: `bun run dev` serves the UI on port 3000; `bun run mock-host` runs an offline relay
-  and scripted host; `bun run build` emits a static SPA under `dist/`.
-- Constraints: non-local deployments require HTTPS and a reachable secure WebSocket relay. The room
-  key stays in the URL fragment and is not sent to the relay.
+- Package: private `@oh-my-pi/collab-web`; the workspace name is retained for the export build.
+- Feature: shared React tool cards, Markdown and math rendering, and local session traces
+  embedded in standalone HTML session exports.
+- Build: `bun run gen:export-viewer` generates the viewer consumed by the coding agent's HTML exporter.
+- Constraints: no live browser guest, collaboration host, or relay is included. Exported
+  HTML embeds its viewer dependencies and session data without remote scripts.
 
 ### `packages/snapcompact` — bitmap context-compression API
 

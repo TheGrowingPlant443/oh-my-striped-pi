@@ -26,9 +26,7 @@ import { getActiveProfile, getConfigDirName } from "@oh-my-pi/pi-utils/dirs";
 import { classifyTerminalMultiplexer } from "@oh-my-pi/pi-tui/terminal-multiplexer";
 import { shouldEnableAppendOnlyContext } from "../../config/append-only-context-mode";
 import { type BashResult, isPersistentShellCdCommand } from "../../exec/bash-executor";
-import { type LoadedCustomShare, loadCustomShare } from "../../export/custom-share";
 import { parseExportArgs } from "../../export/html/args";
-import { shareSession } from "../../export/share";
 import type { CompactOptions } from "../../extensibility/extensions/types";
 import {
 	diffMentalModelContent,
@@ -43,7 +41,6 @@ import {
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../../memory-backend";
 import { BashExecutionComponent, bashPtyViewport } from "@oh-my-pi/pi-tui/chat/bash-execution";
 import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
-import { BorderedLoader } from "@oh-my-pi/pi-tui/overlays/bordered-loader";
 import { EvalExecutionComponent } from "@oh-my-pi/pi-tui/chat/eval-execution";
 import { MoveOverlay, type MoveOverlayResult } from "@oh-my-pi/pi-tui/overlays/move-overlay";
 import { moveDirectorySource } from "../move-directory-source";
@@ -77,12 +74,7 @@ import {
 	type SessionWorktree,
 } from "../../session/session-worktree";
 import { formatShakeSummary, type ShakeMode, type ShakeResult } from "../../session/shake-types";
-import {
-	codexUsagePlan,
-	formatActiveAccountLabel,
-	formatCodexUsageReportLabel,
-	limitMatchesActiveAccount,
-} from "../../slash-commands/helpers/active-oauth-account";
+import { formatActiveAccountLabel, limitMatchesActiveAccount } from "../../slash-commands/helpers/active-oauth-account";
 import { formatProviderName } from "@oh-my-pi/pi-tui/chrome/format";
 import { formatCompactQuota } from "@oh-my-pi/pi-tui/overlays/advisor-config";
 import { resolveTernPane } from "../../tools/browser/tern/kind";
@@ -102,17 +94,12 @@ import { formatDumpArchiveReport, type SessionDumpArchive } from "../../session/
 import { openPath } from "../../utils/open";
 import { resumeCommand } from "../../utils/resume-command";
 import { setSessionTerminalTitle } from "../../utils/title-generator";
-import {
-	collapseSharedUsageReports,
-	formatLimitTitle,
-	summarizeUsageResetCredits,
-} from "@oh-my-pi/pi-tui/overlays/usage-display";
+import { collapseSharedUsageReports, formatLimitTitle } from "@oh-my-pi/pi-tui/overlays/usage-display";
 import { formatRemainingOnlyTotal, isUsedOnlyAbsoluteAmount } from "@oh-my-pi/pi-tui/prompt/usage-amounts";
 import type { UnavailableUsageAccount } from "@oh-my-pi/pi-tui/overlays/usage-dashboard";
 
 import { cfgTerminalShowImages } from "../settings";
 import { cfgProviderAppendOnlyContext } from "../../session/settings";
-import { cfgShareRedactSecrets, cfgShareServerUrl, cfgShareStore } from "../../commands/settings";
 import { flagConsumesValue, restartArgv } from "../../cli/flag-tables";
 import {
 	createDefaultTerminalLaunchRequest,
@@ -482,90 +469,6 @@ export class CommandController {
 		}
 	}
 
-	async handleShareCommand(): Promise<void> {
-		let customShare: LoadedCustomShare | null;
-		try {
-			customShare = await loadCustomShare();
-		} catch (err) {
-			this.ctx.showError(err instanceof Error ? err.message : String(err));
-			return;
-		}
-
-		const loader = new BorderedLoader(this.ctx.ui, theme, "Sharing session...");
-		this.ctx.editorContainer.clear();
-		this.ctx.editorContainer.addChild(loader);
-		this.ctx.ui.setFocus(loader);
-		this.ctx.ui.requestRender();
-
-		const restoreEditor = () => {
-			loader.dispose();
-			this.ctx.editorContainer.clear();
-			this.ctx.editorContainer.addChild(this.ctx.editor);
-			this.ctx.ui.setFocus(this.ctx.editor);
-		};
-		loader.onAbort = () => {
-			restoreEditor();
-			this.ctx.showStatus("Share cancelled");
-		};
-
-		// Custom share scripts keep their legacy contract: they receive a path
-		// to a standalone HTML export. No fallback to the default flow on error.
-		if (customShare) {
-			const tmpFile = path.join(os.tmpdir(), `${Snowflake.next()}.html`);
-			try {
-				await this.ctx.session.exportToHtml(tmpFile);
-				const result = await customShare.fn(tmpFile);
-				if (loader.signal.aborted) return;
-				restoreEditor();
-
-				if (typeof result === "string") {
-					this.ctx.showStatus(`Share URL: ${result}`);
-					this.openInBrowser(result);
-				} else if (result) {
-					const parts: string[] = [];
-					if (result.url) parts.push(`Share URL: ${result.url}`);
-					if (result.message) parts.push(result.message);
-					if (parts.length > 0) this.ctx.showStatus(parts.join("\n"));
-					if (result.url) this.openInBrowser(result.url);
-				} else {
-					this.ctx.showStatus("Session shared");
-				}
-			} catch (err) {
-				if (!loader.signal.aborted) {
-					restoreEditor();
-					this.ctx.showError(`Custom share failed: ${err instanceof Error ? err.message : String(err)}`);
-				}
-			} finally {
-				await fs.rm(tmpFile, { force: true }).catch(() => {});
-			}
-			return;
-		}
-
-		// Default: encrypted snapshot to a secret gist (preferred) or the share
-		// server; the key rides in the link fragment and never leaves the client.
-		try {
-			const result = await shareSession(this.ctx.session.sessionManager, {
-				serverUrl: cfgShareServerUrl.get(this.ctx.settings),
-				store: cfgShareStore.get(this.ctx.settings),
-				state: this.ctx.session.state,
-				obfuscator: cfgShareRedactSecrets.get(this.ctx.settings) ? this.ctx.session.obfuscator : undefined,
-			});
-			if (loader.signal.aborted) return;
-			restoreEditor();
-
-			const lines = [`Share URL: ${result.url}`];
-			if (result.gistUrl) lines.push(`Gist: ${result.gistUrl}`);
-			if (result.truncated) lines.push("Note: large content was trimmed to fit the share size limit.");
-			this.ctx.showStatus(lines.join("\n"));
-			this.openInBrowser(result.url);
-		} catch (error: unknown) {
-			if (!loader.signal.aborted) {
-				restoreEditor();
-				this.ctx.showError(`Failed to share session: ${error instanceof Error ? error.message : "Unknown error"}`);
-			}
-		}
-	}
-
 	async handleSessionCommand(): Promise<void> {
 		const stats = this.ctx.session.getSessionStats();
 		const premiumRequests =
@@ -609,7 +512,6 @@ export class CommandController {
 				sessionId: stats.sessionId,
 				authMode,
 				credentialSource,
-				preferWebsockets: this.ctx.session.preferWebsockets,
 				providerSessionState: this.ctx.session.providerSessionState,
 			});
 			info += renderProviderSection(providerDetails, theme);
@@ -1088,16 +990,13 @@ export class CommandController {
 			await this.#handleMentalModelsSubcommand(argumentText);
 			return;
 		}
-
 		this.ctx.showError("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync|mm ...>");
 	}
 
 	async #handleMentalModelsSubcommand(argumentText: string): Promise<void> {
-		// Parse: "mm <verb> [arg]"
 		const parts = argumentText.split(/\s+/).slice(1);
 		const verb = parts[0]?.toLowerCase() ?? "list";
 		const arg = parts[1];
-
 		const state = this.ctx.session.getHindsightSessionState();
 		const primary = state && !state.aliasOf ? state : undefined;
 		if (!primary) {
@@ -1108,7 +1007,6 @@ export class CommandController {
 			this.ctx.showError("Mental models are disabled (hindsight.mentalModelsEnabled = false).");
 			return;
 		}
-
 		switch (verb) {
 			case "list":
 				await this.#mmList(primary);
@@ -1179,25 +1077,17 @@ export class CommandController {
 	async #mmRefresh(state: HindsightSessionState, id: string | undefined): Promise<void> {
 		try {
 			if (id) {
-				// Single-model refresh is explicit operator intent: bypass the
-				// auto-refresh filter so curated/manual models can still be
-				// refreshed on demand.
 				await state.client.refreshMentalModel(state.bankId, id);
 				this.ctx.showStatus(`Refresh queued for mental model ${id}.`);
 			} else {
-				// Bulk refresh: only touch models that opted into automatic
-				// refresh via `trigger.refresh_after_consolidation`. Curated
-				// models are reviewed before publishing and must not be
-				// silently regenerated by a bank-wide refresh sweep. Reading
-				// `detail: "content"` here is required because the trigger
-				// field is excluded from `detail: "metadata"`.
+				// Only auto-refresh models may be regenerated by a bank-wide sweep.
 				const list = await state.client.listMentalModels(state.bankId, { detail: "content" });
 				const items = list.items ?? [];
 				if (items.length === 0) {
 					this.ctx.showStatus(`No mental models on bank ${state.bankId}.`);
 					return;
 				}
-				const targets = items.filter(m => m.trigger?.refresh_after_consolidation === true);
+				const targets = items.filter(model => model.trigger?.refresh_after_consolidation === true);
 				const skipped = items.length - targets.length;
 				if (targets.length === 0) {
 					this.ctx.showStatus(
@@ -1221,8 +1111,6 @@ export class CommandController {
 					`Refresh queued for ${queued}/${targets.length} auto-refresh model(s)${skippedSuffix}.`,
 				);
 			}
-			// Reload the cache after a brief grace so the new content (if the refresh
-			// completes synchronously on the server) flows into the system prompt.
 			await Bun.sleep(500);
 			await reloadMentalModelsForSession(state.session);
 		} catch (error) {
@@ -1244,18 +1132,13 @@ export class CommandController {
 				this.ctx.showStatus(`No history recorded for ${id}.`);
 				return;
 			}
-			// History is most-recent first. Each entry stores the content BEFORE that
-			// change. To diff "what changed at entry N", compare entry N's
-			// previous_content (= state before that change) with entry N-1's
-			// previous_content (= state after that change, which was state before
-			// the next change). For the most recent change, compare against the
-			// model's CURRENT content.
 			const sections: string[] = [];
 			for (let i = 0; i < history.length; i++) {
 				const before = history[i].previous_content ?? "";
 				const after = i === 0 ? (model.content ?? "") : (history[i - 1].previous_content ?? "");
-				const diff = diffMentalModelContent(before, after);
-				sections.push(`### ${history[i].changed_at}\n\n\`\`\`diff\n${diff}\n\`\`\``);
+				sections.push(
+					`### ${history[i].changed_at}\n\n\`\`\`diff\n${diffMentalModelContent(before, after)}\n\`\`\``,
+				);
 			}
 			this.#showMarkdownPanel(`History — ${model.name}`, sections.join("\n\n"));
 		} catch (error) {
@@ -1309,8 +1192,7 @@ export class CommandController {
 	}
 
 	async #mmReload(state: HindsightSessionState): Promise<void> {
-		const ok = await reloadMentalModelsForSession(state.session);
-		if (ok) {
+		if (await reloadMentalModelsForSession(state.session)) {
 			this.ctx.showStatus("Mental-model cache reloaded.");
 		} else {
 			this.ctx.showError("Reload failed (Hindsight backend not active or mental models disabled).");
@@ -1319,13 +1201,10 @@ export class CommandController {
 
 	async #mmDelete(state: HindsightSessionState, id: string): Promise<void> {
 		try {
-			const removed = await state.client.deleteMentalModel(state.bankId, id);
-			if (!removed) {
+			if (!(await state.client.deleteMentalModel(state.bankId, id))) {
 				this.ctx.showError(`Mental model not found: ${id}`);
 				return;
 			}
-			// Drop the cached snippet so the closing tag does not silently keep
-			// stale content in the system prompt until the next agent_end TTL.
 			await reloadMentalModelsForSession(state.session);
 			this.ctx.showStatus(`Deleted mental model ${id} from bank ${state.bankId}.`);
 		} catch (error) {
@@ -2372,57 +2251,36 @@ function orgSuffix(report: UsageReport): string {
 	return org ? ` (${org})` : "";
 }
 
-/** Keep the existing TUI `(plan)` layout while using the live Codex usage plan. */
-function formatCodexTuiLabel(report: UsageReport, peers: readonly UsageReport[], base: string): string {
-	const identity = formatCodexUsageReportLabel(report, peers, base, undefined, false);
-	const plan = codexUsagePlan(report);
-	return plan ? `${identity} (${plan})` : identity;
-}
-
-function formatAccountLabel(
-	limit: UsageLimit,
-	report: UsageReport,
-	peers: readonly UsageReport[],
-	index: number,
-): string {
-	const codex = report.provider === "openai-codex";
+function formatAccountLabel(limit: UsageLimit, report: UsageReport, index: number): string {
 	const email = report.metadata?.email;
-	if (typeof email === "string" && email)
-		return codex ? formatCodexTuiLabel(report, peers, email) : `${email}${orgSuffix(report)}`;
+	if (typeof email === "string" && email) return `${email}${orgSuffix(report)}`;
 	const accountId =
 		typeof report.metadata?.accountId === "string" && report.metadata.accountId
 			? report.metadata.accountId
 			: limit.scope.accountId || undefined;
-	if (accountId) return codex ? formatCodexTuiLabel(report, peers, accountId) : `${accountId}${orgSuffix(report)}`;
+	if (accountId) return `${accountId}${orgSuffix(report)}`;
 	const projectId =
 		typeof report.metadata?.projectId === "string" && report.metadata.projectId
 			? report.metadata.projectId
 			: limit.scope.projectId || undefined;
 	const base = typeof projectId === "string" && projectId ? projectId : `account ${index + 1}`;
-	return codex ? formatCodexTuiLabel(report, peers, base) : base;
+	return base;
 }
 
-function formatUnlimitedReportLabel(report: UsageReport, peers: readonly UsageReport[], index: number): string {
+function formatUnlimitedReportLabel(report: UsageReport, index: number): string {
 	const email = report.metadata?.email;
-	if (typeof email === "string" && email)
-		return report.provider === "openai-codex"
-			? formatCodexTuiLabel(report, peers, email)
-			: `${email}${orgSuffix(report)}`;
+	if (typeof email === "string" && email) return `${email}${orgSuffix(report)}`;
 	const accountId = report.metadata?.accountId;
-	if (typeof accountId === "string" && accountId)
-		return report.provider === "openai-codex"
-			? formatCodexTuiLabel(report, peers, accountId)
-			: `${accountId}${orgSuffix(report)}`;
+	if (typeof accountId === "string" && accountId) return `${accountId}${orgSuffix(report)}`;
 	const projectId = report.metadata?.projectId;
 	const base = typeof projectId === "string" && projectId ? projectId : `account ${index + 1}`;
-	return report.provider === "openai-codex" ? formatCodexTuiLabel(report, peers, base) : base;
+	return base;
 }
 
 function formatResetShort(limit: UsageLimit, nowMs: number): string | undefined {
 	const resetsAt = limit.window?.resetsAt;
 	if (resetsAt === undefined) return undefined;
-	// Codex returns the prior window's reset_at until a new request opens a fresh window —
-	// rendering a negative delta is meaningless, so drop the suffix in that case.
+	// Expired windows have no remaining reset interval.
 	if (resetsAt <= nowMs) return undefined;
 	return formatDuration(resetsAt - nowMs);
 }
@@ -2430,7 +2288,6 @@ function formatResetShort(limit: UsageLimit, nowMs: number): string | undefined 
 function formatAccountHeaderRow(
 	limits: UsageLimit[],
 	reports: UsageReport[],
-	peers: readonly UsageReport[],
 	nowMs: number,
 	columnWidth: number,
 	uiTheme: Theme,
@@ -2440,7 +2297,7 @@ function formatAccountHeaderRow(
 		const reset = formatResetShort(limit, nowMs);
 		const report = reports[index];
 		const active = report !== undefined && limitMatchesActiveAccount(report, limit, activeAccount);
-		const label = formatAccountLabel(limit, report, peers, index);
+		const label = formatAccountLabel(limit, report, index);
 		return {
 			label: active ? `● ${label}` : label,
 			suffix: reset ? `(${reset})` : "",
@@ -2677,33 +2534,7 @@ export function renderUsageReports(
 		}
 
 		lines.push(uiTheme.bold(uiTheme.fg("accent", providerName)));
-		const activeReport =
-			provider === "openai-codex" && activeAccount
-				? ((activeAccount.accountId
-						? providerReports.find(
-								report =>
-									report.metadata?.orgId === activeAccount.orgId &&
-									report.metadata?.accountId === activeAccount.accountId,
-							)
-						: undefined) ??
-					providerReports.find(
-						report =>
-							report.metadata?.orgId === activeAccount.orgId &&
-							!!activeAccount.email &&
-							report.metadata?.email === activeAccount.email &&
-							(!activeAccount.accountId || !report.metadata?.accountId),
-					))
-				: undefined;
-		const activeAccountLabel =
-			provider === "openai-codex"
-				? activeReport
-					? formatCodexTuiLabel(
-							activeReport,
-							providerReports,
-							activeAccount?.email || activeAccount?.accountId || "account",
-						)
-					: activeAccount?.email || activeAccount?.accountId || activeAccount?.projectId
-				: formatActiveAccountLabel(activeAccount);
+		const activeAccountLabel = formatActiveAccountLabel(activeAccount);
 		if (activeAccountLabel) {
 			lines.push(`  ${uiTheme.fg("accent", "in use by this session:")} ${activeAccountLabel}`);
 		}
@@ -2729,64 +2560,6 @@ export function renderUsageReports(
 			lines.push(
 				`  ${uiTheme.fg("dim", replaceTabs(truncateToWidth(sanitizeText(providerNotes.map(n => n.replace(/[\r\n]+/g, " ")).join(" • ")), 110)))}`.trimEnd(),
 			);
-		}
-
-		const resetAccountLines: string[] = [];
-		for (const report of providerReports) {
-			const resets = summarizeUsageResetCredits(report.resetCredits, nowMs);
-			if (!resets || resets.bankedCount <= 0) continue;
-			const identityLabel =
-				typeof report.metadata?.email === "string" && report.metadata.email
-					? report.metadata.email
-					: typeof report.metadata?.accountId === "string" && report.metadata.accountId
-						? report.metadata.accountId
-						: "account";
-			const orgName = report.metadata?.orgName;
-			const orgId = report.metadata?.orgId;
-			const orgLabel =
-				typeof orgName === "string" && orgName ? orgName : typeof orgId === "string" ? orgId : undefined;
-			const rawLabel =
-				provider === "openai-codex"
-					? formatCodexTuiLabel(report, providerReports, identityLabel)
-					: orgLabel && orgLabel !== identityLabel
-						? `${identityLabel} (${orgLabel})`
-						: identityLabel;
-			const label = sanitizeText(rawLabel.replace(/[\r\n\t]+/g, " "));
-			const activeOrg = activeAccount?.orgId;
-			const reportOrg = typeof report.metadata?.orgId === "string" ? report.metadata.orgId : undefined;
-			const orgMatches = !activeOrg && !reportOrg ? true : activeOrg === reportOrg;
-			const isActive =
-				provider === "openai-codex"
-					? activeReport === report
-					: orgMatches &&
-						!!activeAccount &&
-						((!!activeAccount.accountId && activeAccount.accountId === report.metadata?.accountId) ||
-							(!!activeAccount.email && activeAccount.email === report.metadata?.email));
-			const availability =
-				resets.redeemableCount === resets.bankedCount ? "" : ` · ${resets.redeemableCount} usable now`;
-			resetAccountLines.push(
-				`    • ${label}: ${resets.bankedCount} saved reset${resets.bankedCount === 1 ? "" : "s"}${availability}${isActive ? " (active)" : ""}`,
-			);
-			if (resets.soonestExpiry) {
-				const expiryMs = Date.parse(resets.soonestExpiry);
-				const remaining = expiryMs - nowMs;
-				const expiryDate = resets.soonestExpiry.slice(0, 10);
-				if (remaining > 0) {
-					resetAccountLines.push(`        soonest expires in ${formatDuration(remaining)} (${expiryDate})`);
-				} else {
-					resetAccountLines.push(`        expired (${expiryDate})`);
-				}
-			}
-			if (resets.redeemableCount === 0 && resets.unavailableReason) {
-				const reason = sanitizeText(resets.unavailableReason.replace(/[\r\n\t]+/g, " "));
-				resetAccountLines.push(`        unavailable: ${reason}`);
-			}
-		}
-		if (resetAccountLines.length > 0) {
-			lines.push(
-				`  ${uiTheme.fg("accent", "Saved rate-limit resets")} ${uiTheme.fg("dim", "(/usage reset to spend)")}`,
-			);
-			for (const line of resetAccountLines) lines.push(uiTheme.fg("dim", line));
 		}
 
 		// Order account columns ONCE per provider (worst-first), then apply that
@@ -2838,7 +2611,6 @@ export function renderUsageReports(
 			const accountLabels = formatAccountHeaderRow(
 				sortedLimits,
 				sortedReports,
-				providerReports,
 				nowMs,
 				sectionColumnWidth,
 				uiTheme,
@@ -2864,8 +2636,8 @@ export function renderUsageReports(
 		// Render accounts with no rate limits (e.g. business/enterprise plans).
 		const unlimitedReports = providerReports.filter(report => report.limits.length === 0);
 		for (const report of unlimitedReports) {
-			const label = formatUnlimitedReportLabel(report, providerReports, 0);
-			const tier = report.provider === "openai-codex" ? undefined : report.metadata?.planType;
+			const label = formatUnlimitedReportLabel(report, 0);
+			const tier = report.metadata?.planType;
 			const tierSuffix = typeof tier === "string" && tier ? ` ${uiTheme.fg("dim", `(${tier})`)}` : "";
 			const daybreakSuffix = report.metadata?.daybreak === true ? uiTheme.fg("success", " daybreak") : "";
 			lines.push(

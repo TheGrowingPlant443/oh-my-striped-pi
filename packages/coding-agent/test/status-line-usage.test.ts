@@ -128,7 +128,7 @@ describe("usage status-line segment", () => {
 	it("selects one coherent scope for the active model", async () => {
 		const reports = [
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				limits: [
 					{
 						scope: { windowId: "5h", tier: "spark", modelId: "GPT-5.3-Codex-Spark" },
@@ -142,7 +142,7 @@ describe("usage status-line segment", () => {
 				],
 			},
 		];
-		const component = makeComponent(reports, { provider: "openai-codex", modelId: "gpt-5.6-sol" });
+		const component = makeComponent(reports, { provider: "github-copilot", modelId: "gpt-5.6-sol" });
 
 		component.refreshUsageInBackground();
 		await flushUsageRefresh();
@@ -154,7 +154,7 @@ describe("usage status-line segment", () => {
 		expect(content).toContain("8%");
 
 		const sparkComponent = makeComponent(reports, {
-			provider: "openai-codex",
+			provider: "github-copilot",
 			modelId: "gpt-5.3-codex-spark",
 		});
 		sparkComponent.refreshUsageInBackground();
@@ -167,28 +167,28 @@ describe("usage status-line segment", () => {
 		expect(sparkContent).not.toContain("8%");
 	});
 
-	it("labels untiered windows with the report's plan tier (Z.AI planType)", async () => {
+	it("labels untiered windows with the report's plan tier", async () => {
 		const now = Date.now();
 		const component = makeComponent(
 			[
 				{
-					provider: "zai",
+					provider: "github-copilot",
 					metadata: { planType: "pro" },
 					limits: [
 						{
-							scope: { provider: "zai", windowId: "5h" },
+							scope: { provider: "github-copilot", windowId: "5h" },
 							window: { resetsAt: now + 30 * 60_000 },
 							amount: { usedFraction: 0.21 },
 						},
 						{
-							scope: { provider: "zai", windowId: "7d" },
+							scope: { provider: "github-copilot", windowId: "7d" },
 							window: { resetsAt: now + 141 * 3_600_000 },
 							amount: { usedFraction: 0.05 },
 						},
 					],
 				},
 			],
-			{ provider: "zai" },
+			{ provider: "github-copilot" },
 		);
 
 		component.refreshUsageInBackground();
@@ -229,19 +229,19 @@ describe("usage status-line segment", () => {
 		const component = makeComponent(
 			[
 				{
-					provider: "anthropic",
+					provider: "local",
 					limits: [
 						{ scope: { windowId: "5h" }, amount: { usedFraction: 0.99 } },
 						{ scope: { windowId: "7d" }, amount: { usedFraction: 0.98 } },
 					],
 				},
 				{
-					provider: "openai-codex",
+					provider: "github-copilot",
 					metadata: { accountId: "other-account" },
 					limits: [{ scope: { windowId: "5h", tier: "other" }, amount: { usedFraction: 0.66 } }],
 				},
 				{
-					provider: "openai-codex",
+					provider: "github-copilot",
 					metadata: { accountId: "active-account" },
 					limits: [
 						{ scope: { windowId: "5h", tier: "prolite" }, amount: { usedFraction: 0.24 } },
@@ -249,7 +249,7 @@ describe("usage status-line segment", () => {
 					],
 				},
 			],
-			{ provider: "openai-codex", activeIdentity: { accountId: "active-account" } },
+			{ provider: "github-copilot", activeIdentity: { accountId: "active-account" } },
 		);
 
 		component.refreshUsageInBackground();
@@ -266,15 +266,15 @@ describe("usage status-line segment", () => {
 	});
 
 	it("invalidates cached usage when the active provider changes", async () => {
-		let provider = "openai-codex";
+		let provider = "github-copilot";
 		const model = { contextWindow: 1000, provider };
 		const reports = [
 			{
-				provider: "anthropic",
+				provider: "local",
 				limits: [{ scope: { windowId: "5h" }, amount: { usedFraction: 0.24 } }],
 			},
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				metadata: { accountId: "active-account" },
 				limits: [{ scope: { windowId: "5h", tier: "prolite" }, amount: { usedFraction: 0.8 } }],
 			},
@@ -301,7 +301,7 @@ describe("usage status-line segment", () => {
 				authStorage: {
 					oauth: {
 						identity: (requestedProvider: string) =>
-							requestedProvider === provider && provider === "openai-codex"
+							requestedProvider === provider && provider === "github-copilot"
 								? { accountId: "active-account" }
 								: undefined,
 					},
@@ -322,7 +322,7 @@ describe("usage status-line segment", () => {
 		await flushUsageRefresh();
 		expect(stripVTControlCharacters(component.getTopBorder(200).content)).toContain("80%");
 
-		provider = "anthropic";
+		provider = "local";
 		model.provider = provider;
 
 		const immediate = stripVTControlCharacters(component.getTopBorder(200).content);
@@ -333,10 +333,10 @@ describe("usage status-line segment", () => {
 	});
 
 	it("invalidates cached usage when the active model changes within a provider", async () => {
-		const model = { id: "gpt-5.6-sol", contextWindow: 1000, provider: "openai-codex" };
+		const model = { id: "gpt-5.6-sol", contextWindow: 1000, provider: "github-copilot" };
 		const reports = [
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				metadata: { accountId: "active-account" },
 				limits: [
 					{ scope: { windowId: "7d" }, amount: { usedFraction: 0.08 } },
@@ -373,7 +373,7 @@ describe("usage status-line segment", () => {
 				authStorage: {
 					oauth: {
 						identity: (requestedProvider: string) =>
-							requestedProvider === "openai-codex" ? { accountId: "active-account" } : undefined,
+							requestedProvider === "github-copilot" ? { accountId: "active-account" } : undefined,
 					},
 				},
 			},
@@ -409,12 +409,12 @@ describe("usage status-line segment", () => {
 		const component = makeComponent(
 			[
 				{
-					provider: "anthropic",
+					provider: "github-copilot",
 					metadata: { source: "ratelimit-headers", accountId: "other-account" },
 					limits: [{ scope: { windowId: "5h" }, amount: { usedFraction: 0.66 } }],
 				},
 				{
-					provider: "anthropic",
+					provider: "github-copilot",
 					metadata: { source: "ratelimit-headers", accountId: "active-account" },
 					limits: [
 						{ scope: { windowId: "5h" }, amount: { usedFraction: 0.24 } },
@@ -422,7 +422,7 @@ describe("usage status-line segment", () => {
 					],
 				},
 			],
-			{ provider: "anthropic", activeIdentity: { accountId: "active-account" } },
+			{ provider: "github-copilot", activeIdentity: { accountId: "active-account" } },
 		);
 
 		component.refreshUsageInBackground();
@@ -476,85 +476,12 @@ describe("usage status-line segment", () => {
 		expect(content).not.toContain("7d");
 	});
 
-	it("renders monthly Cursor usage when five-hour and seven-day windows are absent", () => {
-		const result = renderSegment("usage", {
-			usage: { monthly: { percent: 1.88, resetHours: 743 } },
-		} as unknown as SegmentContext);
-		const content = stripVTControlCharacters(result.content);
-
-		expect(result.visible).toBe(true);
-		expect(content).toContain("mo");
-		// Match Cursor web dashboard flooring (1.88 → 1%), not Math.round → 2%.
-		expect(content).toContain("1%");
-		expect(content).not.toContain("2%");
-		expect(content).toContain("30d 23h");
-		expect(content).not.toContain("5h");
-		expect(content).not.toContain("7d");
-	});
-
-	it("keeps monthly Cursor personal usage from the active provider", async () => {
-		const component = makeComponent(
-			[
-				{
-					provider: "cursor",
-					limits: [
-						{
-							id: "cursor:usd:individual-plan",
-							scope: { windowId: "monthly" },
-							window: { id: "monthly", resetsAt: Date.now() + 743 * 3_600_000 },
-							amount: { usedFraction: 0.132 },
-						},
-					],
-				},
-			],
-			{ provider: "cursor" },
-		);
-
-		component.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const content = stripVTControlCharacters(component.getTopBorder(200).content);
-
-		expect(content).toContain("mo");
-		expect(content).toContain("13%");
-	});
-
-	it("prefers Cursor personal dashboard rails over legacy monthly request limits", async () => {
-		const component = makeComponent(
-			[
-				{
-					provider: "cursor",
-					limits: [
-						{
-							id: "cursor:requests:gpt-4",
-							scope: { windowId: "monthly" },
-							amount: { usedFraction: 0.9 },
-						},
-						{
-							id: "cursor:usd:individual-auto",
-							scope: { windowId: "monthly" },
-							amount: { usedFraction: 0.0185 },
-						},
-					],
-				},
-			],
-			{ provider: "cursor" },
-		);
-
-		component.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const content = stripVTControlCharacters(component.getTopBorder(200).content);
-
-		expect(content).toContain("mo");
-		expect(content).toContain("1%");
-		expect(content).not.toContain("90%");
-	});
-
-	it("renders all three OpenCode Go windows including monthly", async () => {
+	it("renders rolling and weekly provider windows", async () => {
 		const now = Date.now();
 		const component = makeComponent(
 			[
 				{
-					provider: "opencode-go",
+					provider: "github-copilot",
 					limits: [
 						{
 							id: "rolling-5h",
@@ -568,16 +495,10 @@ describe("usage status-line segment", () => {
 							window: { id: "7d", durationMs: 7 * 86_400_000, resetsAt: now + 100 * 3_600_000 },
 							amount: { used: 8, usedFraction: 0.08, unit: "percent" },
 						},
-						{
-							id: "monthly",
-							scope: { windowId: "monthly" },
-							window: { id: "monthly", resetsAt: now + 160 * 3_600_000 },
-							amount: { used: 42, usedFraction: 0.42, unit: "percent" },
-						},
 					],
 				},
 			],
-			{ provider: "opencode-go" },
+			{ provider: "github-copilot" },
 		);
 
 		component.refreshUsageInBackground();
@@ -588,38 +509,9 @@ describe("usage status-line segment", () => {
 		expect(content).toContain("12%");
 		expect(content).toContain("7d");
 		expect(content).toContain("8%");
-		expect(content).toContain("mo");
-		expect(content).toContain("42%");
 	});
 
-	it("renders an alibaba-token-plan monthly-only quota without a reported span", async () => {
-		const component = makeComponent(
-			[
-				{
-					provider: "alibaba-token-plan",
-					limits: [
-						{
-							id: "credits:monthly",
-							scope: { provider: "alibaba-token-plan", windowId: "monthly" },
-							window: { id: "monthly", label: "Monthly Credits", resetsAt: Date.now() + 335 * 3_600_000 },
-							amount: { used: 1.04, usedFraction: 0.0104, unit: "percent" },
-						},
-					],
-				},
-			],
-			{ provider: "alibaba-token-plan" },
-		);
-
-		component.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const content = stripVTControlCharacters(component.getTopBorder(200).content);
-
-		expect(content).toContain("mo");
-		expect(content).toContain("1%");
-		expect(content).toContain("13d 23h");
-	});
-
-	it("does not render monthly usage for providers outside the single-bucket gate", async () => {
+	it("keeps Copilot monthly premium requests out of the subscription-window footer", async () => {
 		const component = makeComponent(
 			[
 				{
@@ -651,9 +543,7 @@ describe("usage status-line segment", () => {
 	});
 
 	it("maps non-canonical window ids onto subscription windows by reported span", async () => {
-		// Kimi-shaped rows: the burst window reports duration/timeUnit instead
-		// of a canonical id, and rows written before canonicalization keep the
-		// old id. The reported span still identifies the window.
+		// A reported span identifies non-canonical quota windows.
 		const now = Date.now();
 		const component = makeComponent([
 			{
@@ -682,23 +572,23 @@ describe("usage status-line segment", () => {
 		expect(content).toContain("8%");
 	});
 
-	it("renders Google Antigravity daily usage", async () => {
+	it("renders daily provider usage", async () => {
 		const now = Date.now();
 		const component = makeComponent(
 			[
 				{
-					provider: "google-antigravity",
+					provider: "github-copilot",
 					limits: [
 						{
-							label: "Usage (Google)",
-							scope: { provider: "google-antigravity", windowId: "daily" },
+							label: "Daily usage",
+							scope: { provider: "github-copilot", windowId: "daily" },
 							window: { id: "daily", label: "Daily", durationMs: 86_400_000, resetsAt: now + 11 * 60_000 },
 							amount: { usedFraction: 0.054 },
 						},
 					],
 				},
 			],
-			{ provider: "google-antigravity" },
+			{ provider: "github-copilot" },
 		);
 
 		component.refreshUsageInBackground();
@@ -708,108 +598,6 @@ describe("usage status-line segment", () => {
 		expect(content).toContain("1d");
 		expect(content).toContain("5%");
 		expect(content).toContain("11m");
-	});
-
-	it("scopes Antigravity usage to the active model's backend counter", async () => {
-		const now = Date.now();
-		const reports = [
-			{
-				provider: "google-antigravity",
-				limits: [
-					{
-						id: "google-antigravity:default:default:daily",
-						label: "Usage",
-						scope: { provider: "google-antigravity", windowId: "daily" },
-						window: { id: "daily", label: "Daily", durationMs: 86_400_000, resetsAt: now + 5 * 60_000 },
-						amount: { usedFraction: 0.99 },
-					},
-					{
-						id: "google-antigravity:google:default:daily",
-						label: "Usage (Google)",
-						scope: { provider: "google-antigravity", windowId: "daily" },
-						window: { id: "daily", label: "Daily", durationMs: 86_400_000, resetsAt: now + 11 * 60_000 },
-						amount: { usedFraction: 0.91 },
-					},
-					{
-						id: "google-antigravity:anthropic:default:daily",
-						label: "Usage (Anthropic)",
-						scope: { provider: "google-antigravity", windowId: "daily" },
-						window: { id: "daily", label: "Daily", durationMs: 86_400_000, resetsAt: now + 40 * 60_000 },
-						amount: { usedFraction: 0.24 },
-					},
-					{
-						id: "google-antigravity:openai:default:daily",
-						label: "Usage (OpenAI)",
-						scope: { provider: "google-antigravity", windowId: "daily" },
-						window: { id: "daily", label: "Daily", durationMs: 86_400_000, resetsAt: now + 25 * 60_000 },
-						amount: { usedFraction: 0.63 },
-					},
-				],
-			},
-		];
-
-		const claude = makeComponent(reports, { provider: "google-antigravity", modelId: "claude-opus-4-6" });
-		claude.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const claudeContent = stripVTControlCharacters(claude.getTopBorder(200).content);
-		expect(claudeContent).toContain("1d");
-		expect(claudeContent).toContain("24%");
-		expect(claudeContent).not.toContain("91%");
-		expect(claudeContent).not.toContain("99%");
-
-		const gemini = makeComponent(reports, { provider: "google-antigravity", modelId: "gemini-3-pro" });
-		gemini.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const geminiContent = stripVTControlCharacters(gemini.getTopBorder(200).content);
-		expect(geminiContent).toContain("1d");
-		expect(geminiContent).toContain("91%");
-		expect(geminiContent).not.toContain("24%");
-		expect(geminiContent).not.toContain("99%");
-
-		const gptOss = makeComponent(reports, { provider: "google-antigravity", modelId: "gpt-oss-120b" });
-		gptOss.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const gptOssContent = stripVTControlCharacters(gptOss.getTopBorder(200).content);
-		expect(gptOssContent).toContain("1d");
-		expect(gptOssContent).toContain("63%");
-		expect(gptOssContent).not.toContain("91%");
-		expect(gptOssContent).not.toContain("99%");
-		for (const modelId of ["tab_flash_lite_preview", "tab_jump_flash_lite_preview"]) {
-			const tabModel = makeComponent(reports, { provider: "google-antigravity", modelId });
-			tabModel.refreshUsageInBackground();
-			await flushUsageRefresh();
-			const tabContent = stripVTControlCharacters(tabModel.getTopBorder(200).content);
-			expect(tabContent).toContain("1d");
-			expect(tabContent).toContain("91%");
-			expect(tabContent).not.toContain("24%");
-			expect(tabContent).not.toContain("99%");
-		}
-	});
-
-	it("falls back to legacy default Antigravity usage when the model counter is absent", async () => {
-		const component = makeComponent(
-			[
-				{
-					provider: "google-antigravity",
-					limits: [
-						{
-							id: "google-antigravity:default:default:daily",
-							label: "Usage",
-							scope: { provider: "google-antigravity", windowId: "daily" },
-							window: { id: "daily", label: "Daily", durationMs: 86_400_000 },
-							amount: { usedFraction: 0.42 },
-						},
-					],
-				},
-			],
-			{ provider: "google-antigravity", modelId: "claude-opus-4-6" },
-		);
-
-		component.refreshUsageInBackground();
-		await flushUsageRefresh();
-		const content = stripVTControlCharacters(component.getTopBorder(200).content);
-		expect(content).toContain("1d");
-		expect(content).toContain("42%");
 	});
 
 	it("ignores non-canonical windows without a reported span", async () => {

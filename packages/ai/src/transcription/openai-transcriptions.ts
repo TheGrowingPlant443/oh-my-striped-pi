@@ -1,7 +1,7 @@
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import type { Api, FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
 import { type } from "@oh-my-pi/omptype";
-import { type ApiKey, withAuth } from "../auth-retry";
+import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import type { TranscriptionRequest, TranscriptionResult, TranscriptionSegment, TranscriptionWord } from "./types";
 
@@ -84,6 +84,8 @@ export async function transcribeOpenAI(
 	request: TranscriptionRequest,
 	options: TranscriptionOptions,
 ): Promise<TranscriptionResult> {
+	if (!model.baseUrl?.trim())
+		throw new AIError.ConfigurationError(`${model.provider}/${model.id} requires an explicit base URL`);
 	const form = new FormData();
 	const fileName = request.fileName?.trim() || "audio";
 	form.append("file", new File([request.audio], fileName, { type: request.mimeType }));
@@ -102,7 +104,12 @@ export async function transcribeOpenAI(
 		async key => {
 			const attempt = await fetchImpl(`${model.baseUrl.replace(/\/+$/, "")}/audio/transcriptions`, {
 				method: "POST",
-				headers: { Authorization: `Bearer ${key}`, Accept: "application/json" },
+				headers: {
+					...model.headers,
+					...(await model.resolveHeaders?.(options.signal)),
+					...(key && key !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${key}` } : {}),
+					Accept: "application/json",
+				},
 				body: form,
 				signal: options.signal,
 			});

@@ -1,13 +1,16 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks, mockOAuthProvider } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { registerOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/registry/oauth";
 import { removeWithRetries } from "../../utils/src/temp";
 
-const PROVIDER = "unit-noop-persist-oauth";
+const PROVIDER = "github-copilot";
 const SOURCE = "auth-storage-noop-persistence-test";
 const STICKY_KEY_PREFIX = `session:sticky:${PROVIDER}:`;
 
@@ -28,7 +31,7 @@ describe("AuthStorage skips no-op agent.db writes", () => {
 		store = await SqliteAuthCredentialStore.open(dbPath);
 		authStorage = new AuthStorage(store);
 		minted = 0;
-		registerOAuthProvider({
+		mockOAuthProvider({
 			id: PROVIDER,
 			name: "No-op Persist Unit",
 			sourceId: SOURCE,
@@ -47,7 +50,7 @@ describe("AuthStorage skips no-op agent.db writes", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		unregisterOAuthProviders(SOURCE);
+		resetOAuthMocks(SOURCE);
 		store?.close();
 		store = undefined;
 		authStorage = undefined;
@@ -140,7 +143,7 @@ describe("AuthStorage skips no-op agent.db writes", () => {
 
 	test("selection with recordAffinity false persists no sticky for OAuth or API-key credentials", async () => {
 		if (!authStorage || !store) throw new Error("test setup failed");
-		const apiKeyProvider = "unit-noop-persist-key";
+		const apiKeyProvider = "local";
 		await authStorage.credentials.set(PROVIDER, {
 			type: "oauth",
 			access: "cached-access",

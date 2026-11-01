@@ -1,7 +1,7 @@
 import { type } from "@oh-my-pi/omptype";
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import type { Api, FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
-import { type ApiKey, withAuth } from "../auth-retry";
+import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import type { RerankRequest, RerankResult } from "./types";
 
@@ -86,6 +86,8 @@ export async function rerankOpenRouter(
 	request: RerankRequest,
 	options: RerankOptions,
 ): Promise<RerankResult> {
+	if (!model.baseUrl?.trim())
+		throw new AIError.ConfigurationError(`${model.provider}/${model.id} requires an explicit base URL`);
 	const body = JSON.stringify({
 		model: model.id,
 		query: request.query,
@@ -100,7 +102,9 @@ export async function rerankOpenRouter(
 			const attempt = await fetchImpl(`${model.baseUrl.replace(/\/+$/, "")}/rerank`, {
 				method: "POST",
 				headers: {
-					Authorization: `Bearer ${key}`,
+					...model.headers,
+					...(await model.resolveHeaders?.(options.signal)),
+					...(key && key !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${key}` } : {}),
 					Accept: "application/json",
 					"Content-Type": "application/json",
 				},

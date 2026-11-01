@@ -3,7 +3,6 @@ import type { AssistantMessage, AssistantMessageEvent, SimpleStreamOptions, Usag
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
-import { factoryModel } from "../../ai/test/helpers/factory-droid";
 import {
 	CacheWarmer,
 	type CacheWarmerDeps,
@@ -19,14 +18,14 @@ const SHORT_DELAY_MS = 4.5 * 60_000; // 90% of the 300s short tier
 const LONG_DELAY_MS = 54 * 60_000; // 90% of the 3600s long tier
 const PROMPT_TOKENS = 100_000;
 
-function makeModel(): Model {
+function makeModel(): Model<"anthropic-messages"> {
 	return buildModel({
-		id: "claude-sonnet-5",
-		name: "Claude Sonnet 5",
+		id: "cache-fixture",
+		name: "Configured cache fixture",
 		api: "anthropic-messages",
-		provider: "anthropic",
-		// The official endpoint is what enables the 1h tier for OAuth seats.
-		baseUrl: "https://api.anthropic.com",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
+		compat: { supportsLongCacheRetention: true },
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
@@ -56,8 +55,8 @@ function makeMessage(usage: Usage, stopReason: AssistantMessage["stopReason"] = 
 		timestamp: Date.now(),
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "claude-sonnet-5",
+		provider: "github-copilot",
+		model: "cache-fixture",
 		usage,
 		stopReason,
 	};
@@ -184,7 +183,7 @@ describe("cache warming scheduling math", () => {
 		expect(getCacheWarmingDelayMs(5_000)).toBeUndefined();
 	});
 
-	test("reads the tier matching the request retention and the OAuth default", () => {
+	test("reads the tier matching the configured request retention", () => {
 		// PI_CACHE_RETENTION feeds the default tier; scrub it so the
 		// undefined-options assertions hold on any developer/CI environment.
 		const savedRetention = process.env.PI_CACHE_RETENTION;
@@ -194,53 +193,15 @@ describe("cache warming scheduling math", () => {
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "short" })).toBe(300_000);
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "long" })).toBe(3_600_000);
 			expect(getPromptCacheTtlMs(model, undefined)).toBe(300_000);
-			// OAuth seats default to the 1h tier, but an explicit retention still wins.
-			expect(getPromptCacheTtlMs(model, undefined, true)).toBe(3_600_000);
-			expect(getPromptCacheTtlMs(model, { cacheRetention: "short" }, true)).toBe(300_000);
 		} finally {
 			if (savedRetention !== undefined) process.env.PI_CACHE_RETENTION = savedRetention;
 		}
 	});
 
-	test("uses the actual short TTL when Bedrock emits its five-minute fallback for long retention", () => {
-		const bedrockMessages = buildModel({
-			id: "anthropic.claude-opus-5-5",
-			name: "Claude Opus 5.5",
-			api: "anthropic-messages",
-			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com/anthropic",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-			promptCache: { short: 300 },
-			contextWindow: 200_000,
-			maxTokens: 8_192,
-			compat: { supportsLongCacheRetention: false },
-		});
-		expect(getPromptCacheTtlMs(bedrockMessages, { cacheRetention: "long" })).toBe(300_000);
-
-		const converse = buildModel({
-			id: "us.anthropic.claude-opus-5-5",
-			name: "Claude Opus 5.5",
-			api: "bedrock-converse-stream",
-			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-			reasoning: true,
-			input: ["text"],
-			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-			promptCache: { short: 300, long: 3600 },
-			contextWindow: 200_000,
-			maxTokens: 8_192,
-			compat: {
-				promptCacheMode: "explicit",
-				supportsLongPromptCacheRetention: false,
-				promptCacheMinimumTokens: 0,
-				promptCacheMaximumCheckpoints: 2,
-			},
-		});
-		expect(getPromptCacheTtlMs(converse, { cacheRetention: "long" })).toBe(300_000);
-		converse.compat.supportsLongPromptCacheRetention = true;
-		expect(getPromptCacheTtlMs(converse, { cacheRetention: "long" })).toBe(3_600_000);
+	test("uses the short tier when long cache retention is unsupported", () => {
+		const model = makeModel();
+		model.compat.supportsLongCacheRetention = false;
+		expect(getPromptCacheTtlMs(model, { cacheRetention: "long" })).toBe(300_000);
 	});
 
 	test("never warms without a declared lifetime or with caching off", () => {
@@ -250,7 +211,7 @@ describe("cache warming scheduling math", () => {
 		expect(getPromptCacheTtlMs(makeModel(), { cacheRetention: "none" })).toBeUndefined();
 	});
 
-	test("rejects budget-based reasoning replays on Converse but preserves adaptive and effort models", () => {
+	test("rejects budget reasoning replays but preserves adaptive and effort models", () => {
 		const model = makeModel();
 		model.thinking = { mode: "anthropic-budget-effort", efforts: [Effort.High] };
 		expect(isReplayable(model, { reasoning: Effort.High })).toBe(false);
@@ -259,32 +220,11 @@ describe("cache warming scheduling math", () => {
 		expect(isReplayable(model, { reasoning: Effort.High, forceReasoningOff: true })).toBe(true);
 		expect(isReplayable(model, undefined)).toBe(true);
 
-		const bedrock = buildModel({
-			id: "us.anthropic.claude-opus-5-5",
-			name: "Claude Opus 5.5",
-			api: "bedrock-converse-stream",
-			provider: "amazon-bedrock",
-			baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
-			reasoning: true,
-			thinking: { mode: "budget", efforts: [Effort.High], requiresEffort: true },
-			input: ["text"],
-			cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-			contextWindow: 200_000,
-			maxTokens: 8_192,
-		});
-		expect(isReplayable(bedrock, { reasoning: Effort.High })).toBe(false);
-		expect(isReplayable(bedrock, undefined)).toBe(false);
-		expect(isReplayable(bedrock, { forceReasoningOff: true })).toBe(false);
-		bedrock.thinking = { mode: "anthropic-adaptive", efforts: [Effort.High], requiresEffort: true };
-		expect(isReplayable(bedrock, { forceReasoningOff: true })).toBe(true);
-		bedrock.thinking = { mode: "effort", efforts: [Effort.High] };
-		expect(isReplayable(bedrock, { reasoning: Effort.High })).toBe(false);
-
 		const openai = buildModel({
 			id: "gpt-5.4",
 			name: "GPT-5.4",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			baseUrl: "https://example.invalid",
 			reasoning: true,
 			input: ["text"],
@@ -322,12 +262,12 @@ describe("cache warmer lifecycle", () => {
 		expect(h.warmed[0]?.message.usage.cost.total).toBeGreaterThan(0);
 		expect(h.warmer.status.state).toBe("scheduled");
 		expect(h.refreshes).toEqual([
-			{ type: "start", phase: "streaming", provider: "anthropic", model: "claude-sonnet-5" },
+			{ type: "start", phase: "streaming", provider: "github-copilot", model: "cache-fixture" },
 			{
 				type: "end",
 				phase: "streaming",
-				provider: "anthropic",
-				model: "claude-sonnet-5",
+				provider: "github-copilot",
+				model: "cache-fixture",
 				outcome: "hit",
 				usage: h.warmed[0]?.message.usage,
 			},
@@ -377,12 +317,12 @@ describe("cache warmer lifecycle", () => {
 		await advance(SHORT_DELAY_MS);
 		expect(thrown.warmer.status).toMatchObject({ state: "inactive", reason: "refresh failed" });
 		expect(thrown.refreshes).toEqual([
-			{ type: "start", phase: "streaming", provider: "anthropic", model: "claude-sonnet-5" },
+			{ type: "start", phase: "streaming", provider: "github-copilot", model: "cache-fixture" },
 			{
 				type: "end",
 				phase: "streaming",
-				provider: "anthropic",
-				model: "claude-sonnet-5",
+				provider: "github-copilot",
+				model: "cache-fixture",
 				outcome: "error",
 				warmingStopReason: "refresh failed",
 			},
@@ -453,31 +393,10 @@ describe("cache warmer lifecycle", () => {
 		expect(h.warmer.status.reason).toBe("cache entry outlives the 30-minute idle window");
 	});
 
-	test("schedules Factory Droid Claude models at the tier their upstream actually writes", () => {
-		const model = factoryModel("claude-opus-4-6", ["snowflake"]);
-		const reply = (cttl: Usage["cttl"]) => ({
-			...makeMessage(makeUsage({ cacheWrite: 500, cttl })),
-			provider: model.provider,
-			model: model.id,
-		});
-		const h = harness();
-		h.warmer.start({ model, context: { messages: [] }, options: {} }, () => h.current);
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + SHORT_DELAY_MS);
-
-		// Long retention on an upstream that writes 5m entries keeps the 5m schedule.
-		h.warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "long" } }, () => h.current);
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + SHORT_DELAY_MS);
-		h.warmer.onResponse(reply({ ephemeral5m: 500 }));
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + SHORT_DELAY_MS);
-
-		// A reported 1h write moves the schedule to the 1h lifetime.
-		h.warmer.onResponse(reply({ ephemeral1h: 500 }));
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + LONG_DELAY_MS);
-	});
-
 	test("stops when a response reports a tier the model has no lifetime for", () => {
-		const model = factoryModel("claude-opus-4-6", ["anthropic"]);
+		const model = makeModel();
 		model.promptCache = { short: 300 };
+		model.compat.supportsLongCacheRetention = false;
 		const h = harness();
 		h.warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "long" } }, () => h.current);
 		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + SHORT_DELAY_MS);
@@ -487,42 +406,6 @@ describe("cache warmer lifecycle", () => {
 			model: model.id,
 		});
 		expect(h.warmer.status).toMatchObject({ state: "inactive", reason: "cache lifetime unavailable" });
-	});
-
-	test("warms a Factory Droid model whose override declares only the 1h lifetime", () => {
-		const model = factoryModel("claude-opus-4-6", ["anthropic"]);
-		model.promptCache = { long: 3600 };
-		const reply = (cttl: Usage["cttl"]) => ({
-			...makeMessage(makeUsage({ cacheWrite: 500, cttl })),
-			provider: model.provider,
-			model: model.id,
-		});
-		const h = harness();
-		h.warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "long" } }, () => h.current);
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + LONG_DELAY_MS);
-		h.warmer.onResponse(reply({ ephemeral1h: 500 }));
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + LONG_DELAY_MS);
-
-		// An upstream that wrote a 5m entry has no declared lifetime: stop.
-		h.warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "long" } }, () => h.current);
-		h.warmer.onResponse(reply({ ephemeral5m: 500 }));
-		expect(h.warmer.status).toMatchObject({ state: "inactive", reason: "cache lifetime unavailable" });
-	});
-
-	test("adopts the tier a Factory Droid server-side fallback response reports", () => {
-		const model = factoryModel("claude-fable-5", ["anthropic"]);
-		const h = harness();
-		h.warmer.start({ model, context: { messages: [] }, options: { cacheRetention: "long" } }, () => h.current);
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + SHORT_DELAY_MS);
-		// The refused request retried on claude-opus-5; the response carries the served id.
-		h.warmer.onResponse({
-			...makeMessage(makeUsage({ cacheWrite: 500, cttl: { ephemeral1h: 500 } })),
-			content: [{ type: "fallback", from: { model: model.id }, to: { model: "claude-opus-5" } }],
-			provider: model.provider,
-			model: "claude-opus-5",
-		});
-		expect(h.warmer.status.nextWarmAt).toBe(Date.now() + LONG_DELAY_MS);
-		expect(h.warmer.cacheEntry).toMatchObject({ tier: "long", ttlMs: 3_600_000 });
 	});
 
 	test("streaming mode stops when the agent settles", () => {
@@ -636,7 +519,7 @@ describe("cache warmer lifecycle", () => {
 		start(h);
 		await advance(SHORT_DELAY_MS);
 		expect(h.refreshes).toEqual([
-			{ type: "start", phase: "streaming", provider: "anthropic", model: "claude-sonnet-5" },
+			{ type: "start", phase: "streaming", provider: "github-copilot", model: "cache-fixture" },
 		]);
 		h.warmer.onAgentSettled();
 		h.mode = "off";
@@ -646,12 +529,12 @@ describe("cache warmer lifecycle", () => {
 		expect(h.warmed).toHaveLength(1);
 		expect(h.warmed[0]?.message.usage.cacheRead).toBe(PROMPT_TOKENS);
 		expect(h.refreshes).toEqual([
-			{ type: "start", phase: "streaming", provider: "anthropic", model: "claude-sonnet-5" },
+			{ type: "start", phase: "streaming", provider: "github-copilot", model: "cache-fixture" },
 			{
 				type: "end",
 				phase: "streaming",
-				provider: "anthropic",
-				model: "claude-sonnet-5",
+				provider: "github-copilot",
+				model: "cache-fixture",
 				outcome: "aborted",
 				usage: h.warmed[0]?.message.usage,
 				warmingStopReason: "cache warming disabled",
@@ -678,8 +561,8 @@ describe("cache warmer lifecycle", () => {
 		expect(h.refreshes.at(-1)).toEqual({
 			type: "end",
 			phase: "streaming",
-			provider: "anthropic",
-			model: "claude-sonnet-5",
+			provider: "github-copilot",
+			model: "cache-fixture",
 			outcome: "aborted",
 			warmingStopReason: "cache warming disabled",
 		});
@@ -695,12 +578,12 @@ describe("cache warmer lifecycle", () => {
 		expect(h.replays[0]?.options?.signal?.aborted).toBe(true);
 		expect(h.warmed).toHaveLength(1);
 		expect(h.refreshes).toEqual([
-			{ type: "start", phase: "streaming", provider: "anthropic", model: "claude-sonnet-5" },
+			{ type: "start", phase: "streaming", provider: "github-copilot", model: "cache-fixture" },
 			{
 				type: "end",
 				phase: "streaming",
-				provider: "anthropic",
-				model: "claude-sonnet-5",
+				provider: "github-copilot",
+				model: "cache-fixture",
 				outcome: "aborted",
 				usage: h.warmed[0]?.message.usage,
 			},

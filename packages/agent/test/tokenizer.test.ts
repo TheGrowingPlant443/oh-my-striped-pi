@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "bun:test";
 import type { Api, AssistantMessage, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
-import { convertCodexResponsesMessages } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
 import { convertMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
@@ -204,20 +204,19 @@ describe("countMessage", () => {
 	});
 });
 
-// Ollama chat drops historical assistant thinking even when the stored turn
-// contains it; a false compaction floor can discard most of a usable window.
 describe("Ollama chat history estimate", () => {
 	const model = buildModel({
 		id: "deepseek-v4-flash",
-		name: "DeepSeek V4 Flash",
+		name: "Local DeepSeek V4 Flash",
 		api: "ollama-chat",
-		provider: "ollama-cloud",
-		baseUrl: "https://ollama.com",
+		provider: "ollama",
+		baseUrl: "http://127.0.0.1:11434",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 1_000_000,
 		maxTokens: 8192,
+		compat: { stripThinkingHistory: true },
 	});
 	const turn: AssistantMessage = {
 		role: "assistant",
@@ -239,12 +238,13 @@ describe("Ollama chat history estimate", () => {
 		stopReason: "stop",
 		timestamp: 0,
 	};
-	test("counts foreign thinking demoted into visible Ollama text, without its native signature", () => {
+
+	test("counts foreign thinking demoted to visible text without its signature", () => {
 		const foreign: AssistantMessage = {
 			...turn,
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.6",
 		};
 		const stripping = new Tokenizer(model);
 		const floor = { excludeEncryptedReasoning: true };
@@ -255,14 +255,13 @@ describe("Ollama chat history estimate", () => {
 		expect(replaying.countMessage(foreign, floor)).toBe(estimate);
 	});
 
-	test("counts only replayed content and recounts after the stripping policy changes", () => {
+	test("does not compact on omitted thinking and recounts after replay policy changes", () => {
 		const visible = { ...turn, content: [{ type: "text", text: "Done." }] } satisfies AssistantMessage;
 		const agent = new Agent({ initialState: { model, systemPrompt: [], tools: [], messages: [] } });
 		const floor = { excludeEncryptedReasoning: true };
 		const visibleCount = agent.tokenizer.countMessage(visible);
 		expect(agent.tokenizer.countMessage(turn)).toBe(visibleCount);
 		expect(agent.tokenizer.countMessage(turn, floor)).toBe(visibleCount);
-
 		const replaying = { ...model, compat: { ...model.compat, stripThinkingHistory: false } };
 		expect(agent.tokenizer.countsAlike(replaying)).toBe(false);
 		agent.setModel(replaying);
@@ -290,7 +289,7 @@ describe("chat-completions history estimate", () => {
 			id,
 			name: id,
 			api: "openai-completions",
-			provider: "my-host",
+			provider: "github-copilot",
 			baseUrl: "http://my-server.example:8000/v1",
 			reasoning,
 			input: ["text"],
@@ -413,7 +412,7 @@ describe("countMessage replayed thinking", () => {
 	const VISIBLE_TOKENS = 9;
 	const OUTPUT_TOKENS = 3000;
 
-	function reader(provider: "anthropic" | "openrouter" | "amazon-bedrock" | "google", id: string): Model {
+	function reader(provider: "github-copilot", id: string): Model {
 		const model = getBundledModel(provider, id);
 		if (!model) throw new Error(`missing bundled model ${provider}/${id}`);
 		return model as Model;
@@ -447,21 +446,18 @@ describe("countMessage replayed thinking", () => {
 		};
 	}
 
-	const opus = reader("anthropic", "claude-opus-5-5");
-	const bedrockOpus = reader("amazon-bedrock", "global.anthropic.claude-opus-5-5");
-	const openRouterOpus = reader("openrouter", "~anthropic/claude-opus-latest");
+	const opus = reader("github-copilot", "claude-opus-5.5");
+	const localOpus = { ...opus, api: "local-inference", provider: "local", baseUrl: "http://127.0.0.1:8000" };
 
 	test.each([
-		["on the Claude API", opus, opus, VISIBLE, "toolUse"],
-		["on Bedrock", bedrockOpus, bedrockOpus, VISIBLE, "toolUse"],
+		["on Copilot", opus, opus, VISIBLE, "toolUse"],
 		// Omitted display: no visible thinking, the same reasoning billed.
 		["with its thinking omitted", opus, opus, "", "toolUse"],
-		// The Claude API keeps another model's signature from the same deployment,
-		// and Opus 5.5 reads Opus 5's thinking.
+		// Copilot's Messages wire keeps another Claude model's signed thinking.
 		[
 			"from another Claude model on the same deployment",
 			opus,
-			reader("anthropic", "claude-opus-5"),
+			reader("github-copilot", "claude-opus-5"),
 			VISIBLE,
 			"toolUse",
 		],
@@ -473,19 +469,8 @@ describe("countMessage replayed thinking", () => {
 		expect(new Tokenizer(model).countMessage(signedTurn(from, thinking, SIGNATURE, stop))).toBe(OUTPUT_TOKENS);
 	});
 
-	test.each([
-		// A signature is bound to the deployment that minted it.
-		["a turn from another host", bedrockOpus, opus],
-		// Bedrock binds it to the model too: another model's turn replays as text.
-		[
-			"another Claude model's turn on Bedrock",
-			bedrockOpus,
-			reader("amazon-bedrock", "global.anthropic.claude-opus-5"),
-		],
-		// OpenRouter filters reasoning history out of the request.
-		["a reader that filters reasoning history", openRouterOpus, openRouterOpus],
-	] as const)("charges only the visible blocks for %s, never the signature", (_case, model, from) => {
-		expect(new Tokenizer(model).countMessage(signedTurn(from, VISIBLE, SIGNATURE))).toBe(VISIBLE_TOKENS);
+	test("charges only visible blocks for a turn from another deployment", () => {
+		expect(new Tokenizer(opus).countMessage(signedTurn(localOpus, VISIBLE, SIGNATURE))).toBe(VISIBLE_TOKENS);
 	});
 
 	test("charges only the visible thinking of an aborted turn's final, partly signed block", () => {
@@ -513,9 +498,8 @@ describe("countMessage replayed thinking", () => {
 		expect(tokenizer.countMessage(ranTools)).toBe(OUTPUT_TOKENS);
 	});
 
-	test("charges the reasoning of the latest turn that abandoned its tool calls on the Claude API only", () => {
-		// The Anthropic Messages replay keeps the latest assistant turn
-		// byte-for-byte, signatures included; Bedrock's Converse replay strips them.
+	test("charges the reasoning of the latest turn that abandoned its tool calls on Copilot's Messages wire", () => {
+		// The Messages replay keeps the latest assistant turn byte-for-byte.
 		const toolCall = { type: "toolCall", id: "call-1", name: "read", arguments: { path: "a.ts" } } as const;
 		for (const stop of ["stop", "length"] as const) {
 			const tokenizer = new Tokenizer(opus);
@@ -524,11 +508,6 @@ describe("countMessage replayed thinking", () => {
 			expect(tokenizer.countLatestTurn(turn)).toBe(OUTPUT_TOKENS);
 			// An older position, counted after it, still gets the stripped count.
 			expect(tokenizer.countMessage(turn)).toBe(tokenizer.countMessage(turn, { excludeEncryptedReasoning: true }));
-
-			const bedrock = new Tokenizer(bedrockOpus);
-			const bedrockTurn = signedTurn(bedrockOpus, VISIBLE, SIGNATURE, stop);
-			bedrockTurn.content = [...bedrockTurn.content, toolCall];
-			expect(bedrock.countLatestTurn(bedrockTurn)).toBe(bedrock.countMessage(bedrockTurn));
 		}
 	});
 
@@ -556,7 +535,7 @@ describe("countMessage replayed thinking", () => {
 	});
 
 	test("keeps the compaction floor at the visible blocks of a native Claude replay", () => {
-		const model = reader("anthropic", "claude-opus-5-5");
+		const model = reader("github-copilot", "claude-opus-5.5");
 		const floored = new Tokenizer(model).countMessage(signedTurn(model, VISIBLE, SIGNATURE), {
 			excludeEncryptedReasoning: true,
 		});
@@ -564,19 +543,19 @@ describe("countMessage replayed thinking", () => {
 	});
 
 	test("charges the signature's bytes for a reader whose catalog prices them", () => {
-		const model = reader("google", "gemini-3-pro-preview");
+		const model = reader("github-copilot", "gemini-3-pro-preview");
 		expect(new Tokenizer(model).countMessage(signedTurn(model, VISIBLE, SIGNATURE))).toBe(VISIBLE_TOKENS + 1000);
 	});
 });
 
 // Contract: an assistant turn's native Responses history replays its reasoning
-// items only to the api, model and provider that produced it, and Codex bills
+// items only to the api, model and provider that produced it, and the reader bills
 // each replayed turn at that turn's reported reasoning tokens. The ciphertext
 // is not that price (it runs ~3x larger), and reasoning that is not replayed,
 // or that replay drops with its turn, costs nothing.
 describe("replayed Responses reasoning", () => {
-	const sol = bundledModel<"openai-codex-responses">("openai-codex", "gpt-6.1-sol");
-	const otherCodex = bundledModel<"openai-codex-responses">("openai-codex", "gpt-6-sol");
+	const sol = bundledModel<"openai-responses">("github-copilot", "gpt-6.1-sol");
+	const otherResponses = bundledModel<"openai-responses">("github-copilot", "gpt-6-sol");
 	const REASONING_TOKENS = 5_000;
 	const reasoningItem = { type: "reasoning", id: "rs_1", summary: [], encrypted_content: "e".repeat(16_000) };
 	const callItem = { type: "function_call", call_id: "call_1", name: "read", arguments: '{"path":"a.ts"}' };
@@ -622,42 +601,51 @@ describe("replayed Responses reasoning", () => {
 			timestamp: 0,
 		};
 	}
-	const codexTurn = (payload: AssistantMessage["providerPayload"], signed = true): AssistantMessage =>
+	const responsesHistoryTurn = (payload: AssistantMessage["providerPayload"], signed = true): AssistantMessage =>
 		responsesTurn(sol, payload, [signed ? signedThinking : { type: "thinking", thinking: "" }, toolCall]);
 	const history = (
 		provider: string,
 		items: Array<Record<string, unknown>> = [reasoningItem, callItem],
 	): AssistantMessage["providerPayload"] => ({ type: "openaiResponsesHistory", provider, dt: true, items });
 	const replayed = (provider: string = sol.provider) => history(provider);
-	const visibleTokens = (tokenizer: Tokenizer) => tokenizer.countMessage(codexTurn(undefined, false));
-	/** Reasoning items the real Codex request carries for `turn`. */
+	const visibleTokens = (tokenizer: Tokenizer) => tokenizer.countMessage(responsesHistoryTurn(undefined, false));
+	/** Reasoning items the retained Responses request carries for `turn`. */
 	const wireReasoning = (turn: AssistantMessage) =>
-		convertCodexResponsesMessages(sol, { messages: [turn] }).filter(item => item.type === "reasoning").length;
+		buildResponsesInput({
+			model: sol,
+			context: { messages: [turn] },
+			strictResponsesPairing: true,
+			supportsImageDetailOriginal: false,
+			nativeHistory: { replay: true, filterReasoning: false },
+			includeThinkingSignatures: true,
+		}).filter(item => item.type === "reasoning").length;
 
 	test("charges the turn's reported reasoning tokens, not its ciphertext, to the model it replays to", () => {
 		const tokenizer = new Tokenizer(sol);
 		const expected = visibleTokens(tokenizer) + REASONING_TOKENS;
-		expect(tokenizer.countMessage(codexTurn(replayed()))).toBe(expected);
+		expect(tokenizer.countMessage(responsesHistoryTurn(replayed()))).toBe(expected);
 		// The provider's own count is a token price, so the stored-context floor keeps it too.
-		expect(tokenizer.countMessage(codexTurn(replayed()), floored)).toBe(expected);
+		expect(tokenizer.countMessage(responsesHistoryTurn(replayed()), floored)).toBe(expected);
 	});
 
 	test("charges nothing for reasoning that does not replay to the reader", () => {
 		const tokenizer = new Tokenizer(sol);
 		// Control: the reader that produced the turn is charged.
-		expect(tokenizer.countMessage(codexTurn(replayed()), floored)).toBe(visibleTokens(tokenizer) + REASONING_TOKENS);
+		expect(tokenizer.countMessage(responsesHistoryTurn(replayed()), floored)).toBe(
+			visibleTokens(tokenizer) + REASONING_TOKENS,
+		);
 		// Minted for another provider, or carrying no reasoning item: nothing replays.
-		expect(tokenizer.countMessage(codexTurn(replayed("openai")), floored)).toBe(visibleTokens(tokenizer));
-		expect(tokenizer.countMessage(codexTurn(history(sol.provider, [callItem])), floored)).toBe(
+		expect(tokenizer.countMessage(responsesHistoryTurn(replayed("local")), floored)).toBe(visibleTokens(tokenizer));
+		expect(tokenizer.countMessage(responsesHistoryTurn(history(sol.provider, [callItem])), floored)).toBe(
 			visibleTokens(tokenizer),
 		);
 		// Another model on the same provider gets the turn re-encoded without its reasoning.
-		const other = new Tokenizer(otherCodex);
-		expect(other.countMessage(codexTurn(replayed()), floored)).toBe(visibleTokens(other));
+		const other = new Tokenizer(otherResponses);
+		expect(other.countMessage(responsesHistoryTurn(replayed()), floored)).toBe(visibleTokens(other));
 	});
 
 	test("charges nothing to a reader that filters reasoning history out of its requests", () => {
-		const openai = bundledModel<"openai-responses">("openai", "gpt-6.1-sol");
+		const openai = bundledModel<"openai-responses">("github-copilot", "gpt-6.1-sol");
 		const turn = responsesTurn(openai, history(openai.provider));
 		const visible = (tokenizer: Tokenizer) =>
 			tokenizer.countMessage(responsesTurn(openai, undefined, [{ type: "thinking", thinking: "" }, toolCall]));
@@ -706,20 +694,20 @@ describe("replayed Responses reasoning", () => {
 
 	test("an Agent recounts replayed reasoning after switching to a model it does not replay to", () => {
 		const agent = new Agent({ initialState: { model: sol, systemPrompt: [], tools: [], messages: [] } });
-		const turn = codexTurn(replayed());
+		const turn = responsesHistoryTurn(replayed());
 		expect(agent.tokenizer.countMessage(turn, floored)).toBe(visibleTokens(agent.tokenizer) + REASONING_TOKENS);
-		agent.setModel(otherCodex);
+		agent.setModel(otherResponses);
 		expect(agent.tokenizer.countMessage(turn, floored)).toBe(visibleTokens(agent.tokenizer));
 	});
 
 	test("prices a replayed turn whose backend reported no reasoning tokens at its signature", () => {
-		const unreported = codexTurn(replayed());
+		const unreported = responsesHistoryTurn(replayed());
 		delete unreported.usage.reasoningTokens;
 		// The reasoning item still goes on the wire, so the turn is not free.
 		expect(wireReasoning(unreported)).toBe(1);
 		const tokenizer = new Tokenizer(sol);
 		// Its only price is the ciphertext, counted as a reader that re-encodes the turn counts it.
-		const reencoding = new Tokenizer(otherCodex);
+		const reencoding = new Tokenizer(otherResponses);
 		expect(tokenizer.countMessage(unreported)).toBe(reencoding.countMessage(unreported));
 		expect(tokenizer.countMessage(unreported)).toBeGreaterThan(visibleTokens(tokenizer));
 		expect(tokenizer.countMessage(unreported, floored)).toBe(visibleTokens(tokenizer));
@@ -764,7 +752,7 @@ describe("replayed Responses reasoning", () => {
 	});
 });
 
-function bundledModel<TApi extends Api = Api>(provider: "openai" | "openai-codex", id: string): Model<TApi> {
+function bundledModel<TApi extends Api = Api>(provider: "github-copilot", id: string): Model<TApi> {
 	const model = getBundledModel<TApi>(provider, id);
 	if (!model) throw new Error(`Expected bundled ${provider}/${id}`);
 	return model;

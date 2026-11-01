@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import * as fs from "node:fs/promises";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import {
 	IndexedSessionStorage,
 	type SessionStorageBackend,
@@ -20,6 +19,7 @@ import {
 import { TempDir } from "@oh-my-pi/pi-utils";
 import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import type { SessionTitleUpdate } from "@oh-my-pi/pi-coding-agent/session/session-title-slot";
+import { getTestModel } from "./helpers/model-fixtures";
 
 interface DetachableWriter extends SessionStorageWriter {
 	detach(): void;
@@ -157,8 +157,7 @@ describe("SessionManager atomic rewrite race", () => {
 	it("keeps post-compaction appends on the current JSONL path", async () => {
 		const storage = new DetachingRewriteStorage();
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		sessionManager.appendMessage({
 			role: "assistant",
@@ -272,8 +271,7 @@ describe("SessionManager atomic rewrite race", () => {
 	it("flushSync during an in-flight atomic rewrite durably publishes the exit record", async () => {
 		const storage = new DetachingRewriteStorage();
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		sessionManager.appendMessage({
 			role: "assistant",
@@ -594,8 +592,7 @@ describe("SessionManager atomic rewrite fence spans writer.close()", () => {
 	it("blocks a fresh writer from opening while an in-flight rewrite awaits writer.close()", async () => {
 		const storage = new CloseGatedRewriteStorage();
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		// Seed an assistant message so the session materializes on disk without
 		// opening a persistent writer (cold-path #rewriteSynchronously).
@@ -687,8 +684,7 @@ describe("SessionManager title-change fallback fenced-append durability", () => 
 	it("loops on the dirty flag so fenced appends during the fallback rewrite persist", async () => {
 		const storage = new TitleFallbackPausingStorage();
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		// Materialize the session on disk with a title slot present so a later
 		// setSessionName takes the append-then-updateSessionTitle try branch
@@ -758,8 +754,7 @@ describe("SessionManager fence relaxes when flushSync supersedes the atomic rewr
 	it("routes post-flushSync appends onto the hot path so they land on disk before close()", async () => {
 		const storage = new DetachingRewriteStorage();
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		// Materialize a session on disk so subsequent rewrites are meaningful.
 		sessionManager.appendMessage({
@@ -904,8 +899,7 @@ describe("SessionManager fence handoff across superseded rewrites", () => {
 		const storage = new SequencedRewriteStorage();
 		storage.pauseCount = 2;
 		const sessionManager = SessionManager.create("/cwd", "/sessions", storage);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model");
+		const model = getTestModel("github-copilot");
 
 		sessionManager.appendMessage({
 			role: "assistant",

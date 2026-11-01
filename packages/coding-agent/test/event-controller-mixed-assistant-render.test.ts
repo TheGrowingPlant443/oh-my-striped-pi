@@ -41,9 +41,9 @@ function assistantMessage(content: AssistantMessage["content"]): AssistantMessag
 	return {
 		role: "assistant",
 		content,
-		api: "cursor",
-		provider: "cursor",
-		model: "cursor-model",
+		api: "local-inference",
+		provider: "local",
+		model: "render-model",
 		stopReason: "stop",
 		usage: zeroUsage(),
 		timestamp: 1,
@@ -522,7 +522,7 @@ describe("EventController mixed assistant text/tool rendering", () => {
 		expect(flushed).toContain("GREP_RESULT_2_UNIQUE");
 	});
 
-	for (const arrival of ["early", "buffered"] as const) {
+	for (const arrival of ["early"] as const) {
 		it(`renders inline images from ${arrival} held read results`, async () => {
 			const protocol = Object.getOwnPropertyDescriptor(TERMINAL, "imageProtocol")!;
 			Object.defineProperty(TERMINAL, "imageProtocol", { value: null });
@@ -549,10 +549,6 @@ describe("EventController mixed assistant text/tool rendering", () => {
 					isError: false,
 					timestamp: 1,
 				};
-				if (arrival === "buffered") {
-					ctx.session.agent.getPendingToolResults = () => [result];
-					controller.resetTranscriptAnchors();
-				}
 				await controller.handleEvent({ type: "message_start", message: assistantMessage([]) });
 				if (arrival === "early") {
 					await controller.handleEvent({

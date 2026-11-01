@@ -53,8 +53,8 @@ async function plan(target: SecurityTargetRequest = { kind: "repository" }) {
 			cwd: repositoryRoot,
 			target,
 			outputRoot: stateRoot,
-			model: { provider: "openai-codex", modelId: "gpt-5.6-sol", thinkingLevel: "xhigh" },
-			account: { provider: "openai-codex", credentialId: 17, accountId: "workspace_fixture" },
+			model: { provider: "github-copilot", modelId: "gpt-5.6-sol", thinkingLevel: "xhigh" },
+			account: { provider: "github-copilot", credentialId: 17, accountId: "workspace_fixture" },
 			config: { security: { enabled: true } },
 			workflowFingerprint: "security-reviewer@fixture",
 			createdAt: "2026-07-29T00:00:00.000Z",
@@ -68,8 +68,8 @@ describe("security preflight", () => {
 		const first = await plan();
 		const second = await plan();
 		expect(first.fingerprint).toBe(second.fingerprint);
-		expect(first.account).toEqual({ provider: "openai-codex", credentialId: 17, accountId: "workspace_fixture" });
-		expect(first.model).toEqual({ provider: "openai-codex", modelId: "gpt-5.6-sol", thinkingLevel: "xhigh" });
+		expect(first.account).toEqual({ provider: "github-copilot", credentialId: 17, accountId: "workspace_fixture" });
+		expect(first.model).toEqual({ provider: "github-copilot", modelId: "gpt-5.6-sol", thinkingLevel: "xhigh" });
 	});
 
 	test("rejects an authentication provider that differs from the pinned model", async () => {
@@ -79,8 +79,8 @@ describe("security preflight", () => {
 					cwd: repositoryRoot,
 					target: { kind: "repository" },
 					outputRoot: stateRoot,
-					model: { provider: "amazon-bedrock", modelId: "us.anthropic.claude-opus-4-8" },
-					account: { provider: "bedrock-mantle", api: "openai-responses" },
+					model: { provider: "local", modelId: "qwen2.5-1.5b" },
+					account: { provider: "github-copilot", credentialId: 17 },
 					config: {},
 					workflowFingerprint: "fixture",
 				},
@@ -110,8 +110,8 @@ describe("security preflight", () => {
 				target: { kind: "repository" },
 				knowledgeBasePaths: [kb],
 				outputRoot: stateRoot,
-				model: { provider: "openai-codex", modelId: "gpt-5.6-sol" },
-				account: { provider: "openai-codex", credentialId: 17 },
+				model: { provider: "github-copilot", modelId: "gpt-4o" },
+				account: { provider: "github-copilot", credentialId: 17 },
 				config: {},
 				workflowFingerprint: "fixture",
 			},
@@ -131,8 +131,8 @@ describe("security preflight", () => {
 				target: { kind: "repository" },
 				knowledgeBasePaths: ["policy.md"],
 				outputRoot: stateRoot,
-				model: { provider: "openai-codex", modelId: "fixture" },
-				account: { provider: "openai-codex", credentialId: 17 },
+				model: { provider: "github-copilot", modelId: "gpt-4o" },
+				account: { provider: "github-copilot", credentialId: 17 },
 				config: {},
 				workflowFingerprint: "fixture",
 			},
@@ -183,8 +183,8 @@ describe("security preflight", () => {
 					cwd: repositoryRoot,
 					target: { kind: "repository" },
 					outputRoot: path.join(repositoryRoot, "security-output"),
-					model: { provider: "openai-codex", modelId: "fixture" },
-					account: { provider: "openai-codex", credentialId: 1 },
+					model: { provider: "github-copilot", modelId: "gpt-4o" },
+					account: { provider: "github-copilot", credentialId: 1 },
 					config: {},
 					workflowFingerprint: "fixture",
 				},
@@ -208,8 +208,8 @@ describe("security preflight", () => {
 				target: { kind: "repository" },
 				outputRoot: stateRoot,
 				archiveExisting: true,
-				model: { provider: "openai-codex", modelId: "fixture" },
-				account: { provider: "openai-codex", credentialId: 1 },
+				model: { provider: "github-copilot", modelId: "gpt-4o" },
+				account: { provider: "github-copilot", credentialId: 1 },
 				config: {},
 				workflowFingerprint: "fixture",
 			},

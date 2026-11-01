@@ -378,7 +378,7 @@ directory's `btw-history/` subdirectory. Focused subagent histories use
 are isolated from the main session and siblings. This is local retention
 alongside the session. Even a session containing only
 side questions is made resumable. `--no-session` keeps history in memory only.
-Ordinary transcript export/share does not include these sidecar records.
+Ordinary transcript export does not include these sidecar records.
 
 Each topic uses an OS-backed cross-process lease and a revision check before an
 atomic replacement. Running turns keep their lease until a terminal checkpoint;

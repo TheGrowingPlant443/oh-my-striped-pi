@@ -2,13 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-	AuthStorage,
-	type OAuthCredential,
-	registerOAuthProvider,
-	SqliteAuthCredentialStore,
-	unregisterOAuthProviders,
-} from "@oh-my-pi/pi-ai";
+import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
 import {
 	AuthBrokerClient,
 	type AuthBrokerServerHandle,
@@ -16,9 +10,10 @@ import {
 	startAuthBroker,
 } from "@oh-my-pi/pi-ai/auth-broker";
 import { removeWithRetries } from "../../utils/src/temp";
+import { mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
 
 const DISABLE_CAUSE =
-	'oauth refresh failed: OAuthError: Anthropic token refresh request failed. url=https://api.anthropic.com/v1/oauth/token; body={"error": "invalid_grant", "error_description": "Refresh token expired"}';
+	'oauth refresh failed: OAuthError: token refresh request failed; body={"error": "invalid_grant", "error_description": "Refresh token expired"}';
 
 function mintOAuth(email: string): OAuthCredential {
 	return {
@@ -49,9 +44,9 @@ describe("disabled credential tombstones", () => {
 	});
 
 	test("sqlite store lists identity + cause + disabledAtMs and never token material", async () => {
-		await store!.saveOAuth("anthropic", mintOAuth("dead@example.test"));
-		await store!.saveOAuth("openai-codex", mintOAuth("alive@example.test"));
-		const row = store!.listAuthCredentials("anthropic")[0];
+		await store!.saveOAuth("github-copilot", mintOAuth("dead@example.test"));
+		await store!.saveOAuth("local", mintOAuth("alive@example.test"));
+		const row = store!.listAuthCredentials("github-copilot")[0];
 		await store!.deleteAuthCredential(row.id, DISABLE_CAUSE);
 
 		const all = await storage!.credentials.listDisabled();
@@ -59,7 +54,7 @@ describe("disabled credential tombstones", () => {
 		const summary = all[0];
 		expect(summary).toMatchObject({
 			id: row.id,
-			provider: "anthropic",
+			provider: "github-copilot",
 			type: "oauth",
 			email: "dead@example.test",
 			accountId: "account-dead@example.test",
@@ -72,17 +67,17 @@ describe("disabled credential tombstones", () => {
 		expect(serialized).not.toContain("refresh-dead");
 
 		// Provider filter is exact; a provider with only active rows yields [].
-		expect(await storage!.credentials.listDisabled("anthropic")).toHaveLength(1);
-		expect(await storage!.credentials.listDisabled("openai-codex")).toHaveLength(0);
+		expect(await storage!.credentials.listDisabled("github-copilot")).toHaveLength(1);
+		expect(await storage!.credentials.listDisabled("local")).toHaveLength(0);
 	});
 
 	test("sqlite disable returns false for missing or already-disabled rows without overwriting the tombstone", async () => {
-		await store!.saveOAuth("anthropic", mintOAuth("once@example.test"));
-		const row = store!.listAuthCredentials("anthropic")[0];
+		await store!.saveOAuth("github-copilot", mintOAuth("once@example.test"));
+		const row = store!.listAuthCredentials("github-copilot")[0];
 		expect(await store!.deleteAuthCredential(row.id + 1, "missing")).toBe(false);
 		expect(await store!.deleteAuthCredential(row.id, "original cause")).toBe(true);
 		expect(await store!.deleteAuthCredential(row.id, "later cause")).toBe(false);
-		expect((await store!.listDisabledCredentials("anthropic"))[0]?.cause).toBe("original cause");
+		expect((await store!.listDisabledCredentials("github-copilot"))[0]?.cause).toBe("original cause");
 	});
 
 	test("client maps a broker without the endpoint (404) to an empty list", async () => {
@@ -130,15 +125,15 @@ describe("broker /v1/credentials/disabled round-trip", () => {
 	});
 
 	test("a row disabled on the broker surfaces to remote clients as a tombstone", async () => {
-		await serverStore!.saveOAuth("anthropic", mintOAuth("gone@example.test"));
-		const row = serverStore!.listAuthCredentials("anthropic")[0];
+		await serverStore!.saveOAuth("github-copilot", mintOAuth("gone@example.test"));
+		const row = serverStore!.listAuthCredentials("github-copilot")[0];
 		await serverStore!.deleteAuthCredential(row.id, DISABLE_CAUSE);
 
-		const disabled = await clientStorage!.credentials.listDisabled("anthropic");
+		const disabled = await clientStorage!.credentials.listDisabled("github-copilot");
 		expect(disabled).toHaveLength(1);
 		expect(disabled[0]).toMatchObject({
 			id: row.id,
-			provider: "anthropic",
+			provider: "github-copilot",
 			type: "oauth",
 			email: "gone@example.test",
 			cause: DISABLE_CAUSE,
@@ -150,9 +145,9 @@ describe("broker /v1/credentials/disabled round-trip", () => {
 		// Client connected before this credential existed (e.g. a re-login that
 		// swapped an org-less row for an org-scoped one while a disk-cached
 		// snapshot was still fresh).
-		await serverStore!.saveOAuth("anthropic", { ...mintOAuth("late@example.test"), orgId: "org-late" });
+		await serverStore!.saveOAuth("github-copilot", { ...mintOAuth("late@example.test"), orgId: "org-late" });
 		await clientStorage!.credentials.revalidate();
-		const rows = clientStorage!.credentials.all().anthropic;
+		const rows = clientStorage!.credentials.all()["github-copilot"];
 		const list = Array.isArray(rows) ? rows : [rows];
 		const late = list.find(entry => entry?.type === "oauth" && entry.email === "late@example.test");
 		if (late?.type !== "oauth") throw new Error("expected refreshed oauth credential");
@@ -161,7 +156,7 @@ describe("broker /v1/credentials/disabled round-trip", () => {
 });
 
 describe("OAuth login stamps authorizedAt", () => {
-	const PROVIDER_ID = "test-authorized-at-oauth";
+	const PROVIDER_ID = "github-copilot";
 	let tempDir = "";
 	let store: SqliteAuthCredentialStore | undefined;
 	let storage: AuthStorage | undefined;
@@ -171,7 +166,7 @@ describe("OAuth login stamps authorizedAt", () => {
 		store = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 		storage = new AuthStorage(store);
 		await storage.credentials.reload();
-		registerOAuthProvider({
+		mockOAuthProvider({
 			id: PROVIDER_ID,
 			name: "AuthorizedAt Test",
 			sourceId: "authorized-at-test",
@@ -185,7 +180,7 @@ describe("OAuth login stamps authorizedAt", () => {
 	});
 
 	afterEach(async () => {
-		unregisterOAuthProviders("authorized-at-test");
+		resetOAuthMocks("authorized-at-test");
 		storage?.close();
 		await removeWithRetries(tempDir);
 	});

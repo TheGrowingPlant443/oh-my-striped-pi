@@ -12,7 +12,8 @@ import {
 } from "@oh-my-pi/pi-coding-agent";
 import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
 import type { BashExecutionMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { removeSyncWithRetries, Snowflake, TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 import { rejectionOf } from "./helpers/rejection";
 import { e2eApiKey } from "./utilities";
 
@@ -29,18 +30,19 @@ const isCompactionEntry = (entry: FileEntry): entry is CompactionEntry => entry.
 /**
  * RPC mode tests.
  */
-describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("RPC mode", () => {
+describe.skipIf(!e2eApiKey("COPILOT_GITHUB_TOKEN"))("RPC mode", () => {
 	let client: RpcClient;
 	let sessionDir: string;
 
 	beforeEach(() => {
 		sessionDir = path.join(os.tmpdir(), `omp-rpc-test-${Snowflake.next()}`);
+		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 		client = new RpcClient({
 			cliPath: path.join(import.meta.dir, "..", "dist", "cli.js"),
 			cwd: path.join(import.meta.dir, ".."),
 			env: { PI_CODING_AGENT_DIR: sessionDir },
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: model.provider,
+			model: model.id,
 		});
 	});
 
@@ -56,29 +58,12 @@ describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("RPC mode", () => {
 		const state = await client.getState();
 
 		expect(state.model).toBeDefined();
-		expect(state.model?.provider).toBe("anthropic");
-		expect(state.model?.id).toBe("claude-sonnet-4-5");
+		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
+		expect(state.model?.provider).toBe(model.provider);
+		expect(state.model?.id).toBe(model.id);
 		expect(state.isStreaming).toBe(false);
 		expect(state.messageCount).toBe(0);
 		expect(state.tokensPerSecond).toBeNull();
-	}, 30000);
-
-	test("should set fast mode and expose enabled/active state", async () => {
-		await client.start();
-
-		const enabled = await client.setFastMode(true);
-		expect(enabled).toEqual({ enabled: true, active: true });
-
-		const stateWhileEnabled = await client.getState();
-		expect(stateWhileEnabled.fastModeEnabled).toBe(true);
-		expect(stateWhileEnabled.fastModeActive).toBe(true);
-
-		const disabled = await client.setFastMode(false);
-		expect(disabled).toEqual({ enabled: false, active: false });
-
-		const stateWhileDisabled = await client.getState();
-		expect(stateWhileDisabled.fastModeEnabled).toBe(false);
-		expect(stateWhileDisabled.fastModeActive).toBe(false);
 	}, 30000);
 
 	test("should save messages to session file", async () => {
@@ -314,13 +299,85 @@ describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("RPC mode", () => {
 	}, 90000);
 });
 
-describe("RPC fast mode with unsupported Fireworks model and priority tier", () => {
+test("RPC native fast mode exposes enabled and active state on a private Responses endpoint", async () => {
+	await using temp = await TempDir.create("@rpc-native-fast-");
+	await Bun.write(
+		temp.join("models.yml"),
+		JSON.stringify({
+			providers: {
+				"rpc-native": {
+					api: "openai-responses",
+					baseUrl: "http://127.0.0.1:9/v1",
+					apiKey: "test-key",
+					models: [
+						{
+							id: "gpt-5.2",
+							name: "Private native GPT fixture",
+							reasoning: true,
+							input: ["text", "image"],
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+							contextWindow: 200_000,
+							maxTokens: 8192,
+						},
+					],
+				},
+			},
+		}),
+	);
+	using client = new RpcClient({
+		cliPath: path.join(import.meta.dir, "..", "src", "cli.ts"),
+		cwd: temp.path(),
+		env: {
+			HOME: temp.join("home"),
+			XDG_CONFIG_HOME: temp.join("config"),
+			XDG_DATA_HOME: temp.join("data"),
+			XDG_CACHE_HOME: temp.join("cache"),
+			PI_CODING_AGENT_DIR: temp.path(),
+		},
+		provider: "rpc-native",
+		model: "gpt-5.2",
+		args: ["--no-extensions", "--no-skills", "--no-tools", "--no-session"],
+	});
+	await client.start();
+	expect(await client.setFastMode(true)).toEqual({ enabled: true, active: true });
+	const enabled = await client.getState();
+	expect(enabled.fastModeEnabled).toBe(true);
+	expect(enabled.fastModeActive).toBe(true);
+	expect(await client.setFastMode(false)).toEqual({ enabled: false, active: false });
+	const disabled = await client.getState();
+	expect(disabled.fastModeEnabled).toBe(false);
+	expect(disabled.fastModeActive).toBe(false);
+}, 30000);
+
+describe("RPC fast mode with an unsupported private model", () => {
 	let client: RpcClient;
 	let sessionDir: string;
 
 	beforeEach(async () => {
 		sessionDir = path.join(os.tmpdir(), `omp-rpc-fast-mode-test-${Snowflake.next()}`);
-		await Bun.write(path.join(sessionDir, "config.yml"), ["providers:", "  fireworksTier: priority", ""].join("\n"));
+		await Bun.write(
+			path.join(sessionDir, "models.yml"),
+			JSON.stringify({
+				providers: {
+					"rpc-private": {
+						api: "openai-completions",
+						baseUrl: "http://127.0.0.1:9/v1",
+						apiKey: "test-key",
+						models: [
+							{
+								id: "deepseek-v4-flash",
+								name: "Private DeepSeek fixture",
+								reasoning: true,
+								input: ["text"],
+								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+								contextWindow: 128_000,
+								maxTokens: 8192,
+							},
+						],
+					},
+				},
+			}),
+		);
 		// Startup discovery stays inside the temp dir: the developer's home and this repo's
 		// context, plugins, and model caches are not part of the contract and slow the cold start.
 		client = new RpcClient({
@@ -332,9 +389,8 @@ describe("RPC fast mode with unsupported Fireworks model and priority tier", () 
 				XDG_DATA_HOME: path.join(sessionDir, "data"),
 				XDG_CACHE_HOME: path.join(sessionDir, "cache"),
 				PI_CODING_AGENT_DIR: sessionDir,
-				FIREWORKS_API_KEY: "test-fireworks-key",
 			},
-			provider: "fireworks",
+			provider: "rpc-private",
 			model: "deepseek-v4-flash",
 		});
 	});
@@ -346,7 +402,7 @@ describe("RPC fast mode with unsupported Fireworks model and priority tier", () 
 		}
 	});
 
-	test("rejects enable but disable preserves Fireworks priority activity", async () => {
+	test("rejects enable and disable leaves priority inactive", async () => {
 		await client.start();
 
 		expect(await rejectionOf(client.setFastMode(true))).toMatchObject({
@@ -354,10 +410,10 @@ describe("RPC fast mode with unsupported Fireworks model and priority tier", () 
 		});
 
 		const disabled = await client.setFastMode(false);
-		expect(disabled).toEqual({ enabled: false, active: true });
+		expect(disabled).toEqual({ enabled: false, active: false });
 
 		const state = await client.getState();
 		expect(state.fastModeEnabled).toBe(false);
-		expect(state.fastModeActive).toBe(true);
+		expect(state.fastModeActive).toBe(false);
 	}, 30000);
 });

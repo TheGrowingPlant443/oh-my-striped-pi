@@ -8,7 +8,7 @@ function createErrorMessage(errorMessage: string): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text: "" }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-sonnet-4-5",
 		usage: {
 			input: 0,
@@ -306,7 +306,7 @@ describe("isTextAmbiguousContextOverflow - dual-flag arbitration shared by fallb
 			role: "assistant",
 			content: [],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-sonnet-4-5",
 			stopReason: "error",
 			errorMessage: "request_too_large: image count exceeds the limit of 20",

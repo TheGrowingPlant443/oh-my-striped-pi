@@ -24,7 +24,7 @@ const MODEL_SPEC: ModelSpec<"anthropic-messages"> = {
 	id: "claude-sonnet-4-5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text"],
@@ -80,7 +80,7 @@ async function captureWireBody(
 }
 
 /**
- * Builds one OAuth request and aborts it once the payload is built. `message`
+ * Builds one request and aborts it once the payload is built. `message`
  * is the terminal message; its `requestControls` go on the reply appended for
  * the next turn.
  */
@@ -94,7 +94,6 @@ async function captureTurn(
 	const message = await streamAnthropic(model, context, {
 		apiKey: "sk-ant-api-test",
 		signal: controller.signal,
-		isOAuth: true,
 		sessionId,
 		onPayload: payload => {
 			body = payload as unknown as MessageCreateParams;
@@ -147,7 +146,7 @@ function assistantMessage(text: string, timestamp: number): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-sonnet-4-5",
 		usage: {
 			input: 1,
@@ -375,7 +374,7 @@ describe("anthropic head caching (general API-key path)", () => {
 				role: "assistant",
 				content: [{ type: "toolCall", id: `call-${i}`, name: "lookup", arguments: {} }],
 				api: "anthropic-messages",
-				provider: "anthropic",
+				provider: "github-copilot",
 				model: "claude-sonnet-4-5",
 				usage: {
 					input: 1,
@@ -419,7 +418,7 @@ describe("anthropic head caching (general API-key path)", () => {
 				role: "assistant",
 				content: [{ type: "toolCall", id: `call-${i}`, name: "lookup", arguments: {} }],
 				api: "anthropic-messages",
-				provider: "anthropic",
+				provider: "github-copilot",
 				model: "claude-sonnet-4-5",
 				usage: {
 					input: 1,
@@ -586,7 +585,7 @@ describe("anthropic head caching (general API-key path)", () => {
 			role: "assistant",
 			content: [{ type: "thinking", thinking: "long deliberation", thinkingSignature: "sig-1" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-sonnet-4-5",
 			usage: {
 				input: 1,
@@ -630,42 +629,6 @@ describe("anthropic head caching (general API-key path)", () => {
 		expect(cached).toHaveLength(2);
 	});
 
-	it("skips undecoratable trailing messages so tool-control turns keep a rolling tail breakpoint", async () => {
-		const oAuthModel = buildModel({ ...MODEL_SPEC, id: "claude-fable-5-1", name: "Claude Fable 5.1" });
-		const extra = {
-			name: "extra",
-			description: "Extra tool",
-			parameters: { type: "object", properties: {}, additionalProperties: false },
-		};
-		// Withdrawn `extra` stays declared through `inactiveTools`, so every other turn sends a tool control.
-		const flap = (turn: number): Pick<Context, "tools" | "inactiveTools"> =>
-			turn % 2 === 0
-				? { tools: [...(CONTEXT.tools ?? []), extra] }
-				: { tools: CONTEXT.tools, inactiveTools: [extra] };
-		const captureFlap = (messages: Message[], tools: Pick<Context, "tools" | "inactiveTools">) =>
-			captureTurn(oAuthModel, { systemPrompt: ["You are helpful."], messages, ...tools }, "sess-1");
-		const history: Message[] = [
-			{ role: "user", content: "hello", timestamp: 1 },
-			{ role: "developer", content: "Session policy reminder.", timestamp: 2 },
-		];
-		let flapBody: MessageCreateParams | undefined;
-		for (let turn = 1; turn <= 32; turn++) {
-			const flapTurn = await captureFlap([...history], flap(turn));
-			flapBody = flapTurn.body;
-			history.push({
-				...assistantMessage(`answer ${turn}`, turn * 2 + 10),
-				requestControls: flapTurn.message.requestControls,
-			});
-			history.push({ role: "user", content: `question ${turn}`, timestamp: turn * 2 + 11 });
-		}
-		if (!flapBody) throw new Error("wire body was not captured");
-		expect(countCacheBreakpoints(flapBody)).toBeLessThanOrEqual(4);
-		const flapCached = findCachedMessageIndices(flapBody);
-		const last = (flapBody.messages?.length ?? 0) - 1;
-		expect(flapCached).toContain(last - 1);
-		expect(flapCached).not.toContain(last);
-	});
-
 	it("allocates additional decimation checkpoints when head breakpoints are absent", async () => {
 		const messages: Message[] = [];
 		for (let i = 1; i <= 35; i++) {
@@ -706,11 +669,7 @@ describe("anthropic head caching (general API-key path)", () => {
 			{ role: "user", content: "again", timestamp: 3 },
 		]);
 		expect(countCacheBreakpoints(after)).toBeLessThanOrEqual(4);
-		// The boundary breakpoint sits on the last stable block: with 2 OAuth
-		// identity blocks + 2 stable prompt blocks + 1 recall suffix, the
-		// anchor is index 3. The pre-decorated identity block (index 1) loses
-		// its breakpoint so the head stays at tool + system and both rolling
-		// message breakpoints survive.
+		// Keep the system breakpoint on the stable caller prompt before the volatile recall.
 		const systemAfter = textSystemBlocks(after);
 		const cachedSystem = systemAfter
 			.map((block, index) => ("cache_control" in block && block.cache_control != null ? index : -1))
@@ -748,7 +707,7 @@ describe("anthropic head caching (general API-key path)", () => {
 		expect(second[0]).toEqual(first[0]);
 	});
 
-	it("spends the OAuth system breakpoint on the last system block without taking one from the messages", async () => {
+	it("spends the system breakpoint on the last system block without taking one from the messages", async () => {
 		const oAuthModel = buildModel({ ...MODEL_SPEC, id: "claude-opus-5", name: "Claude Opus 5" });
 		const { body } = await captureTurn(
 			oAuthModel,
@@ -763,9 +722,7 @@ describe("anthropic head caching (general API-key path)", () => {
 			},
 			"sess-oauth-anchor",
 		);
-		// 2 OAuth identity blocks + 2 caller prompt blocks. The only system
-		// breakpoint is on the last block, so a message-prefix miss still reads
-		// tools + the whole system prompt from cache.
+		// Cache the entire caller prompt so a message-prefix miss still reuses the head.
 		const system = textSystemBlocks(body);
 		const cachedSystem = system
 			.map((block, index) => ("cache_control" in block && block.cache_control != null ? index : -1))

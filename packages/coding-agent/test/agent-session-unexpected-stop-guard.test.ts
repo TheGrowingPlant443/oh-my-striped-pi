@@ -3,7 +3,7 @@ import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import * as ai from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { getTestModel } from "./helpers/model-fixtures";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -24,7 +24,7 @@ type SettingsOverrides = Record<string, unknown>;
 const activeHarnesses: Harness[] = [];
 const sharedAuthStorage = createInMemoryAuthStorage();
 sharedAuthStorage.keys.setRuntime("mock", "test-key");
-sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 const sharedModelRegistry = new ModelRegistry(sharedAuthStorage);
 
 afterAll(() => {
@@ -88,7 +88,7 @@ async function createHarness(
 		"retry.fallbackChains": { judge: [] },
 	});
 
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5") ?? mock;
+	const model = getTestModel("github-copilot", candidate => candidate.id === "claude-sonnet-4.5");
 	const sessionManager = SessionManager.inMemory(tempDir.path());
 	const tools = [recordTool as AgentTool];
 	const agent = new Agent({

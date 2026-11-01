@@ -16,7 +16,7 @@ export function authProviders(): readonly CompiledAuthProvider[] {
 
 /** The compiled auth policy for one provider id, if declared. */
 export function authPolicyFor(provider: string): CompiledAuthProvider | undefined {
-	return byId[provider];
+	return Object.hasOwn(byId, provider) ? byId[provider] : undefined;
 }
 
 /** Every hook name referenced anywhere in the auth stratum, for registry completeness checks. */

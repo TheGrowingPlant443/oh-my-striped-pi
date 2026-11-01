@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import {
-	buildTransformedCodexRequestBody,
-	convertOpenAICodexResponsesTools as convertCodexTools,
-	normalizeCodexToolChoice,
-} from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
-import {
 	buildParams,
 	convertTools,
 	mapOpenAIResponsesToolChoiceForTools,
@@ -35,8 +30,8 @@ function makeModel(overrides: Partial<ModelSpec<"openai-responses">> = {}): Mode
 		id: "gpt-5",
 		name: "GPT-5",
 		api: "openai-responses",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -44,22 +39,6 @@ function makeModel(overrides: Partial<ModelSpec<"openai-responses">> = {}): Mode
 		maxTokens: 128000,
 		...overrides,
 	} as ModelSpec<"openai-responses">);
-}
-
-function makeCodexModel(overrides: Partial<ModelSpec<"openai-codex-responses">> = {}): Model<"openai-codex-responses"> {
-	return buildModel({
-		id: "gpt-5",
-		name: "GPT-5",
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		baseUrl: "https://chatgpt.com/backend-api",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 272000,
-		maxTokens: 128000,
-		...overrides,
-	} as ModelSpec<"openai-codex-responses">);
 }
 
 const editTool: Tool = {
@@ -123,40 +102,14 @@ describe("supportsFreeformApplyPatch", () => {
 				makeModel({ id: "gpt-4", baseUrl: "https://proxy.example/", applyPatchToolType: "freeform" }),
 			),
 		).toBe(true);
-		expect(supportsFreeformApplyPatch(makeModel({ id: "gpt-4", baseUrl: "https://api.openai.com/v1" }))).toBe(false);
+		expect(supportsFreeformApplyPatch(makeModel({ id: "gpt-4", baseUrl: "https://api.githubcopilot.com" }))).toBe(
+			false,
+		);
 	});
 });
 
 describe("convertTools: freeform emission", () => {
 	const freeformModel = makeModel({ applyPatchToolType: "freeform" });
-
-	test("muse-code keeps the edit tool a function — api.meta.ai/v1 rejects custom tools", () => {
-		// Verified 2026-09-05: POST /v1/responses with a `custom` tool 400s with
-		// "`custom` tools are not supported on this endpoint" on muse-code; the
-		// same model as a function tool returns 200. The catalog must not re-add
-		// apply-patch-tool-type "freeform" for this provider.
-		const museSpec = {
-			id: "muse-spark-1.3-contributor",
-			name: "Muse Spark 1.3 (C)",
-			api: "openai-responses",
-			baseUrl: "https://api.meta.ai/v1",
-			reasoning: true,
-			input: ["text", "image"],
-			cost: { input: 0.1, output: 0.2, cacheRead: 0.002, cacheWrite: 0 },
-			contextWindow: 1_048_576,
-			maxTokens: 131_072,
-		};
-		const muse = buildModel({ ...museSpec, provider: "muse-code" } as ModelSpec<"openai-responses">);
-		expect(supportsFreeformApplyPatch(muse)).toBe(false);
-		const [out] = convertTools([editTool], false, muse) as unknown as Array<Record<string, unknown>>;
-		expect(out.type).toBe("function");
-
-		// Same model id on the direct Meta API key provider is also function.
-		const meta = buildModel({ ...museSpec, provider: "meta" } as ModelSpec<"openai-responses">);
-		expect(supportsFreeformApplyPatch(meta)).toBe(false);
-		const [functionOut] = convertTools([editTool], false, meta) as unknown as Array<Record<string, unknown>>;
-		expect(functionOut.type).toBe("function");
-	});
 
 	test("edit tool with customFormat becomes a custom grammar tool", () => {
 		const [out] = convertTools([editTool], false, freeformModel) as unknown as Array<Record<string, unknown>>;
@@ -254,19 +207,6 @@ describe("tool choice mapping: freeform emission", () => {
 			name: "read_file",
 		});
 	});
-
-	test("codex backend forced internal edit choice targets custom wire name", () => {
-		expect(
-			normalizeCodexToolChoice(
-				{ type: "tool", name: "edit" },
-				[editTool],
-				makeCodexModel({ applyPatchToolType: "freeform" }),
-			),
-		).toEqual({
-			type: "custom",
-			name: "apply_patch",
-		});
-	});
 });
 
 describe("request params: freeform custom tools", () => {
@@ -275,17 +215,6 @@ describe("request params: freeform custom tools", () => {
 			makeModel({ applyPatchToolType: "freeform" }),
 			{ messages: [{ role: "user", content: "edit", timestamp: 0 }], tools: [editTool] },
 			undefined,
-			undefined,
-		);
-
-		expect(hasCustomTool(params.tools)).toBe(true);
-		expect(params.parallel_tool_calls).toBeUndefined();
-	});
-
-	test("codex responses leaves parallel tool calls unset for custom tools", async () => {
-		const params = await buildTransformedCodexRequestBody(
-			makeCodexModel({ applyPatchToolType: "freeform" }),
-			{ messages: [{ role: "user", content: "edit", timestamp: 0 }], tools: [editTool] },
 			undefined,
 		);
 
@@ -304,7 +233,7 @@ describe("custom_tool_call stream receive", () => {
 			role: "assistant",
 			content: [],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -355,7 +284,7 @@ describe("custom_tool_call stream receive", () => {
 			role: "assistant",
 			content: [],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -412,7 +341,7 @@ describe("custom_tool_call stream receive", () => {
 			role: "assistant",
 			content: [],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -500,7 +429,7 @@ describe("custom_tool_call stream receive", () => {
 			role: "assistant",
 			content: [],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -557,20 +486,6 @@ describe("custom_tool_call stream receive", () => {
 	});
 });
 
-describe("codex-backend convertTools (chatgpt.com/backend-api)", () => {
-	test("wire shape matches direct-OpenAI convertTools (single serializer contract)", () => {
-		const [codexOut] = convertCodexTools([editTool], makeCodexModel({ applyPatchToolType: "freeform" }));
-		const [openaiOut] = convertTools([editTool], false, makeModel({ applyPatchToolType: "freeform" }));
-		expect(codexOut).toEqual(openaiOut as unknown as typeof codexOut);
-	});
-
-	test("falls back to function tool when flag is absent", () => {
-		const [out] = convertCodexTools([editTool], makeCodexModel({ id: "gpt-4" }));
-		expect(out.type).toBe("function");
-		expect(out.name).toBe("edit");
-	});
-});
-
 describe("history replay: custom_tool_call round-trip", () => {
 	test("assistant tool-call block without replayed reasoning omits custom_tool_call item id", () => {
 		const assistantMsg: AssistantMessage = {
@@ -585,7 +500,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -629,7 +544,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -664,7 +579,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -703,7 +618,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -736,7 +651,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -773,7 +688,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {
@@ -807,7 +722,7 @@ describe("history replay: custom_tool_call round-trip", () => {
 				},
 			],
 			timestamp: Date.now(),
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			api: "openai-responses",
 			usage: {

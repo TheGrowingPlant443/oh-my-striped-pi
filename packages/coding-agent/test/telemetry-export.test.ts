@@ -157,11 +157,10 @@ describe("initTelemetryExport signals export path", () => {
 });
 
 describe("estimateProviderCost", () => {
-	// A Codex subscription request: OTel labels the provider `openai`, and the
-	// response may name a served model rather than the requested one.
+	// A Copilot response may name a served model rather than the requested one.
 	const context: CostEstimatorContext = {
-		provider: "openai",
-		providerId: "openai-codex",
+		provider: "github-copilot",
+		providerId: "github-copilot",
 		model: "served-model",
 		modelId: "requested-model",
 		serviceTier: undefined,
@@ -179,7 +178,7 @@ describe("estimateProviderCost", () => {
 	it("reports the request's computed cost when the requested model has known pricing", () => {
 		const result = estimateProviderCost(
 			context,
-			(providerId, modelId) => providerId === "openai-codex" && modelId === "requested-model",
+			(providerId, modelId) => providerId === "github-copilot" && modelId === "requested-model",
 		);
 
 		expect(result).toEqual({ usd: 1.1, inputUsd: 0.2, outputUsd: 0.8 });

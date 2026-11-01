@@ -56,7 +56,7 @@ describe("createAgentSession auto-learn tool activation", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getBundledModel("github-copilot", "claude-sonnet-4.6"),
 			...noDiscoveryOptions(),
 			toolNames: ["read"],
 		});
@@ -80,17 +80,17 @@ describe("createAgentSession auto-learn tool activation", () => {
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({
 				"autolearn.enabled": true,
-				"memory.backend": "hindsight",
-				"hindsight.apiUrl": "http://127.0.0.1:1",
-				"hindsight.mentalModelsEnabled": false,
+				"memory.backend": "mnemopi",
+				"mnemopi.noEmbeddings": true,
+				"mnemopi.llmMode": "none",
 			}),
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getBundledModel("github-copilot", "claude-sonnet-4.6"),
 			...noDiscoveryOptions(),
 			toolNames: ["read"],
 		});
 		sessions.push(session);
 
-		expect(session.getHindsightSessionState()).toBeDefined();
+		expect(session.getMnemopiSessionState()).toBeDefined();
 	});
 
 	it("omits manage_skill from a restricted session when auto-learn is off", async () => {
@@ -106,7 +106,7 @@ describe("createAgentSession auto-learn tool activation", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "checkpoint.enabled": true }),
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getBundledModel("github-copilot", "claude-sonnet-4.6"),
 			...noDiscoveryOptions(),
 			toolNames: ["rewind"],
 			requireYieldTool: true,
@@ -124,7 +124,7 @@ describe("createAgentSession auto-learn tool activation", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings: Settings.isolated({ "checkpoint.enabled": true }),
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getBundledModel("github-copilot", "claude-sonnet-4.6"),
 			...noDiscoveryOptions(),
 			toolNames: ["checkpoint"],
 			requireYieldTool: true,

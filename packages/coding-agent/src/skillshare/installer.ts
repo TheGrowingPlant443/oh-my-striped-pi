@@ -638,15 +638,12 @@ const CLI_HOOKS: SkillInstallHooks = {
 };
 
 async function withClient(run: (client: SkillshareClient) => Promise<number>): Promise<number> {
-	let client: SkillshareClient | undefined;
 	try {
-		client = await SkillshareClient.create();
+		const client = await SkillshareClient.create();
 		return await run(client);
 	} catch (error) {
 		process.stderr.write(`${chalk.red("error")} ${describeError(error)}\n`);
 		return 1;
-	} finally {
-		client?.close();
 	}
 }
 

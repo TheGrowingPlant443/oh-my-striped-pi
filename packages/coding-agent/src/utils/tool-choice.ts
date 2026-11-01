@@ -8,33 +8,17 @@ import type { Api, Model, ToolChoice } from "@oh-my-pi/pi-ai";
 export function buildNamedToolChoice(toolName: string, model?: Model<Api>): ToolChoice | undefined {
 	if (!model) return undefined;
 
-	if (model.api === "anthropic-messages" || model.api === "bedrock-converse-stream") {
+	if (model.api === "anthropic-messages") {
 		return { type: "tool", name: toolName };
 	}
 
-	// openrouter streams through the openai-responses or openai-completions path
-	// (stream.ts), both of which map a named function choice onto the wire.
-	if (
-		model.api === "openai-codex-responses" ||
-		model.api === "openai-responses" ||
-		model.api === "openai-completions" ||
-		model.api === "azure-openai-responses" ||
-		model.api === "openrouter"
-	) {
+	if (model.api === "openai-responses" || model.api === "openai-completions") {
 		// Both OpenAI transports drop tool_choice when the model has none and turn a
 		// forced choice into "auto" when forcing is unsupported. Such a choice never
 		// reaches the wire, so it must not be reported as a forced one.
 		const compat = model.compat as { supportsToolChoice?: boolean; supportsForcedToolChoice?: boolean };
 		if (compat?.supportsToolChoice === false || compat?.supportsForcedToolChoice === false) return undefined;
 		return { type: "function", name: toolName };
-	}
-
-	if (model.api === "ollama-chat") {
-		return { type: "function", name: toolName };
-	}
-
-	if (model.api === "google-generative-ai" || model.api === "google-gemini-cli" || model.api === "google-vertex") {
-		return "required";
 	}
 
 	return undefined;

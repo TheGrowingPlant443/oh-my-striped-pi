@@ -153,6 +153,16 @@ describe("/mcp reauth (ACP dispatcher)", () => {
 		);
 	}
 
+	test.each(["smithery-search filesystem", "smithery-login", "smithery-logout"])(
+		"does not perform cloud registry operations for removed command %s",
+		async args => {
+			const request = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Unexpected registry request"));
+			await handleMcpAcp({ args } as ParsedSlashCommand, makeRuntime(freshAuthStorage()));
+			expect(request).not.toHaveBeenCalled();
+			expect(outputs.join("\n")).toContain("Unknown /mcp subcommand");
+		},
+	);
+
 	beforeEach(async () => {
 		outputs.length = 0;
 		outputWaiters.length = 0;

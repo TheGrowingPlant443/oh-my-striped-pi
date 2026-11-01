@@ -22,18 +22,28 @@ import { buildModel } from "@oh-my-pi/pi-catalog/build";
  */
 const REASONING = "The user wants the Paris weather; I will call get_weather with city=Paris.";
 
-function makeModel<T extends Api>(api: T, provider: string, id: string): Model<T> {
+function makeModel<T extends Api>(api: T, id: string): Model<T> {
 	return buildModel({
 		id,
 		name: id,
 		api,
-		provider,
-		baseUrl: "",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		maxTokens: 8_192,
 		contextWindow: 200_000,
 		reasoning: true,
+		compat:
+			api === "anthropic-messages"
+				? { replayUnsignedThinking: false }
+				: api === "openai-completions"
+					? {
+							thinkingFormat: "openai",
+							replayReasoningContent: false,
+							requiresReasoningContentForToolCalls: false,
+						}
+					: { filterReasoningHistory: false },
 	} as ModelSpec<T>);
 }
 
@@ -50,7 +60,7 @@ function anthropicThinkingTurn(): AssistantMessage {
 			{ type: "text", text: "Checking the forecast." },
 		],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "claude-opus-4-8",
 		usage: {
 			input: 0,
@@ -69,8 +79,8 @@ function anthropicThinkingTurn(): AssistantMessage {
 function geminiThinkingTurn(): AssistantMessage {
 	return {
 		...anthropicThinkingTurn(),
-		api: "google-generative-ai",
-		provider: "google",
+		api: "openai-completions",
+		provider: "github-copilot",
 		model: "gemini-3-pro-preview",
 		content: [
 			{ type: "thinking", thinking: REASONING, thinkingSignature: "google-sig" },
@@ -88,7 +98,7 @@ function transformedAssistant(messages: Message[], target: Model<Api>): Assistan
 
 describe("transformMessages cross-provider thinking demotion → canonical dialect", () => {
 	it("renders Anthropic reasoning as a Gemini ```thinking fence when switching to a Gemini target", () => {
-		const gemini = makeModel("google-generative-ai", "google", "gemini-3-pro-preview");
+		const gemini = makeModel("openai-completions", "gemini-3-pro-preview");
 		const assistant = transformedAssistant([user("weather in Paris?"), anthropicThinkingTurn()], gemini);
 
 		// No native thinking block survives the cross-provider hop.
@@ -114,7 +124,7 @@ describe("transformMessages cross-provider thinking demotion → canonical diale
 		// renderThinking emits `<|channel|>` control tokens. Those MUST NOT leak
 		// into structured history — demotion falls back to a neutral `<think>`
 		// block instead, while still preserving the reasoning.
-		const gpt = makeModel("openai-responses", "openai", "gpt-5");
+		const gpt = makeModel("openai-responses", "gpt-5");
 		const assistant = transformedAssistant([user("weather in Paris?"), anthropicThinkingTurn()], gpt);
 
 		const first = assistant.content[0];
@@ -151,7 +161,7 @@ describe("transformMessages cross-provider thinking demotion → canonical diale
 		] as const;
 
 		for (const target of targets) {
-			const model = makeModel("anthropic-messages", "anthropic", target.id);
+			const model = makeModel("anthropic-messages", target.id);
 			const assistant = transformedAssistant(
 				[user(`weather in Paris for ${target.name}?`), geminiThinkingTurn()],
 				model,
@@ -177,7 +187,7 @@ describe("transformMessages cross-provider thinking demotion → canonical diale
 	});
 
 	it("trims a demoted block that becomes final after following empty thinking blocks are dropped", () => {
-		const claude = makeModel("anthropic-messages", "anthropic", "claude-sonnet-4-6");
+		const claude = makeModel("anthropic-messages", "claude-sonnet-4-6");
 		const turn: AssistantMessage = {
 			...geminiThinkingTurn(),
 			content: [
@@ -197,7 +207,7 @@ describe("transformMessages cross-provider thinking demotion → canonical diale
 	});
 
 	it("trimEnds trailing whitespace already present in bare Anthropic-dialect demoted thinking", () => {
-		const claude = makeModel("anthropic-messages", "anthropic", "claude-sonnet-4-6");
+		const claude = makeModel("anthropic-messages", "claude-sonnet-4-6");
 		const reasoningWithTrailingWhitespace = "The plan is complete.\n \t";
 		const turn: AssistantMessage = {
 			...geminiThinkingTurn(),
@@ -221,12 +231,12 @@ describe("transformMessages cross-provider thinking demotion → canonical diale
 	});
 
 	it("keeps the native thinking block for a same-provider/same-model continuation", () => {
-		const gemini = makeModel("google-generative-ai", "google", "gemini-3-pro-preview");
+		const gemini = makeModel("openai-completions", "gemini-3-pro-preview");
 		const sameModelTurn: AssistantMessage = {
 			...anthropicThinkingTurn(),
 			content: [{ type: "thinking", thinking: REASONING, thinkingSignature: "g-sig" }],
-			api: "google-generative-ai",
-			provider: "google",
+			api: "openai-completions",
+			provider: "github-copilot",
 			model: "gemini-3-pro-preview",
 		};
 		const assistant = transformedAssistant([user("weather in Paris?"), sameModelTurn], gemini);

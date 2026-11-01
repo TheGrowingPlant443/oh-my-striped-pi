@@ -2,6 +2,8 @@
 
 This document covers the on-device models in the `local` catalog and records the tiny-model experiments behind the shipped title and memory recommendations. Model selection is role-based: use `modelRoles.<role>` for the primary selector and `retry.fallbackChains.<role>` for ordered alternatives. Catalog entries are authored in `packages/catalog/src/compat/rules/providers/local.kdl`; text model exports live in `packages/coding-agent/src/tiny/models.ts`. Benchmark timings below are historical measurements, not current-runtime guarantees.
 
+The `local` identity covers built-in tiny text, TTS and STT workers. Self-hosted Ollama, llama.cpp, LM Studio, vLLM and LiteLLM, plus on-device Apple Foundation Models, remain separate integrations; see [Providers](./providers.md). Use a suitable self-hosted model for full coding-session workloads. Unknown explicit selectors are not silently redirected to Copilot.
+
 ```yaml
 modelRoles:
    tiny: local/lfm2.5-230m
@@ -190,7 +192,7 @@ backend on Apple silicon (`providers.tinyModelDevice: mlx` or `PI_TINY_DEVICE=ml
 Of the runnable options, `lfm2-1.2b` loads fastest and is a solid all-rounder; nothing selects it automatically.
 `gemma-3-1b` favors consolidation quality, while `qwen2.5-1.5b` favors fine-grained extraction.
 
-**Configured local options**: `llama3.2:3b`, `qwen3-1.7b` (ONNX-disabled as described above),
+**Configured local options**: `qwen3-1.7b` (ONNX-disabled as described above),
 `gemma-3-1b`, `qwen2.5-1.5b`, `lfm2-1.2b`.
 When `modelRoles.memory` is unset, it resolves through the effective `tiny` role and then the built-in smol priority list; no local weights are downloaded automatically.
 
@@ -237,5 +239,5 @@ In Tern, click the microphone beside Send, speak when **Recording · Stop** appe
 - Local tiny inference for title, memory, or judgment workloads is selected with a `local/<model-id>` role assignment. An unset `tiny` role stays on its online default; an unset `memory` role follows the effective `tiny` role and can therefore become local when `tiny` is local. Unset `speech` and `dictation` roles use their own built-in priority lists, whose first candidates are local.
 - Local inference runs **in a worker** (off the main thread); weights are downloaded only when a local candidate is used or explicitly prefetched with `omp tiny-models` or `omp setup speech`, then cached on disk.
 - Session-title generation uses `modelRoles.tiny`; Mnemopi extraction and consolidation use `modelRoles.memory` when its LLM mode is enabled. Their distinct prompts and benchmark groups do not impose separate runtime model types.
-- Auto-thinking, Smart unexpected-stop detection, typed Eval judgments, and AI-assisted git staging use the `judge` role. Assign `typesafe/jev-1.14.0` for TypeSafe or a compatible local tiny model for on-device judgment; order alternatives under `retry.fallbackChains.judge`.
-- Managed memory extraction uses the shared line-format, small-talk-guarded system prompt on both local and online transports. A local primary additionally selects the local consolidation prompt. Explicit external Mnemopi endpoints remain authoritative instead of being replaced by the memory role.
+- Auto-thinking, Smart unexpected-stop detection, typed Eval judgments, and AI-assisted git staging use the `judge` role. Assign a compatible local tiny model for on-device judgment or a Copilot chat model; order alternatives under `retry.fallbackChains.judge`.
+- Managed memory extraction uses the shared line-format, small-talk-guarded system prompt. A local primary additionally selects the local consolidation prompt. Local Sharpshooter, self-hosted Hindsight and explicitly configured in-house Mnemopi endpoints remain available; configured services control their own upstream behavior.

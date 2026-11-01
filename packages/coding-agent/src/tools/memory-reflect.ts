@@ -1,8 +1,8 @@
 import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import { logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
-import { isHindsightConfigured, loadHindsightConfig } from "../hindsight/config";
 import { ensureBankExists } from "../hindsight/bank";
+import { isHindsightConfigured, loadHindsightConfig } from "../hindsight/config";
 import reflectDescription from "../prompts/tools/reflect.md" with { type: "text" };
 import { sessionMemoryToolRefs } from "../memory-backend/tool-names";
 import type { ToolSession } from ".";
@@ -34,7 +34,7 @@ export class MemoryReflectTool implements AgentTool<typeof memoryReflectSchema> 
 
 	static createIf(session: ToolSession): MemoryReflectTool | null {
 		const backend = cfgMemoryBackend.get(session.settings);
-		if (backend !== "hindsight" && backend !== "mnemopi") return null;
+		if (backend !== "mnemopi" && backend !== "hindsight") return null;
 		if (backend === "hindsight" && !isHindsightConfigured(loadHindsightConfig(session.settings))) return null;
 		return new MemoryReflectTool(session);
 	}
@@ -70,11 +70,9 @@ export class MemoryReflectTool implements AgentTool<typeof memoryReflectSchema> 
 				}
 			}
 
+			if (backend !== "hindsight") throw new Error("No reflective memory backend is active for this session.");
 			const state = this.session.getHindsightSessionState?.();
-			if (!state) {
-				throw new Error("Hindsight backend is not initialised for this session.");
-			}
-
+			if (!state) throw new Error("Hindsight backend is not initialised for this session.");
 			try {
 				await ensureBankExists(state.client, state.bankId, state.config, state.banksSet);
 				const response = await state.client.reflect(state.bankId, params.query, {
@@ -82,10 +80,12 @@ export class MemoryReflectTool implements AgentTool<typeof memoryReflectSchema> 
 					budget: state.config.recallBudget,
 					tags: state.recallTags,
 					tagsMatch: state.recallTagsMatch,
+					signal,
 				});
-				const text = response.text?.trim() || "No relevant information found to reflect on.";
 				return {
-					content: [{ type: "text", text }],
+					content: [
+						{ type: "text", text: response.text?.trim() || "No relevant information found to reflect on." },
+					],
 					details: {},
 				};
 			} catch (err) {

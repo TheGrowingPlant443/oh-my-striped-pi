@@ -3,7 +3,7 @@ import type { Tool, UsageLimit, UsageReport } from "@oh-my-pi/pi-ai";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
 import type { JobWidgetEntry } from "../tools/job-widget";
 import type { CompactionBoundaries } from "./context-usage";
-import type { StatusLineSettings, StatusResetExpiry } from "./types";
+import type { StatusLineSettings } from "./types";
 
 export interface StatusAccountIdentity {
 	accountId?: string;
@@ -56,8 +56,6 @@ export interface StatusLineSession {
 	getContextUsage(): { tokens: number; contextWindow: number; percent: number | null } | undefined;
 	autoResolvedThinkingLevel(): string | undefined;
 	isFastModeActive(): boolean;
-	/** Anthropic usage-limit label (`limit reached · wrapping up · resets 14:30`, `low priority until 14:30 · 62% left`). */
-	getAnthropicSlowModeLabel?(): string | undefined;
 	getPrewalkState?(): unknown;
 	getAsyncJobSnapshot(): { running: readonly { type: string; agentId?: string }[] } | null | undefined;
 	/** Widgets of the running background jobs, in job order; the jobs segment appends the freshest one's glance. */
@@ -89,7 +87,6 @@ export interface FooterSession {
 export interface StatusLineHost<TSession extends StatusLineSession = StatusLineSession> {
 	getSettings(): StatusLineSettings;
 	gitEnabled(): boolean;
-	codexResetFireworksEnabled(): boolean;
 	getSettingsRevision(): number;
 	getSessionSettingsIdentity(session: TSession): unknown;
 	getSessionSettingsRevision(session: TSession): number;
@@ -101,13 +98,6 @@ export interface StatusLineHost<TSession extends StatusLineSession = StatusLineS
 	lookupPullRequest(cwd: string): Promise<{ stdout: string; exitCode: number }>;
 	calculateTokensPerSecond(messages: readonly AgentMessage[], isStreaming: boolean): number | null;
 	limitMatchesActiveAccount(report: UsageReport, limit: UsageLimit, identity: StatusAccountIdentity): boolean;
-	classifyResetExpiry?(report: UsageReport, nowMs: number): StatusResetExpiry | undefined;
-	/**
-	 * One-line warning for saved resets anywhere in the pool that are about to expire.
-	 * The host owns deduplication: a returned warning counts as shown, so each saved
-	 * reset is warned about once, not once per refresh or conversation.
-	 */
-	resetExpiryNotice?(session: TSession, reports: readonly UsageReport[], nowMs: number): string | undefined;
 	computeCompactionBoundaries(session: TSession, contextWindow: number, model?: Model): CompactionBoundaries | null;
 }
 

@@ -1,12 +1,15 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
 import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
 import * as envApiKey from "@oh-my-pi/pi-ai/env-api-key";
-import { serializeAlibabaTokenPlanCredential } from "@oh-my-pi/pi-catalog/wire/alibaba-token-plan";
 import { removeWithRetries } from "../../utils/src/temp";
 
 function countCredentialRows(dbPath: string, provider: string): number {
@@ -44,14 +47,18 @@ describe("AuthStorage api-key login upsert", () => {
 	let dbPath = "";
 	let store: SqliteAuthCredentialStore | null = null;
 	let authStorage: AuthStorage | null = null;
-	let getEnvApiKeySpy: Mock<typeof envApiKey.getEnvApiKey>;
 
 	beforeEach(async () => {
-		getEnvApiKeySpy = vi.spyOn(envApiKey, "getEnvApiKey").mockReturnValue(undefined);
+		vi.spyOn(envApiKey, "getEnvApiKey").mockReturnValue(undefined);
 		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-ai-auth-api-key-login-"));
 		dbPath = path.join(tempDir, "agent.db");
 		store = await SqliteAuthCredentialStore.open(dbPath);
 		authStorage = new AuthStorage(store);
+		mockOAuthProvider({
+			id: "github-copilot",
+			name: "API-key persistence fixture",
+			login: callbacks => callbacks.onPrompt({ message: "API key" }),
+		});
 	});
 
 	afterEach(async () => {
@@ -74,11 +81,11 @@ describe("AuthStorage api-key login upsert", () => {
 			onPrompt: async () => "same-kagi-key",
 		};
 
-		await authStorage.oauth.login("kagi", controller);
-		await authStorage.oauth.login("kagi", controller);
+		await authStorage.oauth.login("github-copilot", controller);
+		await authStorage.oauth.login("github-copilot", controller);
 
-		expect(countCredentialRows(dbPath, "kagi")).toBe(1);
-		const credentials = store.listAuthCredentials("kagi");
+		expect(countCredentialRows(dbPath, "github-copilot")).toBe(1);
+		const credentials = store.listAuthCredentials("github-copilot");
 		expect(credentials).toHaveLength(1);
 		const [stored] = credentials;
 		expect(stored?.credential.type).toBe("api_key");
@@ -86,8 +93,8 @@ describe("AuthStorage api-key login upsert", () => {
 			throw new Error("expected stored api-key credential");
 		}
 		expect(stored.credential.key).toBe("same-kagi-key");
-		expect(store.getApiKey("kagi")).toBe("same-kagi-key");
-		expect(await authStorage.keys.get("kagi", "session-kagi-relogin")).toBe("same-kagi-key");
+		expect(store.getApiKey("github-copilot")).toBe("same-kagi-key");
+		expect(await authStorage.keys.get("github-copilot", "session-kagi-relogin")).toBe("same-kagi-key");
 	});
 
 	it("appends a different api-key row when re-login returns a new key", async () => {
@@ -99,143 +106,34 @@ describe("AuthStorage api-key login upsert", () => {
 			onPrompt: async () => keys.shift() ?? "",
 		};
 
-		await authStorage.oauth.login("kagi", controller);
-		await authStorage.oauth.login("kagi", controller);
+		await authStorage.oauth.login("github-copilot", controller);
+		await authStorage.oauth.login("github-copilot", controller);
 
-		expect(countCredentialRows(dbPath, "kagi")).toBe(2);
-		expect(countCredentialRowsByDisabledState(dbPath, "kagi", false)).toBe(2);
-		expect(countCredentialRowsByDisabledState(dbPath, "kagi", true)).toBe(0);
+		expect(countCredentialRows(dbPath, "github-copilot")).toBe(2);
+		expect(countCredentialRowsByDisabledState(dbPath, "github-copilot", false)).toBe(2);
+		expect(countCredentialRowsByDisabledState(dbPath, "github-copilot", true)).toBe(0);
 
-		const credentials = store.listAuthCredentials("kagi");
+		const credentials = store.listAuthCredentials("github-copilot");
 		expect(credentials.map(entry => entry.credential)).toEqual([
 			{ type: "api_key", key: "first-kagi-key", source: "login" },
 			{ type: "api_key", key: "second-kagi-key", source: "login" },
 		]);
-		const rotatedKeys = [await authStorage.keys.get("kagi"), await authStorage.keys.get("kagi")].sort();
+		const rotatedKeys = [
+			await authStorage.keys.get("github-copilot"),
+			await authStorage.keys.get("github-copilot"),
+		].sort();
 		expect(rotatedKeys).toEqual(["first-kagi-key", "second-kagi-key"]);
-	});
-
-	it("replaces Token Plan Cookies by API-token identity without collapsing different tokens", async () => {
-		if (!store) throw new Error("test setup failed");
-		const firstToken = "sk-sp-first";
-		const secondToken = "sk-sp-second";
-
-		await store.upsertAuthCredential("alibaba-token-plan", {
-			type: "api_key",
-			key: serializeAlibabaTokenPlanCredential(firstToken, "session=old"),
-			source: "login",
-		});
-		await store.upsertAuthCredential("alibaba-token-plan", {
-			type: "api_key",
-			key: serializeAlibabaTokenPlanCredential(firstToken, "session=fresh"),
-			source: "login",
-		});
-		await store.upsertAuthCredential("alibaba-token-plan", {
-			type: "api_key",
-			key: serializeAlibabaTokenPlanCredential(secondToken, "session=second"),
-			source: "login",
-		});
-
-		expect(store.listAuthCredentials("alibaba-token-plan").map(entry => entry.credential)).toEqual([
-			{
-				type: "api_key",
-				key: serializeAlibabaTokenPlanCredential(firstToken, "session=fresh"),
-				source: "login",
-			},
-			{
-				type: "api_key",
-				key: serializeAlibabaTokenPlanCredential(secondToken, "session=second"),
-				source: "login",
-			},
-		]);
-
-		await store.upsertAuthCredential("alibaba-token-plan", {
-			type: "api_key",
-			key: firstToken,
-			source: "login",
-		});
-		expect(store.listAuthCredentials("alibaba-token-plan").map(entry => entry.credential)).toEqual([
-			{ type: "api_key", key: firstToken, source: "login" },
-			{
-				type: "api_key",
-				key: serializeAlibabaTokenPlanCredential(secondToken, "session=second"),
-				source: "login",
-			},
-		]);
 	});
 
 	it("hard-deletes superseded api-key rows when a different key replaces them", async () => {
 		if (!store || !dbPath) throw new Error("test setup failed");
 
-		await store.saveApiKey("kagi", "old-key-123");
-		await store.saveApiKey("kagi", "new-key-456");
+		await store.saveApiKey("github-copilot", "old-key-123");
+		await store.saveApiKey("github-copilot", "new-key-456");
 
-		expect(countCredentialRows(dbPath, "kagi")).toBe(1);
-		expect(countCredentialRowsByDisabledState(dbPath, "kagi", false)).toBe(1);
-		expect(countCredentialRowsByDisabledState(dbPath, "kagi", true)).toBe(0);
-		expect(store.getApiKey("kagi")).toBe("new-key-456");
-	});
-
-	it("reuses the stored api-key row when ollama-cloud re-login returns the same key", async () => {
-		if (!store || !authStorage || !dbPath) throw new Error("test setup failed");
-
-		const controller = {
-			onAuth: () => {},
-			onPrompt: async () => "same-ollama-cloud-key",
-		};
-
-		await authStorage.oauth.login("ollama-cloud", controller);
-		await authStorage.oauth.login("ollama-cloud", controller);
-
-		expect(countCredentialRows(dbPath, "ollama-cloud")).toBe(1);
-		const credentials = store.listAuthCredentials("ollama-cloud");
-		expect(credentials).toHaveLength(1);
-		const [stored] = credentials;
-		expect(stored?.credential.type).toBe("api_key");
-		if (stored?.credential.type !== "api_key") {
-			throw new Error("expected stored api-key credential");
-		}
-		expect(stored.credential.key).toBe("same-ollama-cloud-key");
-		expect(store.getApiKey("ollama-cloud")).toBe("same-ollama-cloud-key");
-		expect(await authStorage.keys.get("ollama-cloud", "session-ollama-cloud-relogin")).toBe("same-ollama-cloud-key");
-	});
-
-	it("stores DeepSeek login credentials as a reusable api-key credential", async () => {
-		if (!store || !authStorage || !dbPath) throw new Error("test setup failed");
-
-		const controller = {
-			onAuth: () => {},
-			onPrompt: async () => "same-deepseek-key",
-			fetch: async () => Response.json({ object: "list", data: [] }),
-		};
-
-		await authStorage.oauth.login("deepseek", controller);
-		await authStorage.oauth.login("deepseek", controller);
-
-		expect(countCredentialRows(dbPath, "deepseek")).toBe(1);
-		const credentials = store.listAuthCredentials("deepseek");
-		expect(credentials).toHaveLength(1);
-		const [stored] = credentials;
-		expect(stored?.credential.type).toBe("api_key");
-		if (stored?.credential.type !== "api_key") {
-			throw new Error("expected stored api-key credential");
-		}
-		expect(stored.credential.key).toBe("same-deepseek-key");
-		expect(store.getApiKey("deepseek")).toBe("same-deepseek-key");
-		expect(await authStorage.keys.get("deepseek", "session-deepseek-relogin")).toBe("same-deepseek-key");
-	});
-
-	it("uses a fresh OpenCode Go login over an existing env fallback", async () => {
-		if (!authStorage) throw new Error("test setup failed");
-
-		getEnvApiKeySpy.mockImplementation(provider => (provider === "opencode-go" ? "old-opencode-key" : undefined));
-
-		await authStorage.oauth.login("opencode-go", {
-			onAuth: () => {},
-			onPrompt: async () => "new-opencode-key",
-		});
-
-		expect(await authStorage.keys.get("opencode-go", "session-opencode-go-login")).toBe("new-opencode-key");
-		expect(await authStorage.keys.peek("opencode-go")).toBe("new-opencode-key");
+		expect(countCredentialRows(dbPath, "github-copilot")).toBe(1);
+		expect(countCredentialRowsByDisabledState(dbPath, "github-copilot", false)).toBe(1);
+		expect(countCredentialRowsByDisabledState(dbPath, "github-copilot", true)).toBe(0);
+		expect(store.getApiKey("github-copilot")).toBe("new-key-456");
 	});
 });

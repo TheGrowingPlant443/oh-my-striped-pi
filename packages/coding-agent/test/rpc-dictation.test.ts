@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as transcription from "@oh-my-pi/pi-ai/transcription";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
@@ -257,60 +256,11 @@ describe("RpcDictationBridge", () => {
 		expect(openMic).not.toHaveBeenCalled();
 		expect(frames.at(-1)).toEqual({ type: "dictation_end", captureId: "preflight", text: "" });
 	});
-
-	test("uses the configured cloud STT engine and never submits a spoken submit trigger", async () => {
-		const model = getBundledModel("openai", "whisper-1");
-		const settings = Settings.isolated({ "stt.submitTrigger": "say-submit" });
-		settings.setModelRole("dictation", "openai/whisper-1");
-		const registry = {
-			getError: () => undefined,
-			getAvailable: () => [model],
-			getAll: () => [model],
-			resolver: vi.fn(() => vi.fn().mockResolvedValue("cloud-key")),
-		};
-		const result = Promise.withResolvers<transcription.TranscriptionResult>();
-		const transcribe = vi.spyOn(transcription, "transcribeAudio").mockReturnValue(result.promise);
-		const micStop = vi.fn();
-		let audio: ((error: Error | null, samples: Float32Array) => void) | undefined;
-		const session = { settings, modelRegistry: registry, sessionId: "session-1" } as unknown as AgentSession;
-		const frames: RpcDictationFrame[] = [];
-		const bridge = new RpcDictationBridge(
-			session,
-			frame => frames.push(frame),
-			() =>
-				new STTController(
-					callback => {
-						audio = callback;
-						return { stop: micStop };
-					},
-					{ settings, registry, getSessionId: () => session.sessionId },
-				),
-		);
-		await bridge.start("cloud");
-		audio?.(null, new Float32Array([0.1, -0.1]));
-		const stopping = bridge.stop();
-		expect(micStop).toHaveBeenCalledTimes(1);
-		expect(transcribe).toHaveBeenCalledTimes(1);
-		expect(registry.resolver).toHaveBeenCalledWith(model, "session-1");
-		result.resolve({
-			text: "please review this submit.",
-			usage: {
-				input: 0,
-				output: 0,
-				cacheRead: 0,
-				cacheWrite: 0,
-				totalTokens: 0,
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-			},
-		});
-		expect(await stopping).toEqual({ text: "please review this submit." });
-		expect(frames.at(-1)).toEqual({ type: "dictation_end", captureId: "cloud", text: "please review this submit." });
-	});
 });
 
 async function rpcHarness(options: { slow?: boolean; fail?: boolean; failDispose?: boolean; disabled?: boolean } = {}) {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-dictation-"));
-	const child = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixtures", "live-rpc-agent.ts")], {
+	const child = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixtures", "dictation-rpc-agent.ts")], {
 		cwd: dir,
 		env: {
 			...process.env,
@@ -378,17 +328,11 @@ describe("dictation over RPC", () => {
 		}
 	}, 60_000);
 
-	test("wire commands are exclusive with live, previews bypass filters, and EOF closes the microphone", async () => {
+	test("previews bypass filters and EOF closes the microphone", async () => {
 		const h = await rpcHarness();
 		try {
 			expect(await h.command("filter", { type: "set_event_filter", events: [] })).toMatchObject({ success: true });
-			expect(await h.command("live", { type: "live_start" })).toMatchObject({ success: true });
-			expect(await h.command("blocked", { type: "dictation_start", captureId: "a" })).toMatchObject({
-				success: false,
-			});
-			await h.command("live-stop", { type: "live_stop" });
 			expect(await h.command("start", { type: "dictation_start", captureId: "a" })).toMatchObject({ success: true });
-			expect(await h.command("live-blocked", { type: "live_start" })).toMatchObject({ success: false });
 			expect(await h.command("stop", { type: "dictation_stop" })).toMatchObject({
 				success: true,
 				data: { text: "hello world" },
@@ -592,7 +536,6 @@ describe("dictation over RPC", () => {
 			expect(await h.command("blocked", { type: "dictation_start", captureId: "next" })).toMatchObject({
 				success: false,
 			});
-			expect(await h.command("blocked-live", { type: "live_start" })).toMatchObject({ success: false });
 		} finally {
 			await cleanup(h);
 		}
@@ -607,10 +550,6 @@ describe("dictation over RPC", () => {
 				request = await h.receive();
 			} while (request.type !== "extension_ui_request" || request.method !== "confirm");
 			expect(await h.command("blocked-dictation", { type: "dictation_start", captureId: "blocked" })).toMatchObject({
-				success: false,
-				error: "Session is changing or shutting down",
-			});
-			expect(await h.command("blocked-live", { type: "live_start" })).toMatchObject({
 				success: false,
 				error: "Session is changing or shutting down",
 			});
@@ -632,7 +571,7 @@ describe("dictation over RPC", () => {
 	test("typed client sends commands and dispatches subscribed frames", async () => {
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-dictation-client-"));
 		using client = new RpcClient({
-			command: [process.execPath, path.join(import.meta.dir, "fixtures", "live-rpc-agent.ts")],
+			command: [process.execPath, path.join(import.meta.dir, "fixtures", "dictation-rpc-agent.ts")],
 			cwd: dir,
 			env: { PI_CODING_AGENT_DIR: dir, PI_NO_TITLE: "1", RPC_SLOW_DICTATION: "" },
 		});

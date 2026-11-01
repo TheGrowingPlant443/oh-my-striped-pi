@@ -3,12 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Tokenizer } from "@oh-my-pi/pi-agent-core";
-import type {
-	ResetCreditAccountStatus,
-	ResetCreditRedeemOutcome,
-	ResetCreditTarget,
-	UsageReport,
-} from "@oh-my-pi/pi-ai";
+import type { UsageReport } from "@oh-my-pi/pi-ai";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins";
 import { MarketplaceManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
@@ -67,7 +62,6 @@ interface FakeAcpBuiltinSession {
 	getTodoPhases(): Array<{ name: string; tasks: Array<{ content: string; status: string }> }>;
 	setTodoPhases(phases: Array<{ name: string; tasks: Array<{ content: string; status: string }> }>): void;
 	refreshBaseSystemPrompt(): Promise<void>;
-	getHindsightSessionState(): undefined;
 	applyMemoryBackend(): Promise<void>;
 	getToolByName(name: string): unknown;
 	compact(args?: string): Promise<void>;
@@ -80,8 +74,6 @@ interface FakeAcpBuiltinSession {
 	};
 	setModel(model: unknown): Promise<void>;
 	setModelTemporary(model: unknown, thinkingLevel?: string): Promise<void>;
-	listResetCredits: () => Promise<ResetCreditAccountStatus[]>;
-	redeemResetCredit: (target: ResetCreditTarget) => Promise<ResetCreditRedeemOutcome>;
 }
 
 function createRuntime() {
@@ -124,12 +116,6 @@ function createRuntime() {
 		setForcedToolChoice(toolName: string) {
 			this.forcedToolChoice = toolName;
 		},
-		async listResetCredits() {
-			return [];
-		},
-		async redeemResetCredit(_target) {
-			return { ok: false, code: "no_credit" };
-		},
 		async newSession(_opts?: { drop?: boolean; parentSession?: string }) {
 			return true;
 		},
@@ -165,7 +151,6 @@ function createRuntime() {
 		},
 		async refreshBaseSystemPrompt() {},
 		// Headless `/move` and `/wt` rebind memory for the destination project.
-		getHindsightSessionState: () => undefined,
 		async applyMemoryBackend() {},
 		getAsyncJobSnapshot: () => null,
 		getAsyncJobTree: () => null,
@@ -316,13 +301,13 @@ describe("ACP builtin slash commands", () => {
 		const { output, runtime } = createRuntime();
 		runtime.session.fetchUsageReports = async () => [
 			{
-				provider: "openai-codex",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [
 					{
 						id: "codex-5h",
 						label: "5 hours",
-						scope: { provider: "openai-codex", tier: "prolite", accountId: "account-1" },
+						scope: { provider: "github-copilot", tier: "prolite", accountId: "account-1" },
 						window: { id: "5h", label: "5 hours", resetsAt: Date.now() + 60 * 60 * 1000 },
 						amount: { used: 0.24, usedFraction: 0.24, unit: "unknown" },
 					},
@@ -334,7 +319,7 @@ describe("ACP builtin slash commands", () => {
 		const result = await executeAcpBuiltinSlashCommand("/usage", runtime);
 
 		expect(result).toEqual({ consumed: true });
-		expect(output[0]).toContain("Openai Codex");
+		expect(output[0]).toContain("Github Copilot");
 		expect(output[0]).toContain("5 hours (prolite)");
 		expect(output[0]).toContain("user@example.com: 0.24 unknown used (76.0% left)");
 		expect(output[0]).toContain("resets in");
@@ -344,19 +329,19 @@ describe("ACP builtin slash commands", () => {
 		const { output, runtime } = createRuntime();
 		runtime.session.fetchUsageReports = async () => [
 			{
-				provider: "anthropic",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [
 					{
 						id: "anthropic:extra",
 						label: "Claude Extra Usage",
-						scope: { provider: "anthropic", windowId: "extra" },
+						scope: { provider: "github-copilot", windowId: "extra" },
 						amount: { used: 123.45, unit: "usd" },
 					},
 					{
 						id: "anthropic:daily",
 						label: "Daily quota",
-						scope: { provider: "anthropic", windowId: "24h" },
+						scope: { provider: "github-copilot", windowId: "24h" },
 						window: { id: "24h", label: "24 hours" },
 						amount: { used: 20, unit: "requests" },
 					},
@@ -379,13 +364,13 @@ describe("ACP builtin slash commands", () => {
 		try {
 			const reports: UsageReport[] = [
 				{
-					provider: "openai-codex",
+					provider: "github-copilot",
 					fetchedAt: now - 5_000,
 					limits: [
 						{
 							id: "codex-5h",
 							label: "5 hours",
-							scope: { provider: "openai-codex", tier: "prolite", accountId: "account-1" },
+							scope: { provider: "github-copilot", tier: "prolite", accountId: "account-1" },
 							window: { id: "5h", label: "5 hours", resetsAt: now + 60 * 60 * 1000 },
 							amount: { used: 0.24, usedFraction: 0.24, unit: "unknown" },
 						},
@@ -408,93 +393,11 @@ describe("ACP builtin slash commands", () => {
 		}
 	});
 
-	it("routes saved reset redemption through /usage reset", async () => {
-		const { runtime } = createRuntime();
-		let redeemedTarget: ResetCreditTarget | undefined;
-		runtime.session.listResetCredits = async () => [
-			{
-				provider: "openai-codex",
-				credentialId: 42,
-				accountId: "account-1",
-				email: "user@example.com",
-				availableCount: 1,
-				credits: [],
-				active: true,
-			},
-		];
-		runtime.session.redeemResetCredit = async target => {
-			redeemedTarget = target;
-			return { ok: true, code: "reset", email: target.email };
-		};
-
-		const result = await executeAcpBuiltinSlashCommand("/usage reset openai-codex/active", runtime);
-
-		expect(result).toEqual({ consumed: true });
-		expect(redeemedTarget).toEqual({
-			provider: "openai-codex",
-			credentialId: 42,
-			accountId: "account-1",
-			email: "user@example.com",
-		});
-	});
-
-	it("pins Claude's provider, credential, organization, and selected grant for same-email accounts", async () => {
-		const { runtime } = createRuntime();
-		let redeemedTarget: ResetCreditTarget | undefined;
-		runtime.session.listResetCredits = async () => [
-			{
-				provider: "openai-codex",
-				credentialId: 7,
-				email: "shared@example.com",
-				availableCount: 1,
-				credits: [],
-				active: true,
-			},
-			{
-				provider: "anthropic",
-				credentialId: 9,
-				accountId: "claude-account",
-				email: "shared@example.com",
-				orgId: "org-claude",
-				availableCount: 2,
-				redeemableCount: 1,
-				nextCreditId: "grant-next",
-				credits: [
-					{
-						id: "grant-next",
-						title: "Claude reset",
-						program: "cedar_ember",
-						remainingCount: 2,
-						usable: true,
-						requiresLimit: true,
-						clears: ["anthropic:5h", "anthropic:7d"],
-						blocking: [],
-						usedFractions: {},
-					},
-				],
-				active: true,
-			},
-		];
-		runtime.session.redeemResetCredit = async target => {
-			redeemedTarget = target;
-			return {
-				ok: true,
-				code: "reset",
-				provider: "anthropic",
-				cleared: ["anthropic:5h", "anthropic:7d"],
-			};
-		};
-
-		await executeAcpBuiltinSlashCommand("/usage reset anthropic/9", runtime);
-
-		expect(redeemedTarget).toEqual({
-			provider: "anthropic",
-			credentialId: 9,
-			accountId: "claude-account",
-			email: "shared@example.com",
-			orgId: "org-claude",
-			creditId: "grant-next",
-		});
+	it("rejects the removed saved-reset subcommand with the retained usage syntax", async () => {
+		const { output, runtime } = createRuntime();
+		const result = await executeAcpBuiltinSlashCommand("/usage reset github-copilot/active", runtime);
+		expect(result).toEqual({ consumed: true, failed: true });
+		expect(output).toHaveLength(1);
 	});
 
 	it("does not dispatch the legacy /reset-usage command", async () => {
@@ -1623,13 +1526,13 @@ describe("wave 5 — adapters and polish", () => {
 		const { output, runtime } = createRuntime();
 		runtime.session.fetchUsageReports = async () => [
 			{
-				provider: "test-provider",
+				provider: "github-copilot",
 				fetchedAt: Date.now(),
 				limits: [
 					{
 						id: "test-limit",
 						label: "Monthly",
-						scope: { provider: "test-provider", tier: "pro", accountId: "acct-1" },
+						scope: { provider: "github-copilot", tier: "pro", accountId: "acct-1" },
 						window: { id: "monthly", label: "monthly", resetsAt: Date.now() + 30 * 86400_000 },
 						amount: { used: 50, usedFraction: 0.5, unit: "requests" },
 					},

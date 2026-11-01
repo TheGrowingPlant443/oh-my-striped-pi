@@ -1,7 +1,6 @@
 import type { FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
 import { base64ImageDataFailureReason, isRecord, parseImageMetadata, USER_AGENT } from "@oh-my-pi/pi-utils";
-import type { ApiKey } from "../auth-retry";
-import { withAuth } from "../auth-retry";
+import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import type { ImageContent } from "../types";
 import type { GeneratedImage, ImageInput } from "./types";
@@ -33,7 +32,8 @@ export function usageFromWire(value: unknown): Usage {
 }
 
 export function imageBaseUrl(model: Model): string {
-	if (!model.baseUrl) throw new AIError.ValidationError(`Image model ${model.provider}/${model.id} has no base URL`);
+	if (!model.baseUrl?.trim())
+		throw new AIError.ValidationError(`Image model ${model.provider}/${model.id} requires an explicit base URL`);
 	return model.baseUrl.replace(/\/+$/, "");
 }
 
@@ -70,12 +70,9 @@ export async function parseImageApiResponse(model: Model, response: Response): P
 	}
 }
 
-/** Request URL, or a builder for routes that depend on the bearer (xAI's `XAI_BASE_URL` rule). */
-type ImageRequestUrl = string | ((bearer: string) => string);
-
 export async function postJson(options: {
 	model: Model;
-	url: ImageRequestUrl;
+	url: string;
 	body: unknown;
 	apiKey: ApiKey;
 	fetch: FetchImpl;
@@ -84,12 +81,11 @@ export async function postJson(options: {
 	return withAuth(
 		options.apiKey,
 		async key => {
-			const url = typeof options.url === "string" ? options.url : options.url(key);
-			const response = await options.fetch(url, {
+			const response = await options.fetch(options.url, {
 				method: "POST",
 				headers: {
 					...(await modelHeaders(options.model, options.signal)),
-					Authorization: `Bearer ${key}`,
+					...(key && key !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${key}` } : {}),
 					"Content-Type": "application/json",
 					"User-Agent": USER_AGENT,
 				},
@@ -104,7 +100,7 @@ export async function postJson(options: {
 
 export async function postMultipart(options: {
 	model: Model;
-	url: ImageRequestUrl;
+	url: string;
 	body: FormData;
 	apiKey: ApiKey;
 	fetch: FetchImpl;
@@ -113,12 +109,11 @@ export async function postMultipart(options: {
 	return withAuth(
 		options.apiKey,
 		async key => {
-			const url = typeof options.url === "string" ? options.url : options.url(key);
-			const response = await options.fetch(url, {
+			const response = await options.fetch(options.url, {
 				method: "POST",
 				headers: {
 					...(await modelHeaders(options.model, options.signal)),
-					Authorization: `Bearer ${key}`,
+					...(key && key !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${key}` } : {}),
 					"User-Agent": USER_AGENT,
 				},
 				body: options.body,

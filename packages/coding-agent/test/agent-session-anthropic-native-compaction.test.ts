@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { __resetProxyCache } from "@oh-my-pi/pi-ai/utils/proxy";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -9,6 +9,22 @@ import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manage
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { requestBodyText } from "@oh-my-pi/pi-ai/utils/request-body";
 import { asGlobalFetch } from "./helpers/fetch-mock";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
+
+const nativeModelSpec: ModelSpec<"anthropic-messages"> = {
+	id: "claude-opus-5-5",
+	name: "Private signed compaction fixture",
+	api: "anthropic-messages",
+	provider: "company-anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	compat: { supportsServerCompaction: true },
+	remoteCompaction: { enabled: true },
+};
 
 interface MessagesRequest {
 	system?: unknown;
@@ -93,20 +109,8 @@ function withoutCacheControl(value: unknown): unknown {
 }
 
 describe("AgentSession Anthropic native compaction", () => {
-	const previousProxy = Bun.env.PI_PROXY_ANTHROPIC;
-
-	beforeEach(() => {
-		// A provider proxy moves first-party requests off the Cowork transport
-		// onto `globalThis.fetch`, where the spy below answers them.
-		Bun.env.PI_PROXY_ANTHROPIC = "http://proxy.example.test:8080";
-		__resetProxyCache();
-	});
-
 	afterEach(() => {
 		vi.restoreAllMocks();
-		if (previousProxy === undefined) delete Bun.env.PI_PROXY_ANTHROPIC;
-		else Bun.env.PI_PROXY_ANTHROPIC = previousProxy;
-		__resetProxyCache();
 	});
 
 	const captured = () =>
@@ -117,12 +121,11 @@ describe("AgentSession Anthropic native compaction", () => {
 
 	/** A real session whose Messages API requests are recorded and answered by `respond`. */
 	async function openSession(tempDir: TempDir, respond: (request: number) => Response) {
-		const model = getBundledModel("anthropic", "claude-opus-5-5");
-		if (!model) throw new Error("Expected bundled claude-opus-5-5");
+		const model = buildModel(nativeModelSpec);
 		const requests: MessagesRequest[] = [];
 		vi.spyOn(globalThis, "fetch").mockImplementation(
 			asGlobalFetch(async (input, init) => {
-				if (!String(input).startsWith("https://api.anthropic.com/v1/messages")) {
+				if (!String(input).startsWith(`${model.baseUrl}/v1/messages`)) {
 					throw new Error(`Unexpected request to ${String(input)}`);
 				}
 				requests.push(JSON.parse(requestBodyText(init) ?? "{}"));
@@ -130,14 +133,21 @@ describe("AgentSession Anthropic native compaction", () => {
 			}),
 		);
 		const authStorage = await AuthStorage.create(tempDir.join("auth.db"));
-		authStorage.keys.setRuntime("anthropic", "sk-ant-test");
+		authStorage.keys.setRuntime(model.provider, "sk-ant-test");
 		const sessionManager = SessionManager.inMemory(tempDir.path());
+		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+		modelRegistry.registerProvider(model.provider, {
+			api: model.api,
+			apiKey: "sk-ant-test",
+			baseUrl: model.baseUrl,
+			models: [toProviderModelConfig(nativeModelSpec)],
+		});
 		const { session } = await createAgentSession({
 			cwd: tempDir.path(),
 			agentDir: tempDir.path(),
 			sessionManager,
 			authStorage,
-			modelRegistry: new ModelRegistry(authStorage, tempDir.join("models.yml")),
+			modelRegistry,
 			settings: Settings.isolated({ "compaction.methodOrder": ["remote"], "compaction.keepRecentTokens": 1 }),
 			model,
 			disableExtensionDiscovery: true,

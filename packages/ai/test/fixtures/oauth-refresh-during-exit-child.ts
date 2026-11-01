@@ -11,7 +11,7 @@ await auth.credentials.reload();
 const startRefresh = (): void => {
 	fs.writeFileSync(`${marker}.started`, "started");
 	auth.oauth
-		.refreshStored("anthropic", {
+		.refreshStored("github-copilot", {
 			forceRefresh: true,
 			credentialFromRow: credential => credential,
 			refresh: async current => {

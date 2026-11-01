@@ -1,35 +1,28 @@
 /**
  * Unified Web Search Tool
  *
- * Single tool supporting Anthropic, Perplexity, Exa, Brave, DeepSeek, Jina, Kimi, Gemini, Codex, Tavily, Kagi, Z.AI, SearXNG, and Synthetic
- * providers with provider-specific parameters exposed conditionally.
+ * Independent search engines with provider-specific parameters exposed conditionally.
  */
 
 import { type } from "@oh-my-pi/omptype";
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import type { Api, AuthStorage, Model } from "@oh-my-pi/pi-ai";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
+import type { AuthStorage } from "@oh-my-pi/pi-ai";
 import { formatAge, formatCount, prompt, truncate } from "@oh-my-pi/pi-utils";
-import { ModelRegistry } from "../../config/model-registry";
-import { type RoleChainCandidate, resolveModelRoleValue, resolveRoleChain } from "../../config/model-resolver";
-import { roleCandidatePool } from "../../config/model-roles";
+import type { ModelRegistry } from "../../config/model-registry";
 import { settings } from "../../config/settings";
 import type { CustomTool, CustomToolContext } from "../../extensibility/custom-tools/types";
-import webSearchSystemPrompt from "../../prompts/system/web-search.md" with { type: "text" };
 import webSearchDescription from "../../prompts/tools/web-search.md" with { type: "text" };
-import { resolveConfiguredModelTarget } from "../../session/role-models";
 import { discoverAuthStorage } from "../../sdk";
 import type { ToolSession } from "../../tools";
 import { throwIfAborted } from "../../tools/tool-errors";
 import {
 	formatSearchProviderFailure,
 	formatSearchProviderFailures,
-	getGroundedSearchProvider,
 	getSearchProvider,
 	type SearchProvider,
 	type SearchProviderFailure,
 } from "./provider";
-import { rankXAIProviders, targetsX, xaiModelChain, xSearchAvailable } from "./providers/xai";
+import { resolveSearchChain, resolveSearchRoleValue } from "./selection";
 import { applyQueryConstraints, parseSearchQuery } from "./query";
 import {
 	DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS,
@@ -39,15 +32,13 @@ import {
 	type SearchResultDetails,
 } from "./types";
 
-import { cfgProvidersAntigravityEndpoint, cfgProvidersWebSearchTimeoutSeconds } from "../../session/settings";
+import { cfgProvidersWebSearchTimeoutSeconds } from "../../session/settings";
 
 /** Web search tool parameters schema */
 export const webSearchSchema = type({
 	query: "string",
 	recency: "'day' | 'week' | 'month' | 'year'?",
 	limit: "number?",
-	max_tokens: "number?",
-	temperature: "number?",
 	num_search_results: "number?",
 });
 
@@ -142,46 +133,8 @@ function hasRenderableSearchContent(response: SearchResponse): boolean {
 
 interface ExecuteSearchOptions {
 	authStorage: AuthStorage;
-	modelRegistry?: ModelRegistry;
 	sessionId?: string;
-	/** The session's active model; `web/hosted` searches through it. */
-	sessionModel?: Model<Api>;
 	signal?: AbortSignal;
-}
-
-function isHostedPlaceholder(model: Model<Api>): boolean {
-	return model.provider === "web" && model.id === "hosted";
-}
-
-/**
- * Expand the `web/hosted` placeholder into models on the session's own
- * provider, which bill the credential the session already uses: first the
- * session model's cheaper `webSearchModel` swap, then the session model itself.
- * A swap the host does not expose is skipped; a failing swap falls through to
- * the session model. Left unexpanded when neither can search.
- */
-function expandHostedCandidate(
-	candidate: RoleChainCandidate,
-	sessionModel: Model<Api> | undefined,
-	pool: Model<Api>[],
-): RoleChainCandidate[] {
-	if (!isHostedPlaceholder(candidate.model) || !sessionModel) return [candidate];
-	const swap = resolveConfiguredModelTarget(sessionModel.webSearchModel, sessionModel, pool);
-	const distinctSwap = swap?.provider === sessionModel.provider && swap.id === sessionModel.id ? undefined : swap;
-	const models = [distinctSwap, sessionModel].filter((model): model is Model<Api> => !!model?.webSearch);
-	if (models.length === 0) return [candidate];
-	return models.map(model => ({ ...candidate, model }));
-}
-
-/**
- * Move the chain's xAI-grounded candidates to the front, keeping their order,
- * or prepend {@link xaiModelChain} when the chain has none. Unchanged without
- * xAI credentials.
- */
-function preferXAI(chain: RoleChainCandidate[], modelRegistry: ModelRegistry): RoleChainCandidate[] {
-	const xai = chain.filter(candidate => candidate.model.webSearch === "xai");
-	if (xai.length > 0) return [...xai, ...chain.filter(candidate => candidate.model.webSearch !== "xai")];
-	return [...xaiModelChain(modelRegistry, settings).map(model => ({ model, explicit: false })), ...chain];
 }
 
 /** Execute web search */
@@ -191,32 +144,15 @@ async function executeSearch(
 	options: ExecuteSearchOptions,
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchResultDetails }> {
 	const { authStorage, sessionId, signal } = options;
-	const modelRegistry = options.modelRegistry ?? new ModelRegistry(authStorage, undefined, { settings });
-	const pool = roleCandidatePool("web", settings, modelRegistry);
 	const candidates = params.model
 		? (() => {
-				const resolved = resolveModelRoleValue(params.model, pool, { settings });
+				const resolved = resolveSearchRoleValue(params.model, settings);
 				return resolved.model
 					? [{ model: resolved.model, explicit: true, thinkingLevel: resolved.thinkingLevel }]
 					: [];
 			})()
-		: resolveRoleChain("web", settings, pool);
+		: resolveSearchChain(settings);
 	const parsedQuery = parseSearchQuery(params.query);
-	let expanded = rankXAIProviders(
-		candidates.flatMap(candidate => expandHostedCandidate(candidate, options.sessionModel, pool)),
-		candidate => candidate.model,
-		settings,
-	);
-	// Only xAI reaches X posts; X-only queries try it first even when the role prefers another engine.
-	if (!params.model && targetsX(parsedQuery)) expanded = preferXAI(expanded, modelRegistry);
-
-	// Invariant across candidates; resolve once before walking the role chain.
-	let antigravityEndpointMode: "auto" | "production" | "sandbox" | undefined;
-	try {
-		antigravityEndpointMode = cfgProvidersAntigravityEndpoint.get(settings);
-	} catch {
-		antigravityEndpointMode = undefined;
-	}
 
 	let timeoutMs = DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS * 1_000;
 	try {
@@ -232,23 +168,13 @@ async function executeSearch(
 	let availableProviderCount = 0;
 	let lastProvider: { id: string; label: string } | undefined;
 	let failedResponseProvider: SearchResponse["provider"] = "none";
-	for (const candidate of expanded) {
+	for (const candidate of candidates) {
 		let provider: SearchProvider | undefined;
 		const candidateMeta = { id: candidate.model.id, label: candidate.model.name };
 		lastProvider = candidateMeta;
 		try {
 			const model = candidate.model;
-			if (isHostedPlaceholder(model)) {
-				if (!candidate.explicit) continue;
-				throw new Error("The session model has no web search grounding.");
-			}
-			if (modelKind(model) === "search") {
-				provider = await getSearchProvider(model.id);
-			} else if (model.webSearch) {
-				provider = await getGroundedSearchProvider(model.webSearch);
-			} else {
-				throw new Error(`Model ${model.provider}/${model.id} does not support web search`);
-			}
+			provider = await getSearchProvider(model.id);
 			lastProvider = provider;
 			const available = candidate.explicit
 				? await provider.isExplicitlyAvailable(authStorage, model)
@@ -257,7 +183,7 @@ async function executeSearch(
 			if (!available && candidate.explicit) {
 				throw new SearchProviderError(
 					provider.id,
-					`${provider.label} web search is unavailable. Configure its credentials or select the automatic provider chain.`,
+					`${provider.label} web search is unavailable. Configure its private endpoint and authentication.`,
 				);
 			}
 			availableProviderCount++;
@@ -268,30 +194,14 @@ async function executeSearch(
 				parsedQuery,
 				limit: params.limit,
 				recency: params.recency,
-				systemPrompt: webSearchSystemPrompt,
-				maxOutputTokens: params.max_tokens,
 				numSearchResults: params.num_search_results,
-				temperature: params.temperature,
 				signal,
 				timeoutMs,
 				authStorage,
 				model,
-				thinkingLevel: candidate.thinkingLevel,
-				modelRegistry,
 				explicit: candidate.explicit,
 				sessionId,
-				antigravityEndpointMode,
 			});
-
-			// A host that silently drops the hosted search tool still answers from the
-			// model's weights; without sources that answer is not a search result.
-			if (modelKind(model) !== "search" && response.sources.length === 0 && !response.citations?.length) {
-				throw new SearchProviderError(
-					provider.id,
-					`${provider.label} returned no sources; ${model.provider}/${model.id} may not support hosted web search.`,
-					204,
-				);
-			}
 
 			// Lenient constraint pass over whatever the provider returned: enforce
 			// site:/inurl:/intitle:/filetype:/date directives the provider could
@@ -370,7 +280,6 @@ export async function runSearchQuery(
 		authStorage?: AuthStorage;
 		modelRegistry?: ModelRegistry;
 		sessionId?: string;
-		sessionModel?: Model<Api>;
 		signal?: AbortSignal;
 	} = {},
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: SearchResultDetails }> {
@@ -382,9 +291,7 @@ export async function runSearchQuery(
 	try {
 		return await executeSearch("cli-web-search", params, {
 			authStorage,
-			modelRegistry: options.modelRegistry,
 			sessionId: options.sessionId,
-			sessionModel: options.sessionModel,
 			signal: options.signal,
 		});
 	} finally {
@@ -392,15 +299,7 @@ export async function runSearchQuery(
 	}
 }
 
-/** Description without the X operators, for hosts without a model registry. */
 const plainDescription = prompt.render(webSearchDescription);
-
-/**
- * Description rendered on first read with a model registry, then reused for
- * the process: re-checking xAI auth per read would rewrite the tool
- * description, and invalidate the prompt cache, whenever auth changes.
- */
-let registryDescription: string | undefined;
 
 /**
  * Web search tool implementation.
@@ -422,12 +321,9 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 		this.#session = session;
 	}
 
-	/** Advertises X search operators when xAI credentials existed at the process's first read. */
+	/** Independent search engines share the same query directives on every host. */
 	get description(): string {
-		const modelRegistry = this.#session.modelRegistry;
-		if (!modelRegistry) return plainDescription;
-		registryDescription ??= prompt.render(webSearchDescription, { xSearch: xSearchAvailable(modelRegistry) });
-		return registryDescription;
+		return plainDescription;
 	}
 
 	async execute(
@@ -441,9 +337,7 @@ export class WebSearchTool implements AgentTool<typeof webSearchSchema, SearchRe
 		const sessionId = this.#session.getSessionId?.() ?? undefined;
 		return executeSearch(_toolCallId, params, {
 			authStorage,
-			modelRegistry: this.#session.modelRegistry,
 			sessionId,
-			sessionModel: this.#session.getActiveModel?.(),
 			signal,
 		});
 	}
@@ -468,9 +362,7 @@ export const webSearchCustomTool: CustomTool<typeof webSearchSchema, SearchResul
 		const sessionId = ctx.sessionManager.getSessionId();
 		return executeSearch(toolCallId, params, {
 			authStorage,
-			modelRegistry: ctx.modelRegistry,
 			sessionId,
-			sessionModel: ctx.model,
 			signal,
 		});
 	},

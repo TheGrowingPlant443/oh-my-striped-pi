@@ -11,12 +11,12 @@ import type {
 	Context,
 	ImageContent,
 	Message,
-	Model,
 	ProviderPayload,
 	TextContent,
 	ToolResultMessage,
 	UserMessage,
 } from "@oh-my-pi/pi-ai";
+import { Effort } from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { dropUnreadableContextImages } from "@oh-my-pi/pi-coding-agent/session/provider-image-budget";
 
@@ -43,19 +43,27 @@ const OPENAI_RESPONSES_MODEL = buildModel({
 	id: "gpt-4.1",
 	name: "GPT 4.1",
 	api: "openai-responses",
-	provider: "openai",
-	baseUrl: "https://api.openai.com/v1",
+	provider: "company-responses",
+	baseUrl: "https://responses.company.example/v1",
 	reasoning: false,
 	input: ["text", "image"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 128_000,
 	maxTokens: 4096,
 });
-const BEDROCK_MODEL: Model = {
-	...OPENAI_RESPONSES_MODEL,
-	api: "bedrock-converse-stream",
-	provider: "amazon-bedrock",
-};
+const ANTHROPIC_MODEL = buildModel({
+	id: "claude-sonnet-4-5",
+	name: "Company Claude Sonnet",
+	api: "anthropic-messages",
+	provider: "company-anthropic",
+	baseUrl: "https://anthropic.company.example",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+});
 
 function userMessage(content: (TextContent | ImageContent)[], providerPayload?: ProviderPayload): UserMessage {
 	return {
@@ -149,13 +157,9 @@ describe("dropUnreadableContextImages", () => {
 		expect(await dropUnreadableContextImages(context, OPENAI_RESPONSES_MODEL)).toBe(context);
 	});
 
-	test("degrades empty inline data and provider references unusable by the active API", async () => {
+	test("degrades empty inline data and URL-backed images on an inline-only API", async () => {
 		const emptyInline: ImageContent = { type: "image", data: "", mimeType: "image/png" };
-		const foreignReference: ImageContent = {
-			...BROKEN_IMAGE,
-			providerFile: { provider: "anthropic", id: "file-anthropic" },
-		};
-		const context: Context = { messages: [userMessage([emptyInline, foreignReference])] };
+		const context: Context = { messages: [userMessage([emptyInline, BROKEN_IMAGE])] };
 
 		const guarded = await dropUnreadableContextImages(context, OPENAI_RESPONSES_MODEL);
 		const message = guarded.messages[0];
@@ -166,7 +170,7 @@ describe("dropUnreadableContextImages", () => {
 		const urlContext: Context = {
 			messages: [userMessage([{ ...BROKEN_IMAGE, url: "https://blobs.example/corrupt.png" }])],
 		};
-		const guardedUrl = await dropUnreadableContextImages(urlContext, BEDROCK_MODEL);
+		const guardedUrl = await dropUnreadableContextImages(urlContext, ANTHROPIC_MODEL);
 		const urlMessage = guardedUrl.messages[0];
 		if (urlMessage?.role !== "user" || !Array.isArray(urlMessage.content)) {
 			throw new Error("expected user content");
@@ -190,27 +194,18 @@ describe("dropUnreadableContextImages", () => {
 	});
 
 	/**
-	 * The reviewer's repro. A reference-backed block carries EMPTY `data` on
-	 * purpose — `functionOutputContent()` builds `{ data: "", url }` /
-	 * `{ data: "", providerFile }`, and the lazy snapcompact frame sink builds
-	 * `{ data: "", url }` before this guard even runs. Decoding those bytes yields
-	 * "empty image data" and would delete a perfectly good image.
+	 * Lazy snapcompact frames carry empty data beside a published URL. Decoding
+	 * those bytes would delete an image the provider can fetch intact.
 	 */
-	test("leaves reference-backed images alone instead of decoding bytes that never travel", async () => {
+	test("leaves URL-backed images alone instead of decoding bytes that never travel", async () => {
 		const urlBacked: ImageContent = {
 			type: "image",
 			data: "",
 			mimeType: "image/png",
 			url: "https://blobs.example/sc:deadbeef:0",
 		};
-		const fileBacked: ImageContent = {
-			type: "image",
-			data: "",
-			mimeType: "application/octet-stream",
-			providerFile: { provider: "openai", id: "file-abc123" },
-		};
 		const context: Context = {
-			messages: [userMessage([urlBacked, fileBacked]), toolResult([urlBacked, fileBacked])],
+			messages: [userMessage([urlBacked]), toolResult([urlBacked])],
 		};
 
 		const guarded = await dropUnreadableContextImages(context, OPENAI_RESPONSES_MODEL);

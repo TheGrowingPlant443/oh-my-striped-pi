@@ -10,9 +10,6 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
 import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
 import type { BeforeAgentStartEvent, Extension } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import { loadHindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
 import * as memoryBackend from "@oh-my-pi/pi-coding-agent/memory-backend";
 import type { MemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
 import { loadMnemopiConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
@@ -102,8 +99,8 @@ describe("queued user delivery policy", () => {
 		const model = buildModel({
 			id: "mock",
 			name: "mock",
-			api: "openai-completions",
-			provider: "openai",
+			api: "openai-responses",
+			provider: "github-copilot",
 			baseUrl: "https://example.invalid",
 			reasoning: false,
 			input: ["text", "image"],
@@ -151,7 +148,7 @@ describe("queued user delivery policy", () => {
 	}
 
 	async function setupMemory(
-		backendId: "mnemopi" | "hindsight",
+		backendId: "mnemopi",
 		recall: (query: string) => Promise<string | undefined>,
 		policy = false,
 	) {
@@ -168,10 +165,6 @@ describe("queued user delivery policy", () => {
 			"mnemopi.llmMode": "none",
 			"mnemopi.autoRetain": false,
 			"mnemopi.autoRecall": true,
-			"hindsight.apiUrl": "http://unused.invalid",
-			"hindsight.autoRetain": false,
-			"hindsight.autoRecall": true,
-			"hindsight.mentalModelsEnabled": false,
 		});
 		const backend = await memoryBackend.resolveMemoryBackend(settings);
 		const tools: AgentTool[] = ["old_tool", "new_tool"].map(name => ({
@@ -205,27 +198,12 @@ describe("queued user delivery policy", () => {
 				const content = await recall(query);
 				return content ? [{ id: "recalled", content, source: null, timestamp: null, score: 1 }] : [];
 			});
-		} else {
-			const client = new HindsightApi({ baseUrl: "http://unused.invalid" });
-			const state = new HindsightSessionState({
-				sessionId: session.sessionId,
-				session,
-				config: loadHindsightConfig(settings),
-				client,
-				bankId: "test-bank",
-				banksSet: new Set(["test-bank"]),
-			});
-			session.setHindsightSessionState(state);
-			vi.spyOn(client, "recall").mockImplementation(async (_bank, query) => {
-				const text = await recall(query);
-				return { results: text ? [{ id: "recalled", text }] : [] };
-			});
 		}
 		await session.setActiveToolsByName(["old_tool"]);
 		return fixture;
 	}
 
-	it.each(["mnemopi", "hindsight"] as const)(
+	it.each(["mnemopi"] as const)(
 		"retries cancelled real %s recall and keeps one committed copy on later turns",
 		async backendId => {
 			let recalls = 0;
@@ -270,7 +248,7 @@ describe("queued user delivery policy", () => {
 		},
 	);
 
-	it.each(["mnemopi", "hindsight"] as const)(
+	it.each(["mnemopi"] as const)(
 		"consumes an empty successful real %s recall only when delivery commits",
 		async backendId => {
 			let recalls = 0;
@@ -299,24 +277,21 @@ describe("queued user delivery policy", () => {
 		},
 	);
 
-	it.each(["mnemopi", "hindsight"] as const)(
-		"retries failed real %s recall on the next committed turn",
-		async backendId => {
-			let recalls = 0;
-			const { requests } = await setupMemory(backendId, async () => {
-				if (++recalls === 1) throw new Error("recall unavailable");
-				return "recovered recall";
-			});
-			await session.prompt("lookup unavailable");
-			expect(requests[0].systemPrompt?.join("\n")).not.toContain("recovered recall");
-			await session.prompt("lookup recovered");
-			expect(requests[1].systemPrompt?.join("\n")).toContain("recovered recall");
-			await session.prompt("already recalled");
-			expect(recalls).toBe(2);
-		},
-	);
+	it.each(["mnemopi"] as const)("retries failed real %s recall on the next committed turn", async backendId => {
+		let recalls = 0;
+		const { requests } = await setupMemory(backendId, async () => {
+			if (++recalls === 1) throw new Error("recall unavailable");
+			return "recovered recall";
+		});
+		await session.prompt("lookup unavailable");
+		expect(requests[0].systemPrompt?.join("\n")).not.toContain("recovered recall");
+		await session.prompt("lookup recovered");
+		expect(requests[1].systemPrompt?.join("\n")).toContain("recovered recall");
+		await session.prompt("already recalled");
+		expect(recalls).toBe(2);
+	});
 
-	it.each(["mnemopi", "hindsight"] as const)(
+	it.each(["mnemopi"] as const)(
 		"delivers real %s recall with the winning tool policy in the same request",
 		async backendId => {
 			let recalls = 0;
@@ -340,34 +315,31 @@ describe("queued user delivery policy", () => {
 		},
 	);
 
-	it.each(["mnemopi", "hindsight"] as const)(
-		"discards late real %s recall after the queue is replaced",
-		async backendId => {
-			const started = Promise.withResolvers<void>();
-			const release = Promise.withResolvers<void>();
-			let recalls = 0;
-			const { agent, requests } = await setupMemory(backendId, async () => {
-				if (++recalls === 1) {
-					started.resolve();
-					await release.promise;
-					return "discarded recall";
-				}
-				return "current recall";
-			});
-			await session.steer("discarded task");
-			await started.promise;
-			agent.replaceQueues([], []);
-			release.resolve();
-			await session.waitForIdle();
-			expect(requests).toEqual([]);
-			await session.prompt("replacement task");
-			expect(recalls).toBe(2);
-			expect(requests[0].systemPrompt?.join("\n")).toContain("current recall");
-			expect(requests[0].systemPrompt?.join("\n")).not.toContain("discarded recall");
-		},
-	);
+	it.each(["mnemopi"] as const)("discards late real %s recall after the queue is replaced", async backendId => {
+		const started = Promise.withResolvers<void>();
+		const release = Promise.withResolvers<void>();
+		let recalls = 0;
+		const { agent, requests } = await setupMemory(backendId, async () => {
+			if (++recalls === 1) {
+				started.resolve();
+				await release.promise;
+				return "discarded recall";
+			}
+			return "current recall";
+		});
+		await session.steer("discarded task");
+		await started.promise;
+		agent.replaceQueues([], []);
+		release.resolve();
+		await session.waitForIdle();
+		expect(requests).toEqual([]);
+		await session.prompt("replacement task");
+		expect(recalls).toBe(2);
+		expect(requests[0].systemPrompt?.join("\n")).toContain("current recall");
+		expect(requests[0].systemPrompt?.join("\n")).not.toContain("discarded recall");
+	});
 
-	it.each(["mnemopi", "hindsight"] as const)(
+	it.each(["mnemopi"] as const)(
 		"does not carry pending real %s recall into a replacement session",
 		async backendId => {
 			const started = Promise.withResolvers<void>();
@@ -394,8 +366,6 @@ describe("queued user delivery policy", () => {
 	it.each([
 		["mnemopi", "reset"],
 		["mnemopi", "rekey"],
-		["hindsight", "reset"],
-		["hindsight", "rekey"],
 	] as const)(
 		"declines real %s delivery when its memory state is invalidated by %s in the hook",
 		async (backendId, change) => {
@@ -405,7 +375,7 @@ describe("queued user delivery policy", () => {
 				async () => `owned-recall-${++recalls}`,
 				true,
 			);
-			const state = backendId === "mnemopi" ? getMnemopiSessionState(session) : session.getHindsightSessionState();
+			const state = getMnemopiSessionState(session);
 			if (!state) throw new Error("Real memory state was not installed");
 			const basePrompt = session.systemPrompt;
 			pausePreparation(async () => {
@@ -645,7 +615,7 @@ describe("queued user delivery policy", () => {
 		async delivery => {
 			let recalls = 0;
 			const { requests, delivered, extensions, pausePreparation } = await setupMemory(
-				"hindsight",
+				"mnemopi",
 				async () => `override-memory-${++recalls}`,
 				true,
 			);
@@ -700,7 +670,7 @@ describe("queued user delivery policy", () => {
 
 	it("preserves absolute overrides and their downstream chain after a source-base retry", async () => {
 		const { requests, extensions, pausePreparation } = await setupMemory(
-			"hindsight",
+			"mnemopi",
 			async () => "hidden memory",
 			true,
 		);
@@ -720,7 +690,7 @@ describe("queued user delivery policy", () => {
 	});
 
 	it("retries a base change during returned-image normalization before publishing the request", async () => {
-		const { requests, extensions } = await setupMemory("hindsight", async () => "image memory", true);
+		const { requests, extensions } = await setupMemory("mnemopi", async () => "image memory", true);
 		const image: ImageContent = {
 			type: "image",
 			mimeType: "image/png",
@@ -763,7 +733,7 @@ describe("queued user delivery policy", () => {
 		async delivery => {
 			let recalls = 0;
 			const { agent, requests, delivered, events, pausePreparation } = await setupMemory(
-				"hindsight",
+				"mnemopi",
 				async () => `churn-memory-${++recalls}`,
 				true,
 			);
@@ -881,7 +851,7 @@ describe("queued user delivery policy", () => {
 	it("lets cancellation during retry retain the queued original without consuming recall", async () => {
 		let recalls = 0;
 		const { agent, requests, delivered, pausePreparation } = await setupMemory(
-			"hindsight",
+			"mnemopi",
 			async () => `retry-memory-${++recalls}`,
 			true,
 		);
@@ -921,7 +891,7 @@ describe("queued user delivery policy", () => {
 	it("declines a source-base change after preparation without partially committing memory or context", async () => {
 		let recalls = 0;
 		const { agent, requests, delivered } = await setupMemory(
-			"hindsight",
+			"mnemopi",
 			async () => `commit-memory-${++recalls}`,
 			true,
 		);

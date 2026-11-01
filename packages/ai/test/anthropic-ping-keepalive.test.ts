@@ -9,7 +9,7 @@ const model: Model<"anthropic-messages"> = buildModel({
 	id: "claude-opus-4-8",
 	name: "Claude Opus 4.8",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text"],

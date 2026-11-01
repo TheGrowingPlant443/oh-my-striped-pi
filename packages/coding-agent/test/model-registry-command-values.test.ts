@@ -115,12 +115,43 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		}
 	});
 
+	test("keeps company provider catalog reads free of key and header command side effects", async () => {
+		const counterFile = path.join(tempDir, "rejected-command.txt");
+		fs.writeFileSync(counterFile, "");
+		fs.writeFileSync(
+			modelsPath,
+			JSON.stringify({
+				providers: {
+					"extra-provider": {
+						apiKey: `!${failedTrackingCommand(counterFile)}`,
+						headers: { Authorization: `!${failedTrackingCommand(counterFile)}` },
+						baseUrl: "https://extra.example/v1",
+						api: "openai-completions",
+						discovery: { type: "openai-models-list" },
+					},
+				},
+			}),
+		);
+		const requests: string[] = [];
+		const registry = new ModelRegistry(authStorage, modelsPath, {
+			fetch: async input => {
+				requests.push(String(input));
+				throw new Error("network disabled");
+			},
+		});
+		expect(registry.getError()).toBeUndefined();
+		registry.getAll("all");
+		registry.getDiscoverableProviders();
+		expect(fs.readFileSync(counterFile, "utf8")).toBe("");
+		expect(requests.some(url => url.startsWith("https://extra.example"))).toBe(false);
+		expect(registry.getDiscoverableProviders()).toContain("extra-provider");
+	});
 	test("provider apiKey and headers resolve from command stdout", async () => {
 		fs.writeFileSync(
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					anthropic: {
+					"github-copilot": {
 						baseUrl: "https://anthropic-proxy.example.com/v1",
 						apiKey: `!${stdoutCommand("cmd-api-key")}`,
 						authHeader: true,
@@ -131,9 +162,9 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		expect(registry.hasCommandBackedApiKey("anthropic")).toBe(true);
-		expect(registry.hasCommandBackedApiKey("openai")).toBe(false);
-		const models = registry.getAll().filter(model => model.provider === "anthropic");
+		expect(registry.hasCommandBackedApiKey("github-copilot")).toBe(true);
+		expect(registry.hasCommandBackedApiKey("local")).toBe(false);
+		const models = registry.getAll().filter(model => model.provider === "github-copilot");
 
 		expect(models.length).toBeGreaterThan(1);
 		for (const model of models) {
@@ -149,7 +180,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${stdoutCommand("cmd-api-key")}`,
@@ -164,7 +195,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 
 		expect(model).toBeDefined();
 		const headers = await registry.resolveModelHeaders(model!);
@@ -181,7 +212,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${trackedTokenCommand(tokenFile, counterFile)}`,
@@ -190,13 +221,13 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 				},
 			}),
 		);
-		authStorage.keys.setRuntime("custom-proxy", "runtime-key");
+		authStorage.keys.setRuntime("github-copilot", "runtime-key");
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 
 		expect(await registry.getApiKey(model)).toBe("runtime-key");
-		expect(await registry.getApiKeyForProvider("custom-proxy")).toBe("runtime-key");
+		expect(await registry.getApiKeyForProvider("github-copilot")).toBe("runtime-key");
 		expect(await Bun.file(counterFile).text()).toBe("");
 	});
 
@@ -211,7 +242,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${command}`,
@@ -223,7 +254,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect(await registry.getApiKey(model)).toBe("stale-key");
 		fs.writeFileSync(tokenFile, "fresh-key");
@@ -255,7 +286,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${command}`,
@@ -267,7 +298,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect(await registry.getApiKey(model)).toBe("stale-key");
 		fs.writeFileSync(tokenFile, "FAIL");
@@ -295,7 +326,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${trackingCommand}`,
@@ -312,7 +343,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			id: "foo",
 			name: "foo",
 			api: "openai-completions",
-			provider: "custom-proxy",
+			provider: "github-copilot",
 			baseUrl: "a",
 			reasoning: false,
 			input: ["text"],
@@ -340,7 +371,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${stdoutFileCommand(bearerFile)}`,
@@ -352,7 +383,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		// Materializing the request headers caches the stale command result, as
 		// the first live request would. The rotation below is only observed on
@@ -391,7 +422,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${stdoutFileCommand(bearerFile)}`,
@@ -408,7 +439,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect((await registry.resolveModelHeaders(model))?.["x-tenant-token"]).toBe("stale-tenant");
 		expect(await registry.getApiKey(model)).toBe("stale-bearer");
@@ -443,7 +474,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${stdoutFileCommand(bearerFile)}`,
@@ -457,7 +488,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect((await registry.resolveModelHeaders(model))?.["x-tenant-token"]).toBe("stale-tenant");
 		expect(await registry.getApiKey(model)).toBe("stale-bearer");
@@ -524,7 +555,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${command}`,
@@ -536,7 +567,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect(await registry.getApiKey(model)).toBe("stale-key");
 		expect(fs.readFileSync(counterFile, "utf8")).toBe("1");
@@ -554,7 +585,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		await registry.refresh("online", { refreshCommandCredentials: true });
 		expect(await registry.getApiKey(model)).toBe("fresh-key");
 		expect(fs.readFileSync(counterFile, "utf8")).toBe("11");
-		const refreshed = registry.find("custom-proxy", "custom-model");
+		const refreshed = registry.find("github-copilot", "custom-model");
 		expect(refreshed && (await registry.resolveModelHeaders(refreshed))?.Authorization).toBe("Bearer fresh-key");
 	});
 
@@ -569,7 +600,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${command}`,
@@ -581,7 +612,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		const model = registry.find("custom-proxy", "custom-model");
+		const model = registry.find("github-copilot", "custom-model");
 		if (!model) throw new Error("Expected custom model");
 		expect(await registry.getApiKey(model)).toBeUndefined();
 		expect(fs.readFileSync(counterFile, "utf8")).toBe("1");
@@ -607,7 +638,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"custom-proxy": {
+					"github-copilot": {
 						baseUrl: "https://custom-proxy.example.com/v1",
 						api: "openai-completions",
 						apiKey: `!${trackedTokenCommand(tokenFile, counterFile)}`,
@@ -618,13 +649,13 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		expect(await registry.getApiKeyForProvider("custom-proxy")).toBe("stale-key");
+		expect(await registry.getApiKeyForProvider("github-copilot")).toBe("stale-key");
 		expect(fs.readFileSync(counterFile, "utf8")).toBe("1");
 
 		fs.writeFileSync(tokenFile, "fresh-key");
 		// Hover / auto-refresh: live catalog, same cached credential.
-		await registry.refreshProvider("custom-proxy", "online");
-		expect(await registry.getApiKeyForProvider("custom-proxy")).toBe("stale-key");
+		await registry.refreshProvider("github-copilot", "online");
+		expect(await registry.getApiKeyForProvider("github-copilot")).toBe("stale-key");
 		expect(fs.readFileSync(counterFile, "utf8")).toBe("1");
 	});
 
@@ -642,34 +673,28 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					"proxy-a": {
-						baseUrl: "https://a.example.com/v1",
-						api: "openai-completions",
-						apiKey: `!${trackedTokenCommand(tokenA, counterA)}`,
-						models: [{ id: "model-a", name: "A" }],
+					"github-copilot": {
+						headers: { "X-Key": `!${trackedTokenCommand(tokenA, counterA)}` },
 					},
-					"proxy-b": {
-						baseUrl: "https://b.example.com/v1",
-						api: "openai-completions",
-						apiKey: `!${trackedTokenCommand(tokenB, counterB)}`,
-						models: [{ id: "model-b", name: "B" }],
+					local: {
+						headers: { "X-Key": `!${trackedTokenCommand(tokenB, counterB)}` },
 					},
 				},
 			}),
 		);
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		expect(await registry.getApiKeyForProvider("proxy-a")).toBe("a-stale");
-		expect(await registry.getApiKeyForProvider("proxy-b")).toBe("b-stale");
+		expect((await registry.getProviderHeaders("github-copilot"))?.["X-Key"]).toBe("a-stale");
+		expect((await registry.getProviderHeaders("local"))?.["X-Key"]).toBe("b-stale");
 		expect(fs.readFileSync(counterA, "utf8")).toBe("1");
 		expect(fs.readFileSync(counterB, "utf8")).toBe("1");
 
 		fs.writeFileSync(tokenA, "a-fresh");
 		fs.writeFileSync(tokenB, "b-fresh");
-		await registry.refreshProvider("proxy-a", "online", { refreshCommandCredentials: true });
+		await registry.refreshProvider("github-copilot", "online", { refreshCommandCredentials: true });
 
-		expect(await registry.getApiKeyForProvider("proxy-a")).toBe("a-fresh");
-		expect(await registry.getApiKeyForProvider("proxy-b")).toBe("b-stale");
+		expect((await registry.getProviderHeaders("github-copilot"))?.["X-Key"]).toBe("a-fresh");
+		expect((await registry.getProviderHeaders("local"))?.["X-Key"]).toBe("b-stale");
 		expect(fs.readFileSync(counterA, "utf8")).toBe("11");
 		expect(fs.readFileSync(counterB, "utf8")).toBe("1");
 	});
@@ -686,7 +711,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		fs.writeFileSync(modelsPath, JSON.stringify({ providers: {} }));
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		registry.registerProvider("ext-proxy", {
+		registry.registerProvider("github-copilot", {
 			baseUrl: "https://ext.example.com/v1",
 			api: "openai-completions",
 			apiKey: "literal-key",
@@ -705,7 +730,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			],
 		});
 
-		const model = registry.find("ext-proxy", "ext-model");
+		const model = registry.find("github-copilot", "ext-model");
 		if (!model) throw new Error("Expected extension model");
 		const initialHeaders = await registry.resolveModelHeaders(model);
 		expect(initialHeaders?.["x-tenant-token"]).toBe("stale-provider");
@@ -715,9 +740,9 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 
 		fs.writeFileSync(providerHeaderFile, "fresh-provider");
 		fs.writeFileSync(modelHeaderFile, "fresh-model");
-		await registry.refreshProvider("ext-proxy", "online", { refreshCommandCredentials: true });
+		await registry.refreshProvider("github-copilot", "online", { refreshCommandCredentials: true });
 
-		const refreshed = registry.find("ext-proxy", "ext-model");
+		const refreshed = registry.find("github-copilot", "ext-model");
 		const refreshedHeaders = refreshed ? await registry.resolveModelHeaders(refreshed) : undefined;
 		expect(refreshedHeaders?.["x-tenant-token"]).toBe("fresh-provider");
 		expect(refreshedHeaders?.["x-model-token"]).toBe("fresh-model");
@@ -733,7 +758,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		fs.writeFileSync(modelsPath, JSON.stringify({ providers: {} }));
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		registry.registerProvider("dyn-proxy", {
+		registry.registerProvider("github-copilot", {
 			baseUrl: "https://dyn.example.com/v1",
 			api: "openai-completions",
 			apiKey: "literal-key",
@@ -751,20 +776,20 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			],
 		});
 
-		await registry.refreshProvider("dyn-proxy", "online");
-		const model = registry.find("dyn-proxy", "dyn-model");
+		await registry.refreshProvider("github-copilot", "online");
+		const model = registry.find("github-copilot", "dyn-model");
 		if (!model) throw new Error("Expected dynamic model");
 		expect((await registry.resolveModelHeaders(model))?.["x-model-token"]).toBe("stale-dynamic");
 		expect(fs.readFileSync(modelCounter, "utf8")).toBe("1");
 
 		fs.writeFileSync(modelHeaderFile, "fresh-dynamic");
-		await registry.refreshProvider("dyn-proxy", "online");
-		const cached = registry.find("dyn-proxy", "dyn-model");
+		await registry.refreshProvider("github-copilot", "online");
+		const cached = registry.find("github-copilot", "dyn-model");
 		expect(cached && (await registry.resolveModelHeaders(cached))?.["x-model-token"]).toBe("stale-dynamic");
 		expect(fs.readFileSync(modelCounter, "utf8")).toBe("1");
 
-		await registry.refreshProvider("dyn-proxy", "online", { refreshCommandCredentials: true });
-		const refreshed = registry.find("dyn-proxy", "dyn-model");
+		await registry.refreshProvider("github-copilot", "online", { refreshCommandCredentials: true });
+		const refreshed = registry.find("github-copilot", "dyn-model");
 		expect(refreshed && (await registry.resolveModelHeaders(refreshed))?.["x-model-token"]).toBe("fresh-dynamic");
 		expect(fs.readFileSync(modelCounter, "utf8")).toBe("11");
 	});
@@ -777,7 +802,7 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 		fs.writeFileSync(modelsPath, JSON.stringify({ providers: {} }));
 
 		const registry = new ModelRegistry(authStorage, modelsPath);
-		registry.registerProvider("dyn-proxy", {
+		registry.registerProvider("github-copilot", {
 			baseUrl: "https://dyn.example.com/v1",
 			api: "openai-completions",
 			apiKey: `!${stdoutFileCommand(bearerFile)}`,
@@ -796,8 +821,8 @@ describe("ModelRegistry command-resolved models.yml values", () => {
 			],
 		});
 
-		await registry.refreshProvider("dyn-proxy", "online");
-		const model = registry.find("dyn-proxy", "dyn-model");
+		await registry.refreshProvider("github-copilot", "online");
+		const model = registry.find("github-copilot", "dyn-model");
 		if (!model) throw new Error("Expected dynamic model");
 		expect((await registry.resolveModelHeaders(model))?.["x-tenant-token"]).toBe("stale-tenant");
 		expect(await registry.getApiKey(model)).toBe("stale-bearer");

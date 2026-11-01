@@ -43,6 +43,7 @@ type CaptureFactory = (onAudio: (error: Error | null, samples: Float32Array) => 
 
 interface SttRegistry extends ModelBrowserRegistry {
 	resolver(model: Model<Api>, sessionId?: string): ApiKeyResolver;
+	resolveModelHeaders?(model: Model<Api>, signal?: AbortSignal): Promise<Record<string, string> | undefined>;
 }
 
 export interface STTControllerDependencies {
@@ -51,7 +52,7 @@ export interface STTControllerDependencies {
 	getSessionId?: () => string;
 }
 
-/** Coordinates native microphone capture with streaming local or buffered cloud transcription. */
+/** Coordinates native microphone capture with local or configured-endpoint transcription. */
 export class STTController {
 	#state: SttState = "idle";
 	#resolvedModelKey: SttModelKey | null = null;
@@ -75,10 +76,9 @@ export class STTController {
 	#streamAbort: AbortController | null = null;
 	#streamUtterance = "";
 
-	// Buffered cloud capture.
-	#cloudModel: Model<Api> | null = null;
-	/** Captured cloud-dictation audio, converted to 16-bit PCM on arrival (half the Float32 footprint). */
-	#cloudAudio: Int16Array[] = [];
+	#bufferedModel: Model<Api> | null = null;
+	/** Retain PCM16 rather than Float32 microphone chunks to halve capture memory. */
+	#bufferedAudio: Int16Array[] = [];
 
 	/** Creates a controller; tests may replace the hardware capture boundary. */
 	constructor();
@@ -261,24 +261,25 @@ export class STTController {
 	}
 
 	async #stop(options: SttCallbacks): Promise<void> {
-		if (this.#cloudModel) await this.#stopBuffered(options);
+		if (this.#bufferedModel) await this.#stopBuffered(options);
 		else await this.#stopStreaming(options);
 	}
 
-	// ── Buffered cloud transcription ────────────────────────────────
-
 	#startBuffered(editor: SttTarget, options: SttCallbacks, model: Model<Api>): void {
+		if (!model.baseUrl?.trim()) {
+			options.showWarning("Transcription model requires an explicit base URL");
+			return;
+		}
 		this.#streamEditor = editor;
 		this.#streamCallbacks = options;
 		this.#streamCommitted = false;
 		this.#streamUtterance = "";
 		this.#streamAbort = new AbortController();
-		this.#cloudModel = model;
-		this.#cloudAudio = [];
-
+		this.#bufferedModel = model;
+		this.#bufferedAudio = [];
 		try {
 			this.#streamRecorder = this.#createCapture((error, samples) => {
-				if (this.#disposed || this.#cloudModel !== model || this.#state !== "recording") return;
+				if (this.#disposed || this.#bufferedModel !== model || this.#state !== "recording") return;
 				if (error) {
 					logger.error("Native microphone capture failed", { error: error.message });
 					const recorder = this.#streamRecorder;
@@ -286,93 +287,87 @@ export class STTController {
 					try {
 						recorder?.stop();
 					} catch (cause) {
-						logger.debug("stt: microphone cleanup failed", {
-							error: cause instanceof Error ? cause.message : String(cause),
-						});
+						logger.debug("stt: microphone cleanup failed", { error: String(cause) });
 					}
 					this.#streamAbort?.abort(error);
 					this.#streamEditor?.clearVolatileText();
-					this.#cleanupCloud();
+					this.#cleanupBuffered();
 					this.#setState("idle", options);
 					options.showWarning(error.message);
 					return;
 				}
-				if (samples.length > 0) this.#cloudAudio.push(floatToPcm16(samples));
+				if (samples.length > 0) this.#bufferedAudio.push(floatToPcm16(samples));
 			});
-		} catch (err) {
+		} catch (error) {
 			this.#streamAbort?.abort();
-			this.#cleanupCloud();
-			const msg = err instanceof Error ? err.message : "Failed to start microphone capture";
-			options.showWarning(msg);
-			logger.error("STT recording failed to start", { error: msg });
+			this.#cleanupBuffered();
+			const message = error instanceof Error ? error.message : "Failed to start microphone capture";
+			options.showWarning(message);
+			logger.error("STT recording failed to start", { error: message });
 			return;
 		}
-
 		this.#setState("recording", options);
-		logger.debug("STT buffered recording started", { model: `${model.provider}/${model.id}` });
 	}
 
 	async #stopBuffered(options: SttCallbacks): Promise<void> {
-		const model = this.#cloudModel;
+		const model = this.#bufferedModel;
 		const recorder = this.#streamRecorder;
 		const abort = this.#streamAbort;
 		if (!model || !abort || !this.#registry) {
-			this.#cleanupCloud();
+			this.#cleanupBuffered();
 			this.#setState("idle", options);
 			return;
 		}
-
 		this.#setState("transcribing", options);
 		options.showStatus("Transcribing...");
 		try {
 			recorder?.stop();
-		} catch (err) {
-			logger.debug("stt: buffered recorder stop failed", {
-				error: err instanceof Error ? err.message : String(err),
-			});
+		} catch (error) {
+			logger.debug("stt: buffered recorder stop failed", { error: String(error) });
 		}
 		this.#streamRecorder = null;
-
 		let failed = false;
 		let finalText = "";
 		try {
 			const language = cfgSttLanguage.get(this.#settings);
+			const registry = this.#registry;
 			const result = await transcribeAudio(
-				model,
 				{
-					audio: encodePcm16Wav(this.#cloudAudio),
+					...model,
+					resolveHeaders: registry.resolveModelHeaders
+						? signal => registry.resolveModelHeaders!(model, signal)
+						: model.resolveHeaders,
+				},
+				{
+					audio: encodePcm16Wav(this.#bufferedAudio),
 					mimeType: "audio/wav",
 					fileName: "dictation.wav",
 					responseFormat: "json",
 					...(language && { language }),
 				},
-				{
-					apiKey: this.#registry.resolver(model, this.#getSessionId?.()),
-					signal: abort.signal,
-				},
+				{ apiKey: registry.resolver(model, this.#getSessionId?.()), signal: abort.signal },
 			);
 			finalText = result.text.trim();
-		} catch (err) {
+		} catch (error) {
 			failed = true;
 			if (!this.#disposed) {
-				const msg = err instanceof Error ? err.message : "Transcription failed";
-				options.showWarning(msg);
-				logger.error("STT cloud transcription failed", { error: msg });
+				const message = error instanceof Error ? error.message : "Transcription failed";
+				options.showWarning(message);
+				logger.error("STT endpoint transcription failed", { error: message });
 			}
 		}
 		if (this.#disposed) {
-			this.#cleanupCloud();
+			this.#cleanupBuffered();
 			return;
 		}
-
 		this.#finishTranscript(finalText, failed, options);
-		this.#cleanupCloud();
+		this.#cleanupBuffered();
 		this.#setState("idle", options);
 	}
 
-	#cleanupCloud(): void {
-		this.#cloudModel = null;
-		this.#cloudAudio = [];
+	#cleanupBuffered(): void {
+		this.#bufferedModel = null;
+		this.#bufferedAudio = [];
 		this.#streamRecorder = null;
 		this.#streamEditor = null;
 		this.#streamCallbacks = null;
@@ -542,8 +537,8 @@ export class STTController {
 			// best effort cleanup
 		}
 		this.#cleanupStream();
-		this.#cloudModel = null;
-		this.#cloudAudio = [];
+		this.#bufferedModel = null;
+		this.#bufferedAudio = [];
 		this.#state = "idle";
 		this.#resolvedModelKey = null;
 	}

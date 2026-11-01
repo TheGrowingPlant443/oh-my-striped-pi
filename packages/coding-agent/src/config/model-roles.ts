@@ -12,6 +12,7 @@ import {
 } from "@oh-my-pi/pi-tui/overlays/model-browser";
 import { isValidThemeColor } from "@oh-my-pi/pi-tui/theme";
 import type { Settings } from "./settings";
+import { isRegisteredSearchEngine, SEARCH_ENGINE_MODELS } from "../web/search/provider";
 
 import { cfgCycleOrder, cfgModelTags } from "./model-settings";
 
@@ -44,8 +45,7 @@ function acceptsTinyOrChat(model: Model): boolean {
 }
 
 function acceptsWeb(model: Model): boolean {
-	const kind = modelKind(model);
-	return kind === "search" || (kind === "chat" && model.webSearch !== undefined);
+	return model.provider === "web" && modelKind(model) === "search" && isRegisteredSearchEngine(model.id);
 }
 
 function acceptsJudge(model: Model): boolean {
@@ -103,6 +103,7 @@ function isModelRole(role: string): role is ModelRole {
 
 /** Available models eligible for a role, including keyless runner models. */
 export function roleCandidatePool(role: string, settings: Settings, registry: ModelBrowserRegistry): Model[] {
+	if (role === "web") return SEARCH_ENGINE_MODELS;
 	return registry.getAvailable("all").filter(getRoleInfo(role, settings).accepts);
 }
 

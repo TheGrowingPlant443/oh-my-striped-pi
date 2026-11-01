@@ -1,17 +1,21 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { configureCredentialRedaction } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
+import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 beforeAll(() => configureCredentialRedaction(true));
 afterAll(() => configureCredentialRedaction(false));
 
-// Non-reasoning model on api.openai.com (canonical path)
-const gpt4oMiniModel = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-responses">;
-// Reasoning model on api.openai.com (developer-role path)
-const o4MiniModel = getBundledModel("openai", "o4-mini") as Model<"openai-responses">;
+// Explicitly rebuild the Completions seed for the Responses adapter.
+const gpt4oMiniModel = buildModel<"openai-responses">({
+	...getBundledModel("github-copilot", "gpt-4o"),
+	api: "openai-responses",
+	compat: undefined,
+});
+// Copilot reasoning models use developer-role input messages.
+const o4MiniModel = getBundledModel<"openai-responses">("github-copilot", "gpt-5-mini");
 
 function createSseResponse(): Response {
 	const events = [
@@ -99,8 +103,8 @@ describe("openai-responses system prompt routing", () => {
 		});
 	});
 
-	describe("reasoning model on known OpenAI endpoints (developer role)", () => {
-		it("sends multiple system prompts as input[role=developer] for api.openai.com", async () => {
+	describe("reasoning model on Copilot (developer role)", () => {
+		it("sends multiple system prompts as input[role=developer]", async () => {
 			const context: Context = {
 				systemPrompt: ["First.", "Second."],
 				messages: [{ role: "user", content: "hi", timestamp: Date.now() }],
@@ -117,14 +121,13 @@ describe("openai-responses system prompt routing", () => {
 		});
 	});
 
-	describe("reasoning model on custom proxy (instructions path)", () => {
-		it("uses instructions for reasoning model on non-official endpoint", async () => {
-			const proxyModel: Model<"openai-responses"> = buildModel({
+	describe("explicit developer-role opt-out (instructions path)", () => {
+		it("uses instructions when developer-role support is disabled", async () => {
+			const proxyModel = buildModel<"openai-responses">({
 				...o4MiniModel,
 				api: "openai-responses",
-				baseUrl: "https://proxy.example.com/v1",
-				compat: o4MiniModel.compatConfig,
-			} as ModelSpec<"openai-responses">);
+				compat: { ...o4MiniModel.compatConfig, supportsDeveloperRole: false },
+			});
 			const context: Context = {
 				systemPrompt: ["Proxy reasoning prompt."],
 				messages: [{ role: "user", content: "hi", timestamp: Date.now() }],

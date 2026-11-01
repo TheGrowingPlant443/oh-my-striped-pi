@@ -4,7 +4,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { AuthStorage, type Context } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
@@ -15,6 +14,7 @@ import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
 
 import { cfgBrowserEnabled } from "@oh-my-pi/pi-coding-agent/tools/browser/settings";
 import { cfgComputerEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { getTestModel } from "./helpers/model-fixtures";
 
 // Guards the SDK/session boundary: browser and computer stay outside the tool
 // registry while their eval preludes follow live, session-local settings.
@@ -28,8 +28,7 @@ describe("AgentSession eval preludes", () => {
 		registryDir = path.join(os.tmpdir(), `pi-computer-toggle-${Snowflake.next()}`);
 		fs.mkdirSync(registryDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(registryDir, "auth.db"));
-		authStorage.keys.setRuntime("google", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -47,7 +46,7 @@ describe("AgentSession eval preludes", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			disableExtensionDiscovery: true,
 			skills: [],
 			contextFiles: [],
@@ -84,10 +83,9 @@ describe("AgentSession eval preludes", () => {
 		expect(session.getEvalPreludes().map(definition => definition.name)).toEqual(["browser"]);
 		expect(session.getAllToolNames()).not.toContain("browser");
 
-		const gemini = getBundledModel("google", "gemini-2.5-flash");
-		if (!gemini) throw new Error("Expected bundled Google Gemini model to exist");
-		await session.setModel(gemini);
-		expect(session.model).toBe(gemini);
+		const alternate = getTestModel("github-copilot", model => model.id !== session.model?.id);
+		await session.setModel(alternate);
+		expect(session.model).toBe(alternate);
 		expect(session.getEvalPreludes().map(definition => definition.name)).toEqual(["browser"]);
 	});
 
@@ -101,7 +99,7 @@ describe("AgentSession eval preludes", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			disableExtensionDiscovery: true,
 			skills: [],
 			contextFiles: [],
@@ -171,7 +169,7 @@ describe("AgentSession eval preludes", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			disableExtensionDiscovery: true,
 			skills: [],
 			contextFiles: [],
@@ -192,7 +190,6 @@ describe("AgentSession eval preludes", () => {
 		const manager = new MCPManager(registryDir, null, async () => ({
 			configs: {},
 			sources: {},
-			exaApiKeys: [],
 		}));
 		const reconcile = vi.spyOn(manager, "reconcileBrowserFilter");
 		const settings = Settings.isolated({ "browser.enabled": false });
@@ -202,7 +199,7 @@ describe("AgentSession eval preludes", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			disableExtensionDiscovery: true,
 			skills: [],
 			contextFiles: [],
@@ -244,7 +241,7 @@ describe("AgentSession eval preludes", () => {
 			modelRegistry,
 			sessionManager: SessionManager.inMemory(),
 			settings,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getTestModel("github-copilot"),
 			disableExtensionDiscovery: true,
 			skills: [],
 			contextFiles: [],

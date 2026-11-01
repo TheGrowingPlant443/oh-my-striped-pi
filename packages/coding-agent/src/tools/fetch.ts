@@ -5,12 +5,11 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { type FetchImpl, getEnvApiKey, type ImageContent, type TextContent } from "@oh-my-pi/pi-ai";
+import { type FetchImpl, type ImageContent, type TextContent } from "@oh-my-pi/pi-ai";
 import { htmlToMarkdown, notebookToEditableText } from "@oh-my-pi/pi-natives";
 import { $which, ptree } from "@oh-my-pi/pi-utils";
 import { type ArchiveFormat, listArchiveRoot, sniffArchiveFormat } from "@oh-my-pi/pi-utils/ar";
 import type { Element } from "@oh-my-pi/pi-utils/dom";
-import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
 import type { ToolSession } from "../sdk";
 import type { AgentStorage } from "../session/agent-storage";
@@ -20,12 +19,10 @@ import { formatDimensionNote, resizeImage } from "../utils/image-resize";
 import { CONVERTIBLE_EXTENSIONS } from "../utils/markit";
 import { ensureTool } from "../utils/tools-manager";
 import { decodeBody } from "../web/response-body";
-import { findFirecrawlApiKey, scrapeWithFirecrawl } from "../web/firecrawl";
-import { extractWithParallel, findParallelApiKey, getParallelExtractContent } from "../web/parallel";
+import { isFirecrawlConfigured, scrapeWithFirecrawl } from "../web/firecrawl";
 import type { RenderResult, SpecialHandler } from "../web/scrapers/types";
 import { finalizeOutput, loadPage, looksLikeHtml, MAX_BYTES } from "../web/scrapers/types";
 import { type BinaryFetchResult, convertWithMarkit, fetchBinary } from "../web/scrapers/utils";
-import { findCredential } from "../web/search/providers/utils";
 import { applyListLimit } from "@oh-my-pi/pi-tui/tools/list-limit";
 import { parseTailCount } from "./path-utils";
 import { type LineRange, parseLineRanges } from "@oh-my-pi/pi-tui/tools/line-ranges";
@@ -509,24 +506,11 @@ async function parseFeedToMarkdown(content: string, maxItems = 10): Promise<stri
 }
 
 /**
- * Cap on any single remote reader-mode request (Parallel, Firecrawl, Jina) so a
+ * Cap on a configured private reader request so a
  * stalled remote endpoint cannot consume the whole reader-mode budget and starve
  * the local fallback renderers (trafilatura, lynx, native). See #1449.
  */
 const REMOTE_READER_MAX_MS = 10_000;
-const JINA_MARKDOWN_MARKER = "Markdown Content:";
-const JINA_READER_MAX_BYTES = 2 * 1024 * 1024;
-
-function parseJinaReaderContent(responseBody: string): string | null {
-	const markerStart = responseBody.indexOf(JINA_MARKDOWN_MARKER);
-	if (markerStart < 0) return null;
-
-	const content = responseBody.slice(markerStart + JINA_MARKDOWN_MARKER.length).trim();
-	if (content.length < 100 || content.startsWith("Loading...") || content.startsWith("Please enable JavaScript")) {
-		return null;
-	}
-	return content;
-}
 
 /**
  * Markdown image whose destination is an inline `data:` URI. The label allows
@@ -548,28 +532,21 @@ function stripDataUriImages(markdown: string): string {
 }
 
 /** Reader backends for {@link renderHtmlToText}, in default priority order. */
-export type FetchProvider = "native" | "trafilatura" | "lynx" | "parallel" | "firecrawl" | "jina";
+export type FetchProvider = "native" | "trafilatura" | "lynx" | "firecrawl";
 
-const FETCH_PROVIDER_ORDER: readonly FetchProvider[] = [
-	"native",
-	"trafilatura",
-	"lynx",
-	"parallel",
-	"firecrawl",
-	"jina",
-];
+const FETCH_PROVIDER_ORDER: readonly FetchProvider[] = ["native", "trafilatura", "lynx", "firecrawl"];
 
 /**
  * Render HTML to markdown by trying reader backends in priority order: native
- * (in-process), trafilatura, lynx, Parallel, Firecrawl, then Jina. The
+ * (in-process), trafilatura, lynx, then an explicitly configured private Firecrawl.
  * `providers.fetch` setting picks the order — `auto` uses the default above; any
  * specific backend is tried first, then the remaining backends as fallbacks.
  * Every backend's output must clear the same length and JavaScript-gate checks,
  * and a lynx dump the navigation check too ({@link isLowQualityOutput}), before
  * it is accepted, otherwise the next backend is tried.
  *
- * The overall `timeout` budget bounds the whole call; remote backends (Parallel,
- * Firecrawl, Jina) are additionally capped at `REMOTE_READER_MAX_MS` so a hung
+ * The overall `timeout` budget bounds the whole call; private Firecrawl requests
+ * are additionally capped at `REMOTE_READER_MAX_MS` so a hung
  * endpoint cannot starve later renderers — especially the purely-local native
  * converter, which always works on already-loaded HTML. Only a real `userSignal`
  * cancellation aborts the chain (#1449).
@@ -613,41 +590,9 @@ export async function renderHtmlToText(
 			const result = await ptree.exec(["lynx", "-dump", "-nolist", "-width", "250", url], execOptions);
 			return result.ok ? result.stdout : null;
 		},
-		parallel: async () => {
-			if (!findParallelApiKey(storage)) return null;
-			const parallelResult = await extractWithParallel(
-				[url],
-				{
-					objective: "Extract the main content",
-					excerpts: true,
-					fullContent: false,
-					signal: remoteSignal(),
-					fetch: fetchImpl,
-				},
-				storage,
-			);
-			const firstDocument = parallelResult.results[0];
-			return firstDocument ? getParallelExtractContent(firstDocument) : null;
-		},
 		firecrawl: async () => {
-			if (!findFirecrawlApiKey(storage)) return null;
+			if (!isFirecrawlConfigured()) return null;
 			return scrapeWithFirecrawl(url, { signal: remoteSignal(), fetch: fetchImpl }, storage);
-		},
-		jina: async () => {
-			const apiKey = findCredential(storage, getEnvApiKey("jina"), "jina");
-			const headers: Record<string, string> = {
-				Accept: "text/markdown",
-				"X-No-Cache": "true",
-			};
-			if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-			const response = await fetchImpl(`https://r.jina.ai/${url}`, {
-				headers,
-				signal: remoteSignal(),
-			});
-			if (!response.ok) return null;
-			const contentLength = Number(response.headers.get("content-length"));
-			if (Number.isFinite(contentLength) && contentLength > JINA_READER_MAX_BYTES) return null;
-			return parseJinaReaderContent(await response.text());
 		},
 	};
 
@@ -1045,14 +990,13 @@ async function handleSpecialUrls(
 	timeout: number,
 	signal: AbortSignal | undefined,
 	storage: AgentStorage | null,
-	modelRegistry: ModelRegistry | undefined,
 ): Promise<FetchRenderResult | null> {
 	const specialHandlers = await loadSpecialHandlers();
 	for (const handler of specialHandlers) {
 		if (signal?.aborted) {
 			throw new ToolAbortError();
 		}
-		const result = await handler(url, timeout, signal, storage, modelRegistry);
+		const result = await handler(url, timeout, signal, storage);
 		if (result) return result;
 	}
 	return null;
@@ -1072,7 +1016,6 @@ async function renderUrl(
 	settings: Settings,
 	signal: AbortSignal | undefined,
 	storage: AgentStorage | null,
-	modelRegistry: ModelRegistry | undefined,
 	fetchOverride?: FetchImpl,
 	excludeWebP?: true,
 ): Promise<FetchRenderResult> {
@@ -1101,7 +1044,7 @@ async function renderUrl(
 
 	// Step 1: Try special handlers for known sites (unless raw mode)
 	if (!raw) {
-		const specialResult = await handleSpecialUrls(url, timeout, signal, storage, modelRegistry);
+		const specialResult = await handleSpecialUrls(url, timeout, signal, storage);
 		if (specialResult) return specialResult;
 	}
 
@@ -1671,7 +1614,6 @@ export async function fetchReadUrl(
 		session.settings,
 		signal,
 		storage,
-		session.modelRegistry,
 		session.fetch,
 		webpExclusionForModel(session.getActiveModel?.()),
 	);

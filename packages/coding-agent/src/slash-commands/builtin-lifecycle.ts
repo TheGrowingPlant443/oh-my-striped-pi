@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { CompactionCancelledError } from "@oh-my-pi/pi-agent-core/compaction";
 import { logger, setProjectDir } from "@oh-my-pi/pi-utils";
 import { clearClaudePluginRootsCache } from "../discovery/helpers";
-import { rebindMemoryBackendForCwd } from "../hindsight/backend";
+import { rebindMemoryBackendForCwd } from "../memory-backend/runtime";
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../memory-backend";
 import type { FreshSessionResult, HandoffResult } from "../session/agent-session";
 import { COMPACT_MODES, parseCompactArgs } from "../session/compact-modes";
@@ -565,10 +565,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 			{ name: "rebuild", description: "Alias for enqueue" },
 			{ name: "mm list", description: "List mental models on the active bank" },
 			{ name: "mm show", description: "Show one mental model (id required)" },
-			{
-				name: "mm refresh",
-				description: "Refresh auto-refresh models bank-wide, or one model by id",
-			},
+			{ name: "mm refresh", description: "Refresh auto-refresh models bank-wide, or one model by id" },
 			{ name: "mm history", description: "Diff the change history of a mental model" },
 			{ name: "mm seed", description: "Create any built-in mental models that are missing" },
 			{ name: "mm delete", description: "Delete a mental model from the bank (id required)" },
@@ -625,11 +622,14 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 				}
 				case "mm":
 					return usage(
-						"Mental-model maintenance via /memory mm is unsupported in ACP mode; use the hindsight HTTP API directly.",
+						"Mental-model maintenance via /memory mm is unsupported in ACP mode; use the private Hindsight HTTP API directly.",
 						runtime,
 					);
 				default:
-					return usage("Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync>", runtime);
+					return usage(
+						"Usage: /memory <view|stats|diagnose|clear|reset|enqueue|rebuild|queue|sync|mm ...>",
+						runtime,
+					);
 			}
 		},
 		handleTui: async (command, runtime) => {

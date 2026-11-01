@@ -19,7 +19,7 @@ describe("web_search native view", () => {
 				content: [],
 				details: {
 					response: {
-						provider: "parallel",
+						provider: "searxng",
 						answer: "The answer",
 						sources: [{ url: "https://www.example.com/a", title: "Example", ageSeconds: 3 * 86400 }],
 						model: "m1",

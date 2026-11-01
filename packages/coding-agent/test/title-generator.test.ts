@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
+import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
 import * as ai from "@oh-my-pi/pi-ai";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { formatModelStringWithRouting, resolveModelOverride } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
+import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
 import {
@@ -22,15 +21,23 @@ import { isWsl, logger, setTerminalHeadless } from "@oh-my-pi/pi-utils";
 import { mockWindowsConsoleTitle, type WindowsConsoleTitleMock } from "./terminal-title-test-utils";
 
 function getModelOrThrow(id: string): Model<Api> {
-	const model = getBundledModel("anthropic", id);
-	if (!model) throw new Error(`Expected model ${id}`);
-	return model;
+	return getModelFor("company-messages", id);
 }
 
-function getModelFor(provider: GeneratedProvider, id: string): Model<Api> {
-	const model = getBundledModel(provider, id);
-	if (!model) throw new Error(`Expected model ${provider}/${id}`);
-	return model;
+function getModelFor(provider: string, id: string): Model<Api> {
+	return buildModel({
+		id,
+		name: id,
+		provider,
+		api: provider === "company-messages" ? "anthropic-messages" : "openai-completions",
+		baseUrl: "https://models.company.test/v1",
+		reasoning: true,
+		thinking: { mode: "effort", efforts: [Effort.Minimal, Effort.Low, Effort.Medium, Effort.High] },
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 200_000,
+		maxTokens: 16_384,
+	});
 }
 
 function createSettings(model: Model<Api>): Settings {
@@ -531,7 +538,7 @@ describe("title generator", () => {
 	});
 
 	it("accepts a plain sentence when the model omits the <title> markers", async () => {
-		const model = getModelFor("deepseek", "deepseek-v4-pro");
+		const model = getModelFor("company-deepseek", "deepseek-v4-pro");
 		vi.spyOn(ai, "completeSimple").mockResolvedValue({
 			stopReason: "stop",
 			content: [{ type: "text", text: "Fix login button on mobile" }],
@@ -549,7 +556,7 @@ describe("title generator", () => {
 	it.each(["Here's a thinking process:", "Thinking process:", "Reasoning process:"])(
 		"rejects a markerless prose thinking preamble: %s",
 		async responseText => {
-			const model = getModelFor("deepseek", "deepseek-v4-pro");
+			const model = getModelFor("company-deepseek", "deepseek-v4-pro");
 			vi.spyOn(ai, "completeSimple").mockResolvedValue({
 				stopReason: "stop",
 				content: [{ type: "text", text: responseText }],
@@ -566,7 +573,7 @@ describe("title generator", () => {
 	);
 
 	it("preserves a markerless title that mentions a <think> tag", async () => {
-		const model = getModelFor("deepseek", "deepseek-v4-pro");
+		const model = getModelFor("company-deepseek", "deepseek-v4-pro");
 		vi.spyOn(ai, "completeSimple").mockResolvedValue({
 			stopReason: "stop",
 			content: [{ type: "text", text: "Fix <think> tag parsing" }],
@@ -582,7 +589,7 @@ describe("title generator", () => {
 	});
 
 	it("preserves a markerless title that mentions a ```thinking fence", async () => {
-		const model = getModelFor("deepseek", "deepseek-v4-pro");
+		const model = getModelFor("company-deepseek", "deepseek-v4-pro");
 		vi.spyOn(ai, "completeSimple").mockResolvedValue({
 			stopReason: "stop",
 			content: [{ type: "text", text: "Fix ```thinking fence parsing" }],
@@ -599,7 +606,7 @@ describe("title generator", () => {
 	});
 
 	it("strips an unclosed <title> tag from a truncated response", async () => {
-		const model = getModelFor("deepseek", "deepseek-v4-pro");
+		const model = getModelFor("company-deepseek", "deepseek-v4-pro");
 		vi.spyOn(ai, "completeSimple").mockResolvedValue({
 			stopReason: "stop",
 			content: [{ type: "text", text: "<title>Refactor API client error handling" }],
@@ -688,59 +695,10 @@ describe("title generator", () => {
 		expect(completeSimpleMock).not.toHaveBeenCalled();
 	});
 
-	it("preserves routed current-model title fallback for distinct @upstream routes", async () => {
-		const base = getModelFor("openrouter", "google/gemini-2.5-flash");
-		const registryLookup = { getAvailable: () => [base] };
-		const cerebras = resolveModelOverride(
-			["openrouter/google/gemini-2.5-flash@cerebras"],
-			registryLookup as never,
-		).model!;
-		const openaiRouted = resolveModelOverride(
-			["openrouter/google/gemini-2.5-flash@openai"],
-			registryLookup as never,
-		).model!;
-		expect(formatModelStringWithRouting(cerebras)).toBe("openrouter/google/gemini-2.5-flash@cerebras");
-		expect(formatModelStringWithRouting(openaiRouted)).toBe("openrouter/google/gemini-2.5-flash@openai");
-
-		const completeSimpleMock = vi.spyOn(ai, "completeSimple").mockImplementation(async model => {
-			if (formatModelStringWithRouting(model) === "openrouter/google/gemini-2.5-flash@cerebras") {
-				return {
-					stopReason: "error",
-					errorStatus: 400,
-					errorMessage: "upstream cerebras failed",
-					content: [],
-				} as never;
-			}
-			return {
-				stopReason: "stop",
-				content: [{ type: "text", text: "<title>Routed Recovery</title>" }],
-			} as never;
-		});
-		const settings = Settings.isolated({
-			modelRoles: { tiny: "openrouter/google/gemini-2.5-flash@cerebras" },
-			"retry.modelFallback": true,
-		});
-		const registry = {
-			getAvailable: () => [base],
-			getApiKey: async () => "test-key",
-			getApiKeyForProvider: async () => "test-key",
-			authStorage: { rotateSessionCredential: async () => false },
-			resolver: () => async () => "test-key",
-		} as never;
-
-		const title = await generateSessionTitle("Investigate routing", registry, settings, undefined, openaiRouted);
-		expect(title).toBe("Routed Recovery");
-		const attempted = completeSimpleMock.mock.calls.map(call => formatModelStringWithRouting(call[0] as Model<Api>));
-		expect(attempted).toEqual([
-			"openrouter/google/gemini-2.5-flash@cerebras",
-			"openrouter/google/gemini-2.5-flash@openai",
-		]);
-	});
-
 	it("expands appended currentModel fallbackChains without merging role chains", async () => {
 		const current = getModelOrThrow("claude-opus-4-8");
 		const currentFallback = getModelOrThrow("claude-sonnet-4-5");
-		const roleOnly = getModelFor("openai", "gpt-4o-mini");
+		const roleOnly = getModelFor("company-openai", "gpt-4o-mini");
 		const completeSimpleMock = vi.spyOn(ai, "completeSimple").mockImplementation(async model => {
 			if (model.id === current.id) {
 				return {

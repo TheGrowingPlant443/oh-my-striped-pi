@@ -1,11 +1,4 @@
-import type {
-	Agent,
-	AgentMessage,
-	AgentTool,
-	AgentToolContext,
-	StreamFn,
-	ThinkingLevel,
-} from "@oh-my-pi/pi-agent-core";
+import type { Agent, AgentMessage, AgentTool, StreamFn, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type {
 	AssistantMessage,
 	Context,
@@ -29,7 +22,6 @@ import type { ModelRegistry } from "../config/model-registry";
 import type { PromptTemplate } from "../config/prompt-templates";
 import type { Settings } from "../config/settings";
 import type { SkillsSettings } from "../extensibility/settings";
-import type { CursorMcpResourceAdapter } from "../cursor";
 import type { RawSseDebugBuffer } from "@oh-my-pi/pi-tui/apps/debug/raw-sse-buffer";
 import type { EvalPreludeDefinition } from "../eval/preludes";
 import type { TtsrManager } from "../export/ttsr";
@@ -46,7 +38,6 @@ import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
 import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
 import type { ToolSession } from "../tools";
 import type { XdevState } from "../tools/xdev";
-import type { CodexAutoRedeemCoordinator } from "./codex-auto-reset";
 import type { SettingsGatedToolDelta } from "./session-tools";
 import type { CostGate } from "./cost-gate";
 import type { SessionManager } from "./session-manager";
@@ -272,13 +263,6 @@ export interface AgentSessionConfig {
 	 * `allowSessionModelFallback` option. Default: false.
 	 */
 	allowSessionModelFallback?: boolean;
-	/**
-	 * `false` when the extension UI context cannot reach a human: ACP installs one
-	 * for every client, but without form elicitation its prompts resolve empty.
-	 * Saved-reset consent then takes its no-prompt-UI path. `createAgentSession`
-	 * passes its `interactivePrompts` option. Default: true.
-	 */
-	interactivePrompts?: boolean;
 	/** Whether the startup model may be replaced by refreshed same-selector registry metadata. */
 	rebindModelAfterDiscovery?: boolean;
 	/** Tool registry for LSP and settings. */
@@ -319,8 +303,6 @@ export interface AgentSessionConfig {
 	sideStreamFn?: StreamFn;
 	/** Stream wrapper for advisor requests. */
 	advisorStreamFn?: StreamFn;
-	/** Shared saved-reset coordinator; defaults process-wide so concurrent Codex/Claude sessions cannot double-spend. Inject a fresh one in tests. */
-	codexResetCoordinator?: CodexAutoRedeemCoordinator;
 	/** Provider payload hook used by the active session request path. */
 	onPayload?: SimpleStreamOptions["onPayload"];
 	/** Provider response hook used by the active session request path. */
@@ -368,35 +350,6 @@ export interface AgentSessionConfig {
 	providerPromptCacheKeySource?: "explicit" | "fork";
 	/** Full advisor toolset built against an advisor-scoped tool session. */
 	advisorTools?: AgentTool[];
-	/**
-	 * Build a `grep` honoring a Cursor `pi_grep` frame's own context width and
-	 * match cap, against the advisor-scoped tool session. Without it an advisor
-	 * running on Cursor silently drops both fields.
-	 */
-	advisorCreateGrepTool?(options: { context?: number; totalMatchLimit?: number }): AgentTool | undefined;
-	/**
-	 * Build the `replace`-mode `edit` a Cursor `pi_edit` frame needs, against the
-	 * advisor-scoped tool session. The advisor's ordinary instance follows the
-	 * configured `edit.mode` and rejects the frame's `old_string`/`new_string` args.
-	 */
-	advisorCreateEditTool?(): AgentTool | undefined;
-	/**
-	 * The execute-time context the advisor's bridge tools resolve approval from.
-	 *
-	 * `ExtensionToolWrapper` reads `tools.approvalMode`, per-tool
-	 * `tools.approval.<tool>` policies and `autoApprove` only from this context;
-	 * with none it fails closed to `always-ask` with empty policies (no user
-	 * grant), so a bridge tool that needs a prompt cannot run unattended.
-	 */
-	advisorGetToolContext?: () => AgentToolContext | undefined;
-	/**
-	 * The live MCP connections the advisor's Cursor resource frames answer from.
-	 *
-	 * Advisors share the session's connections and may be granted tools from
-	 * those same servers; without this their `list_mcp_resources` reports an
-	 * empty catalog and every `read_mcp_resource` a `not_found`.
-	 */
-	advisorMcpResources?: CursorMcpResourceAdapter;
 	/** Preloaded watchdog prompt content for the advisor. */
 	advisorWatchdogPrompt?: string;
 	/** Shared advisor instructions loaded from WATCHDOG.yml. */

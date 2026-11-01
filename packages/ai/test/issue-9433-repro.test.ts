@@ -16,7 +16,7 @@ const model = buildModel({
 	id: "test-model",
 	name: "Test",
 	api: "openai-completions",
-	provider: "litellm",
+	provider: "github-copilot",
 	baseUrl: "http://127.0.0.1:4000/v1",
 	reasoning: false,
 	input: ["text"],

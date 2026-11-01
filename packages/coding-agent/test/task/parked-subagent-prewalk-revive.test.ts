@@ -7,9 +7,9 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
 import { Effort } from "@oh-my-pi/pi-ai";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -52,7 +52,6 @@ beforeEach(async () => {
 	setAgentDir(path.join(home, ".omp", "agent"));
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
-	registerMockApi(MOCK_API_SOURCE);
 });
 
 afterEach(async () => {
@@ -79,6 +78,7 @@ it("revives a parked subagent on its prewalk handoff target, keeping its todo li
 	const modelRegistry = new ModelRegistry(authStorage);
 	const planner = Object.assign(
 		createMockModel({
+			provider: "mock",
 			id: PLANNER,
 			reasoning: true,
 			handler: context => {
@@ -109,6 +109,7 @@ it("revives a parked subagent on its prewalk handoff target, keeping its todo li
 	);
 	const target = Object.assign(
 		createMockModel({
+			provider: "mock",
 			id: TARGET,
 			reasoning: true,
 			handler: context =>
@@ -118,8 +119,16 @@ it("revives a parked subagent on its prewalk handoff target, keeping its todo li
 		}),
 		{ thinking },
 	);
-	const catalogAvailable = modelRegistry.getAvailable.bind(modelRegistry);
-	vi.spyOn(modelRegistry, "getAvailable").mockImplementation(kind => [planner, target, ...catalogAvailable(kind)]);
+	modelRegistry.registerProvider(planner.provider, {
+		api: planner.api,
+		baseUrl: planner.baseUrl,
+		models: [planner, target],
+	});
+	registerCustomApi(
+		planner.api,
+		(model, context, options) => (model.id === planner.id ? planner : target).stream(model, context, options),
+		MOCK_API_SOURCE,
+	);
 
 	try {
 		const result = await runSubprocess({

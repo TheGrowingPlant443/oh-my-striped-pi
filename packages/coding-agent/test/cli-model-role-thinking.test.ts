@@ -35,8 +35,8 @@ describe("--model role override thinking suffix", () => {
 	});
 
 	async function overriddenDefaultRole(cliArgs: string[]): Promise<string | undefined> {
-		const model = getBundledModel("anthropic", "claude-opus-4-5");
-		if (!model) throw new Error("expected claude-opus-4-5 to be bundled");
+		const model = getBundledModel("github-copilot", "gpt-5.6-sol");
+		if (!model) throw new Error("expected Copilot GPT-5.6 Sol to be bundled");
 		authStorage.keys.setRuntime(model.provider, "test-key");
 		const settings = Settings.isolated();
 		settings.setModelRole("default", `${model.provider}/${model.id}:high`);
@@ -51,34 +51,34 @@ describe("--model role override thinking suffix", () => {
 	}
 
 	test("keeps the requested effort on the default role", async () => {
-		expect(await overriddenDefaultRole(["--model", "anthropic/claude-opus-4-5:low"])).toBe(
-			"anthropic/claude-opus-4-5:low",
+		expect(await overriddenDefaultRole(["--model", "github-copilot/gpt-5.6-sol:low"])).toBe(
+			"github-copilot/gpt-5.6-sol:low",
 		);
 	});
 
 	test("leaves the role effort unselected when the flag carries no suffix", async () => {
-		expect(await overriddenDefaultRole(["--model", "anthropic/claude-opus-4-5"])).toBe("anthropic/claude-opus-4-5");
+		expect(await overriddenDefaultRole(["--model", "github-copilot/gpt-5.6-sol"])).toBe("github-copilot/gpt-5.6-sol");
 	});
 
 	test("records the explicit --thinking effort over the --model suffix", async () => {
-		expect(await overriddenDefaultRole(["--model", "anthropic/claude-opus-4-5:low", "--thinking", "high"])).toBe(
-			"anthropic/claude-opus-4-5:high",
+		expect(await overriddenDefaultRole(["--model", "github-copilot/gpt-5.6-sol:low", "--thinking", "high"])).toBe(
+			"github-copilot/gpt-5.6-sol:high",
 		);
 	});
 
 	test("records --thinking on the default role when --model carries no suffix", async () => {
 		// The only case where the flag supplies the effort and the suffix does not.
-		expect(await overriddenDefaultRole(["--model", "anthropic/claude-opus-4-5", "--thinking", "high"])).toBe(
-			"anthropic/claude-opus-4-5:high",
+		expect(await overriddenDefaultRole(["--model", "github-copilot/gpt-5.6-sol", "--thinking", "high"])).toBe(
+			"github-copilot/gpt-5.6-sol:high",
 		);
 	});
 
 	test("prewalk @default resolves the configured default before --model overrides the session role", async () => {
-		const startupModel = getBundledModel("anthropic", "claude-opus-4-5");
-		const configuredDefault = getBundledModel("anthropic", "claude-sonnet-4-6");
+		const startupModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+		const configuredDefault = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!startupModel || !configuredDefault) throw new Error("expected bundled models");
 
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 
 		const settings = Settings.isolated({ defaultThinkingLevel: "auto" });
 		settings.setModelRole("default", `${configuredDefault.provider}/${configuredDefault.id}`);
@@ -96,11 +96,11 @@ describe("--model role override thinking suffix", () => {
 	});
 
 	test("prewalk bare default resolves the configured default before --model overrides the session role", async () => {
-		const startupModel = getBundledModel("anthropic", "claude-opus-4-5");
-		const configuredDefault = getBundledModel("anthropic", "claude-sonnet-4-6");
+		const startupModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+		const configuredDefault = getBundledModel("github-copilot", "claude-sonnet-4.6");
 		if (!startupModel || !configuredDefault) throw new Error("expected bundled models");
 
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 
 		const settings = Settings.isolated({ defaultThinkingLevel: "auto" });
 		settings.setModelRole("default", `${configuredDefault.provider}/${configuredDefault.id}`);

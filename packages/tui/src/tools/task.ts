@@ -2427,7 +2427,7 @@ export interface AgentProgress {
 	resolvedModelIdentity?: string;
 	/** Explicit thinking metadata; never inferred from the model identity. */
 	resolvedThinkingLevel?: ConfiguredThinkingLevel;
-	/** True when {@link resolvedModel} is the target of an active retry fallback (not the originally configured model). Lets observer-only UIs (collab guests, Agent Hub rows with no live session) flag the fallback and keep the provider. */
+	/** True when {@link resolvedModel} is the target of an active retry fallback (not the originally configured model). Lets Agent Hub rows with no live session flag the fallback and keep the provider. */
 	resolvedModelIsFallback?: boolean;
 	/** Extension routing note (e.g. model-pools) explaining why {@link resolvedModel} was chosen. */
 	resolvedModelRoute?: string;

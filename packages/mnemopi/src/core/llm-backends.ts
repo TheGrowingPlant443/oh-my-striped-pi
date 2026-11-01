@@ -1,12 +1,9 @@
-import type { FetchImpl } from "@oh-my-pi/pi-ai";
-
 export interface CompleteOptions {
 	maxTokens?: number;
 	temperature?: number;
 	timeout?: number;
 	provider?: string | null;
 	model?: string | null;
-	fetch?: FetchImpl;
 }
 
 export interface LlmBackend {

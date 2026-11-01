@@ -1,7 +1,7 @@
 /**
  * Web search CLI command handlers.
  *
- * Handles `omp q`/`omp web-search` subcommands for testing web search models.
+ * Handles `omp q`/`omp web-search` subcommands for independent search engines.
  */
 
 import { APP_NAME, getProjectDir } from "@oh-my-pi/pi-utils";
@@ -104,7 +104,7 @@ export async function runSearchCommand(cmd: SearchCommandArgs): Promise<void> {
 }
 
 export function printSearchHelp(): void {
-	process.stdout.write(`${chalk.bold(`${APP_NAME} q`)} - Test web search models
+	process.stdout.write(`${chalk.bold(`${APP_NAME} q`)} - Test web search engines
 
 ${chalk.bold("Usage:")}
   ${APP_NAME} q [options] <query>
@@ -114,7 +114,7 @@ ${chalk.bold("Arguments:")}
   query      Search query text
 
 ${chalk.bold("Options:")}
-  --model <selector>  Catalog model selector (for example, web/duckduckgo)
+  --model <selector>  Search engine selector (for example, web/duckduckgo)
   --recency <value>   Recency filter (when supported): ${RECENCY_OPTIONS.join(", ")}
   -l, --limit <n>     Max results to return
   --compact           Render condensed output
@@ -128,7 +128,7 @@ ${chalk.bold("Query directives:")}
 
 ${chalk.bold("Examples:")}
   ${APP_NAME} q --model=web/duckduckgo "what's the color of the sky"
-  ${APP_NAME} q --model=openrouter/google/gemini-2.5-flash --recency=week "latest TypeScript changes"
+  ${APP_NAME} q --model=web/searxng --recency=week "latest TypeScript changes"
   ${APP_NAME} q 'transformer scaling site:arxiv.org after:2024 -site:reddit.com'
 `);
 }

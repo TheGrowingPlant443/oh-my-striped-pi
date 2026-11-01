@@ -56,7 +56,7 @@ export class MemoryRetainTool implements AgentTool<MemoryRetainSchema, MemoryRet
 
 	static createIf(session: ToolSession): MemoryRetainTool | null {
 		const backend = cfgMemoryBackend.get(session.settings);
-		if (backend !== "hindsight" && backend !== "mnemopi") return null;
+		if (backend !== "mnemopi" && backend !== "hindsight") return null;
 		if (backend === "hindsight" && !isHindsightConfigured(loadHindsightConfig(session.settings))) return null;
 		return new MemoryRetainTool(session);
 	}
@@ -124,26 +124,16 @@ export class MemoryRetainTool implements AgentTool<MemoryRetainSchema, MemoryRet
 			});
 		}
 
+		if (backend !== "hindsight") throw new Error("No writable memory backend is active for this session.");
 		const state = this.session.getHindsightSessionState?.();
-		if (!state) {
-			throw new Error("Hindsight backend is not initialised for this session.");
-		}
+		if (!state) throw new Error("Hindsight backend is not initialised for this session.");
 		if (params.items.some(item => item.scope === "global")) {
 			throw new Error("Global memory scope is only available with the Mnemopi backend.");
 		}
-
-		// Push every item onto the session-owned queue and return immediately.
-		// The queue flushes either when it reaches its batch threshold or when
-		// its debounce timer fires. If the eventual batch fails, the queue
-		// surfaces a UI-only warning notice — the LLM is not informed.
-		for (const item of params.items) {
-			state.enqueueRetain(item.content, item.context);
-		}
-
+		for (const item of params.items) state.enqueueRetain(item.content, item.context);
 		const count = params.items.length;
-		const noun = count === 1 ? "memory" : "memories";
 		return {
-			content: [{ type: "text", text: `${count} ${noun} queued.` }],
+			content: [{ type: "text", text: `${count} ${count === 1 ? "memory" : "memories"} queued.` }],
 			details: { count },
 		};
 	}

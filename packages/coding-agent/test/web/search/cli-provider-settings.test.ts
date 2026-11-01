@@ -6,10 +6,12 @@ import { __resetDirsFromEnvForTests, setAgentDir, TempDir } from "@oh-my-pi/pi-u
 import { runSearchCommand } from "../../../src/cli/web-search-cli";
 
 import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgSearxngEndpoint } from "@oh-my-pi/pi-coding-agent/web/settings";
 
 const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
 const originalOmpProfile = process.env.OMP_PROFILE;
 const originalPiProfile = process.env.PI_PROFILE;
+const originalFirecrawlBaseUrl = process.env.FIRECRAWL_BASE_URL;
 
 let tempAgentDir: TempDir | undefined;
 let originalExitCode: typeof process.exitCode;
@@ -23,22 +25,32 @@ function makeFetchMock(): typeof fetch {
 	return Object.assign(
 		async (input: string | Request | URL): Promise<Response> => {
 			const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-			if (url === "https://www.startpage.com/") {
-				return new Response("<html><body></body></html>", {
-					status: 200,
-					headers: { "Content-Type": "text/html" },
-				});
-			}
-			if (url.startsWith("https://www.startpage.com/sp/search")) {
+			if (url.startsWith("http://searxng.internal/search")) {
 				return new Response(
-					'<div class="result"><a class="result-link" href="https://startpage.example"><h2>Startpage result</h2></a><p class="description">startpage</p></div>',
-					{ status: 200, headers: { "Content-Type": "text/html" } },
+					JSON.stringify({
+						results: [{ title: "Private SearXNG result", url: "https://searxng.example", content: "searxng" }],
+					}),
+					{
+						headers: { "Content-Type": "application/json" },
+					},
 				);
 			}
-			if (url === "https://html.duckduckgo.com/html/") {
+			if (url === "http://firecrawl.internal/v2/search") {
 				return new Response(
-					'<div class="result"><a class="result__a" href="https://duckduckgo.example">DuckDuckGo result</a><a class="result__snippet">duckduckgo</a></div>',
-					{ status: 200, headers: { "Content-Type": "text/html" } },
+					JSON.stringify({
+						data: {
+							web: [
+								{
+									title: "Private Firecrawl result",
+									url: "https://firecrawl.example",
+									description: "firecrawl",
+								},
+							],
+						},
+					}),
+					{
+						headers: { "Content-Type": "application/json" },
+					},
 				);
 			}
 			return new Response(`unexpected URL: ${url}`, { status: 500 });
@@ -54,7 +66,9 @@ beforeEach(async () => {
 	tempAgentDir = TempDir.createSync("@omp-search-cli-");
 	setAgentDir(tempAgentDir.path());
 	const settings = await Settings.init({ inMemory: true, cwd: tempAgentDir.path() });
-	settings.setModelRole("web", "web/startpage");
+	settings.setModelRole("web", "web/searxng");
+	cfgSearxngEndpoint.set(settings, "http://searxng.internal");
+	process.env.FIRECRAWL_BASE_URL = "http://firecrawl.internal";
 	cfgRetryFallbackChains.set(settings, { web: [] });
 });
 
@@ -65,6 +79,7 @@ afterEach(async () => {
 	restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
 	restoreEnv("OMP_PROFILE", originalOmpProfile);
 	restoreEnv("PI_PROFILE", originalPiProfile);
+	restoreEnv("FIRECRAWL_BASE_URL", originalFirecrawlBaseUrl);
 	__resetDirsFromEnvForTests();
 	// runSearchCommand opens <agentDir>/models.db; Windows cannot delete an open database.
 	closeModelCache();
@@ -86,8 +101,8 @@ describe("runSearchCommand model role settings", () => {
 		await runSearchCommand({ query: "role selection smoke test", limit: 1, expanded: false });
 
 		const plain = stripVTControlCharacters(stdout);
-		expect(plain).toContain("startpage.example");
-		expect(plain).not.toContain("duckduckgo.example");
+		expect(plain).toContain("searxng.example");
+		expect(plain).not.toContain("firecrawl.example");
 	});
 
 	it("treats --model as a one-shot override of modelRoles.web", async () => {
@@ -100,13 +115,13 @@ describe("runSearchCommand model role settings", () => {
 
 		await runSearchCommand({
 			query: "explicit model override",
-			model: "web/duckduckgo",
+			model: "web/firecrawl",
 			limit: 1,
 			expanded: false,
 		});
 
 		const plain = stripVTControlCharacters(stdout);
-		expect(plain).toContain("duckduckgo.example");
-		expect(plain).not.toContain("startpage.example");
+		expect(plain).toContain("firecrawl.example");
+		expect(plain).not.toContain("searxng.example");
 	});
 });

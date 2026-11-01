@@ -18,7 +18,7 @@ export function providerEntries(): Readonly<Record<string, CompiledProvider>> {
 
 /** One provider's catalog entry, or `undefined` for ids without one. */
 export function providerEntry(provider: string): CompiledProvider | undefined {
-	return rules.providers[provider];
+	return Object.hasOwn(rules.providers, provider) ? rules.providers[provider] : undefined;
 }
 
 /**
@@ -28,5 +28,5 @@ export function providerEntry(provider: string): CompiledProvider | undefined {
 export function seedModels<TApi extends Api = Api>(provider: string): readonly ModelSpec<TApi>[] {
 	// Compile-time validated JSON; the only untyped edge is `thinking`/`compat`
 	// arriving as resolved-key records rather than the spec interfaces.
-	return (rules.providers[provider]?.seed?.models ?? EMPTY) as unknown as readonly ModelSpec<TApi>[];
+	return (providerEntry(provider)?.seed?.models ?? EMPTY) as unknown as readonly ModelSpec<TApi>[];
 }

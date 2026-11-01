@@ -18,6 +18,7 @@ import { type BenchSummary, runBenchCommand } from "@oh-my-pi/pi-coding-agent/cl
 import { type BenchModelRegistry, resolveBenchTargets } from "@oh-my-pi/pi-coding-agent/cli/bench-runtime";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { getModelDbPath, TempDir } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function fakeModel(provider: string, id: string): Model<Api> {
 	return buildModel({
@@ -242,36 +243,32 @@ describe("default bench runtime", () => {
 		const tempDir = TempDir.createSync("@omp-bench-runtime-");
 		const apiKey = "bench-cache-test-key";
 		const modelId = "cached-bench-model";
+		const bundled = getTestModel("github-copilot");
 		const cacheDbPath = getModelDbPath(tempDir.path());
 		await fs.mkdir(path.dirname(cacheDbPath), { recursive: true });
 		try {
 			writeModelCache(
-				resolveModelCacheProviderId("opencode-go", { apiKey }),
+				resolveModelCacheProviderId("github-copilot", { apiKey }),
 				Date.now(),
 				[
 					buildModel({
+						...bundled,
 						id: modelId,
 						name: "Cached Bench Model",
-						provider: "opencode-go",
-						api: "openai-completions",
-						baseUrl: "https://opencode.ai/zen/go/v1",
-						reasoning: false,
-						input: ["text"],
-						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-						contextWindow: 128_000,
-						maxTokens: 4096,
 					}),
 				],
 				true,
 				"",
 				cacheDbPath,
+				[bundled],
+				bundled.headers,
 			);
 			const script = `
 				import { createDefaultBenchRuntime, resolveBenchTargets } from "./packages/coding-agent/src/cli/bench-runtime.ts";
 				const runtime = await createDefaultBenchRuntime();
 				try {
 				const [target] = await resolveBenchTargets(
-						["opencode-go/${modelId}"],
+						["github-copilot/${modelId}"],
 						runtime.modelRegistry,
 						runtime.settings,
 						() => {},
@@ -286,7 +283,7 @@ describe("default bench runtime", () => {
 				env: {
 					...process.env,
 					NO_COLOR: "1",
-					OPENCODE_API_KEY: apiKey,
+					COPILOT_GITHUB_TOKEN: apiKey,
 					PI_CODING_AGENT_DIR: tempDir.path(),
 				},
 				stdout: "pipe",
@@ -300,7 +297,7 @@ describe("default bench runtime", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stderr).toBe("");
-			expect(stdout.trim()).toBe(`opencode-go/${modelId}`);
+			expect(stdout.trim()).toBe(`github-copilot/${modelId}`);
 		} finally {
 			await tempDir.remove();
 		}
@@ -436,15 +433,15 @@ async function captureServiceTier(opts: {
 	return { wire: captured?.serviceTier, summary: summary.serviceTierByFamily };
 }
 
-describe("bench provider session state and websocket preference", () => {
-	it("sends providerSessionState and preferWebsockets to the stream", async () => {
+describe("bench provider session state", () => {
+	it("sends a fresh providerSessionState map to the stream", async () => {
 		const registry = fakeRegistry({
-			models: [fakeModel("openai-codex", "gpt-5.5")],
-			authedProviders: ["openai-codex"],
+			models: [fakeModel("github-copilot", "gpt-5.5")],
+			authedProviders: ["github-copilot"],
 		});
 		let captured: SimpleStreamOptions | undefined;
 		await runBenchCommand(
-			{ models: ["openai-codex/gpt-5.5"], flags: { runs: 1, maxTokens: 64, json: true } },
+			{ models: ["github-copilot/gpt-5.5"], flags: { runs: 1, maxTokens: 64, json: true } },
 			{
 				createRuntime: async () => ({
 					modelRegistry: registry,
@@ -465,7 +462,6 @@ describe("bench provider session state and websocket preference", () => {
 		);
 		expect(captured?.providerSessionState).toBeInstanceOf(Map);
 		expect(captured?.providerSessionState?.size).toBe(0);
-		expect(captured?.preferWebsockets).toBe(true);
 	});
 });
 

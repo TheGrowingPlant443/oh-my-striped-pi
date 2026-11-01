@@ -196,7 +196,7 @@ describe("SessionManager on a session file another omp process writes", () => {
 		using tempDir = TempDir.createSync("@omp-shared-session-file-");
 		const original = await createSession(tempDir);
 
-		// `omp share`, `--export`, and `render` open a session the same way and never write it.
+		// `--export` and `render` open a session the same way and never write it.
 		const { other: inspector } = await OtherProcess.resume(tempDir, original);
 		try {
 			expect(await resumeAndAppend(original, tempDir.path())).toEqual({ savedTo: original, notices: [] });

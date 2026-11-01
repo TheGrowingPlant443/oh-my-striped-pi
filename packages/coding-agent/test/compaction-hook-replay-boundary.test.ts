@@ -19,7 +19,7 @@ describe("hook-provided compaction replay boundary", () => {
 
 	beforeAll(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -38,8 +38,8 @@ describe("hook-provided compaction replay boundary", () => {
 			role: "assistant" as const,
 			content: [{ type: "text" as const, text }],
 			api: "anthropic-messages" as const,
-			provider: "anthropic" as const,
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot" as const,
+			model: "claude-sonnet-4.5",
 			stopReason: "stop" as const,
 			usage: {
 				input: 1000,
@@ -80,8 +80,8 @@ describe("hook-provided compaction replay boundary", () => {
 			},
 			emitBeforeAgentStart: async () => undefined,
 		};
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in anthropic model to exist");
+		const bundled = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!bundled) throw new Error("Expected bundled Copilot model");
 		session = new AgentSession({
 			agent: new Agent({
 				initialState: { model: bundled, systemPrompt: ["Test"], tools: [], messages: [] },

@@ -15,7 +15,7 @@ function customAdaptiveModel(): Model<"anthropic-messages"> {
 		id: "claude-opus-5",
 		name: "claude-opus-5",
 		api: "anthropic-messages",
-		provider: "ccs",
+		provider: "github-copilot",
 		baseUrl: "https://ccs.example/anthropic",
 		reasoning: true,
 		input: ["text", "image"],
@@ -56,8 +56,7 @@ describe("issue #10994 — anthropic adaptive minimal effort clamp", () => {
 		const model = customAdaptiveModel();
 		const { promise, resolve } = Promise.withResolvers<{ output_config?: { effort?: string } }>();
 		streamAnthropic(model, CONTEXT, {
-			apiKey: "sk-ant-oat-test",
-			isOAuth: true,
+			apiKey: "copilot-test-token",
 			signal: abortedSignal(),
 			thinkingEnabled: true,
 			reasoning: Effort.Minimal,

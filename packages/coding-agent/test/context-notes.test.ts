@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { convertOpenAICodexResponsesTools } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import { convertTools } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { isJsonSchemaValueValid } from "@oh-my-pi/pi-ai/utils/schema";
 import { validateToolCall } from "@oh-my-pi/pi-ai/utils/validation";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
@@ -52,13 +52,13 @@ function toolSession(
 	};
 }
 
-function codexModel() {
+function responsesModel() {
 	return buildModel({
 		id: "gpt-5.5",
 		name: "gpt-5.5",
-		api: "openai-codex-responses",
-		provider: "openai-codex",
-		baseUrl: "https://chatgpt.com/backend-api/codex/responses",
+		api: "openai-responses",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -81,8 +81,8 @@ describe("experimental context notes", () => {
 			if (!sessionFile) throw new Error("expected persisted session file");
 			const before = await Bun.file(sessionFile).text();
 			const revision = getContextNotes(manager.getBranch());
-			const model = codexModel();
-			const [wireTool] = convertOpenAICodexResponsesTools([tool], model);
+			const model = responsesModel();
+			const [wireTool] = convertTools([tool], false, model);
 			if (wireTool?.type !== "function") throw new Error("expected function schema");
 			expect(isJsonSchemaValueValid(wireTool.parameters, {})).toBe(true);
 			expect(isJsonSchemaValueValid(wireTool.parameters, { text: "" })).toBe(true);

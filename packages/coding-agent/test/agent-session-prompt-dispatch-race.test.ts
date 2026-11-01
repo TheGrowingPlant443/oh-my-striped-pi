@@ -41,7 +41,7 @@ describe("AgentSession concurrent prompt dispatch", () => {
 
 	beforeEach(async () => {
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -57,8 +57,8 @@ describe("AgentSession concurrent prompt dispatch", () => {
 	});
 
 	function createSession(sessionManager = SessionManager.inMemory(), extensionRunner?: ExtensionRunner) {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected retained Copilot test model");
 
 		const agent = new Agent({
 			getApiKey: () => "test-key",
@@ -119,7 +119,7 @@ describe("AgentSession concurrent prompt dispatch", () => {
 				await reachedFlush.promise;
 			}
 			const pending = session.promptCustomMessage({
-				customType: "collab-prompt",
+				customType: "test-prompt",
 				content: "Admitted on the abandoned branch",
 				display: true,
 				attribution: "user",
@@ -141,7 +141,7 @@ describe("AgentSession concurrent prompt dispatch", () => {
 			}
 			expect(await pending).toBe(false);
 			expect(
-				manager.getEntries().some(entry => entry.type === "custom_message" && entry.customType === "collab-prompt"),
+				manager.getEntries().some(entry => entry.type === "custom_message" && entry.customType === "test-prompt"),
 			).toBe(false);
 		},
 	);

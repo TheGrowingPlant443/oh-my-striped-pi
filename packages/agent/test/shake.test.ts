@@ -39,9 +39,9 @@ function assistantMessage(content: AssistantMessage["content"]): AssistantMessag
 		role: "assistant",
 		content,
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,

@@ -9,20 +9,13 @@
  */
 
 import type { ParsedCollabLink } from "@oh-my-pi/pi-wire";
-import {
-	DEFAULT_RELAY_URL,
-	ENVELOPE_HEADER_LENGTH,
-	ROOM_ID_BYTES,
-	ROOM_KEY_BYTES,
-	WRITE_TOKEN_BYTES,
-} from "@oh-my-pi/pi-wire";
+import { ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES, ROOM_KEY_BYTES, WRITE_TOKEN_BYTES } from "@oh-my-pi/pi-wire";
 
 export { COLLAB_PROTO } from "@oh-my-pi/pi-wire";
 export type { ParsedCollabLink };
-export { DEFAULT_RELAY_URL, ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES };
+export { ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES };
 
 const ROOM_PATH_RE = /^\/r\/([A-Za-z0-9_-]{10,64})(?:\.([A-Za-z0-9_-]+))?$/;
-const BARE_LINK_RE = /^([A-Za-z0-9_-]{10,64})[#.]([A-Za-z0-9_-]+)$/;
 const B64URL_RE = /^[A-Za-z0-9_-]+$/;
 const LOCAL_HOSTNAMES: Record<string, true> = { localhost: true, "127.0.0.1": true, "::1": true, "[::1]": true };
 
@@ -112,9 +105,8 @@ function normalizeRelayOrigin(relayUrl: string): { origin: string } | { error: s
 }
 
 /**
- * Render the shareable link. Compact forms: the default relay collapses to
- * `<roomId>.<key>`; custom wss relays drop the scheme (`host[:port]/r/…`);
- * plain-ws localhost relays keep the full `ws://` URL.
+ * Render a link that always includes its explicit relay origin. Secure
+ * relays drop the wss:// scheme; localhost ws:// links keep the full URL.
  *
  * The room secret is dot-joined (`<roomId>.<key>`) rather than `#`-joined:
  * RFC 3986 forbids a raw `#` inside a fragment, so strict URL stacks (macOS
@@ -135,7 +127,6 @@ export function formatCollabLink(relayUrl: string, roomId: string, key: Uint8Arr
 		secret.set(writeToken, key.byteLength);
 	}
 	const keyText = encodeBase64Url(secret);
-	if (normalized.origin === DEFAULT_RELAY_URL) return `${roomId}.${keyText}`;
 	const compact = normalized.origin.startsWith("wss://")
 		? normalized.origin.slice("wss://".length)
 		: normalized.origin;
@@ -146,11 +137,8 @@ export function parseCollabLink(link: string): ParsedCollabLink | { error: strin
 	// Lenient input: terminals that open OSC 8 links through strict URL stacks
 	// (macOS Foundation) percent-encode the legacy second `#` to `%23`.
 	let text = link.trim().replace(/%23/gi, "#");
-	// Bare `<roomId>.<key>` (legacy `<roomId>#<key>`) → default relay.
-	const bare = BARE_LINK_RE.exec(text);
-	if (bare) text = `${DEFAULT_RELAY_URL}/r/${bare[1]}.${bare[2]}`;
-	// Scheme-less `host[:port]/r/…` → wss.
-	else if (!text.includes("://")) text = `wss://${text}`;
+	// Every link names its relay; room-only links have no implicit public destination.
+	if (!text.includes("://")) text = `wss://${text}`;
 	let url: URL;
 	try {
 		url = new URL(text);

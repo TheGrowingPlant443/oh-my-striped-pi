@@ -19,7 +19,6 @@ import * as path from "node:path";
 import { setImmediate } from "node:timers/promises";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { importRoomKey } from "@oh-my-pi/pi-coding-agent/collab/crypto";
 import { type CollabGuestUiResult, CollabHost } from "@oh-my-pi/pi-coding-agent/collab/host";
 import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-pi/pi-coding-agent/collab/protocol";
@@ -32,6 +31,7 @@ import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { FakeWebSocket, installInMemoryRelay, uninstallInMemoryRelay } from "./helpers/in-memory-relay";
+import { getTestModel } from "../helpers/model-fixtures";
 
 const RELAY_URL = "ws://localhost:8788";
 const WEB_URL = "https://collab.example";
@@ -169,10 +169,9 @@ describe("collab host registry lifecycle (#6099)", () => {
 		"notifies the submitting guest when %s discards an admitted prompt",
 		async transition => {
 			const auth = await AuthStorage.create(":memory:");
-			auth.keys.setRuntime("anthropic", "test-key");
+			const model = getTestModel("github-copilot");
+			auth.keys.setRuntime(model.provider, "test-key");
 			const models = new ModelRegistry(auth);
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			if (!model) throw new Error("Test model missing");
 			const manager = SessionManager.create(tmp, tmp);
 			manager.appendMessage({ role: "user", content: "Retained", timestamp: 1 });
 			const abandoned = manager.appendMessage({ role: "user", content: "Abandoned", timestamp: 2 });

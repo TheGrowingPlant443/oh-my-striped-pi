@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, spyOn, test, vi } from "bun:test";
 import type { FetchImpl, Model } from "@oh-my-pi/pi-ai";
 import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
@@ -37,8 +38,6 @@ function createContext(
 }
 
 const local = requireModel("local", "kokoro");
-const xai = requireModel("xai", "grok-tts");
-const deepInfra = requireModel("deepinfra", "hexgrad/Kokoro-82M");
 
 let authStorage: AuthStorage;
 let tempDir: string;
@@ -55,26 +54,20 @@ afterEach(() => {
 });
 
 describe("speech role candidate ordering", () => {
-	test("hoists available default cloud candidates ahead of local for MP3 only", async () => {
-		await authStorage.credentials.set("xai", [{ type: "api_key", key: "xai-test-key" }]);
+	test("selects the default local speech model", async () => {
 		const settings = Settings.isolated();
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
 
-		expect(resolveSpeechCandidates(settings, registry, false).map(candidate => candidate.model)).toEqual([
-			local,
-			xai,
-		]);
-		expect(resolveSpeechCandidates(settings, registry, true).map(candidate => candidate.model)).toEqual([xai, local]);
+		expect(resolveSpeechCandidates(settings, registry).map(candidate => candidate.model)).toEqual([local]);
 	});
 
-	test("keeps an explicitly configured local candidate ahead of paid MP3 candidates", async () => {
-		await authStorage.credentials.set("xai", [{ type: "api_key", key: "xai-test-key" }]);
+	test("keeps an explicitly configured local candidate", async () => {
 		const settings = Settings.isolated({ modelRoles: { speech: "local/kokoro" } });
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
 
-		const candidates = resolveSpeechCandidates(settings, registry, true);
-		expect(candidates.map(candidate => candidate.model)).toEqual([local, xai]);
-		expect(candidates.map(candidate => candidate.explicit)).toEqual([true, false]);
+		const candidates = resolveSpeechCandidates(settings, registry);
+		expect(candidates.map(candidate => candidate.model)).toEqual([local]);
+		expect(candidates.map(candidate => candidate.explicit)).toEqual([true]);
 	});
 });
 
@@ -92,7 +85,7 @@ describe("tts speech chain execution", () => {
 
 		const result = await ttsTool.execute(
 			"tts-local",
-			{ text: "Hello locally", language: "en", output_path: "voice.wav" },
+			{ text: "Hello locally", output_path: "voice.wav" },
 			undefined,
 			createContext(settings, registry, tempDir, fetchImpl),
 		);
@@ -107,44 +100,83 @@ describe("tts speech chain execution", () => {
 		expect(fs.existsSync(path.join(tempDir, "voice.wav"))).toBe(true);
 	});
 
-	test("uses the selected openai-speech endpoint and model id", async () => {
-		await authStorage.credentials.set("deepinfra", [{ type: "api_key", key: "deepinfra-test-key" }]);
-		const settings = Settings.isolated({
-			modelRoles: { speech: `${deepInfra.provider}/${deepInfra.id}` },
-			"retry.fallbackChains": { speech: [] },
+	test("uses an explicitly configured company speech endpoint without changing role order", async () => {
+		const remote = buildModel({
+			id: "kokoro-company",
+			name: "Company Kokoro",
+			provider: "company",
+			api: "openai-speech",
+			baseUrl: "https://speech.company.example/v1",
+			kind: "tts",
+			input: ["text"],
+			reasoning: false,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: null,
+			maxTokens: null,
 		});
+		authStorage.keys.setRuntime("company", "company-key");
+		const settings = Settings.isolated({ modelRoles: { speech: "company/kokoro-company" } });
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
-		let requestedUrl = "";
-		let requestedBody: string | undefined;
-		const fetchImpl: FetchImpl = async (input, init) => {
-			requestedUrl = String(input);
-			if (typeof init?.body !== "string") throw new Error("Expected JSON request body");
-			requestedBody = init.body;
-			return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
-		};
-
+		registry.getAvailable = () => [remote, local];
+		registry.getAll = () => [remote, local];
+		registry.find = (provider, id) => [remote, local].find(model => model.provider === provider && model.id === id);
+		const requests: Array<{ url: string; body: unknown }> = [];
 		const result = await ttsTool.execute(
-			"tts-cloud",
-			{ text: "Hello cloud", voice_id: "sky", language: "en", output_path: "voice.mp3" },
+			"tts-company",
+			{ text: "Hello company", voice_id: "company-voice", output_path: "company.mp3" },
 			undefined,
-			createContext(settings, registry, tempDir, fetchImpl),
+			createContext(settings, registry, tempDir, async (url, init) => {
+				requests.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+				return new Response(new Uint8Array([1, 2, 3]));
+			}),
 		);
-
 		expect(result.isError).not.toBe(true);
-		expect(requestedUrl).toBe(`${deepInfra.baseUrl}/audio/speech`);
-		expect(requestedBody).toBe(
-			JSON.stringify({ model: deepInfra.id, input: "Hello cloud", response_format: "mp3", voice: "sky" }),
-		);
-		expect(result.details).toMatchObject({ backend: "openai-speech", codec: "mp3" });
+		expect(result.details).toMatchObject({ backend: "openai-speech", voiceId: "company-voice", codec: "mp3" });
+		expect(requests).toEqual([
+			{
+				url: "https://speech.company.example/v1/audio/speech",
+				body: {
+					model: "kokoro-company",
+					input: "Hello company",
+					response_format: "mp3",
+					voice: "company-voice",
+				},
+			},
+		]);
+		expect(fs.readFileSync(path.join(tempDir, "company.mp3"))).toEqual(Buffer.from([1, 2, 3]));
 	});
 
-	test("does not fall back when the explicit speech fallback chain is empty", async () => {
-		await authStorage.credentials.set("xai", [{ type: "api_key", key: "xai-test-key" }]);
+	const companySpeech = () =>
+		buildModel({
+			id: "kokoro-company",
+			name: "Company Kokoro",
+			provider: "company",
+			api: "openai-speech",
+			baseUrl: "https://speech.company.example/v1",
+			kind: "tts",
+			input: ["text"],
+			reasoning: false,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: null,
+			maxTokens: null,
+		});
+
+	function companyRegistry(fallbackChain: string[]): { settings: Settings; registry: ModelRegistry } {
+		const remote = companySpeech();
+		authStorage.keys.setRuntime("company", "company-key");
 		const settings = Settings.isolated({
-			modelRoles: { speech: `${xai.provider}/${xai.id}` },
-			"retry.fallbackChains": { speech: [] },
+			modelRoles: { speech: "company/kokoro-company" },
+			"retry.fallbackChains": { speech: fallbackChain },
 		});
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
+		registry.getAvailable = () => [remote, local];
+		registry.getAll = () => [remote, local];
+		registry.find = (provider, id) => [remote, local].find(model => model.provider === provider && model.id === id);
+		return { settings, registry };
+	}
+
+	test("does not fall back when the explicit speech fallback chain is empty", async () => {
+		const { settings, registry } = companyRegistry([]);
 		const localSynthesis = spyOn(ttsClient, "synthesize").mockResolvedValue({
 			pcm: new Float32Array([0]),
 			sampleRate: 24_000,
@@ -153,7 +185,7 @@ describe("tts speech chain execution", () => {
 
 		const result = await ttsTool.execute(
 			"tts-explicit",
-			{ text: "No fallback", language: "en", output_path: "voice.mp3" },
+			{ text: "No fallback", output_path: "voice.mp3" },
 			undefined,
 			createContext(settings, registry, tempDir, fetchImpl),
 		);
@@ -162,8 +194,32 @@ describe("tts speech chain execution", () => {
 		expect(localSynthesis).not.toHaveBeenCalled();
 	});
 
-	test("advances from a cloud HTTP error to the next local candidate", async () => {
-		await authStorage.credentials.set("xai", [{ type: "api_key", key: "xai-test-key" }]);
+	test("advances from a company endpoint HTTP error to the next local candidate", async () => {
+		const { settings, registry } = companyRegistry(["local/kokoro"]);
+		const localSynthesis = spyOn(ttsClient, "synthesize").mockResolvedValue({
+			pcm: new Float32Array([0, 0.5, -0.5]),
+			sampleRate: 24_000,
+		});
+		const fetchImpl: FetchImpl = async () => new Response("rate limited", { status: 429 });
+
+		const result = await ttsTool.execute(
+			"tts-remote-fallback",
+			{ text: "Fall back locally", output_path: "voice.mp3" },
+			undefined,
+			createContext(settings, registry, tempDir, fetchImpl),
+		);
+
+		expect(result.isError).not.toBe(true);
+		expect(result.details).toMatchObject({ backend: "local-inference", codec: "wav" });
+		expect(localSynthesis).toHaveBeenCalledWith("kokoro", "Fall back locally", {
+			voice: "af_heart",
+			speed: 1,
+			signal: undefined,
+		});
+		expect(fs.existsSync(path.join(tempDir, "voice.wav"))).toBe(true);
+	});
+
+	test("writes local WAV output for a non-WAV path", async () => {
 		const settings = Settings.isolated();
 		const registry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), { settings });
 		const localSynthesis = spyOn(ttsClient, "synthesize").mockResolvedValue({
@@ -174,7 +230,7 @@ describe("tts speech chain execution", () => {
 
 		const result = await ttsTool.execute(
 			"tts-fallback",
-			{ text: "Fall back locally", language: "en", output_path: "voice.mp3" },
+			{ text: "Fall back locally", output_path: "voice.mp3" },
 			undefined,
 			createContext(settings, registry, tempDir, fetchImpl),
 		);

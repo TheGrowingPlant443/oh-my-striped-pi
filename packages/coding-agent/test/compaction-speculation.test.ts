@@ -3,7 +3,9 @@ import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
 import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
 import type { AssistantMessage, Context, Model, UserMessage } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
@@ -22,6 +24,35 @@ import {
 const CONTEXT_WINDOW = 100_000;
 const THRESHOLD = 50_000;
 const SPECULATION_BAND_START = THRESHOLD - 8_192;
+
+const summaryModelSpec: ModelSpec<"anthropic-messages"> = {
+	id: "claude-sonnet-4-5",
+	name: "Private speculative summary fixture",
+	api: "anthropic-messages",
+	provider: "anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: CONTEXT_WINDOW,
+	maxTokens: 16_384,
+	compat: { supportsServerCompaction: false },
+	remoteCompaction: { enabled: false },
+};
+
+const remoteModelSpec: ModelSpec<"openai-responses"> = {
+	id: "gpt-5",
+	name: "Private speculative Responses fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: CONTEXT_WINDOW,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true },
+};
 
 function userMessage(text: string): UserMessage {
 	return { role: "user", content: [{ type: "text", text }], timestamp: Date.now() };
@@ -107,7 +138,6 @@ describe("async speculative compaction", () => {
 				throw new Error("The compact seam should be used instead of the side stream");
 			},
 			providerSessionState: new Map(),
-			preferWebsockets: () => undefined,
 			model: () => model,
 			thinkingLevel: () => undefined,
 			isDisposed: () => false,
@@ -144,8 +174,6 @@ describe("async speculative compaction", () => {
 			obfuscatePreparationForProvider:
 				options.obfuscatePreparationForProvider ?? (<T>(preparation: T) => preparation),
 			getPromptCacheKeyForModel: () => undefined,
-			closeCodexProviderSessionsForHistoryRewrite: () => {},
-			resetCodexProviderAfterCompaction: () => {},
 			resetPlanReference: () => {},
 			syncTodoPhasesFromBranch: () => {},
 			resetAdvisorRuntimes: () => {},
@@ -180,9 +208,7 @@ describe("async speculative compaction", () => {
 		authStorage = await AuthStorage.create(":memory:");
 		authStorage.keys.setRuntime("anthropic", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!bundled) throw new Error("Expected built-in model");
-		defaultModel = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		defaultModel = buildModel(summaryModelSpec);
 		model = defaultModel;
 	});
 
@@ -276,10 +302,16 @@ describe("async speculative compaction", () => {
 		expect(events).toEqual(expect.arrayContaining(["auto_compaction_start", "auto_compaction_end"]));
 	});
 
-	it("applies an Anthropic snapshot after append-only growth without dropping its tail or new turns", async () => {
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!bundled) throw new Error("Expected compaction-capable Anthropic model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+	it("applies a Copilot Anthropic snapshot after append-only growth without dropping its tail or new turns", async () => {
+		const bundled = getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.6");
+		if (!bundled) throw new Error("Expected Copilot Anthropic model");
+		model = {
+			...bundled,
+			contextWindow: CONTEXT_WINDOW,
+			compat: { ...bundled.compat, supportsServerCompaction: true },
+			remoteCompaction: { ...bundled.remoteCompaction, enabled: true },
+		};
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		maintenance = createMaintenance({ methodOrder: ["remote"] });
 		const started = Promise.withResolvers<void>();
 		const release = Promise.withResolvers<void>();
@@ -293,25 +325,22 @@ describe("async speculative compaction", () => {
 				details: {},
 				preserveData: {
 					anthropicCompaction: {
-						provider: "anthropic",
+						provider: "github-copilot",
 						content: "signed snapshot summary",
 						signature: "snapshot-signature",
 					},
 				},
 			};
 		});
-
 		maintenance.maybeStartSpeculativeCompaction(SPECULATION_BAND_START, CONTEXT_WINDOW);
 		await started.promise;
 		const snapshotLeafId = sessionManager.getBranch().at(-1)?.id;
-		// Growth beyond the recovery band does not change the signed snapshot.
 		const addedUser = userMessage("post-snapshot request " + "growth ".repeat(45_000));
 		const addedAssistant = assistantMessage("post-snapshot reply", model);
 		sessionManager.appendMessage(addedUser);
 		sessionManager.appendMessage(addedAssistant);
 		release.resolve();
 		await waitForState("armed");
-
 		await maintenance.runAutoCompaction("threshold", false, { triggerContextTokens: THRESHOLD });
 		const entry = sessionManager.getEntries().findLast(item => item.type === "compaction");
 		if (entry?.type !== "compaction") throw new Error("Expected native compaction entry");
@@ -335,10 +364,16 @@ describe("async speculative compaction", () => {
 		});
 	});
 
-	it("invalidates an Anthropic snapshot when its prefix is rewound", async () => {
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!bundled) throw new Error("Expected compaction-capable Anthropic model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+	it("invalidates a Copilot Anthropic snapshot when its prefix is rewound", async () => {
+		const bundled = getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.6");
+		if (!bundled) throw new Error("Expected Copilot Anthropic model");
+		model = {
+			...bundled,
+			contextWindow: CONTEXT_WINDOW,
+			compat: { ...bundled.compat, supportsServerCompaction: true },
+			remoteCompaction: { ...bundled.remoteCompaction, enabled: true },
+		};
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		maintenance = createMaintenance({ methodOrder: ["remote"] });
 		let invocation = 0;
 		const compactSpy = vi.spyOn(compactionModule, "compact").mockImplementation(async preparation => ({
@@ -348,7 +383,7 @@ describe("async speculative compaction", () => {
 			details: {},
 			preserveData: {
 				anthropicCompaction: {
-					provider: "anthropic",
+					provider: "github-copilot",
 					content: `native summary ${invocation}`,
 					signature: `signature ${invocation}`,
 				},
@@ -360,7 +395,6 @@ describe("async speculative compaction", () => {
 		sessionManager.branch(branch[branch.length - 2].id);
 		sessionManager.appendMessage(assistantMessage("rewritten prefix", model));
 		sessionManager.appendMessage(userMessage("new suffix"));
-
 		await maintenance.runAutoCompaction("threshold", false, { triggerContextTokens: THRESHOLD });
 		expect(compactSpy).toHaveBeenCalledTimes(2);
 		const entry = sessionManager.getEntries().findLast(item => item.type === "compaction");
@@ -368,9 +402,7 @@ describe("async speculative compaction", () => {
 	});
 
 	it("preserves an in-flight native interval through the next compaction", async () => {
-		const bundled = getBundledModel("openai", "gpt-5");
-		if (!bundled) throw new Error("Expected built-in OpenAI model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		model = buildModel(remoteModelSpec);
 		authStorage.keys.setRuntime("openai", "test-key");
 		maintenance = createMaintenance({ methodOrder: ["remote"] });
 		const started = Promise.withResolvers<void>();
@@ -480,9 +512,7 @@ describe("async speculative compaction", () => {
 	});
 
 	it("routes speculative compaction through the session secret boundary", async () => {
-		const bundled = getBundledModel("openai", "gpt-5");
-		if (!bundled) throw new Error("Expected built-in OpenAI model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		model = buildModel(remoteModelSpec);
 		authStorage.keys.setRuntime("openai", "test-key");
 		maintenance = createMaintenance({
 			methodOrder: ["remote"],
@@ -512,9 +542,7 @@ describe("async speculative compaction", () => {
 	});
 
 	it("discards stale remote speculation when visible native replacement history exceeds recovery headroom", async () => {
-		const bundled = getBundledModel("openai", "gpt-5");
-		if (!bundled) throw new Error("Expected built-in OpenAI model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		model = buildModel(remoteModelSpec);
 		authStorage.keys.setRuntime("openai", "test-key");
 		maintenance = createMaintenance({ methodOrder: ["remote"] });
 		let invocation = 0;
@@ -555,9 +583,7 @@ describe("async speculative compaction", () => {
 	});
 
 	it("keeps a shrinking native compaction even when its opaque ciphertext is large", async () => {
-		const bundled = getBundledModel("openai", "gpt-5");
-		if (!bundled) throw new Error("Expected built-in OpenAI model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		model = buildModel(remoteModelSpec);
 		authStorage.keys.setRuntime("openai", "test-key");
 		maintenance = createMaintenance({ asyncEnabled: false, methodOrder: ["remote"] });
 		const nativeCompactionItem = {
@@ -821,9 +847,12 @@ describe("async speculative compaction", () => {
 	});
 
 	function useNativeCompactionModel(): void {
-		const bundled = getBundledModel("anthropic", "claude-sonnet-4-6");
-		if (!bundled) throw new Error("Expected compaction-capable Anthropic model");
-		model = { ...bundled, contextWindow: CONTEXT_WINDOW };
+		model = buildModel({
+			...summaryModelSpec,
+			id: "claude-sonnet-4-6",
+			compat: { supportsServerCompaction: true },
+			remoteCompaction: { enabled: true },
+		});
 		maintenance = createMaintenance({ methodOrder: ["remote", "snapcompact"] });
 	}
 
@@ -1086,7 +1115,16 @@ describe("resolveSpeculationMethod", () => {
 	it("speculates past snapcompact when the model's wire strips image input", () => {
 		const settings = cfgCompaction.get(Settings.isolated({ "compaction.methodOrder": ["snapcompact", "soft"] }));
 		// Same declared input; only the second drops images on the wire.
-		expect(resolveSpeculationMethod(getBundledModel("anthropic", "claude-sonnet-4-5"), settings)).toBeUndefined();
-		expect(resolveSpeculationMethod(getBundledModel("venice", "deepseek-v4-1-flash"), settings)).toBe("soft");
+		expect(resolveSpeculationMethod(buildModel(summaryModelSpec), settings)).toBeUndefined();
+		const strippedModel = buildModel({
+			...summaryModelSpec,
+			id: "private-text-only-wire",
+			api: "openai-completions",
+			provider: "private-text-gateway",
+			baseUrl: "https://text.company.invalid/v1",
+			remoteCompaction: { enabled: false },
+			compat: { stripImageInput: true },
+		} satisfies ModelSpec<"openai-completions">);
+		expect(resolveSpeculationMethod(strippedModel, settings)).toBe("soft");
 	});
 });

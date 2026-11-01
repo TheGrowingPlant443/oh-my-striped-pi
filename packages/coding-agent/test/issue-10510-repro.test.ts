@@ -29,7 +29,7 @@ describe("issue #10510: prewalk + eager-todo conflict", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-issue-10510-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -39,7 +39,7 @@ describe("issue #10510: prewalk + eager-todo conflict", () => {
 	});
 
 	function modelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
+		const model = getBundledModel("github-copilot", id);
 		if (!model) throw new Error(`Expected bundled model ${id}`);
 		return model;
 	}
@@ -74,8 +74,8 @@ describe("issue #10510: prewalk + eager-todo conflict", () => {
 
 	/** Runs a first-turn prompt and returns every hidden/visible text sent to the model. */
 	async function collectInjectedText(options: { prewalk: "handoff" | "noop" | "off" }): Promise<string> {
-		const primary = modelOrThrow("claude-sonnet-4-5");
-		const handoffTarget = modelOrThrow("claude-sonnet-4-6");
+		const primary = modelOrThrow("claude-sonnet-4.5");
+		const handoffTarget = modelOrThrow("claude-sonnet-4.6");
 		const prewalkTarget =
 			options.prewalk === "handoff" ? handoffTarget : options.prewalk === "noop" ? primary : undefined;
 		const recordTool = mkTool("record", "ok");

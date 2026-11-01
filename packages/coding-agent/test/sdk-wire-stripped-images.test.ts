@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
@@ -35,7 +35,19 @@ describe("session image replacement on a wire that strips images", () => {
 	it("replaces history images with text before the provider transforms run", async () => {
 		using tempDir = TempDir.createSync("@pi-wire-stripped-images-");
 		// Declares image input; `compat.stripImageInput` drops images on the wire.
-		const model = getBundledModel("venice", "deepseek-v4-1-flash");
+		const model = buildModel({
+			id: "company-text-wire",
+			name: "Company text-only wire",
+			provider: "company-image-fixture",
+			api: "openai-completions",
+			baseUrl: "https://image-wire.company.test/v1",
+			reasoning: false,
+			input: ["text", "image"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 128_000,
+			maxTokens: 8192,
+			compat: { stripImageInput: true },
+		});
 		const bodies: string[] = [];
 		const fetchStub = Object.assign(
 			async (_input: string | URL | Request, init?: RequestInit | BunFetchRequestInit) => {

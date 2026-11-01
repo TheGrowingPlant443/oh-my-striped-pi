@@ -13,7 +13,6 @@ import {
 	type OAuthLoginIdentity,
 	type OAuthProviderId,
 	type OAuthProviderInfo,
-	PASTE_CODE_LOGIN_PROVIDERS,
 } from "@oh-my-pi/pi-ai";
 import { openPath } from "../utils/open";
 
@@ -151,14 +150,6 @@ export async function runTerminalOAuthLogin(
 	options: { openBrowser?: boolean } = {},
 ): Promise<OAuthLoginIdentity | undefined> {
 	const ask = (msg: string, signal?: AbortSignal) => promptLine(rl, `${msg} `, signal);
-	// Only paste-code providers (fixed non-loopback redirect, e.g. GitLab Duo
-	// Agent's vscode:// URI) get the manual paste fallback. An explicit
-	// `onManualCodeInput` is honored for ANY provider (the storage escape hatch),
-	// so for loopback providers we do not pass it: an eager readline prompt adds
-	// noise to a flow that normally completes through HTTP. `AuthStorage.oauth.login`
-	// independently refuses to synthesize the default prompt
-	// for non-paste-code providers, so this is defense-in-depth on the same gate.
-	const usesManualInput = PASTE_CODE_LOGIN_PROVIDERS.has(provider);
 	return storage.oauth.login(provider, {
 		onAuth({ url, launchUrl, instructions }) {
 			process.stdout.write("\nOpen this URL in your browser:\n");
@@ -183,13 +174,6 @@ export async function runTerminalOAuthLogin(
 		onPrompt(p) {
 			return ask(`${p.message}${p.placeholder ? ` (${p.placeholder})` : ""}:`);
 		},
-		...(usesManualInput
-			? {
-					onManualCodeInput(signal) {
-						return ask("Paste the authorization code (or full redirect URL):", signal);
-					},
-				}
-			: undefined),
 	});
 }
 

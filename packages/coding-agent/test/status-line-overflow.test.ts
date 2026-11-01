@@ -62,7 +62,6 @@ function createCtx(overrides?: {
 		vibeMode: null,
 		vim: null,
 		collab: null,
-		stream: null,
 		recording: false,
 		usageStats: {
 			input: 0,

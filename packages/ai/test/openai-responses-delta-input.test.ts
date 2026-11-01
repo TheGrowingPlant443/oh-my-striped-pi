@@ -3,7 +3,6 @@ import { buildResponsesDeltaInput } from "@oh-my-pi/pi-ai/providers/openai-share
 import {
 	kStreamingArgumentsDone,
 	kStreamingBlockIndex,
-	kStreamingBlockKind,
 	kStreamingLastParseLen,
 	kStreamingPartialJson,
 } from "@oh-my-pi/pi-ai/utils/block-symbols";
@@ -34,7 +33,6 @@ describe("buildResponsesDeltaInput streaming-symbol scrub", () => {
 		Reflect.set(live[1], kStreamingPartialJson, '{"par');
 		Reflect.set(live[1], kStreamingLastParseLen, 4);
 		Reflect.set(live[1], kStreamingArgumentsDone, true);
-		Reflect.set(live[1], kStreamingBlockKind, "mcp");
 		const appended: ResponseInputItem = {
 			type: "function_call",
 			id: "fc_2",

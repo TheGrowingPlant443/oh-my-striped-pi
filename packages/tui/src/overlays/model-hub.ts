@@ -881,8 +881,11 @@ export class ModelHubComponent implements Component {
 	 */
 	#setCandidateItems(items: ReadonlyArray<ModelBrowserItem>): void {
 		const assigning = this.#assigning;
-		const scoped =
-			assigning?.kind === "role"
+		const role = assigning?.kind === "role" || assigning?.kind === "fallback" ? assigning.role : undefined;
+		const independent = role === undefined ? undefined : this.#settings.roleCandidates?.(role);
+		const scoped = independent
+			? buildBrowserItems(independent)
+			: assigning?.kind === "role"
 				? items.filter(item => this.#settings.getRoleInfo(assigning.role).accepts(item.model))
 				: items;
 		this.#candidateItems = [...scoped];
@@ -1243,7 +1246,7 @@ export class ModelHubComponent implements Component {
 					? (this.#settings.getProjectModelRole(scopedRole) ?? this.#settings.getGlobalModelRole(scopedRole))
 					: this.#settings.getGlobalModelRole(scopedRole),
 		};
-		return this.#settings.resolveRoleValue(roleValue, allModels, roleLookup);
+		return this.#settings.resolveRoleValue(roleValue, allModels, roleLookup, role);
 	}
 
 	#thinkingLevelForScope(role: string, scope: ModelRoleSelectionScope): ConfiguredThinkingLevel {
@@ -1459,8 +1462,15 @@ export class ModelHubComponent implements Component {
 	 * effort support is a catalog fact, not an auth fact, and the row already
 	 * exists, so the strip changes no scope.
 	 */
-	#findFallbackModel(provider: string, id: string): ModelBrowserItem | undefined {
-		const model = this.#registry.find(provider, id);
+	#findFallbackModel(provider: string, id: string, role?: string): ModelBrowserItem | undefined {
+		const independent = role === undefined ? undefined : this.#settings.roleCandidates?.(role);
+		const model = independent
+			? independent.find(
+					model =>
+						model.provider.toLowerCase() === provider.toLowerCase() &&
+						model.id.toLowerCase() === id.toLowerCase(),
+				)
+			: this.#registry.find(provider, id);
 		if (!model) return undefined;
 		return { provider: model.provider, id: model.id, model, selector: `${model.provider}/${model.id}` };
 	}
@@ -1473,7 +1483,10 @@ export class ModelHubComponent implements Component {
 	 * slug is kept verbatim so saves can re-attach it (`openrouter/id@fireworks`
 	 * looks up `openrouter/id` but persists with the route intact).
 	 */
-	#parseFallbackEntry(raw: string):
+	#parseFallbackEntry(
+		raw: string,
+		role?: string,
+	):
 		| {
 				provider: string;
 				id: string;
@@ -1486,10 +1499,11 @@ export class ModelHubComponent implements Component {
 			parseModelString(pattern, {
 				allowMaxSuffix: true,
 				allowAutoAlias: true,
-				isLiteralModelId: (provider, id) => this.#findFallbackModel(provider, id) !== undefined,
+				isLiteralModelId: (provider, id) => this.#findFallbackModel(provider, id, role) !== undefined,
 			});
 		const literal = parse(trimmed);
-		if (literal && this.#findFallbackModel(literal.provider, literal.id)) return { ...literal, upstream: undefined };
+		if (literal && this.#findFallbackModel(literal.provider, literal.id, role))
+			return { ...literal, upstream: undefined };
 		const routing = splitUpstreamRouting(trimmed);
 		if (!routing) {
 			if (!literal) return undefined;
@@ -1513,9 +1527,9 @@ export class ModelHubComponent implements Component {
 		| undefined {
 		const raw = this.#fallbackChains()[role]?.[index];
 		if (!raw || raw.endsWith("/*")) return undefined;
-		const parsed = this.#parseFallbackEntry(raw);
+		const parsed = this.#parseFallbackEntry(raw, role);
 		if (!parsed) return undefined;
-		const item = this.#findFallbackModel(parsed.provider, parsed.id);
+		const item = this.#findFallbackModel(parsed.provider, parsed.id, role);
 		if (!item) return undefined;
 		return { item, thinkingLevel: parsed.thinkingLevel, upstream: parsed.upstream };
 	}
@@ -1683,7 +1697,7 @@ export class ModelHubComponent implements Component {
 			// Suffixed entries (`provider/id:low`) carry effort the browser rows
 			// don't show; match on the base so the current model preselects.
 			if (selector) {
-				const parsed = this.#parseFallbackEntry(selector);
+				const parsed = this.#parseFallbackEntry(selector, role);
 				this.#browser.selectSelector(parsed ? `${parsed.provider}/${parsed.id}` : selector);
 			}
 		}

@@ -9,6 +9,11 @@ than anyone re-read it. The `docs/` tree is kept current (and indexed for the
 in-agent `docs://` / `/docs` surface), so this file links there instead of
 duplicating prose that goes stale.
 
+This fork supports only Local (on-device tiny/TTS/STT) and GitHub Copilot model providers. Independent search engines, direct reads, reader fallbacks and executable integrations remain; this is not an egress sandbox, and Copilot transmits model context. Local diagnostics, memories/Mnemopi and recording/playback remain; remote publication, memory endpoints and image generation/URL publication are removed. Configurable OpenTelemetry (OTLP) export to an operator-provided or company in-house collector remains: without a configured endpoint there is no export, message-content capture defaults to `none`, and the operator is responsible for the collector. See [OpenTelemetry export](../../docs/environment-variables.md#11-opentelemetry-export).
+
+`/update` invokes the CLI without an agent turn. Application updates are company-managed (Git/Nix/release process); `/update --plugins [--check]` updates installed plugins.
+
+
 ## Local development
 
 Run from `packages/coding-agent/` (or add `--cwd=packages/coding-agent`):
@@ -25,16 +30,15 @@ Run from `packages/coding-agent/` (or add `--cwd=packages/coding-agent`):
 Never invoke `tsc`/`npx tsc` directly — `bun run check` is the typecheck gate. After
 changing export HTML/CSS/JS, web themes, or the shared tool/trace renderers, run
 `bun run gen:export-viewer` and include `src/export/html/viewer.generated.json`
-with the change. The generated JS lives in ignored `export-assets/`; CI verifies
-the committed metadata (`--check`, also implied by `CI=true`) and publishes the
-exact asset from the Linux binary build alongside the release binaries.
+and `src/export/html/viewer.generated.js.txt` with the change. The generator also
+writes content-addressed JS into ignored `export-assets/`; CI verifies the
+committed metadata (`--check`, also implied by `CI=true`) before regenerating it.
 
-Exports from a source checkout inline the generated viewer, so `bun gen:export-viewer`
-followed by `/export` exercises local changes without publishing or a local
-server. Packaged releases reference their versioned `build.stencil.so` viewer.
-Both load Markdown and Highlight.js from immutable content-addressed
-`stencil.so/assets/omp/` files. Keep those files on the site permanently: older
-exports reference them directly.
+Source, npm and compiled exports embed the complete generated viewer, including
+the vendored Markdown implementation and Highlight.js. Opening an export needs
+no server or remote JavaScript. `bun run gen:export-viewer` followed by `/export`
+exercises local changes without publishing. Highlight.js 11.9.0 is vendored in
+`src/export/html/vendor/` and covered by `THIRD-PARTY-NOTICES.txt`.
 
 Scope fake timers to the deadline a test exercises, then restore real timers
 before real socket listeners are started. Bun's mocked clock can defer
@@ -94,9 +98,9 @@ Top-level entry modules: `cli.ts`, `main.ts`, `sdk.ts`, `index.ts` (SDK barrel),
 | `extensibility/`, `slash-commands/`                      | Extensions, hooks, custom tools/commands, skills, plugins    | [extensions.md](../../docs/extensions.md), [hooks.md](../../docs/hooks.md), [skills.md](../../docs/skills.md)                                                |
 | `capability/`, `discovery/`                              | Capability registry + provider discovery modules             | [extension-loading.md](../../docs/extension-loading.md), [context-files.md](../../docs/context-files.md)                                                     |
 | `advisor/`, `autolearn/`, `autoresearch/`                | Advisor/watchdog, managed skills, background research        | [advisor-watchdog.md](../../docs/advisor-watchdog.md)                                                                                                        |
-| `memories/`, `memory-backend/`, `mnemopi/`, `hindsight/` | Memory subsystems and backends                               | [memory.md](../../docs/memory.md), [mnemosyne-memory-backend.md](../../docs/mnemosyne-memory-backend.md)                                                     |
+| `memories/`, `memory-backend/`, `mnemopi/` | Local memory storage and inference | [memory.md](../../docs/memory.md), [mnemosyne-memory-backend.md](../../docs/mnemosyne-memory-backend.md) |
 | `internal-urls/`                                         | Router + handlers (`agent://`, `docs://`, `rule://`, …)      | [tree.md](../../docs/tree.md)                                                                                                                                |
-| `tui/`, `collab/`                                        | Low-level TUI primitives, live session sharing               | [tui.md](../../docs/tui.md), [collab.md](../../docs/collab.md)                                                                                               |
+| `stream/`                                               | Local terminal recording and playback                      | [stream.md](../../docs/stream.md)                                                                                                                            |
 | `tts/`, `stt/`                                           | Text-to-speech / speech-to-text                              | —                                                                                                                                                            |
 | `tiny/`, `auto-thinking/`                                | Embedded tiny-model experiments, auto thinking level         | [local-models.md](../../docs/local-models.md)                                                                                                                |
 | `async/`, `lib/`, `utils/`, `prompts/`, `edit/`          | Shared plumbing, prompt assets, patch/diff engine            | [tools/edit.md](../../docs/tools/edit.md)                                                                                                                    |
@@ -118,7 +122,7 @@ Top-level entry modules: `cli.ts`, `main.ts`, `sdk.ts`, `index.ts` (SDK barrel),
 
 - [settings.md](../../docs/settings.md), [config-usage.md](../../docs/config-usage.md)
 - [environment-variables.md](../../docs/environment-variables.md)
-- [models.md](../../docs/models.md), [providers.md](../../docs/providers.md), [adding-a-provider.md](../../docs/adding-a-provider.md)
+- [models.md](../../docs/models.md), [providers.md](../../docs/providers.md) — retained Local/Copilot catalog
 - [local-models.md](../../docs/local-models.md)
 - [provider-streaming-internals.md](../../docs/provider-streaming-internals.md), [ai-schema-normalize.md](../../docs/ai-schema-normalize.md)
 - [toolconv/](../../docs/toolconv/) — per-family tool-call conversion (anthropic, deepseek, gemini, gemma, glm-4.5, harmony, hermes, kimi-k2, minimax, pi-native, qwen3, xml); see also [ERRATA-GPT5-HARMONY.md](../../docs/ERRATA-GPT5-HARMONY.md)
@@ -142,7 +146,7 @@ Top-level entry modules: `cli.ts`, `main.ts`, `sdk.ts`, `index.ts` (SDK barrel),
 ### Task delegation and subagents
 
 - [task-agent-discovery.md](../../docs/task-agent-discovery.md), [tools/task.md](../../docs/tools/task.md)
-- [collab.md](../../docs/collab.md), [agent-hub.md](../../docs/agent-hub.md), [tools/wait.md](../../docs/tools/wait.md)
+- [agent-hub.md](../../docs/agent-hub.md), [tools/wait.md](../../docs/tools/wait.md)
 
 ### Web I/O and retrieval
 
@@ -191,7 +195,6 @@ Top-level entry modules: `cli.ts`, `main.ts`, `sdk.ts`, `index.ts` (SDK barrel),
 | A skill                     | [skills.md](../../docs/skills.md)                                                                                                                                                                                                                                                                |
 | A marketplace plugin        | [marketplace.md](../../docs/marketplace.md), [plugin-manager-installer-plumbing.md](../../docs/plugin-manager-installer-plumbing.md), [skills/authoring-marketplaces.md](../../docs/skills/authoring-marketplaces.md), [gemini-manifest-extensions.md](../../docs/gemini-manifest-extensions.md) |
 | A custom MCP tool/server    | [mcp-server-tool-authoring.md](../../docs/mcp-server-tool-authoring.md), [custom-tools.md](../../docs/custom-tools.md)                                                                                                                                                                           |
-| A provider                  | [adding-a-provider.md](../../docs/adding-a-provider.md)                                                                                                                                                                                                                                          |
 | Programmatic/SDK use        | [sdk.md](../../docs/sdk.md)                                                                                                                                                                                                                                                                      |
 
 See also `AGENTS.md` at the repo root for repo-wide conventions (Bun-over-Node,

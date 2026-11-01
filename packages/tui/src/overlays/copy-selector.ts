@@ -1154,7 +1154,7 @@ export function targetCopy(target: OutlineTarget, blocks: readonly CopyBlock[]):
 			return { content: message.summary, label: "summary" };
 		case "custom":
 		case "hookMessage": {
-			// A user-invoked skill/collab prompt copies as what the user typed, not the expanded body.
+			// A user-invoked skill prompt copies as what the user typed, not the expanded body.
 			const draft = message.role === "custom" ? userTurnDraft(entry) : undefined;
 			if (draft?.trim()) return { content: draft, label: "user message" };
 			const content =

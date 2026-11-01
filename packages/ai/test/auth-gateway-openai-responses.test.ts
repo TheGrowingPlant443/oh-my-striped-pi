@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { clearCustomApis } from "@oh-my-pi/pi-ai/api-registry";
 import { startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
 import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
+import { ValidationError } from "@oh-my-pi/pi-ai/error";
 import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import { encodeResponse, encodeStream, parseRequest } from "@oh-my-pi/pi-ai/providers/openai-responses-server";
 import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
@@ -70,49 +71,52 @@ describe("openai-responses parseRequest", () => {
 			id: "rs_abc",
 			summary: [{ type: "summary_text", text: "The user wants arithmetic." }],
 		};
-		const parsed = parseRequest({
-			model: "gpt-5.3-codex-spark",
-			instructions: "You are X",
-			input: [
-				{ type: "message", role: "user", content: [{ type: "input_text", text: "what's 2+2?" }] },
-				{
-					type: "message",
-					role: "assistant",
-					id: "msg_commentary",
-					phase: "commentary",
-					content: [
-						{ type: "output_text", text: "Let me " },
-						{ type: "output_text", text: "think." },
-					],
-				},
-				reasoningItem,
-				{
-					type: "function_call",
-					id: "fc_item_999",
-					call_id: "call_42",
-					name: "math",
-					arguments: '{"a":2,"b":2}',
-				},
-				{ type: "function_call_output", call_id: "call_42", output: "4" },
-			],
-			tools: [
-				{
-					type: "function",
-					name: "math",
-					description: "Do arithmetic",
-					parameters: { type: "object", properties: { a: { type: "number" }, b: { type: "number" } } },
-					strict: true,
-				},
-			],
-			tool_choice: { type: "function", name: "math" },
-			max_output_tokens: 1024,
-			temperature: 0.1,
-			top_p: 0.9,
-			reasoning: { effort: "high", summary: "detailed" },
-			store: true,
-			previous_response_id: "resp_prev",
-			stream: true,
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.3-codex-spark",
+				instructions: "You are X",
+				input: [
+					{ type: "message", role: "user", content: [{ type: "input_text", text: "what's 2+2?" }] },
+					{
+						type: "message",
+						role: "assistant",
+						id: "msg_commentary",
+						phase: "commentary",
+						content: [
+							{ type: "output_text", text: "Let me " },
+							{ type: "output_text", text: "think." },
+						],
+					},
+					reasoningItem,
+					{
+						type: "function_call",
+						id: "fc_item_999",
+						call_id: "call_42",
+						name: "math",
+						arguments: '{"a":2,"b":2}',
+					},
+					{ type: "function_call_output", call_id: "call_42", output: "4" },
+				],
+				tools: [
+					{
+						type: "function",
+						name: "math",
+						description: "Do arithmetic",
+						parameters: { type: "object", properties: { a: { type: "number" }, b: { type: "number" } } },
+						strict: true,
+					},
+				],
+				tool_choice: { type: "function", name: "math" },
+				max_output_tokens: 1024,
+				temperature: 0.1,
+				top_p: 0.9,
+				reasoning: { effort: "high", summary: "detailed" },
+				store: true,
+				previous_response_id: "resp_prev",
+				stream: true,
+			},
+			{ provider: "github-copilot", id: "gpt-5.3-codex-spark" },
+		);
 
 		expect(parsed.modelId).toBe("gpt-5.3-codex-spark");
 		expect(parsed.stream).toBe(true);
@@ -131,7 +135,7 @@ describe("openai-responses parseRequest", () => {
 		const a = msgs[1]!;
 		if (a.role !== "assistant") throw new Error("expected assistant");
 		expect(a.api).toBe("openai-responses");
-		expect(a.provider).toBe("openai");
+		expect(a.provider).toBe("github-copilot");
 		expect(a.model).toBe("gpt-5.3-codex-spark");
 		expect(a.content).toHaveLength(3);
 		expect(a.content[0]).toMatchObject({ type: "text", text: "Let me think." });
@@ -178,14 +182,17 @@ describe("openai-responses parseRequest", () => {
 	});
 
 	it("coerces a message item with content:null to an empty content array (Codex #10956)", () => {
-		const parsed = parseRequest({
-			model: "gpt-5.3-codex-spark",
-			input: [
-				{ type: "message", role: "user", content: [{ type: "input_text", text: "again" }] },
-				{ type: "message", role: "user", content: null },
-			],
-			max_output_tokens: 16,
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.3-codex-spark",
+				input: [
+					{ type: "message", role: "user", content: [{ type: "input_text", text: "again" }] },
+					{ type: "message", role: "user", content: null },
+				],
+				max_output_tokens: 16,
+			},
+			{ provider: "github-copilot", id: "gpt-5.3-codex-spark" },
+		);
 
 		const msgs = parsed.context.messages;
 		expect(msgs).toHaveLength(2);
@@ -200,96 +207,101 @@ describe("openai-responses parseRequest", () => {
 
 	it("preserves canonical multimodal order and nullable fallback sources", () => {
 		const imageData = Buffer.from("tool image").toString("base64");
-		const parsed = parseRequest({
-			model: "gpt-5.6-sol",
-			input: [
-				{
-					type: "function_call",
-					id: "fc_read",
-					call_id: "call_read",
-					name: "read",
-					arguments: '{"path":"image.png"}',
-				},
-				{
-					type: "function_call_output",
-					call_id: "call_read",
-					output: [
-						{
-							type: "input_image",
-							image_url: `data:image/png;base64,${imageData}`,
-							file_id: null,
-							detail: "original",
-						},
-						{ type: "input_text", text: "Read image file [image/png]" },
-						{ type: "input_image", image_url: "", file_id: "file_image_123", detail: null },
-						{ type: "input_text", text: "done" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.6-sol",
+				input: [
+					{
+						type: "function_call",
+						id: "fc_read",
+						call_id: "call_read",
+						name: "read",
+						arguments: '{"path":"image.png"}',
+					},
+					{
+						type: "function_call_output",
+						call_id: "call_read",
+						output: [
+							{
+								type: "input_image",
+								image_url: `data:image/png;base64,${imageData}`,
+								file_id: null,
+								detail: "original",
+							},
+							{ type: "input_text", text: "Read image file [image/png]" },
+							{ type: "input_text", text: "done" },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "gpt-5.6-sol" },
+		);
 
 		const result = parsed.context.messages[1];
 		if (result?.role !== "toolResult") throw new Error("expected tool result");
 		expect(result.content).toEqual([
 			{ type: "image", data: imageData, mimeType: "image/png", detail: "original" },
 			{ type: "text", text: "Read image file [image/png]" },
-			{
-				type: "image",
-				data: "",
-				mimeType: "application/octet-stream",
-				providerFile: { provider: "openai", id: "file_image_123" },
-			},
 			{ type: "text", text: "done" },
 		]);
 	});
 
 	it("rejects function output images with an empty source", () => {
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6-sol",
-				input: [
-					{
-						type: "function_call_output",
-						call_id: "call_read",
-						output: [{ type: "input_image", image_url: "", file_id: null, detail: null }],
-					},
-				],
-			}),
-		).toThrow(/at least one of `image_url` or `file_id`/);
+			parseRequest(
+				{
+					model: "gpt-5.6-sol",
+					input: [
+						{
+							type: "function_call_output",
+							call_id: "call_read",
+							output: [{ type: "input_image", image_url: "", file_id: null, detail: null }],
+						},
+					],
+				},
+				{ provider: "github-copilot", id: "gpt-5.6-sol" },
+			),
+		).toThrow(ValidationError);
 	});
 
 	it("rejects file blocks in tool outputs instead of flattening their content", () => {
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6-sol",
-				input: [
-					{
-						type: "function_call_output",
-						call_id: "call_read",
-						output: [{ type: "input_file", filename: "report.pdf", file_data: "opaque" }],
-					},
-				],
-			}),
+			parseRequest(
+				{
+					model: "gpt-5.6-sol",
+					input: [
+						{
+							type: "function_call_output",
+							call_id: "call_read",
+							output: [{ type: "input_file", filename: "report.pdf", file_data: "opaque" }],
+						},
+					],
+				},
+				{ provider: "github-copilot", id: "gpt-5.6-sol" },
+			),
 		).toThrow(/input_file/);
 	});
 
 	it("concatenates legacy function output text while retaining inline images", () => {
 		const imageData = Buffer.from("legacy image").toString("base64");
-		const parsed = parseRequest({
-			model: "gpt-5.6-sol",
-			input: [
-				{
-					type: "function_call_output",
-					call_id: "call_legacy",
-					output: [
-						{ type: "output_text", text: "foo" },
-						{ type: "text", text: "bar" },
-						{ type: "refusal", refusal: "no" },
-						{ type: "input_image", image_url: `data:image/png;base64,${imageData}` },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.6-sol",
+				input: [
+					{
+						type: "function_call_output",
+						call_id: "call_legacy",
+						output: [
+							{ type: "output_text", text: "foo" },
+							{ type: "text", text: "bar" },
+							{ type: "refusal", refusal: "no" },
+							{ type: "input_image", image_url: `data:image/png;base64,${imageData}` },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "gpt-5.6-sol" },
+		);
 
 		const result = parsed.context.messages[0];
 		if (result?.role !== "toolResult") throw new Error("expected tool result");
@@ -302,12 +314,11 @@ describe("openai-responses parseRequest", () => {
 	it("round-trips Pi image-read image forms as native function output blocks", () => {
 		const imageData = Buffer.from("read tool image").toString("base64");
 		const imageUrl = "https://blob.example.invalid/read-image.png";
-		const providerFileId = "file_read_image_123";
 		const model = buildModel({
 			id: "gpt-5.6-sol",
 			name: "GPT-5.6 Sol",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			baseUrl: "https://api.openai.com/v1",
 			reasoning: true,
 			input: ["text", "image"],
@@ -321,7 +332,7 @@ describe("openai-responses parseRequest", () => {
 					role: "assistant",
 					content: [{ type: "toolCall", id: "call_read", name: "read", arguments: { path: "image.png" } }],
 					api: "openai-responses",
-					provider: "openai",
+					provider: "github-copilot",
 					model: model.id,
 					usage: zeroUsage(),
 					stopReason: "toolUse",
@@ -335,13 +346,6 @@ describe("openai-responses parseRequest", () => {
 						{ type: "text", text: "Read image file [image/png]" },
 						{ type: "image", data: imageData, mimeType: "image/png", detail: "original" },
 						{ type: "image", data: imageData, mimeType: "image/png", detail: "high", url: imageUrl },
-						{
-							type: "image",
-							data: imageData,
-							mimeType: "image/png",
-							detail: "low",
-							providerFile: { provider: "openai", id: providerFileId },
-						},
 					],
 					isError: false,
 					timestamp: 2,
@@ -365,11 +369,10 @@ describe("openai-responses parseRequest", () => {
 				image_url: `data:image/png;base64,${imageData}`,
 			},
 			{ type: "input_image", detail: "high", image_url: imageUrl },
-			{ type: "input_image", detail: "low", file_id: providerFileId },
 		]);
 		expect(wireInput.some(item => "role" in item && item.role === "user")).toBe(false);
 
-		const parsed = parseRequest({ model: model.id, input: wireInput });
+		const parsed = parseRequest({ model: model.id, input: wireInput }, model);
 		const result = parsed.context.messages.find(message => message.role === "toolResult");
 		if (result?.role !== "toolResult") throw new Error("expected tool result");
 		expect(result.content).toEqual([
@@ -381,13 +384,6 @@ describe("openai-responses parseRequest", () => {
 				mimeType: "application/octet-stream",
 				detail: "high",
 				url: imageUrl,
-			},
-			{
-				type: "image",
-				data: "",
-				mimeType: "application/octet-stream",
-				detail: "low",
-				providerFile: { provider: "openai", id: providerFileId },
 			},
 		]);
 
@@ -408,7 +404,7 @@ describe("openai-responses parseRequest", () => {
 			id: "gpt-5.6-sol",
 			name: "GPT-5.6 Sol",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			baseUrl: "https://api.openai.com/v1",
 			reasoning: true,
 			input: ["text", "image"],
@@ -417,25 +413,28 @@ describe("openai-responses parseRequest", () => {
 			maxTokens: 128_000,
 			applyPatchToolType: "freeform",
 		} satisfies ModelSpec<"openai-responses">);
-		const parsed = parseRequest({
-			model: model.id,
-			input: [
-				{
-					type: "custom_tool_call",
-					call_id: "call_patch",
-					name: "apply_patch",
-					input: "*** Begin Patch",
-				},
-				{
-					type: "custom_tool_call_output",
-					call_id: "call_patch",
-					output: [
-						{ type: "input_text", text: "Rendered patch preview" },
-						{ type: "input_image", image_url: `data:image/png;base64,${imageData}`, detail: "high" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: model.id,
+				input: [
+					{
+						type: "custom_tool_call",
+						call_id: "call_patch",
+						name: "apply_patch",
+						input: "*** Begin Patch",
+					},
+					{
+						type: "custom_tool_call_output",
+						call_id: "call_patch",
+						output: [
+							{ type: "input_text", text: "Rendered patch preview" },
+							{ type: "input_image", image_url: `data:image/png;base64,${imageData}`, detail: "high" },
+						],
+					},
+				],
+			},
+			model,
+		);
 
 		const result = parsed.context.messages[1];
 		if (result?.role !== "toolResult") throw new Error("expected custom tool result");
@@ -462,50 +461,57 @@ describe("openai-responses parseRequest", () => {
 
 	it("rejects raw explicit prompt-cache controls instead of silently dropping them", () => {
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6",
-				input: "hi",
-				prompt_cache_options: { mode: "explicit", ttl: "30m" },
-			}),
+			parseRequest(
+				{ model: "gpt-5.6", input: "hi", prompt_cache_options: { mode: "explicit", ttl: "30m" } },
+				{ provider: "github-copilot", id: "gpt-5.6" },
+			),
 		).toThrow("prompt_cache_options and prompt_cache_breakpoint are unsupported");
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.6",
-				input: [
-					{
-						role: "user",
-						content: [{ type: "input_text", text: "hi", prompt_cache_breakpoint: { mode: "explicit" } }],
-					},
-				],
-			}),
+			parseRequest(
+				{
+					model: "gpt-5.6",
+					input: [
+						{
+							role: "user",
+							content: [{ type: "input_text", text: "hi", prompt_cache_breakpoint: { mode: "explicit" } }],
+						},
+					],
+				},
+				{ provider: "github-copilot", id: "gpt-5.6" },
+			),
 		).toThrow("prompt_cache_options and prompt_cache_breakpoint are unsupported");
 	});
 
 	it("accepts a bare string input and rejects a missing model", () => {
-		const parsed = parseRequest({ model: "m", input: "hi" });
+		const parsed = parseRequest({ model: "m", input: "hi" }, { provider: "github-copilot", id: "m" });
 		expect(parsed.context.messages).toHaveLength(1);
 		const m = parsed.context.messages[0]!;
 		if (m.role !== "user") throw new Error("expected user");
 		expect(m.content).toBe("hi");
 
-		expect(() => parseRequest({ input: "hi" })).toThrow(/model/);
+		expect(() => parseRequest({ input: "hi" }, { provider: "github-copilot", id: "validation-target" })).toThrow(
+			/model/,
+		);
 	});
 
 	it("preserves string message content and system input items", () => {
-		const parsed = parseRequest({
-			model: "m",
-			instructions: "top-level instructions",
-			input: [
-				{ role: "system", content: "system from easy input" },
-				{ role: "user", content: "hello" },
-				{ role: "assistant", content: "hi there" },
-				{
-					type: "message",
-					role: "system",
-					content: [{ type: "input_text", text: "structured system" }],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				instructions: "top-level instructions",
+				input: [
+					{ role: "system", content: "system from easy input" },
+					{ role: "user", content: "hello" },
+					{ role: "assistant", content: "hi there" },
+					{
+						type: "message",
+						role: "system",
+						content: [{ type: "input_text", text: "structured system" }],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 
 		expect(parsed.context.systemPrompt).toEqual([
 			"top-level instructions",
@@ -527,13 +533,14 @@ describe("openai-responses parseRequest", () => {
 			id: "rs_x",
 			content: [{ type: "reasoning_text", text: "hmm" }],
 		};
-		const parsed = parseRequest({
-			model: "m",
-			input: [reasoningItem],
-		});
+		const parsed = parseRequest(
+			{ model: "local/selected", input: [reasoningItem] },
+			{ provider: "local", id: "selected" },
+		);
 		expect(parsed.context.messages).toHaveLength(1);
 		const a = parsed.context.messages[0]!;
 		if (a.role !== "assistant") throw new Error("expected synthetic assistant");
+		expect(a).toMatchObject({ provider: "local", model: "selected", api: "openai-responses" });
 		expect(a.content).toHaveLength(1);
 		expect(a.content[0]).toMatchObject({
 			type: "thinking",
@@ -548,46 +555,49 @@ describe("openai-responses parseRequest", () => {
 		const imageUrl = "https://example.invalid/capture/%E2%98%83.png?sig=a%2Fb+c&raw=✓";
 		const pendingSafetyChecks = [{ id: "safe_1", code: "confirm_domain", message: "Open example.invalid?" }];
 		const acknowledgedSafetyChecks = [{ id: "safe_1", code: "confirm_domain", message: "Open example.invalid?" }];
-		const parsed = parseRequest({
-			model: "gpt-5.4",
-			tools: [{ type: "computer" }],
-			tool_choice: { type: "computer" },
-			include: ["computer_call_output.output.image_url", "reasoning.encrypted_content"],
-			input: [
-				{
-					type: "computer_call",
-					id: "item_computer_1",
-					call_id: "call_computer_1",
-					action: { type: "click", button: "left", x: 17, y: 29, keys: ["SHIFT"] },
-					pending_safety_checks: pendingSafetyChecks,
-					status: "completed",
-				},
-				{
-					type: "computer_call_output",
-					call_id: "call_computer_1",
-					output: { type: "computer_screenshot", file_id: fileId },
-					acknowledged_safety_checks: acknowledgedSafetyChecks,
-					status: "failed",
-				},
-				{
-					type: "computer_call",
-					id: "item_computer_2",
-					call_id: "call_computer_2",
-					actions: [
-						{ type: "keypress", keys: ["CTRL", "L"] },
-						{ type: "type", text: imageUrl },
-					],
-					pending_safety_checks: [],
-					status: "completed",
-				},
-				{
-					type: "computer_call_output",
-					call_id: "call_computer_2",
-					output: { type: "computer_screenshot", image_url: imageUrl },
-					acknowledged_safety_checks: [],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.4",
+				tools: [{ type: "computer" }],
+				tool_choice: { type: "computer" },
+				include: ["computer_call_output.output.image_url", "reasoning.encrypted_content"],
+				input: [
+					{
+						type: "computer_call",
+						id: "item_computer_1",
+						call_id: "call_computer_1",
+						action: { type: "click", button: "left", x: 17, y: 29, keys: ["SHIFT"] },
+						pending_safety_checks: pendingSafetyChecks,
+						status: "completed",
+					},
+					{
+						type: "computer_call_output",
+						call_id: "call_computer_1",
+						output: { type: "computer_screenshot", file_id: fileId },
+						acknowledged_safety_checks: acknowledgedSafetyChecks,
+						status: "failed",
+					},
+					{
+						type: "computer_call",
+						id: "item_computer_2",
+						call_id: "call_computer_2",
+						actions: [
+							{ type: "keypress", keys: ["CTRL", "L"] },
+							{ type: "type", text: imageUrl },
+						],
+						pending_safety_checks: [],
+						status: "completed",
+					},
+					{
+						type: "computer_call_output",
+						call_id: "call_computer_2",
+						output: { type: "computer_screenshot", image_url: imageUrl },
+						acknowledged_safety_checks: [],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "gpt-5.4" },
+		);
 
 		expect(parsed.context.tools).toEqual([
 			{ name: "computer", description: "", parameters: {}, native: { type: "computer" } },
@@ -642,20 +652,23 @@ describe("openai-responses parseRequest", () => {
 
 	it("uses the singular GA action when an explicitly empty actions batch is also present", () => {
 		const action = { type: "click" as const, button: "left" as const, x: 41, y: 73 };
-		const parsed = parseRequest({
-			model: "gpt-5.4",
-			input: [
-				{
-					type: "computer_call",
-					id: "item_empty_batch",
-					call_id: "call_empty_batch",
-					actions: [],
-					action,
-					pending_safety_checks: [],
-					status: "completed",
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "gpt-5.4",
+				input: [
+					{
+						type: "computer_call",
+						id: "item_empty_batch",
+						call_id: "call_empty_batch",
+						actions: [],
+						action,
+						pending_safety_checks: [],
+						status: "completed",
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "gpt-5.4" },
+		);
 		const message = parsed.context.messages[0];
 		if (message?.role !== "assistant" || message.content[0]?.type !== "toolCall") {
 			throw new Error("expected computer call");
@@ -675,7 +688,7 @@ describe("openai-responses parseRequest", () => {
 			role: "user" as const,
 			content: [
 				{ type: "input_text" as const, text: "inspect these" },
-				{ type: "input_image" as const, file_id: "file_image_电脑/%2F", detail: "original" as const },
+				{ type: "input_image" as const, image_url: "data:image/png;base64,aW1hZ2U=", detail: "original" as const },
 				{
 					type: "input_image" as const,
 					image_url: "https://example.invalid/image?sig=a%2Fb+✓",
@@ -684,7 +697,10 @@ describe("openai-responses parseRequest", () => {
 				{ type: "input_file" as const, file_url: "https://example.invalid/context/%E9%9B%AA.pdf?sig=a%2Fb+✓" },
 			],
 		};
-		const parsed = parseRequest({ model: "gpt-5.4", input: [nativeItem] });
+		const parsed = parseRequest(
+			{ model: "gpt-5.4", input: [nativeItem] },
+			{ provider: "github-copilot", id: "gpt-5.4" },
+		);
 		const message = parsed.context.messages[0];
 		if (message?.role !== "user") throw new Error("expected user message");
 		expect(message.content).toBe("inspect these");
@@ -696,7 +712,7 @@ describe("openai-responses parseRequest", () => {
 			id: "gpt-5.4",
 			name: "GPT-5.4",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			baseUrl: "https://api.openai.com/v1",
 			reasoning: true,
 			input: ["text", "image"],
@@ -718,11 +734,14 @@ describe("openai-responses parseRequest", () => {
 			role: "system" as const,
 			content: [
 				{ type: "input_text" as const, text: "Inspect this policy image" },
-				{ type: "input_image" as const, file_id: "file_system_image_雪", detail: "auto" as const },
+				{ type: "input_image" as const, image_url: "data:image/png;base64,cG9saWN5", detail: "auto" as const },
 				{ type: "input_file" as const, file_id: "file_system_document_电脑" },
 			],
 		};
-		const systemParsed = parseRequest({ model: "gpt-5.4", input: [nativeSystemItem] });
+		const systemParsed = parseRequest(
+			{ model: "gpt-5.4", input: [nativeSystemItem] },
+			{ provider: "github-copilot", id: "gpt-5.4" },
+		);
 		expect(systemParsed.context.systemPrompt).toBeUndefined();
 		const carrier = systemParsed.context.messages[0];
 		if (carrier?.role !== "developer") throw new Error("expected native system payload carrier");
@@ -744,10 +763,10 @@ describe("openai-responses parseRequest", () => {
 
 	it("rejects malformed known computer items instead of accepting them as opaque hosted items", () => {
 		expect(() =>
-			parseRequest({
-				model: "gpt-5.4",
-				input: [{ type: "computer_call", id: "item_only" }],
-			}),
+			parseRequest(
+				{ model: "gpt-5.4", input: [{ type: "computer_call", id: "item_only" }] },
+				{ provider: "github-copilot", id: "gpt-5.4" },
+			),
 		).toThrow(/computer_call|call_id|valid bridged Responses input item/);
 	});
 });
@@ -762,7 +781,7 @@ describe("openai-responses encodeResponse", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [
 				{
@@ -841,7 +860,7 @@ describe("openai-responses encodeResponse", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [
 				{
@@ -891,7 +910,7 @@ describe("openai-responses encodeResponse", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5.4",
 			content: [
 				{
@@ -929,7 +948,7 @@ describe("openai-responses encodeResponse", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [{ type: "text", text: "partial" }],
 			usage: zeroUsage(),
@@ -951,7 +970,7 @@ describe("openai-responses encodeStream", () => {
 		const partial: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [],
 			usage: zeroUsage(),
@@ -962,7 +981,7 @@ describe("openai-responses encodeStream", () => {
 		const finalMessage: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [
 				{ type: "thinking", thinking: "step 1", thinkingSignature: "rs_s1", itemId: "rs_s1" },
@@ -1133,7 +1152,7 @@ describe("openai-responses encodeStream", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5.4",
 			content: [computerCall],
 			usage: zeroUsage(),
@@ -1194,7 +1213,7 @@ describe("openai-responses encodeStream", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5.4",
 			content: [
 				{ type: "thinking", thinking: "think", itemId: "rs_interleaved_server" },
@@ -1248,7 +1267,7 @@ describe("openai-responses encodeStream", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [{ type: "text", text: "Working", textSignature }],
 			usage: { ...zeroUsage(), input: 1, output: 1 },
@@ -1285,7 +1304,7 @@ describe("openai-responses encodeStream", () => {
 		const base: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [],
 			usage: zeroUsage(),
@@ -1355,7 +1374,7 @@ describe("openai-responses encodeStream", () => {
 		const message: AssistantMessage = {
 			role: "assistant",
 			api: "openai-responses",
-			provider: "openai",
+			provider: "github-copilot",
 			model: "gpt-5",
 			content: [{ type: "text", text: "partial" }],
 			usage: { ...zeroUsage(), output: 1 },
@@ -1385,56 +1404,13 @@ describe("openai-responses encodeStream", () => {
 	});
 });
 
-describe("auth-gateway OpenAI Responses multimodal tool outputs", () => {
-	it("rejects OpenAI image file IDs before dispatching to a non-Responses upstream", async () => {
-		registerMockApi();
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-responses-file-id-"));
-		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openai", "test-key");
-		const mock = createMockModel({ provider: "openai", id: "mock/file-id" });
-		mock.push({ content: ["unexpected provider call"] });
-		const gateway = startAuthGateway({
-			bind: "127.0.0.1:0",
-			bearerTokens: ["test-token"],
-			storage,
-			resolveModel: () => mock.model,
-			version: "test",
-		});
-
-		try {
-			const response = await fetch(`${gateway.url}/v1/responses`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
-				body: JSON.stringify({
-					model: "mock/file-id",
-					input: [
-						{
-							type: "function_call_output",
-							call_id: "call_read",
-							output: [{ type: "input_image", file_id: "file_image_123" }],
-						},
-					],
-				}),
-			});
-			expect(response.status).toBe(400);
-			const body = (await response.json()) as { error: { message: string } };
-			expect(body.error.message).toContain("require a Responses-compatible upstream model");
-			expect(mock.calls).toHaveLength(0);
-		} finally {
-			await gateway.close();
-			storage.close();
-			await fs.rm(dir, { recursive: true, force: true });
-			clearCustomApis();
-		}
-	});
-});
 describe("auth-gateway OpenAI Responses computer option bridge", () => {
 	it("preserves the native tool, forced choice, and include in stream options", async () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-computer-options-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-		storage.keys.setRuntime("openai", "test-key");
-		const mock = createMockModel({ provider: "openai", id: "mock/computer-options" });
+		storage.keys.setRuntime("local", "test-key");
+		const mock = createMockModel({ id: "local/computer-options" });
 		mock.push({ content: ["ok"] });
 		const gateway = startAuthGateway({
 			bind: "127.0.0.1:0",
@@ -1449,7 +1425,7 @@ describe("auth-gateway OpenAI Responses computer option bridge", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json", Authorization: "Bearer test-token" },
 				body: JSON.stringify({
-					model: "mock/computer-options",
+					model: "local/computer-options",
 					input: "inspect the desktop",
 					tools: [{ type: "computer" }],
 					tool_choice: { type: "computer" },

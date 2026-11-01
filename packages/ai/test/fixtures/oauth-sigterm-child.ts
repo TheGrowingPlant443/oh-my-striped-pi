@@ -6,8 +6,8 @@ const release = process.argv[3];
 if (!db || !release) throw new Error("Expected database and response-release paths");
 await AgentStorage.open(db);
 const auth = new AuthStorage(await SqliteAuthCredentialStore.open(db));
-await auth.credentials.set("anthropic", [{ type: "oauth", access: "old", refresh: "old-refresh", expires: 0 }]);
-await auth.oauth.refreshStored("anthropic", {
+await auth.credentials.set("github-copilot", [{ type: "oauth", access: "old", refresh: "old-refresh", expires: 0 }]);
+await auth.oauth.refreshStored("github-copilot", {
 	forceRefresh: true,
 	credentialFromRow: credential => credential,
 	refresh: async current => {

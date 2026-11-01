@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { getTestModel } from "../helpers/model-fixtures";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
@@ -27,15 +27,14 @@ function createRuntime(
 	sessionManager = SessionManager.inMemory(),
 ) {
 	authStorage = createInMemoryAuthStorage();
-	authStorage.keys.setRuntime("anthropic", "test-key");
+	authStorage.keys.setRuntime("github-copilot", "test-key");
 	// Plain titles keep the rename lifecycle tests to one title request; the card tests opt in.
 	const settings = Settings.isolated({
 		"compaction.enabled": false,
 		"title.icons": "boring",
 		modelRoles: { tiny: `local/${DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY}` },
 	});
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-	if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+	const model = getTestModel("github-copilot");
 	const agent = new Agent({
 		getApiKey: () => "test-key",
 		initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },

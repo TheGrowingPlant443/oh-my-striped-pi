@@ -55,6 +55,9 @@ export async function handleSpeech(bootOpts: AuthGatewayRouteOptions, req: Reque
 		return speechWire.formatError(400, "invalid_request_error", message);
 	}
 
+	if (!model.baseUrl?.trim())
+		return speechWire.formatError(400, "invalid_request_error", "Model requires an explicit base URL");
+
 	const client = resolveClientIdentity(req.headers);
 	const sessionId = deterministicUuid(`speech\u0000${model.provider}/${model.id}`);
 	const apiKey = await resolveGatewayApiKey(bootOpts, model, sessionId, controller.signal, peer);

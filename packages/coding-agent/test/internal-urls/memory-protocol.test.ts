@@ -92,6 +92,23 @@ describe("MemoryProtocolHandler", () => {
 		await expect(router.resolve("memory://root", { settings })).rejects.toThrow("Unknown protocol: memory://");
 	});
 
+	it("rejects private Hindsight id reads instead of accessing another backend", async () => {
+		const settings = Settings.isolated({ "memory.backend": "hindsight" });
+		await expect(
+			InternalUrlRouter.instance().resolve("memory://private-memory-id", { settings, cwd: process.cwd() }),
+		).rejects.toThrow();
+	});
+
+	it("does not expose stale local artifacts to a private Hindsight caller", async () => {
+		await withMemoryFixture(async ({ memoryRoot }) => {
+			await Bun.write(path.join(memoryRoot, "memory_summary.md"), "stale local project summary");
+			const settings = Settings.isolated({ "memory.backend": "hindsight" });
+			await expect(InternalUrlRouter.instance().resolve("memory://root", { settings })).rejects.toThrow(
+				/File-backed memory artifacts only exist with memory.backend=local.*active backend: hindsight.*`recall`\/`reflect`/,
+			);
+		});
+	});
+
 	it("reads memory through the calling session's configured registry", async () => {
 		await withMemoryFixture(async ({ cwd, memoryRoot }) => {
 			await Bun.write(path.join(memoryRoot, "memory_summary.md"), "custom registry summary");
@@ -471,7 +488,6 @@ async function withMnemopiSession(fn: (fixture: MnemopiFixture) => Promise<void>
 				getSessionId: () => "test-mnemopi",
 			},
 			emitNotice: () => {},
-			getHindsightSessionState: () => undefined,
 			settings: Settings.isolated({ "memory.backend": "mnemopi" }),
 		} as unknown as AgentSession;
 		const state = new MnemopiSessionState({ sessionId: "test-mnemopi", config, session });
@@ -717,7 +733,7 @@ describe("MemoryProtocolHandler — mnemopi bridge (issue #4443)", () => {
 					getArtifactsDir: () => null,
 					getSessionId: () => "autocomplete-child",
 				},
-				settings: Settings.isolated({ "memory.backend": "hindsight" }),
+				settings: Settings.isolated({ "memory.backend": "off" }),
 			} as unknown as AgentSession;
 			AgentRegistry.global().register({
 				id: "autocomplete-child",
@@ -739,8 +755,7 @@ describe("MemoryProtocolHandler — mnemopi bridge (issue #4443)", () => {
 			}));
 			expect(bound?.items.map(item => item.value)).toContain("memory://<memory-id>");
 
-			// Typing into the child instead binds to its hindsight backend, which has
-			// no addressable ids and no file-backed root, so it is offered nothing.
+			// The child has memory disabled, so it has no addressable ids or root.
 			const childBound = await getInternalUrlSuggestions("memory://", undefined, undefined, () => ({
 				cwd: sharedCwd,
 				sessionFile: childSessionFile,
@@ -755,39 +770,6 @@ describe("MemoryProtocolHandler — mnemopi bridge (issue #4443)", () => {
 					sessionId: "gone",
 				})),
 			).toBeNull();
-		});
-	});
-
-	it("answers a same-cwd hindsight caller from its own backend, not the mnemopi peer", async () => {
-		await withMnemopiSession(async ({ state, dbDir }) => {
-			const childSessionFile = path.join(dbDir.path(), "hindsight-child.jsonl");
-			const childSession = {
-				sessionFile: childSessionFile,
-				sessionManager: {
-					getCwd: () => dbDir.path(),
-					getArtifactsDir: () => null,
-					getSessionId: () => "hindsight-child",
-				},
-				settings: Settings.isolated({ "memory.backend": "hindsight" }),
-			} as unknown as AgentSession;
-			AgentRegistry.global().register({
-				id: "hindsight-child",
-				displayName: "hindsight-child",
-				kind: "sub",
-				parentId: "test-mnemopi",
-				session: childSession,
-				sessionFile: childSessionFile,
-			});
-
-			const id = state.rememberInScope("mnemopi peer row");
-			if (!id) throw new Error("Expected the mnemopi fixture to store a memory id");
-
-			await expect(
-				InternalUrlRouter.instance().resolve(`memory://${id}`, {
-					cwd: dbDir.path(),
-					sessionFile: childSessionFile,
-				}),
-			).rejects.toThrow("Hindsight memories are not addressable via memory://");
 		});
 	});
 
@@ -809,26 +791,7 @@ describe("MemoryProtocolHandler — mnemopi bridge (issue #4443)", () => {
 	});
 });
 
-/**
- * Register a live session simulating memory.backend=hindsight: it exposes a
- * Hindsight state but no mnemopi state, so the handler must treat memory://<id>
- * as unaddressable and return a corrective pointer (issue #7587).
- */
-function withHindsightSession(fn: () => Promise<void>): Promise<void> {
-	const session = {
-		getHindsightSessionState: () => ({ bankId: "test-bank" }),
-	} as unknown as AgentSession;
-	AgentRegistry.global().register({
-		id: "test-hindsight",
-		displayName: "test-hindsight",
-		kind: "main",
-		session,
-		sessionFile: null,
-	});
-	return fn();
-}
-
-describe("MemoryProtocolHandler — hindsight (issue #7587)", () => {
+describe("MemoryProtocolHandler — unknown namespaces", () => {
 	beforeEach(() => {
 		AgentRegistry.resetGlobalForTests();
 		InternalUrlRouter.resetForTests();
@@ -837,27 +800,6 @@ describe("MemoryProtocolHandler — hindsight (issue #7587)", () => {
 	afterEach(() => {
 		AgentRegistry.resetGlobalForTests();
 		InternalUrlRouter.resetForTests();
-	});
-
-	it("returns a corrective error for memory://<id> when hindsight is active", async () => {
-		await withHindsightSession(async () => {
-			const router = InternalUrlRouter.instance();
-			await expect(router.resolve("memory://a1b2c3d4e5f6")).rejects.toThrow(
-				/Hindsight memories are not addressable via memory:\/\/.*use `recall`.*`reflect`/s,
-			);
-		});
-	});
-
-	it("uses the calling session backend when hindsight and mnemopi sessions coexist", async () => {
-		await withMnemopiSession(async () => {
-			await withHindsightSession(async () => {
-				const router = InternalUrlRouter.instance();
-				const settings = Settings.isolated({ "memory.backend": "hindsight" });
-				await expect(router.resolve("memory://a1b2c3d4e5f6", { settings })).rejects.toThrow(
-					/Hindsight memories are not addressable via memory:\/\//,
-				);
-			});
-		});
 	});
 
 	it("keeps the generic namespace error when no memory backend is active", async () => {
@@ -879,8 +821,8 @@ describe("MemoryProtocolHandler — file-backed root vs non-local backends (issu
 		InternalUrlRouter.resetForTests();
 	});
 
-	it("rejects stale local root artifacts after switching to hindsight", async () => {
-		const cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "memory-protocol-11909-hindsight-"));
+	it("rejects stale local root artifacts after switching to mnemopi", async () => {
+		const cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "memory-protocol-11909-mnemopi-"));
 		const previousAgentDir = getAgentDir();
 		try {
 			setAgentDir(path.join(cleanupRoot, "agent"));
@@ -889,9 +831,9 @@ describe("MemoryProtocolHandler — file-backed root vs non-local backends (issu
 			const memoryRoot = getMemoryRoot(getAgentDir(), cwd);
 			await fs.mkdir(memoryRoot, { recursive: true });
 			await Bun.write(path.join(memoryRoot, "memory_summary.md"), "stale local summary");
-			const settings = Settings.isolated({ "memory.backend": "hindsight" });
+			const settings = Settings.isolated({ "memory.backend": "mnemopi" });
 			await expect(InternalUrlRouter.instance().resolve("memory://root", { cwd, settings })).rejects.toThrow(
-				"File-backed memory artifacts only exist with memory.backend=local (active backend: hindsight). Use `recall`/`reflect` to search Hindsight memories.",
+				"File-backed memory artifacts only exist with memory.backend=local (active backend: mnemopi). Use `recall`/`reflect` to search Mnemopi memories, or `read memory://<memory-id>` for a full row.",
 			);
 		} finally {
 			setAgentDir(previousAgentDir);
@@ -918,10 +860,10 @@ describe("MemoryProtocolHandler — file-backed root vs non-local backends (issu
 
 	it("advertises memory://root only on the local backend that can populate it", async () => {
 		const router = InternalUrlRouter.instance();
-		const hindsight = await router.complete("memory", "", {
-			settings: Settings.isolated({ "memory.backend": "hindsight" }),
+		const mnemopi = await router.complete("memory", "", {
+			settings: Settings.isolated({ "memory.backend": "mnemopi" }),
 		});
-		expect((hindsight ?? []).map(item => item.value)).not.toContain("root");
+		expect((mnemopi ?? []).map(item => item.value)).not.toContain("root");
 		const local = await router.complete("memory", "", {
 			settings: Settings.isolated({ "memory.backend": "local" }),
 		});

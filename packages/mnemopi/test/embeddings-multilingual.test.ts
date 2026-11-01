@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { embeddingDimFor, isApiModel } from "@oh-my-pi/pi-mnemopi/core/embeddings";
+import { embeddingDimFor } from "@oh-my-pi/pi-mnemopi/core/embeddings";
 
 function withEnvValue<T>(key: string, value: string | undefined, fn: () => T): T {
 	const previous = process.env[key];
@@ -16,31 +16,6 @@ function withEnvValue<T>(key: string, value: string | undefined, fn: () => T): T
 			delete process.env[key];
 		} else {
 			process.env[key] = previous;
-		}
-	}
-}
-
-function withEnvValues<T>(updates: Record<string, string | undefined>, fn: () => T): T {
-	const previous: Record<string, string | undefined> = {};
-	for (const key in updates) {
-		previous[key] = process.env[key];
-		const value = updates[key];
-		if (value === undefined) {
-			delete process.env[key];
-		} else {
-			process.env[key] = value;
-		}
-	}
-	try {
-		return fn();
-	} finally {
-		for (const key in previous) {
-			const value = previous[key];
-			if (value === undefined) {
-				delete process.env[key];
-			} else {
-				process.env[key] = value;
-			}
 		}
 	}
 }
@@ -70,46 +45,5 @@ describe("multilingual embedding metadata", () => {
 			expect(embeddingDimFor("BAAI/bge-small-en-v1.5")).toBe(768);
 			expect(embeddingDimFor("unknown-model")).toBe(768);
 		});
-	});
-
-	it("routes only explicit API models or custom endpoints to the API", () => {
-		withEnvValues(
-			{
-				MNEMOPI_EMBEDDING_API_URL: undefined,
-				MNEMOPI_EMBEDDINGS_VIA_API: undefined,
-				OPENROUTER_BASE_URL: undefined,
-			},
-			() => {
-				expect(isApiModel("openai/text-embedding-3-small")).toBe(true);
-				expect(isApiModel("text-embedding-3-large")).toBe(true);
-				expect(isApiModel("my-org/text-embedding-custom")).toBe(true);
-				expect(isApiModel("BAAI/bge-small-en-v1.5")).toBe(false);
-				expect(isApiModel("jina-embeddings-v5-omni-nano")).toBe(false);
-			},
-		);
-
-		withEnvValues(
-			{
-				MNEMOPI_EMBEDDING_API_URL: undefined,
-				MNEMOPI_EMBEDDINGS_VIA_API: undefined,
-				OPENROUTER_BASE_URL: "https://llama.example/v1",
-			},
-			() => {
-				expect(isApiModel("BAAI/bge-small-en-v1.5")).toBe(true);
-				expect(isApiModel("some/random-model")).toBe(true);
-			},
-		);
-
-		withEnvValues(
-			{
-				MNEMOPI_EMBEDDING_API_URL: undefined,
-				MNEMOPI_EMBEDDINGS_VIA_API: undefined,
-				OPENROUTER_BASE_URL: "https://openrouter.ai/api/v1",
-			},
-			() => {
-				expect(isApiModel("jina-embeddings-v5-omni-nano")).toBe(false);
-				expect(isApiModel("openai/text-embedding-3-small")).toBe(true);
-			},
-		);
 	});
 });

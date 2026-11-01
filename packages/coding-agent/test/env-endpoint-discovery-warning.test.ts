@@ -40,7 +40,7 @@ describe("env-redirected implicit provider discovery warning", () => {
 	test("surfaces the failure in session.configWarnings after background discovery", async () => {
 		Bun.env.OLLAMA_BASE_URL = "http://ollama.typo:11434";
 		authStorage = await AuthStorage.create(path.join(tempDir, "auth.db"));
-		authStorage.keys.setRuntime("openai", "test-openai-key");
+		authStorage.keys.setRuntime("github-copilot", "test-copilot-key");
 		const modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"), {
 			fetch: async () => {
 				throw new Error("EHOSTUNREACH: connect failed");

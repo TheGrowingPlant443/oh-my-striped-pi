@@ -1,8 +1,9 @@
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import { fetchWithRetry, parseStreamingJson, readJsonl } from "@oh-my-pi/pi-utils";
+import { NO_AUTH_SENTINEL } from "../auth-retry";
 import * as AIError from "../error";
 import { parseToolCallArguments } from "../utils/tool-call-arguments";
-import { getEnvApiKey } from "../env-api-key";
+import { resolveProviderApiKey } from "../env-api-key";
 import type {
 	Api,
 	AssistantMessage,
@@ -97,7 +98,7 @@ type InternalToolCallBlock = AssistantMessage["content"][number] & {
 function normalizeBaseUrl(baseUrl?: string): string {
 	const value = baseUrl?.trim();
 	if (!value) {
-		return "https://ollama.com";
+		throw new AIError.ConfigurationError("Ollama request setup requires an explicit base URL");
 	}
 	const trimmed = value.endsWith("/") ? value.slice(0, -1) : value;
 	return trimmed.endsWith("/api") ? trimmed.slice(0, -4) : trimmed;
@@ -114,11 +115,7 @@ function mapReasoning(
 	if (disableReasoning && modelReasoning) {
 		return false;
 	}
-	const mappedReasoning =
-		model.provider === "ollama-cloud" && reasoning
-			? (model.thinking?.effortMap?.[reasoning] ?? reasoning)
-			: reasoning;
-	switch (mappedReasoning) {
+	switch (reasoning) {
 		case "minimal":
 		case "low":
 			return "low";
@@ -278,8 +275,6 @@ function convertMessages(model: Model<"ollama-chat">, context: Context): OllamaM
 		const developerRole =
 			msg.role === "developer" && (index < systemPrompts.length || msg.attribution !== "user") ? "system" : "user";
 		const converted = convertMessage(msg, supportsImages, developerRole);
-		// Some Ollama Cloud models historically rejected thinking in history (#1000).
-		// Preserve reasoning for the verified model without weakening that guard everywhere.
 		if (stripThinkingHistory && converted.role === "assistant" && converted.thinking) {
 			const { thinking: _t, ...rest } = converted;
 			return rest;
@@ -325,13 +320,7 @@ function createChatBody(model: Model<"ollama-chat">, context: Context, options: 
 	const runtimeOptions: { num_predict?: number; temperature?: number; top_p?: number } = {};
 	let hasRuntimeOptions = false;
 	if (options?.maxTokens !== undefined && !model.omitMaxOutputTokens) {
-		// Ollama Cloud rejects `num_predict` above 65536 with HTTP 400 uniformly
-		// across cloud-served models (confirmed empirically, #3392). Deliberately
-		// keyed on the provider id, not catalog policy: this is a wire-level
-		// safety net that must hold even for stale `models.db` rows and custom
-		// `modelOverrides` that never passed through catalog resolution.
-		runtimeOptions.num_predict =
-			model.provider === "ollama-cloud" ? Math.min(options.maxTokens, 65_536) : options.maxTokens;
+		runtimeOptions.num_predict = options.maxTokens;
 		hasRuntimeOptions = true;
 	}
 	if (options?.temperature !== undefined) {
@@ -568,11 +557,8 @@ const streamOllamaOnce = (
 			for (const call of streamMarkupHealing.drainCompleted()) emitHealedToolCall(call);
 		};
 		try {
-			const apiKey = options.apiKey || getEnvApiKey(model.provider);
-			if (!apiKey) {
-				throw new AIError.MissingApiKeyError(model.provider);
-			}
 			const baseUrl = normalizeBaseUrl(model.baseUrl);
+			const apiKey = resolveProviderApiKey(model.provider, options.apiKey);
 			let body = createChatBody(model, context, options);
 			const replacementPayload = await options.onPayload?.(body, model);
 			if (replacementPayload !== undefined) {
@@ -604,7 +590,7 @@ const streamOllamaOnce = (
 					headers: {
 						...model.headers,
 						...options.headers,
-						Authorization: `Bearer ${apiKey}`,
+						...(apiKey && apiKey !== NO_AUTH_SENTINEL ? { Authorization: `Bearer ${apiKey}` } : {}),
 						"Content-Type": "application/json",
 					},
 					body: JSON.stringify(body),

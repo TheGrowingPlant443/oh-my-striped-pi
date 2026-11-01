@@ -2,13 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { complete, stream } from "@oh-my-pi/pi-ai/stream";
 import type { Api, Context, Model, OptionsForApi } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { e2eApiKey, resolveApiKey } from "./oauth";
+import { resolveApiKey } from "./oauth";
 
-// Resolve OAuth tokens at module level (async, runs before tests)
-const [geminiCliToken, openaiCodexToken] = await Promise.all([
-	resolveApiKey("google-gemini-cli"),
-	resolveApiKey("openai-codex"),
-]);
+const githubCopilotToken = await resolveApiKey("github-copilot");
 
 async function testAbortSignal<TApi extends Api>(llm: Model<TApi>, options: OptionsForApi<TApi> = {}) {
 	const context: Context = {
@@ -66,148 +62,24 @@ async function testImmediateAbort<TApi extends Api>(llm: Model<TApi>, options: O
 	expect(response.stopReason).toBe("aborted");
 }
 
-describe("AI Providers Abort Tests", () => {
-	describe.skipIf(!e2eApiKey("GEMINI_API_KEY"))("Google Provider Abort", () => {
-		const llm = getBundledModel("google", "gemini-2.5-flash");
+describe("GitHub Copilot Abort Tests", () => {
+	for (const modelId of ["gpt-4o", "claude-sonnet-4"]) {
+		describe(modelId, () => {
+			it.skipIf(!githubCopilotToken)(
+				"should abort mid-stream",
+				async () => {
+					await testAbortSignal(getBundledModel("github-copilot", modelId), { apiKey: githubCopilotToken });
+				},
+				{ retry: 3 },
+			);
 
-		it(
-			"should abort mid-stream",
-			async () => {
-				await testAbortSignal(llm, { thinking: { enabled: true } });
-			},
-			{ retry: 3 },
-		);
-
-		it(
-			"should handle immediate abort",
-			async () => {
-				await testImmediateAbort(llm, { thinking: { enabled: true } });
-			},
-			{ retry: 3 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Completions Provider Abort", () => {
-		const llm: Model<"openai-completions"> = {
-			...getBundledModel("openai", "gpt-4o-mini")!,
-			api: "openai-completions",
-		};
-
-		it(
-			"should abort mid-stream",
-			async () => {
-				await testAbortSignal(llm);
-			},
-			{ retry: 3 },
-		);
-
-		it(
-			"should handle immediate abort",
-			async () => {
-				await testImmediateAbort(llm);
-			},
-			{ retry: 3 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Responses Provider Abort", () => {
-		const llm = getBundledModel("openai", "gpt-5-mini");
-
-		it(
-			"should abort mid-stream",
-			async () => {
-				await testAbortSignal(llm);
-			},
-			{ retry: 3 },
-		);
-
-		it(
-			"should handle immediate abort",
-			async () => {
-				await testImmediateAbort(llm);
-			},
-			{ retry: 3 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("Anthropic Provider Abort", () => {
-		const llm = getBundledModel("anthropic", "claude-opus-4-5-20251101");
-
-		it(
-			"should abort mid-stream",
-			async () => {
-				await testAbortSignal(llm, { thinkingEnabled: true, thinkingBudgetTokens: 2048 });
-			},
-			{ retry: 3 },
-		);
-
-		it(
-			"should handle immediate abort",
-			async () => {
-				await testImmediateAbort(llm, { thinkingEnabled: true, thinkingBudgetTokens: 2048 });
-			},
-			{ retry: 3 },
-		);
-	});
-
-	describe.skipIf(!e2eApiKey("MISTRAL_API_KEY"))("Mistral Provider Abort", () => {
-		const llm = getBundledModel("mistral", "devstral-medium-latest");
-
-		it(
-			"should abort mid-stream",
-			async () => {
-				await testAbortSignal(llm);
-			},
-			{ retry: 3 },
-		);
-
-		it(
-			"should handle immediate abort",
-			async () => {
-				await testImmediateAbort(llm);
-			},
-			{ retry: 3 },
-		);
-	});
-
-	// Google Gemini CLI / Antigravity share the same provider, so one test covers both
-	describe("Google Gemini CLI Provider Abort", () => {
-		it.skipIf(!geminiCliToken)(
-			"should abort mid-stream",
-			async () => {
-				const llm = getBundledModel("google-gemini-cli", "gemini-2.5-flash");
-				await testAbortSignal(llm, { apiKey: geminiCliToken });
-			},
-			{ retry: 3 },
-		);
-
-		it.skipIf(!geminiCliToken)(
-			"should handle immediate abort",
-			async () => {
-				const llm = getBundledModel("google-gemini-cli", "gemini-2.5-flash");
-				await testImmediateAbort(llm, { apiKey: geminiCliToken });
-			},
-			{ retry: 3 },
-		);
-	});
-
-	describe("OpenAI Codex Provider Abort", () => {
-		it.skipIf(!openaiCodexToken)(
-			"should abort mid-stream",
-			async () => {
-				const llm = getBundledModel("openai-codex", "gpt-5.2-codex");
-				await testAbortSignal(llm, { apiKey: openaiCodexToken });
-			},
-			{ retry: 3 },
-		);
-
-		it.skipIf(!openaiCodexToken)(
-			"should handle immediate abort",
-			async () => {
-				const llm = getBundledModel("openai-codex", "gpt-5.2-codex");
-				await testImmediateAbort(llm, { apiKey: openaiCodexToken });
-			},
-			{ retry: 3 },
-		);
-	});
+			it.skipIf(!githubCopilotToken)(
+				"should handle immediate abort",
+				async () => {
+					await testImmediateAbort(getBundledModel("github-copilot", modelId), { apiKey: githubCopilotToken });
+				},
+				{ retry: 3 },
+			);
+		});
+	}
 });

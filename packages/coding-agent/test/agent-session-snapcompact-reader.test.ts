@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, Context, Message, Model } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
@@ -26,14 +26,30 @@ import * as snapcompact from "@oh-my-pi/snapcompact";
 const REASONING = "PRIVATE-REASONING";
 const PLAIN_LEGEND = "`¶user:`, `¶ai:`, `¶call:`: user, assistant reply, tool call.";
 
-function bundled(provider: GeneratedProvider, modelId: string): Model {
-	const model = getBundledModel(provider, modelId);
-	if (!model) throw new Error(`Expected bundled ${provider}/${modelId}`);
-	return model;
-}
-
-const gpt = bundled("openai", "gpt-5.4");
-const claude = bundled("anthropic", "claude-opus-5-5");
+const gpt = buildModel({
+	id: "gpt-5.4",
+	name: "Company GPT",
+	provider: "company-responses",
+	api: "openai-responses",
+	baseUrl: "https://models.company.invalid/responses",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 400_000,
+	maxTokens: 32_000,
+});
+const claude = buildModel({
+	id: "claude-opus-5-5",
+	name: "Company Claude",
+	provider: "company-anthropic",
+	api: "anthropic-messages",
+	baseUrl: "https://models.company.invalid/anthropic",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 1_000_000,
+	maxTokens: 64_000,
+});
 
 function assistant(model: Model, content: AssistantMessage["content"]): AssistantMessage {
 	return {
@@ -98,9 +114,17 @@ describe("snapcompact archive read by a Claude model", () => {
 		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-snapcompact-reader-"));
 		setAgentDir(path.join(tempDir, "agent"));
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		authStorage.keys.setRuntime("openai", "test-key");
+		authStorage.keys.setRuntime(claude.provider, "test-key");
+		authStorage.keys.setRuntime(gpt.provider, "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
+		for (const model of [claude, gpt]) {
+			modelRegistry.registerProvider(model.provider, {
+				apiKey: "test-key",
+				api: model.api,
+				baseUrl: model.baseUrl,
+				models: [{ ...model, contextWindow: model.contextWindow!, maxTokens: model.maxTokens! }],
+			});
+		}
 	});
 
 	afterEach(async () => {

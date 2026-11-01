@@ -27,7 +27,6 @@ import {
 	type Usage,
 } from "@oh-my-pi/pi-ai";
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import { isAnthropicOAuthToken } from "@oh-my-pi/pi-catalog/utils";
 import type { CacheWarmingDecisionEvent, CacheWarmingDecisionEventResult } from "../extensibility/shared-events";
 
 export type { CacheWarmingDecisionEvent, CacheWarmingDecisionEventResult };
@@ -88,36 +87,15 @@ function supportsLongCacheRetention(model: Model<Api>): boolean {
 			compat !== undefined && "supportsLongCacheRetention" in compat && compat.supportsLongCacheRetention === true
 		);
 	}
-	// Factory Droid resolves long retention per upstream at request time, so
-	// warming starts on the 5m tier and adopts 1h once a response reports it.
-	// A model declaring only a 1h lifetime (a long-only `promptCache` override)
-	// starts on 1h instead, and stops if a response reports a 5m write.
-	if (model.api === "factory-droid-agent") return model.promptCache?.short === undefined;
-	if (model.api === "bedrock-converse-stream") {
-		return (
-			compat !== undefined &&
-			"supportsLongPromptCacheRetention" in compat &&
-			compat.supportsLongPromptCacheRetention === true
-		);
-	}
 	return true;
 }
 
-/**
- * Retention tier a request writes under, or undefined when caching is off.
- *
- * Mirrors the Anthropic provider's retention default (`getCacheControl`):
- * OAuth subscriber seats write 1h entries where the model supports them.
- * `resolveCacheRetention` keeps an explicit option or `PI_CACHE_RETENTION`
- * ahead of that fallback.
- */
+/** Retention tier a request writes under, or undefined when caching is off. */
 export function resolvePromptCacheTier(
 	model: Model<Api>,
 	options: SimpleStreamOptions | undefined,
-	isOAuthToken = false,
 ): PromptCacheTier | undefined {
-	const longByDefault = isOAuthToken && model.api === "anthropic-messages" && supportsLongCacheRetention(model);
-	const retention = resolveCacheRetention(options?.cacheRetention, longByDefault ? "long" : "short");
+	const retention = resolveCacheRetention(options?.cacheRetention, "short");
 	if (retention === "none") return undefined;
 	return retention === "long" && !supportsLongCacheRetention(model) ? "short" : retention;
 }
@@ -127,12 +105,8 @@ export function resolvePromptCacheTier(
  * `promptCache` tier for the retention the request used. Undefined when the
  * model has no lifetime for that tier or caching is off.
  */
-export function getPromptCacheTtlMs(
-	model: Model<Api>,
-	options: SimpleStreamOptions | undefined,
-	isOAuthToken = false,
-): number | undefined {
-	const tier = resolvePromptCacheTier(model, options, isOAuthToken);
+export function getPromptCacheTtlMs(model: Model<Api>, options: SimpleStreamOptions | undefined): number | undefined {
+	const tier = resolvePromptCacheTier(model, options);
 	const seconds = tier === undefined ? undefined : model.promptCache?.[tier];
 	return seconds === undefined ? undefined : seconds * 1000;
 }
@@ -149,34 +123,14 @@ export function observedPromptCacheTier(usage: Usage): PromptCacheTier | undefin
 }
 
 /**
- * Whether `message` is the response to a request sent to `model`. A
- * server-side fallback retags the response with the served model, so its
- * fallback marker's `from` names the model the request went to.
- */
-function answers(message: AssistantMessage, model: Model<Api>): boolean {
-	if (message.provider !== model.provider) return false;
-	if (message.model === model.id) return true;
-	const fallback = message.content.find(block => block.type === "fallback");
-	return fallback?.type === "fallback" && fallback.from.model === model.id;
-}
-
-/**
- * Whether replaying the request leaves its cache entry untouched. Anthropic
- * Messages and Converse budget-based reasoning derive a wire budget from
- * `max_tokens`; lowering the cap can change that budget and the cache key.
+ * Whether replaying the request leaves its cache entry untouched. Budget-based
+ * Anthropic reasoning derives its wire budget from `max_tokens`; lowering the
+ * cap can change that budget and the cache key.
  */
 export function isReplayable(model: Model<Api>, options: SimpleStreamOptions | undefined): boolean {
 	if (model.api === "anthropic-messages") {
 		const reasoningRequested = model.reasoning && options?.reasoning !== undefined && !options.forceReasoningOff;
 		return !reasoningRequested || model.thinking?.mode === "anthropic-adaptive";
-	}
-	if (model.api === "bedrock-converse-stream") {
-		const reasoningRequested =
-			model.reasoning &&
-			((options?.reasoning !== undefined && !options.disableReasoning && !options.forceReasoningOff) ||
-				(model.thinking?.requiresEffort === true && !model.thinking.suppressWhenOff));
-		if (!reasoningRequested) return true;
-		return model.thinking?.mode === "anthropic-adaptive";
 	}
 	return true;
 }
@@ -375,14 +329,8 @@ export class CacheWarmer {
 	/** Keep the prompt cache entry written by `request` warm while `isCurrent` holds. */
 	start(request: CacheWarmRequest, isCurrent: () => boolean): void {
 		this.#clearRun();
-		// A string key is classified up front. Resolver keys (rotating
-		// credentials) cannot be inspected without consuming them; they start on
-		// the short tier and `onResponse` switches to the tier the provider
-		// reports having written.
-		const apiKey = request.options.apiKey;
-		const isOAuthToken =
-			request.model.api === "anthropic-messages" && typeof apiKey === "string" && isAnthropicOAuthToken(apiKey);
-		const tier = resolvePromptCacheTier(request.model, request.options, isOAuthToken);
+		// Start from configured retention; `onResponse` adopts the tier actually written.
+		const tier = resolvePromptCacheTier(request.model, request.options);
 		const entry = tier === undefined ? undefined : { model: request.model, tier, touchedAt: Date.now(), isCurrent };
 		this.#pendingEntry = entry;
 		const mode = this.#deps.getMode();
@@ -427,7 +375,7 @@ export class CacheWarmer {
 	onResponse(message: AssistantMessage): void {
 		const observed = observedPromptCacheTier(message.usage);
 		const pending = this.#pendingEntry;
-		if (pending && answers(message, pending.model)) {
+		if (pending && message.provider === pending.model.provider && message.model === pending.model.id) {
 			this.#pendingEntry = undefined;
 			if (message.stopReason !== "error" && (message.usage.cacheRead > 0 || message.usage.cacheWrite > 0)) {
 				if (observed !== undefined) pending.tier = observed;
@@ -436,7 +384,7 @@ export class CacheWarmer {
 		}
 		const run = this.#run;
 		if (!run || run.timer === undefined) return;
-		if (!answers(message, run.model)) return;
+		if (message.provider !== run.model.provider || message.model !== run.model.id) return;
 		if (observed === undefined || observed === run.tier) return;
 		const delayMs = this.#delayFor(run.model, observed);
 		if (delayMs === undefined) {
@@ -617,12 +565,7 @@ export class CacheWarmer {
 		}
 	}
 
-	/**
-	 * Requests one output token. Anthropic Messages cuts off at its first
-	 * generated block after reporting early cache usage. Converse suppresses
-	 * adaptive allowance and runs to terminal metadata under a true one-token
-	 * total-generation cap.
-	 */
+	/** Requests one output token, cutting off generation after the early cache usage report. */
 	async #replay(run: ActiveRun): Promise<AssistantMessage | undefined> {
 		const cutoff = new AbortController();
 		let stream: CacheWarmStream;
@@ -631,20 +574,11 @@ export class CacheWarmer {
 			maxTokens: 1,
 			signal: AbortSignal.any([run.controller.signal, cutoff.signal]),
 		};
-		if (run.model.api === "bedrock-converse-stream" && run.model.thinking?.mode === "anthropic-adaptive") {
-			// Adaptive Converse ignores thinkingBudgets on the wire. Zero each
-			// supported effort so the generic mapper cannot inflate maxTokens,
-			// including after mandatory-effort normalization selects its default.
-			const thinkingBudgets = { ...run.options.thinkingBudgets };
-			for (const effort of run.model.thinking.efforts) thinkingBudgets[effort] = 0;
-			replayOptions.thinkingBudgets = thinkingBudgets;
-		}
 		try {
 			stream = await this.#deps.stream(run.model, run.context, replayOptions);
 		} catch {
 			return undefined;
 		}
-		const needsTerminalUsage = run.model.api === "bedrock-converse-stream";
 		let partial: AssistantMessage | undefined;
 		try {
 			for await (const event of stream) {
@@ -654,7 +588,7 @@ export class CacheWarmer {
 					break;
 				}
 				partial = event.partial;
-				if (isGenerationEvent(event) && !needsTerminalUsage) {
+				if (isGenerationEvent(event)) {
 					cutoff.abort();
 					break;
 				}

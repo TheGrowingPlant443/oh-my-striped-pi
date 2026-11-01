@@ -69,7 +69,7 @@ describe("AgentSession mid-run threshold compaction", () => {
 	beforeAll(async () => {
 		sharedDir = TempDir.createSync("@pi-agent-goal-midrun-compaction-shared-");
 		sharedAuthStorage = await AuthStorage.create(path.join(sharedDir.path(), "auth.db"));
-		sharedAuthStorage.keys.setRuntime("anthropic", "test-key");
+		sharedAuthStorage.keys.setRuntime("github-copilot", "test-key");
 		sharedModelRegistry = new ModelRegistry(sharedAuthStorage, path.join(sharedDir.path(), "models.yml"));
 	});
 
@@ -107,8 +107,8 @@ describe("AgentSession mid-run threshold compaction", () => {
 		sessionManager: SessionManager;
 	}> {
 		const observedContexts: string[][] = [];
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 model to exist");
 
 		const modelRegistry = sharedModelRegistry;
 		const parentSettings = Settings.isolated({
@@ -160,8 +160,8 @@ describe("AgentSession mid-run threshold compaction", () => {
 								},
 							],
 							api: "anthropic-messages" as const,
-							provider: "anthropic" as const,
-							model: "claude-sonnet-4-5",
+							provider: "github-copilot" as const,
+							model: "claude-sonnet-4.5",
 							usage: highUsage(50_000),
 							stopReason: "toolUse" as const,
 							timestamp: Date.now(),
@@ -170,8 +170,8 @@ describe("AgentSession mid-run threshold compaction", () => {
 							role: "assistant" as const,
 							content: [{ type: "text" as const, text: "All done." }],
 							api: "anthropic-messages" as const,
-							provider: "anthropic" as const,
-							model: "claude-sonnet-4-5",
+							provider: "github-copilot" as const,
+							model: "claude-sonnet-4.5",
 							usage: highUsage(200),
 							stopReason: "stop" as const,
 							timestamp: Date.now(),
@@ -640,8 +640,8 @@ describe("AgentSession mid-run threshold compaction", () => {
 					},
 				],
 				api: "anthropic-messages" as const,
-				provider: "anthropic" as const,
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot" as const,
+				model: "claude-sonnet-4.5",
 				stopReason: "stop" as const,
 				usage: highUsage(100),
 				timestamp,

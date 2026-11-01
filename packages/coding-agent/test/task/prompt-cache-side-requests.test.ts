@@ -1,7 +1,7 @@
-import { afterEach, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import type { Model } from "@oh-my-pi/pi-ai";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildTransformedCodexRequestBody } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
 import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -23,6 +23,14 @@ interface Request {
 	input: unknown;
 }
 
+beforeEach(() => {
+	const resolve = catalogPolicy.resolveCatalogPolicy;
+	vi.spyOn(catalogPolicy, "resolveCatalogPolicy").mockImplementation(model => ({
+		...resolve(model),
+		sharedPromptCache: model.provider === "github-copilot" && model.id === "gpt-5.4",
+	}));
+});
+
 afterEach(() => {
 	vi.restoreAllMocks();
 	AgentLifecycleManager.resetGlobalForTests();
@@ -30,58 +38,46 @@ afterEach(() => {
 });
 
 it.each([
-	["Muse automatic key", false, false],
-	["model switched to Luna", true, false],
-	["explicit Muse key", false, true],
-	["explicit Luna key", true, true],
+	["automatic eligible key", false, false],
+	["model switched to an ineligible model", true, false],
+	["explicit eligible key", false, true],
+	["explicit ineligible key", true, true],
 ] as const)(
 	"keeps primary, ephemeral, and handoff routing consistent for %s",
-	async (_name, switchToLuna, explicit) => {
+	async (_name, switchToIneligible, explicit) => {
 		using dir = TempDir.createSync("@omp-task-side-cache-");
 		const auth = await AuthStorage.create(dir.join("auth.db"));
-		auth.keys.setRuntime("muse-code", "test-key");
-		auth.keys.setRuntime("openai-codex", "test-key");
+		auth.keys.setRuntime("github-copilot", "test-key");
 		const mock = createMockModel({ handler: { content: [{ type: "text", text: "## Goal\nContinue the review." }] } });
 		const requests: Request[] = [];
 		let stage = "seed";
 		const realFactory = settingsStream.createSettingsAwareStreamFn;
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
-		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation((settings, _base, slow) =>
-			realFactory(
-				settings,
-				async (model, context, options) => {
-					const cacheOptions = {
-						sessionId: options?.sessionId,
-						promptCacheKey: options?.promptCacheKey,
-						providerSessionState: options?.providerSessionState,
-					};
-					const body =
-						model.api === "openai-codex-responses"
-							? await buildTransformedCodexRequestBody(
-									model as Model<"openai-codex-responses">,
-									context,
-									cacheOptions,
-								)
-							: buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
-					requests.push({
-						stage,
-						provider: model.provider,
-						sessionId: options?.sessionId,
-						key: body.prompt_cache_key,
-						system: context.systemPrompt,
-						tools: body.tools,
-						input: body.input,
-					});
-					return mock.stream(model, context, options);
-				},
-				slow,
-			),
+		vi.spyOn(settingsStream, "createSettingsAwareStreamFn").mockImplementation(settings =>
+			realFactory(settings, async (model, context, options) => {
+				const cacheOptions = {
+					sessionId: options?.sessionId,
+					promptCacheKey: options?.promptCacheKey,
+					providerSessionState: options?.providerSessionState,
+				};
+				const body = buildParams(model as Model<"openai-responses">, context, cacheOptions, undefined).params;
+				requests.push({
+					stage,
+					provider: model.provider,
+					sessionId: options?.sessionId,
+					key: body.prompt_cache_key,
+					system: context.systemPrompt,
+					tools: body.tools,
+					input: body.input,
+				});
+				return mock.stream(model, context, options);
+			}),
 		);
 		const { session } = await createAgentSession({
 			cwd: dir.path(),
 			agentDir: dir.path(),
 			authStorage: auth,
-			model: getBundledModel("muse-code", "muse-spark-1.3-contributor"),
+			model: getBundledModel("github-copilot", "gpt-5.4"),
 			providerSessionId: "child-provider-session",
 			providerPromptCacheKey: explicit ? "configured-cache" : undefined,
 			taskPromptCacheKey: "parent:task",
@@ -105,7 +101,7 @@ it.each([
 		try {
 			await session.prompt("Review the cache-key change.");
 			expect(requests[0]?.key).toBe(explicit ? "configured-cache" : "parent:task");
-			if (switchToLuna) session.agent.setModel(getBundledModel("openai-codex", "gpt-6-luna"));
+			if (switchToIneligible) session.agent.setModel(getBundledModel("github-copilot", "gpt-5.5"));
 			if (explicit) session.agent.promptCacheKey = "live-explicit-cache";
 			stage = "primary";
 			await session.prompt("Check the next part.");
@@ -115,8 +111,12 @@ it.each([
 			await session.handoff();
 			const current = requests.slice(1);
 			expect(current.map(r => r.stage)).toEqual(["primary", "ephemeral", "handoff"]);
-			expect(current.map(r => r.provider)).toEqual(Array(3).fill(switchToLuna ? "openai-codex" : "muse-code"));
-			const expected = explicit ? "live-explicit-cache" : switchToLuna ? "child-provider-session" : "parent:task";
+			expect(current.map(r => r.provider)).toEqual(Array(3).fill("github-copilot"));
+			const expected = explicit
+				? "live-explicit-cache"
+				: switchToIneligible
+					? "child-provider-session"
+					: "parent:task";
 			expect(current.map(r => r.key)).toEqual(Array(3).fill(expected));
 			const primary = current[0];
 			for (const side of current.slice(1)) {

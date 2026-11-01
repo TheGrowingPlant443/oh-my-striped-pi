@@ -35,7 +35,7 @@ describe("--provider with a model the startup catalog lacks", () => {
 	});
 
 	async function deferredPattern(cliArgs: string[]): Promise<string | string[] | undefined> {
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		vi.spyOn(process, "exit").mockImplementation((code?: number | string | null) => {
 			throw new Error(`buildSessionOptions exited with ${code}`);
 		});
@@ -51,21 +51,23 @@ describe("--provider with a model the startup catalog lacks", () => {
 	}
 
 	test("defers the provider-qualified selector to post-extension resolution", async () => {
-		expect(await deferredPattern(["--provider", "anthropic", "--model", "claude-unreleased-9"])).toBe(
-			"anthropic/claude-unreleased-9",
+		expect(await deferredPattern(["--provider", "github-copilot", "--model", "claude-unreleased-9"])).toBe(
+			"github-copilot/claude-unreleased-9",
 		);
 	});
 
 	test("does not double the provider prefix", async () => {
-		expect(await deferredPattern(["--provider", "anthropic", "--model", "anthropic/claude-unreleased-9"])).toBe(
-			"anthropic/claude-unreleased-9",
-		);
+		expect(
+			await deferredPattern(["--provider", "github-copilot", "--model", "github-copilot/claude-unreleased-9"]),
+		).toBe("github-copilot/claude-unreleased-9");
 	});
 
 	test("defers a discovery provider that holds no models until its refresh", async () => {
 		const hasProvider = modelRegistry.hasProvider.bind(modelRegistry);
-		vi.spyOn(modelRegistry, "hasProvider").mockImplementation(id => id === "proxy" || hasProvider(id));
-		expect(await deferredPattern(["--provider", "proxy", "--model", "some-model"])).toBe("proxy/some-model");
+		vi.spyOn(modelRegistry, "hasProvider").mockImplementation(id => id === "github-copilot" || hasProvider(id));
+		expect(await deferredPattern(["--provider", "github-copilot", "--model", "some-model"])).toBe(
+			"github-copilot/some-model",
+		);
 	});
 });
 
@@ -85,9 +87,9 @@ describe("print-mode suggestions for a provider-qualified miss", () => {
 					"--no-session",
 					"-p",
 					"--provider",
-					"anthropic",
+					"github-copilot",
 					"--model",
-					"gpt-4o",
+					"unknown-copilot-model",
 					"hi",
 				],
 				{
@@ -98,8 +100,7 @@ describe("print-mode suggestions for a provider-qualified miss", () => {
 						USERPROFILE: home,
 						TMPDIR: process.env.TMPDIR,
 						NO_COLOR: "1",
-						ANTHROPIC_API_KEY: "test-key",
-						OPENAI_API_KEY: "test-key",
+						COPILOT_GITHUB_TOKEN: "test-key",
 					},
 					stdin: "ignore",
 					stdout: "pipe",
@@ -108,8 +109,8 @@ describe("print-mode suggestions for a provider-qualified miss", () => {
 			);
 			const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
 			expect(exitCode).toBe(1);
-			expect(stderr).toContain('Model "anthropic/gpt-4o" not found');
-			expect(stderr).not.toContain("openai/");
+			expect(stderr).toContain('Model "github-copilot/unknown-copilot-model" not found');
+			expect(stderr).not.toContain("local/");
 		} finally {
 			removeSyncWithRetries(home);
 		}
@@ -123,7 +124,7 @@ describe("print mode with a stale configured default", () => {
 		fs.mkdirSync(agentDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(agentDir, "config.yml"),
-			"modelRoles:\n  default: anthropic/claude-sonnet-9-9\nretry:\n  enabled: false\n",
+			"modelRoles:\n  default: github-copilot/claude-sonnet-9-9\nretry:\n  enabled: false\n",
 		);
 		try {
 			const proc = Bun.spawn(
@@ -146,16 +147,14 @@ describe("print mode with a stale configured default", () => {
 						USERPROFILE: home,
 						TMPDIR: process.env.TMPDIR,
 						NO_COLOR: "1",
-						ANTHROPIC_API_KEY: "test-key",
-						// The fallback model's request never reaches Anthropic; the test stops the run once the warning is out.
-						ANTHROPIC_BASE_URL: "http://127.0.0.1:9",
+						COPILOT_GITHUB_TOKEN: "test-key",
 					},
 					stdin: "ignore",
 					stdout: "pipe",
 					stderr: "pipe",
 				},
 			);
-			const warning = "Default model anthropic/claude-sonnet-9-9 not found. Using anthropic/";
+			const warning = "Default model github-copilot/claude-sonnet-9-9 not found. Using github-copilot/";
 			const stderr = await readUntil(proc.stderr, warning);
 			proc.kill();
 			await proc.exited;

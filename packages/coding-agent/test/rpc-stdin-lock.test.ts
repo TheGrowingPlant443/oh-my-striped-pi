@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
 import { isRecord, readJsonl } from "@oh-my-pi/pi-utils";
+import { getTestModel } from "./helpers/model-fixtures";
 
 async function expectRpcOwnsStdin(): Promise<void> {
 	const cliPath = path.join(import.meta.dir, "..", "src", "cli.ts");
 	const extensionPath = path.join(import.meta.dir, "fixtures", "locked-stdin-reader.ts");
+	const model = getTestModel("github-copilot");
 	const child = Bun.spawn(
 		[
 			"bun",
@@ -14,9 +16,9 @@ async function expectRpcOwnsStdin(): Promise<void> {
 			"--mode",
 			"rpc",
 			"--provider",
-			"anthropic",
+			model.provider,
 			"--model",
-			"claude-sonnet-4-5",
+			model.id,
 		],
 		{
 			cwd: path.join(import.meta.dir, ".."),

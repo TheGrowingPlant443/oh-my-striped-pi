@@ -17,7 +17,7 @@ import {
 import { getTab, releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
 import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
 import { ToolAbortError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
-import { CLAUDE_TRACE_DEBUG_CERT, CLAUDE_TRACE_DEBUG_KEY } from "@oh-my-pi/pi-coding-agent/cli/claude-trace-cli";
+import { TEST_TLS_CERT, TEST_TLS_KEY } from "../helpers/tls-certificate";
 import type { Browser, Page } from "puppeteer-core";
 import { rejectionOf } from "../helpers/rejection";
 import { chromiumAvailable } from "./chromium-probe";
@@ -395,7 +395,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 		const serveUntrusted = () =>
 			Bun.serve({
 				port: 0,
-				tls: { cert: CLAUDE_TRACE_DEBUG_CERT, key: CLAUDE_TRACE_DEBUG_KEY },
+				tls: { cert: TEST_TLS_CERT, key: TEST_TLS_KEY },
 				fetch: () => new Response("<title>untrusted</title>", { headers: { "content-type": "text/html" } }),
 			});
 		const server = serveUntrusted();

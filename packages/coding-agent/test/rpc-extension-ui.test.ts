@@ -10,6 +10,7 @@ import {
 	requestRpcInput,
 	requestRpcSelect,
 } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import { getTestModel } from "./helpers/model-fixtures";
 
 function requireRequest(frame: object | undefined): { id: string } {
 	if (!frame || !("id" in frame)) {
@@ -400,13 +401,14 @@ await runRpcMode(session);
 
 	it("rejects secret login input, completes ordinary OAuth input, and logs the stored account out", async () => {
 		await using temp = await TempDir.create("@rpc-login-");
+		const model = getTestModel("github-copilot");
 		const extensionPath = temp.join("login.mjs");
 		await Bun.write(
 			extensionPath,
 			`
 export default function(pi) {
   globalThis.fetch = async () => { throw new Error("Offline login fixture refuses network"); };
-  // rpc-alias is a second login for rpc-ordinary's credentials, like openai-codex-device.
+  // rpc-alias is a second login for rpc-ordinary's credentials.
   for (const [id, secret, storeCredentialsAs] of [["rpc-secret", true], ["rpc-ordinary", false], ["rpc-alias", false, "rpc-ordinary"]]) {
     pi.registerProvider(id, {
       baseUrl: "http://127.0.0.1:9/v1",
@@ -442,9 +444,9 @@ export default function(pi) {
 				"--mode",
 				"rpc",
 				"--provider",
-				"anthropic",
+				model.provider,
 				"--model",
-				"claude-sonnet-4-5",
+				model.id,
 			],
 			{
 				cwd: temp.path(),

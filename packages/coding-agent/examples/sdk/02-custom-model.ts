@@ -11,28 +11,28 @@ import { createAgentSession, discoverAuthStorage, discoverModels } from "@oh-my-
 const authStorage = await discoverAuthStorage();
 const modelRegistry = await discoverModels(authStorage);
 
-// Option 1: Find a specific built-in model by provider/id
-const opus = getModel("anthropic", "claude-opus-4-5");
-if (opus) {
-	console.log(`Found model: ${opus.provider}/${opus.id}`);
+// Select a concrete Copilot model; upstream families are not provider IDs.
+const model = getModel("github-copilot", "gpt-5.5");
+if (model) {
+	console.log(`Found model: ${model.provider}/${model.id}`);
 }
 
-// Option 2: Find model via registry (includes custom models from models.json)
-const customModel = modelRegistry.find("my-provider", "my-model");
-if (customModel) {
-	console.log(`Found custom model: ${customModel.provider}/${customModel.id}`);
+// Registry lookup includes overrides from models.yml.
+const configuredModel = modelRegistry.find("github-copilot", "gpt-5.5");
+if (configuredModel) {
+	console.log(`Found model: ${configuredModel.provider}/${configuredModel.id}`);
 }
 
-// Option 3: Pick from available models (have valid API keys)
+// Available models have configured auth or are keyless local tiny/TTS/STT workers.
 const available = modelRegistry.getAvailable();
 console.log(
 	"Available models:",
 	available.map(m => `${m.provider}/${m.id}`),
 );
 
-if (available.length > 0) {
+if (configuredModel) {
 	const { session } = await createAgentSession({
-		model: available[0],
+		model: configuredModel,
 		thinkingLevel: ThinkingLevel.Medium, // off, low, medium, high
 		authStorage,
 		modelRegistry,

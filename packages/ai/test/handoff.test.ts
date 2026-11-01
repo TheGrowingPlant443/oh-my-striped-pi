@@ -3,7 +3,9 @@ import { type } from "@oh-my-pi/omptype";
 import { complete } from "@oh-my-pi/pi-ai/stream";
 import type { Api, AssistantMessage, Context, Message, Model, Tool, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { e2eApiKey } from "./oauth";
+import { resolveApiKey } from "./oauth";
+
+const githubCopilotToken = await resolveApiKey("github-copilot");
 
 // Tool for testing
 const weatherSchema = type({
@@ -16,7 +18,7 @@ const weatherTool: Tool<typeof weatherSchema> = {
 	parameters: weatherSchema,
 };
 
-// Pre-built contexts representing typical outputs from each provider
+// Local transcript fixtures exercise each retained wire format.
 const providerContexts = {
 	// Anthropic-style message with thinking block
 	anthropic: {
@@ -40,8 +42,8 @@ const providerContexts = {
 					arguments: { location: "Tokyo" },
 				},
 			],
-			provider: "anthropic",
-			model: "claude-haiku-4-5",
+			provider: "local",
+			model: "local-anthropic",
 			usage: {
 				input: 100,
 				output: 50,
@@ -69,11 +71,11 @@ const providerContexts = {
 		},
 	},
 
-	// Google-style message with thinking
-	google: {
+	// Local chat transcript with unsigned thinking
+	local: {
 		message: {
 			role: "assistant",
-			api: "google-generative-ai",
+			api: "openai-completions",
 			content: [
 				{
 					type: "thinking",
@@ -87,13 +89,13 @@ const providerContexts = {
 				},
 				{
 					type: "toolCall",
-					id: "call_gemini_123",
+					id: "call_local_123",
 					name: "get_weather",
 					arguments: { location: "Berlin" },
 				},
 			],
-			provider: "google",
-			model: "gemini-2.5-flash",
+			provider: "local",
+			model: "local-chat",
 			usage: {
 				input: 120,
 				output: 60,
@@ -107,7 +109,7 @@ const providerContexts = {
 		} satisfies AssistantMessage,
 		toolResult: {
 			role: "toolResult" as const,
-			toolCallId: "call_gemini_123",
+			toolCallId: "call_local_123",
 			toolName: "get_weather",
 			content: [{ type: "text", text: "Weather in Berlin: 22°C, sunny" }],
 			isError: false,
@@ -143,8 +145,8 @@ const providerContexts = {
 					arguments: { location: "London" },
 				},
 			],
-			provider: "openai",
-			model: "gpt-4o-mini",
+			provider: "local",
+			model: "local-completions",
 			usage: {
 				input: 110,
 				output: 55,
@@ -196,8 +198,8 @@ const providerContexts = {
 					arguments: { location: "Sydney" },
 				},
 			],
-			provider: "openai",
-			model: "gpt-5-mini",
+			provider: "local",
+			model: "local-responses",
 			usage: {
 				input: 115,
 				output: 58,
@@ -241,8 +243,8 @@ const providerContexts = {
 					text: "I was about to calculate 20 × 30 which is",
 				},
 			],
-			provider: "test",
-			model: "test-model",
+			provider: "local",
+			model: "local-interrupted",
 			usage: {
 				input: 50,
 				output: 25,
@@ -266,7 +268,7 @@ const providerContexts = {
 };
 
 /**
- * Test that a provider can handle contexts from different sources
+ * Test that Copilot can handle contexts from different wire formats.
  */
 async function testProviderHandoff<TApi extends Api>(
 	targetModel: Model<TApi>,
@@ -309,7 +311,7 @@ async function testProviderHandoff<TApi extends Api>(
 	};
 
 	try {
-		const response = await complete(targetModel, context, {});
+		const response = await complete(targetModel, context, { apiKey: githubCopilotToken });
 
 		// Check for error
 		if (response.stopReason === "error") {
@@ -366,180 +368,17 @@ async function testProviderHandoff<TApi extends Api>(
 	}
 }
 
-describe("Cross-Provider Handoff Tests", () => {
-	describe.skipIf(!e2eApiKey("ANTHROPIC_API_KEY"))("Anthropic Provider Handoff", () => {
-		const model = getBundledModel("anthropic", "claude-haiku-4-5-20251001");
-
-		it("should handle contexts from all providers", async () => {
-			console.log("\nTesting Anthropic with pre-built contexts:\n");
-
-			const contextTests = [
-				{ label: "Anthropic-style", context: providerContexts.anthropic, sourceModel: "claude-haiku-4-5-20251001" },
-				{ label: "Google-style", context: providerContexts.google, sourceModel: "gemini-2.5-flash" },
-				{ label: "OpenAI-Completions", context: providerContexts.openaiCompletions, sourceModel: "gpt-4o-mini" },
-				{ label: "OpenAI-Responses", context: providerContexts.openaiResponses, sourceModel: "gpt-5-mini" },
-				{ label: "Aborted", context: providerContexts.aborted, sourceModel: null },
-			];
-
-			let successCount = 0;
-			let skippedCount = 0;
-
-			for (const { label, context, sourceModel } of contextTests) {
-				// Skip testing same model against itself
-				if (sourceModel && sourceModel === model.id) {
-					console.log(`[${label} → ${model.provider}] Skipping same-model test`);
-					skippedCount++;
-					continue;
+describe("Copilot Wire Handoff Tests", () => {
+	for (const modelId of ["gpt-4o", "claude-sonnet-4", "gpt-5-mini"]) {
+		it.skipIf(!githubCopilotToken)(
+			`${modelId} should handle local transcript contexts`,
+			async () => {
+				const model = getBundledModel("github-copilot", modelId);
+				for (const [label, context] of Object.entries(providerContexts)) {
+					expect(await testProviderHandoff(model, label, context)).toBe(true);
 				}
-				const success = await testProviderHandoff(model, label, context);
-				if (success) successCount++;
-			}
-
-			const totalTests = contextTests.length - skippedCount;
-			console.log(`\nAnthropic success rate: ${successCount}/${totalTests} (${skippedCount} skipped)\n`);
-
-			// All non-skipped handoffs should succeed
-			expect(successCount).toBe(totalTests);
-		});
-	});
-
-	describe.skipIf(!e2eApiKey("GEMINI_API_KEY"))("Google Provider Handoff", () => {
-		const model = getBundledModel("google", "gemini-2.5-flash");
-
-		it("should handle contexts from all providers", async () => {
-			console.log("\nTesting Google with pre-built contexts:\n");
-
-			const contextTests = [
-				{ label: "Anthropic-style", context: providerContexts.anthropic, sourceModel: "claude-haiku-4-5-20251001" },
-				{ label: "Google-style", context: providerContexts.google, sourceModel: "gemini-2.5-flash" },
-				{ label: "OpenAI-Completions", context: providerContexts.openaiCompletions, sourceModel: "gpt-4o-mini" },
-				{ label: "OpenAI-Responses", context: providerContexts.openaiResponses, sourceModel: "gpt-5-mini" },
-				{ label: "Aborted", context: providerContexts.aborted, sourceModel: null },
-			];
-
-			let successCount = 0;
-			let skippedCount = 0;
-
-			for (const { label, context, sourceModel } of contextTests) {
-				// Skip testing same model against itself
-				if (sourceModel && sourceModel === model.id) {
-					console.log(`[${label} → ${model.provider}] Skipping same-model test`);
-					skippedCount++;
-					continue;
-				}
-				const success = await testProviderHandoff(model, label, context);
-				if (success) successCount++;
-			}
-
-			const totalTests = contextTests.length - skippedCount;
-			console.log(`\nGoogle success rate: ${successCount}/${totalTests} (${skippedCount} skipped)\n`);
-
-			// All non-skipped handoffs should succeed
-			expect(successCount).toBe(totalTests);
-		});
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Completions Provider Handoff", () => {
-		const model: Model<"openai-completions"> = {
-			...getBundledModel("openai", "gpt-4o-mini"),
-			api: "openai-completions",
-		};
-
-		it("should handle contexts from all providers", async () => {
-			console.log("\nTesting OpenAI Completions with pre-built contexts:\n");
-
-			const contextTests = [
-				{ label: "Anthropic-style", context: providerContexts.anthropic, sourceModel: "claude-haiku-4-5-20251001" },
-				{ label: "Google-style", context: providerContexts.google, sourceModel: "gemini-2.5-flash" },
-				{ label: "OpenAI-Completions", context: providerContexts.openaiCompletions, sourceModel: "gpt-4o-mini" },
-				{ label: "OpenAI-Responses", context: providerContexts.openaiResponses, sourceModel: "gpt-5-mini" },
-				{ label: "Aborted", context: providerContexts.aborted, sourceModel: null },
-			];
-
-			let successCount = 0;
-			let skippedCount = 0;
-
-			for (const { label, context, sourceModel } of contextTests) {
-				// Skip testing same model against itself
-				if (sourceModel && sourceModel === model.id) {
-					console.log(`[${label} → ${model.provider}] Skipping same-model test`);
-					skippedCount++;
-					continue;
-				}
-				const success = await testProviderHandoff(model, label, context);
-				if (success) successCount++;
-			}
-
-			const totalTests = contextTests.length - skippedCount;
-			console.log(`\nOpenAI Completions success rate: ${successCount}/${totalTests} (${skippedCount} skipped)\n`);
-
-			// All non-skipped handoffs should succeed
-			expect(successCount).toBe(totalTests);
-		});
-	});
-
-	describe.skipIf(!e2eApiKey("OPENAI_API_KEY"))("OpenAI Responses Provider Handoff", () => {
-		const model = getBundledModel("openai", "gpt-5-mini");
-
-		it("should handle contexts from all providers", async () => {
-			console.log("\nTesting OpenAI Responses with pre-built contexts:\n");
-
-			const contextTests = [
-				{ label: "Anthropic-style", context: providerContexts.anthropic, sourceModel: "claude-haiku-4-5-20251001" },
-				{ label: "Google-style", context: providerContexts.google, sourceModel: "gemini-2.5-flash" },
-				{ label: "OpenAI-Completions", context: providerContexts.openaiCompletions, sourceModel: "gpt-4o-mini" },
-				{ label: "OpenAI-Responses", context: providerContexts.openaiResponses, sourceModel: "gpt-5-mini" },
-				{ label: "Aborted", context: providerContexts.aborted, sourceModel: null },
-			];
-
-			let successCount = 0;
-			let skippedCount = 0;
-
-			for (const { label, context, sourceModel } of contextTests) {
-				// Skip testing same model against itself
-				if (sourceModel && sourceModel === model.id) {
-					console.log(`[${label} → ${model.provider}] Skipping same-model test`);
-					skippedCount++;
-					continue;
-				}
-				const success = await testProviderHandoff(model, label, context);
-				if (success) successCount++;
-			}
-
-			const totalTests = contextTests.length - skippedCount;
-			console.log(`\nOpenAI Responses success rate: ${successCount}/${totalTests} (${skippedCount} skipped)\n`);
-
-			// All non-skipped handoffs should succeed
-			expect(successCount).toBe(totalTests);
-		});
-	});
-
-	describe.skipIf(!e2eApiKey("MISTRAL_API_KEY"))("Mistral Provider Handoff", () => {
-		const model = getBundledModel("mistral", "devstral-medium-latest");
-
-		it("should handle contexts from all providers", async () => {
-			console.log("\nTesting Mistral with pre-built contexts:\n");
-
-			const contextTests = [
-				{ label: "Anthropic-style", context: providerContexts.anthropic, sourceModel: "claude-haiku-4-5-20251001" },
-				{ label: "Google-style", context: providerContexts.google, sourceModel: "gemini-2.5-flash" },
-				{ label: "OpenAI-Completions", context: providerContexts.openaiCompletions, sourceModel: "gpt-4o-mini" },
-				{ label: "OpenAI-Responses", context: providerContexts.openaiResponses, sourceModel: "gpt-5-mini" },
-				{ label: "Aborted", context: providerContexts.aborted, sourceModel: null },
-			];
-
-			let successCount = 0;
-			const totalTests = contextTests.length;
-
-			for (const { label, context } of contextTests) {
-				const success = await testProviderHandoff(model, label, context);
-				if (success) successCount++;
-			}
-
-			console.log(`\nMistral success rate: ${successCount}/${totalTests}\n`);
-
-			// All handoffs should succeed
-			expect(successCount).toBe(totalTests);
-		}, 60000);
-	});
+			},
+			60000,
+		);
+	}
 });

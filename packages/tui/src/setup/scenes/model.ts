@@ -231,7 +231,7 @@ class ModelSceneController implements SetupSceneController {
 					...rows,
 					state,
 					...(state === "error" && this.#discoveryError !== undefined ? { message: this.#discoveryError } : {}),
-					empty: "No models yet. Skip this step and run /login to sign in to a provider.",
+					empty: "No models yet. Start a local model server, or run /login to sign in to GitHub Copilot.",
 					actions: [pickerAction("skip", "Skip", "escape", { end: true }), primary],
 				},
 				this.#saveError === undefined

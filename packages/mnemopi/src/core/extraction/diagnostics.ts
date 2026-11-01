@@ -1,4 +1,4 @@
-export const EXTRACTION_TIERS = ["host", "remote", "local", "cloud", "wrapper"] as const;
+export const EXTRACTION_TIERS = ["host", "local", "wrapper"] as const;
 export type ExtractionTier = (typeof EXTRACTION_TIERS)[number];
 
 const MAX_ERROR_SAMPLES_PER_TIER = 10;
@@ -56,9 +56,7 @@ export function safeForLog(value: unknown): string {
 function emptyTierStats(): Record<ExtractionTier, MutableTierStats> {
 	return {
 		host: { attempts: 0, successes: 0, no_output: 0, failures: 0, error_samples: [] },
-		remote: { attempts: 0, successes: 0, no_output: 0, failures: 0, error_samples: [] },
 		local: { attempts: 0, successes: 0, no_output: 0, failures: 0, error_samples: [] },
-		cloud: { attempts: 0, successes: 0, no_output: 0, failures: 0, error_samples: [] },
 		wrapper: { attempts: 0, successes: 0, no_output: 0, failures: 0, error_samples: [] },
 	};
 }

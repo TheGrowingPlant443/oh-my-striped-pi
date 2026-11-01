@@ -1,7 +1,6 @@
 import * as path from "node:path";
 import {
 	Agent,
-	type AgentEvent,
 	type AgentMessage,
 	type AgentOptions,
 	type AgentTelemetryConfig,
@@ -24,11 +23,9 @@ import type {
 	ServiceTierByFamily,
 	SimpleStreamOptions,
 } from "@oh-my-pi/pi-ai";
-import { resolveApiKeyOnce } from "@oh-my-pi/pi-ai/auth-retry";
 import type { DiscoverAuthStorageOptions } from "@oh-my-pi/pi-ai/auth-broker/discover";
 import type { Dialect } from "@oh-my-pi/pi-ai/dialect";
 import { prewarmModelConnection } from "@oh-my-pi/pi-ai/providers/connection-prewarm";
-import { isOpenAICodexWebSocketPreferred } from "@oh-my-pi/pi-ai/providers/openai-codex-transport";
 import { withCredentialRedaction } from "@oh-my-pi/pi-ai/providers/transform-messages";
 import { sendsImageInputOnWire } from "@oh-my-pi/pi-ai/providers/vision-guard";
 import { FALLBACK_DIALECT, preferredDialect } from "@oh-my-pi/pi-catalog/identity";
@@ -87,11 +84,7 @@ import { loadPromptTemplates as loadPromptTemplatesInternal, type PromptTemplate
 import { buildServiceTierByFamily } from "./config/service-tier";
 import { bindEffects, combine } from "./config/registry";
 import { Settings } from "./config/settings";
-import { CursorExecHandlers, type CursorMcpResourceAdapter } from "./cursor";
-import { createBridgeEditTool, createBridgeGrepFactory } from "./cursor-bridge-tools";
 import "./discovery";
-import { LiveImageUrlService } from "./blob-broker/service";
-import { wrapStreamFnWithBlobUrlFallback } from "./blob-broker/stream-fallback";
 import { initializeWithSettings } from "./discovery";
 import { setInvocationConfiguredExtensions, withOmpExtensionRootScope } from "./discovery/omp-extension-roots";
 import { disposeVmContextsByOwner } from "./eval/js/context-manager";
@@ -229,9 +222,8 @@ import {
 	projectMountedMCPXdevGuidance,
 	type SettingsGatedToolDelta,
 } from "./session/session-tools";
-import { anthropicSlowModeHasNoSiblingHeadroom } from "./session/anthropic-slow-mode";
 import { CacheWarmer } from "./session/cache-warmer";
-import { createSettingsAwareStreamFn, resolveOpenAIWebsocketPreference } from "./session/settings-stream-fn";
+import { createSettingsAwareStreamFn } from "./session/settings-stream-fn";
 import { SnapcompactInlineTransformer } from "./session/snapcompact-inline";
 import { createSnapcompactSavingsRecorder } from "./session/snapcompact-savings-journal";
 import { createSpeculativeToolExecutionConfig } from "./speculation/host";
@@ -247,7 +239,6 @@ import {
 } from "./system-prompt";
 import type { AgentDefinition } from "./task/types";
 import { AgentOutputManager } from "./task/output-manager";
-import { wrapStreamFnWithProviderConcurrency } from "./task/provider-concurrency";
 import { sessionDelegationBias } from "./task/prompt-policy";
 import { isScoutSpawnable } from "./task/spawn-policy";
 import type { StructuredSubagentSchemaMode } from "@oh-my-pi/pi-tui/tools/task";
@@ -304,12 +295,11 @@ import { createRatchetPrelude } from "./ratchet/prelude-definition";
 import { createArchivePrelude } from "./archive/prelude-definition";
 import { ToolContextStore } from "./tools/context";
 import { isIrcEnabled } from "./irc/messaging";
-import { imageGenTool } from "./tools/image-gen";
 import { wrapToolWithMetaNotice } from "./tools/output-meta";
 import { isFilesystemSourcePath } from "./tools/path-utils";
-import { isAutoQaEnabled } from "./tools/report-tool-issue";
 import { queueResolveHandler } from "./tools/resolve";
 import { USER_TODO_EDIT_CUSTOM_TYPE } from "./tools/todo";
+import { imageGenTool } from "./tools/image-gen";
 import { ttsTool } from "./tools/tts";
 import { resolveActiveRepoContext } from "./utils/active-repo-context";
 import { EventBus } from "./utils/event-bus";
@@ -327,8 +317,8 @@ import {
 	cfgAsyncMaxJobs,
 	cfgAsyncWidgets,
 	cfgComputerEnabled,
-	cfgRatchetEnabled,
 	cfgGenerateImageEnabled,
+	cfgRatchetEnabled,
 	cfgSecurityEnabled,
 	cfgSpeechgenEnabled,
 	cfgToolsAbortOnFabricatedResult,
@@ -351,7 +341,6 @@ import {
 	cfgPersonality,
 	cfgProviderAppendOnlyContext,
 	cfgProvidersCacheWarming,
-	cfgProvidersKimiApiFormat,
 	cfgRetryFallbackChains,
 	cfgRetryModelFallback,
 	cfgRetryUsageAwareFallback,
@@ -534,12 +523,6 @@ function collectPendingMCPToolNames(explicitToolNames: readonly string[] | undef
 function logMCPLoadErrors(errors: MCPLoadResult["errors"]): void {
 	for (const [serverName, error] of errors) {
 		logger.error("MCP tool load failed", { path: `mcp:${serverName}`, error });
-	}
-}
-
-function applyMCPEnvironment(result: { exaApiKeys: string[] }): void {
-	if (result.exaApiKeys.length > 0 && !$env.EXA_API_KEY) {
-		Bun.env.EXA_API_KEY = result.exaApiKeys[0];
 	}
 }
 
@@ -829,7 +812,7 @@ export interface CreateAgentSessionOptions {
 	bindProcessState?: boolean;
 	/** Task recursion depth (for subagent sessions). Default: 0 */
 	taskDepth?: number;
-	/** Parent Hindsight state to alias for subagent memory tools. */
+	/** Parent Hindsight state: subagents alias it; copied-prompt top-level forks inherit delivered recall. */
 	parentHindsightSessionState?: HindsightSessionState;
 	/** Parent Mnemopi state: subagents alias it; a top-level fork (`/tan`) inherits its delivered recall. */
 	parentMnemopiSessionState?: MnemopiSessionState;
@@ -900,8 +883,7 @@ export interface CreateAgentSessionOptions {
 	/**
 	 * A human can answer synchronous prompts even without a terminal UI (e.g. an
 	 * ACP client rendering elicitation forms). Enables `ask` without enabling
-	 * TUI-only session behavior such as eager LSP warmup. An explicit `false` also
-	 * keeps saved-reset consent off the extension UI context. Default: `hasUI`.
+	 * TUI-only session behavior such as eager LSP warmup. Default: `hasUI`.
 	 */
 	interactivePrompts?: boolean;
 	/** Keep `ask` advertised in a headless fork sharing a parent's tool-schema prefix; calls still fail without UI. */
@@ -2197,7 +2179,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				modelRegistry.authStorage.keys.prefetchUsage(resolvedModel.provider, providerSessionId, {
 					baseUrl: resolvedModel.baseUrl,
 					modelId: resolvedModel.id,
-					accountIds: resolvedModel.accountAccess && Object.keys(resolvedModel.accountAccess),
 				}),
 			)
 			.catch(error => {
@@ -2675,8 +2656,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			onStatus: onMCPStatus,
 			startupTimeoutMs: cfgMcpStartupTimeoutMs.get(settings),
 			enableProjectConfig: cfgMcpEnableProjectConfig.get(settings),
-			// Always filter Exa - we have native integration
-			filterExa: true,
 			// Filter browser MCP only when Eval can expose the built-in browser prelude.
 			filterBrowser: initialBrowserPreludeAvailable,
 			extensionRoots: buildSessionExtensionRoots(),
@@ -2709,7 +2688,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 								await deferredMCPManager.disconnectAll();
 								return;
 							}
-							applyMCPEnvironment(mcpResult);
 							logMCPLoadErrors(mcpResult.errors);
 							// Connected MCP tools (and cached routes of servers still connecting) are
 							// enabled and mounted under xd:// devices right away, so a turn whose
@@ -2742,7 +2720,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				if (cfgMcpNotifications.get(settings)) {
 					mcpManager.setNotificationsEnabled(true);
 				}
-				applyMCPEnvironment(mcpResult);
 
 				// Log MCP errors
 				for (const { path, error } of mcpResult.errors) {
@@ -3640,7 +3617,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			}),
 		];
 		// `wrapToolWithMetaNotice` runs the centralized large-output → artifact spill.
-		// Built-in tools get it in `createTools`; extension, SDK-custom, image-gen,
+		// Built-in tools get it in `createTools`; extension, SDK-custom,
 		// TTS, and startup (non-deferred) MCP tools all funnel through here, so apply
 		// it once at this adapter boundary (idempotent — a no-op if already wrapped).
 		const wrappedExtensionTools: Tool[] = deduplicateMCPToolsByName(
@@ -3710,9 +3687,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			const removed: string[] = [];
 			if (restrictToolNames) return { added, removed };
 			const wanted: CustomTool[] = [];
-			// Image generation also honors an explicit tool whitelist: custom tools are
-			// force-activated, so `--no-tools` or a list without `generate_image` must
-			// keep it out (issue #5305).
 			const imageGenRequested = !options.toolNames || options.toolNames.includes("generate_image");
 			if (cfgGenerateImageEnabled.get(settings) && imageGenRequested) {
 				wanted.push(imageGenTool as unknown as CustomTool);
@@ -3743,33 +3717,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			return { added, removed };
 		};
 		await reconcileSettingsGatedCustomTools();
-		// Hashline `edit` stays in the registry so Cursor can call it as MCP.
-		// Native StrReplace arrives as `editToolCall` and materializes through
-		// exec `readArgs`/`writeArgs`; `pi_edit` still needs a `replace`-mode
-		// instance because `PiEditExecArgs` carries `old_string`/`new_string`,
-		// which is exactly `replace`'s schema and nothing else's. The registry
-		// instance follows the session's configured mode, so the bridge builds
-		// its own and serves it through `getEditReplaceTool` — not `getTool`,
-		// which doubles as the agent loop's fallback for unadvertised calls.
-		//
-		// The grant is captured here, independently of the session's provider:
-		// a session that starts on another provider can switch to Cursor later,
-		// and the roster is built once, at session creation.
-		const editWasGranted = toolRegistry.has("edit");
-		// Built on first use rather than eagerly: a session that never reaches
-		// Cursor never constructs it.
-		let cursorBridgeEditTool: AgentTool | undefined;
-		const getCursorBridgeEditTool = (): AgentTool | undefined => {
-			// Only when the session actually granted `edit`. `createTools` omits
-			// it entirely for a restricted tool set, and the bridge answers native
-			// frames that arrive regardless of the advertised catalog — so
-			// building one unconditionally would hand a read-only agent a
-			// mutating tool it was denied (the issue #5680 escalation).
-			if (!editWasGranted) return undefined;
-			cursorBridgeEditTool ??= createBridgeEditTool(toolSession, extensionRunner);
-			return cursorBridgeEditTool;
-		};
-
 		let writeRegistration: Promise<boolean> | undefined;
 		const ensureWriteRegistered = (): Promise<boolean> => {
 			if (toolRegistry.has("write")) return Promise.resolve(builtInRegistryToolNames.has("write"));
@@ -3890,10 +3837,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			await ensureWriteRegistered();
 		}
 
-		// oxlint-disable-next-line prefer-const -- captured by device closures before assignment
-		let cursorEventEmitter: ((event: AgentEvent) => void) | undefined;
-		// Cursor and the agent loop may call a mounted device by its top-level
-		// name. Resolve that name from the canonical map and apply the same
+		// The agent loop may call a mounted device by its top-level name.
+		// Resolve that name from the canonical map and apply the same
 		// execution-only ACP decorator used by `write xd://<tool>`; docs and
 		// renderer lookup continue to use the undecorated canonical instance.
 		//
@@ -3903,8 +3848,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// live state can hold a roster the model never saw for this request, and
 		// recovering a name against it would dispatch a tool that was never
 		// advertised while exact dispatch still answered from the snapshot.
-		// Callers with no request snapshot (the Cursor exec bridge) pass none and
-		// get device resolution only.
 		const resolveDeviceTool = (name: string, advertised: readonly AgentTool[] = []): AgentTool | undefined => {
 			const bareName = stripXdUrlPrefix(name);
 			const state = toolSession.xdev;
@@ -3933,59 +3876,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// Mounted devices are absent from the advertised tool set, so a miss on a
 		// device name has nothing to suggest unless the loop is told they exist.
 		const suggestDeviceToolNames = (): Iterable<string> => toolSession.xdev?.mountedNames ?? [];
-		// Cursor's resource frames ask what THIS client's servers advertise; only
-		// live connections have any. Built once: the advisor bridges answer from
-		// the same connections the primary does.
-		const cursorMcpResources: CursorMcpResourceAdapter | undefined = mcpManager && {
-			serverNames: () => mcpManager.getConnectedServers(),
-			getServerResources: async name => {
-				// The manager registers a server's tools before its background
-				// resource load finishes, so a frame arriving in that window
-				// would read an empty cache and report "advertises nothing".
-				await mcpManager.ensureServerResources(name);
-				return mcpManager.getServerResources(name);
-			},
-			readServerResource: (name, uri) => mcpManager.readServerResource(name, uri),
-		};
-		const cursorExecHandlers = new CursorExecHandlers({
-			cwd,
-			// The session's cwd moves (`/cd`, resume, branch restore) while this
-			// bridge is built once at startup. Path-confining frames — the native
-			// `delete` and a `download_path` resource read — resolve against
-			// whichever of the two they are given, so without the live resolver the
-			// primary would write into the workspace the session has left while
-			// reporting success for the path the server asked about. The advisor
-			// bridge already passes one.
-			getCwd: () => sessionManager.getCwd(),
-			tools: toolRegistry,
-			getExecutableTool: resolveDeviceTool,
-			// `pi_edit` needs the `replace`-mode instance specifically, and the
-			// registry may still hold the session's own `edit` (any mode) when
-			// this session did not start on Cursor.
-			getEditReplaceTool: getCursorBridgeEditTool,
-			getToolContext: () => toolContextStore.getContext(),
-			mcpResources: cursorMcpResources,
-			emitEvent: event => cursorEventEmitter?.(event),
-			getTodoPhases: () => session.getTodoPhases(),
-			setTodoPhases: phases => session.setTodoPhases(phases),
-			persistTodoPhases: phases => sessionManager.appendCustomEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases }),
-			// `pi_grep` carries its own context width and match cap, which the
-			// shared grep instance fixed at construction cannot express. Gated on
-			// the grant: the factory builds a fresh tool and `executeTool` prefers
-			// it over the registry, so installing it unconditionally would let a
-			// session without `grep` search anyway.
-			createGrepTool: toolRegistry.has("grep") ? createBridgeGrepFactory(toolSession, extensionRunner) : undefined,
-			// Native delete and resource-download frames mutate files without a
-			// registry tool. Resolve both the transactional active predicate and
-			// live access mode: Agent.state.tools commits only after prompt rebuilding,
-			// while this predicate revokes before the await and rolls back on failure.
-			allowDirectFileMutation: () =>
-				(editWasGranted && toolSession.isToolActive?.("edit") === true) ||
-				(toolSession.isToolActive?.("write") === true &&
-					toolRegistry.has("write") &&
-					toolSession.deviceOnlyWrite !== true),
-		});
-
 		// Resolve the live inline-descriptors setting against the active model.
 		// `auto` enforces the per-model policy (inline for Gemini, off otherwise), so
 		// a mid-session model switch re-decides it. Prompt and agent (description
@@ -4090,9 +3980,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			const memoryInstructions = memoryBackend
 				? await memoryBackend.buildDeveloperInstructions(agentDir, sessionManager.getCwd(), settings, session)
 				: undefined;
-			// Advisors get the same memory block (sharpshooter decisions, mnemopi/
-			// hindsight instructions) wrapped as shared background knowledge; the
-			// tool-availability caveat lives in the wrapper template.
+			// Advisors get the same memory instructions as shared background knowledge;
+			// the tool-availability caveat lives in the wrapper template.
 			advisorMemoryPrompt = formatAdvisorMemoryPrompt(memoryInstructions);
 			if (hasSession) session.setAdvisorMemoryPrompt(advisorMemoryPrompt);
 			const inlineToolDescriptors = resolveInlineToolDescriptors();
@@ -4228,7 +4117,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				scoutAvailable: isScoutSpawnable(cfgTaskDisabledAgents.get(settings), options.spawns ?? "*"),
 				delegationBias: sessionDelegationBias(toolSession),
 				taskIrcEnabled: !restrictToolNames && isIrcEnabled(settings, options.taskDepth ?? 0),
-				autoQaEnabled: !restrictToolNames && isAutoQaEnabled(settings),
 				writeTransportOnly:
 					toolSession.deviceOnlyWrite === true && toolSession.pendingFullWriteDescription !== true,
 				secretsEnabled: obfuscator?.obfuscates() === true,
@@ -4459,16 +4347,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// redacted from text before snapcompact rasterizes it into PNG frames. Clamp
 		// to the provider budget before normalizing decoder-incompatible images so
 		// dropped historical images never pay a transcode cost.
-		// URL-mirrored images: providers that fetch image URLs get a broker URL
-		// instead of inline base64. Decoration runs LAST among image transforms so
-		// the served bytes are exactly the bytes that would have shipped inline.
-		// Live-bound: `images.urls.*` changes rebuild the service between requests.
-		const blobBroker = new LiveImageUrlService(
-			settings,
-			() => sessionManager.getCwd(),
-			model => modelRegistry.getApiKey(model, providerSessionId),
-		);
-		disposeCallbacks.add(() => blobBroker.dispose());
 		// Always installed; the getter-backed options are snapshotted per request,
 		// so `snapcompact.*` changes apply on the next call (a no-op while both are off).
 		const snapcompactInline = new SnapcompactInlineTransformer(
@@ -4486,9 +4364,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			// Journal the tokens each imaged tool result keeps off the wire
 			// (frames never reach session.jsonl, so this is their only trace).
 			createSnapcompactSavingsRecorder(() => sessionManager.getSessionFile() ?? null),
-			// With a serving blob broker, frames become lazy URLs: rasterized
-			// only when a provider fetches them, never held as pixels here.
-			blobBroker,
 		);
 		// One transform per conversation: the date/cwd reminder remembers what each
 		// conversation was sent, so the main loop and every advisor get their own.
@@ -4501,12 +4376,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				transformed = await snapcompactInline.transform(transformed, transformModel);
 				transformed = clampProviderContextImages(transformed, transformModel);
 				transformed = await normalizeProviderContextImagesForModel(transformed, transformModel);
-				// After the model-specific normalizers: they carry better wording for the
-				// cases they own (STB WebP), so this stays the backstop for everything
-				// else, and it runs before the blob broker uploads any of these bytes.
+				// Model-specific normalizers own their diagnostics; this is the backstop.
 				transformed = await dropUnreadableContextImages(transformed, transformModel);
-				transformed = await blobBroker.decorateContext(transformed, transformModel);
-				// Byte budget after decoration: URL/file-referenced images carry no inline bytes.
 				transformed = clampProviderContextImageBytes(transformed, transformModel);
 				// Keep per-request volatility out of the system prompt: the date/cwd
 				// reminder rides on the first user turn so open-weight providers keep
@@ -4560,29 +4431,9 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		let notifyFirstChatDispatch = options.onFirstChatDispatch;
 		// Shared, settings-aware stream wrapper used by the main agent, advisor,
 		// and side-channel requests (`/btw`, `/omfg`, IRC auto-replies, handoff).
-		// Keeps OpenRouter sticky-routing variants, antigravity endpoint routing,
-		// in-flight caps, and the loop guard consistent across every provider call
-		// the session drives. Wrapped in a per-provider concurrency limiter so
-		// each LLM HTTP request — not the whole subagent lifecycle — holds the
-		// slot, preventing the nested-spawn deadlock from issue #3749.
-		// Every attempt this session sends (primary, side-channel, advisor, cache warming,
-		// image-source retries) passes the session tree's cost gate once it holds its
-		// concurrency slot, and adds its cost to the gate before releasing the slot.
-		const settingsBoundStreamFn = wrapStreamFnWithBlobUrlFallback(
-			wrapStreamFnWithProviderConcurrency(
-				settings,
-				guardStreamFn(
-					createSettingsAwareStreamFn(settings, undefined, {
-						canAutoAccept: streamModel =>
-							anthropicSlowModeHasNoSiblingHeadroom(modelRegistry.authStorage, streamModel, session?.sessionId),
-						notify: (level, message) => session?.emitNotice(level, message, "anthropic-slow-mode"),
-						onLane: lane => session?.noteAnthropicSlowModeLane(lane),
-					}),
-					currentCostGate,
-				),
-			),
-			() => blobBroker.current,
-		);
+		// Every primary, side-channel, advisor and cache-warming request passes
+		// through the session tree's cost gate and consistent request settings.
+		const settingsBoundStreamFn = guardStreamFn(createSettingsAwareStreamFn(settings), currentCostGate);
 		// Outbound credential-pattern redaction follows THIS session's `secrets.enabled` per
 		// request, not the process-wide switch (the newest effect holder's): concurrent ACP/SDK
 		// sessions in one process each keep their own policy.
@@ -4591,15 +4442,11 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				settingsBoundStreamFn(streamModel, context, streamOptions),
 			);
 		// Primary-agent (and its auto-learn capture twin) provider options read per
-		// request, so `/settings` changes to budgets, Kimi format, or the Codex
-		// websocket policy reach the next call without a session recreate.
+		// request, so live settings changes reach the next call without recreating the session.
 		const primaryStreamFn: StreamFn = (streamModel, context, streamOptions) => {
-			const kimiApiFormat = cfgProvidersKimiApiFormat.get(settings);
 			return settingsAwareStreamFn(streamModel, context, {
 				...streamOptions,
 				thinkingBudgets: streamOptions?.thinkingBudgets ?? cfgThinkingBudgets.get(settings),
-				kimiApiFormat: streamOptions?.kimiApiFormat ?? (kimiApiFormat === "auto" ? undefined : kimiApiFormat),
-				preferWebsockets: streamOptions?.preferWebsockets ?? resolveOpenAIWebsocketPreference(settings),
 			});
 		};
 		// Prompt-cache warmer for the main agent loop only: replays the last
@@ -4684,17 +4531,13 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					cfgExternalThinking.get(settings) &&
 					agent.state.tools.some(tool => tool.name === "think") &&
 					supportsExternalThinking(streamModel);
-				const fallbackCreditRedemption = session?.consumeActiveFallbackCreditRedemption(streamModel);
 				if (streamOptions?.promptCacheKey === undefined) session?.promoteTaskSiblingCandidate(streamModel);
 				const merged: SimpleStreamOptions = {
 					...streamOptions,
 					promptCacheKey: streamOptions?.promptCacheKey ?? session?.getPromptCacheKeyForModel(streamModel),
 					forceReasoningOff: externalThinking || streamOptions?.forceReasoningOff,
 				};
-				const stream = primaryStreamFn(streamModel, context, {
-					...merged,
-					...(fallbackCreditRedemption !== undefined ? { fallbackCreditRedemption } : {}),
-				});
+				const stream = primaryStreamFn(streamModel, context, merged);
 				// A request that waited for a provider slot is checked again when it goes out.
 				if (stream instanceof Promise) {
 					stream.catch(error => {
@@ -4703,21 +4546,17 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 				}
 				// Every request through this streamFn is this session's own main
 				// loop (side-channel, advisor, and maintenance requests use
-				// dedicated wrappers), so it owns the warmer. The replay omits the
-				// one-shot fallback-credit redemption.
+				// dedicated wrappers), so it owns the warmer.
 				session.startCacheWarming(streamModel, context, merged);
 				return stream;
 			},
-			cursorExecHandlers,
-			getCursorTools: () => (toolSession.xdev ? listXdevTools(toolSession.xdev) : []),
 			transformToolCallArguments,
 			// A stray sloppy payload in plain text becomes a real edit tool call so
 			// the normal pipeline (validation, approval, rendering) executes it.
 			transformAssistantMessage: async (message, signal) => {
 				if (cfgEditRecoverInlineEdits.get(settings)) {
 					// The live tool is an ExtensionToolWrapper whose proxy forwards the
-					// EditTool `mode` getter; a bridge/custom edit tool without a sloppy
-					// mode (e.g. Cursor's replace-pinned pi_edit) never recovers.
+					// EditTool `mode` getter; custom tools without sloppy mode never recover.
 					const editTool = agent.state.tools.find(tool => tool.name === "edit") as { mode?: EditMode } | undefined;
 					if (editTool?.mode === "sloppy") {
 						const recovered = recoverInlineSloppyEdit(message);
@@ -4754,8 +4593,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// session adopts every model with the window its own settings select (a
 		// subagent with a compaction override must not inherit the parent's).
 		agent.setModelResolver(next => modelRegistry.fitContextWindow(next, settings));
-
-		cursorEventEmitter = event => agent.emitExternalEvent(event);
 
 		// Restore messages if session has existing data
 		if (hasExistingSession) {
@@ -4857,8 +4694,8 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		const built = await Promise.all(advisorToolBuilds);
 		// Wrapped like every registry tool: `ExtensionToolWrapper` is where the
 		// approval mode, per-tool `tools.approval.<tool>` policies and
-		// `autoApprove` are enforced. The advisor's loop and its Cursor exec
-		// bridge both run these instances directly, so a raw one would execute a
+		// `autoApprove` are enforced. The advisor's loop runs these instances
+		// directly, so a raw one would execute a
 		// `bash`/`write` the user configured as `ask` or `deny`. Meta-notice
 		// first, matching the registry's wrap order.
 		const advisorTools: Tool[] = built
@@ -4928,7 +4765,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			skillsSettings: cfgSkills.get(settings),
 			modelRegistry,
 			allowSessionModelFallback: options.hasUI === true && options.allowSessionModelFallback !== false,
-			interactivePrompts: options.interactivePrompts,
 			rebindModelAfterDiscovery: options.model === undefined || options.rebindModelAfterDiscovery === true,
 			toolRegistry,
 			reconcileBrowserMcpFilter: mcpManager
@@ -5002,20 +4838,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			accountPoolScope,
 			providerPromptCacheKeySource,
 			advisorTools,
-			// Same per-call `grep` seam the primary bridge gets, built against the
-			// advisor's own tool session so a `pi_grep` frame's context width and
-			// match cap are honored there too.
-			advisorCreateGrepTool: createBridgeGrepFactory(advisorToolSession, extensionRunner, advisorAgent),
-			// Same `replace`-mode requirement as the primary bridge; the advisor
-			// path gates it on the advisor's own `edit` grant.
-			advisorCreateEditTool: () => createBridgeEditTool(advisorToolSession, extensionRunner, advisorAgent),
-			// The advisor's bridge tools are wrapped for approval, but the wrapper
-			// reads the mode and per-tool policies only from the execute-time
-			// context — the primary bridge passes the same store.
-			advisorGetToolContext: () => toolContextStore.getContext(),
-			// Same live connections the primary bridge reads; an advisor's
-			// resource frame would otherwise report every server as empty.
-			advisorMcpResources: cursorMcpResources,
 			titleSystemPrompt: options.titleSystemPrompt,
 			autoTitle: options.autoTitle === true && !isSubagentSession,
 		});
@@ -5375,41 +5197,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			};
 		}
 
-		const prewarmModel = session.model;
-		if (prewarmModel?.api === "openai-codex-responses") {
-			// `.api` equality doesn't narrow the generic; the guard makes this cast sound.
-			const codexModel = prewarmModel as Model<"openai-codex-responses">;
-			if (isOpenAICodexWebSocketPreferred(codexModel, { preferWebsockets: session.preferWebsockets })) {
-				void (async () => {
-					try {
-						const codexPrewarmApiKey = options.getApiKey
-							? // `getApiKey` returns a value-or-promise union; unwrap the promise,
-								// then resolve the result if it is itself an ApiKeyResolver.
-								await resolveApiKeyOnce(await options.getApiKey(codexModel))
-							: await modelRegistry.getApiKey(codexModel, providerSessionId);
-						if (!codexPrewarmApiKey) return;
-						// Load the transport only for an actual Codex prewarm, not unrelated session setup.
-						const { prewarmOpenAICodexResponses } =
-							await import("@oh-my-pi/pi-ai/providers/openai-codex-responses");
-						await logger.time("prewarmOpenAICodexResponses", prewarmOpenAICodexResponses, codexModel, {
-							apiKey: codexPrewarmApiKey,
-							sessionId: providerSessionId,
-							preferWebsockets: session.preferWebsockets,
-							providerSessionState: session.providerSessionState,
-							serviceTier: session.effectiveServiceTier(codexModel),
-						});
-					} catch (error) {
-						const errorMessage = error instanceof Error ? error.message : String(error);
-						logger.debug("Codex websocket prewarm failed", {
-							error: errorMessage,
-							provider: codexModel.provider,
-							model: codexModel.id,
-						});
-					}
-				})();
-			}
-		}
-
 		// Broker-shared language servers (see lsp/mux/protocol.ts). The mode is
 		// process state read on every client cold start, so only a session that binds
 		// process state holds it, until disposed. A subagent or helper session (usually
@@ -5524,7 +5311,6 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 						transformed = clampProviderContextImages(transformed, transformModel);
 						transformed = await normalizeProviderContextImagesForModel(transformed, transformModel);
 						transformed = await dropUnreadableContextImages(transformed, transformModel);
-						transformed = await blobBroker.decorateContext(transformed, transformModel);
 						transformed = clampProviderContextImageBytes(transformed, transformModel);
 						return captureDateCwdReminder.transform(
 							transformed,

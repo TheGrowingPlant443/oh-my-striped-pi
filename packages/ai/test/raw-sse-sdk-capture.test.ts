@@ -2,40 +2,45 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
 import type { AnthropicMessagesClientLike } from "@oh-my-pi/pi-ai/providers/anthropic-client";
 import type { RawMessageStreamEvent } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import { streamAzureOpenAIResponses } from "@oh-my-pi/pi-ai/providers/azure-openai-responses";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { Context, FetchImpl, Model, RawSseEvent } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
 const context: Context = {
 	messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],
 };
 
-const openAIResponsesModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
-const openAICompletionsModel = {
-	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
-	api: "openai-completions",
-} satisfies Model<"openai-completions">;
-const azureOpenAIResponsesModel: Model<"azure-openai-responses"> = buildModel({
+const openAIResponsesModel = buildModel({
 	id: "gpt-5-mini",
 	name: "GPT-5 Mini",
-	api: "azure-openai-responses",
-	provider: "azure",
-	baseUrl: "https://example.openai.azure.com/openai/v1",
+	api: "openai-responses",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: false,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-	contextWindow: 400_000,
-	maxTokens: 128_000,
+	contextWindow: 128_000,
+	maxTokens: 16_384,
+});
+const openAICompletionsModel = buildModel({
+	id: "gpt-4o-mini",
+	name: "GPT-4o Mini",
+	api: "openai-completions",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 16_384,
 });
 const anthropicModel: Model<"anthropic-messages"> = buildModel({
 	id: "claude-sonnet-4-5",
 	name: "Claude Sonnet 4.5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -236,24 +241,6 @@ describe("SDK raw SSE capture", () => {
 		expect(sentinel?.data).toBe("[DONE]");
 		expect(sentinel?.raw).toEqual(["data: [DONE]"]);
 	});
-
-	it("records Azure OpenAI Responses SDK events from the decoded stream", async () => {
-		const fetchMock = createFetchResponse(openAIResponsesEvents);
-		const observed: RawSseEvent[] = [];
-
-		const result = await streamAzureOpenAIResponses(azureOpenAIResponsesModel, context, {
-			apiKey: "test-key",
-			fetch: fetchMock,
-			azureBaseUrl: azureOpenAIResponsesModel.baseUrl,
-			azureApiVersion: "v1",
-			onSseEvent: recordEvent(observed),
-		}).result();
-
-		expect(result.stopReason).toBe("stop");
-		expect(observed.map(event => event.event)).toEqual(openAIResponsesEvents.map(event => event.type));
-		expect(JSON.parse(observed.at(-1)!.data)).toEqual(openAIResponsesEvents.at(-1));
-	});
-
 	it("records Anthropic SDK events from the decoded stream", async () => {
 		const observed: RawSseEvent[] = [];
 

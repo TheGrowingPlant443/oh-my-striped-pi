@@ -14,7 +14,7 @@ function syntheticModel(id: string): ModelSpec<"openai-completions"> {
 		id,
 		name: id,
 		api: "openai-completions",
-		provider: "synthetic",
+		provider: "github-copilot",
 		baseUrl: "https://api.synthetic.new/openai/v1",
 		reasoning: false,
 		input: ["text"],

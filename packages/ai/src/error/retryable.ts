@@ -1,7 +1,6 @@
 import { isRetryableError, isUnexpectedSocketCloseMessage } from "@oh-my-pi/pi-utils";
 import {
 	ALIYUN_MM_GATEWAY_PATTERN,
-	CODEX_HTTP_BODY_READ_ERROR_PATTERN,
 	isRetryableStreamEnvelopeError,
 	isTransientStreamDropError,
 	isTransientStreamParseError,
@@ -56,7 +55,6 @@ export function isProviderRetryableError(error: unknown): boolean {
 		isUnexpectedSocketCloseMessage(msg) ||
 		isTransientTransportMessage(msg) ||
 		TRANSIENT_TRANSPORT_PATTERN.test(msg) ||
-		CODEX_HTTP_BODY_READ_ERROR_PATTERN.test(msg) ||
 		PROVIDER_TRANSIENT_EXTRA_PATTERN.test(msg) ||
 		isTransientStreamParseError(error) ||
 		isTransientStreamDropError(error) ||

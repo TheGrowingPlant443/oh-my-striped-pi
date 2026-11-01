@@ -38,7 +38,11 @@ describe("AgentSession.fork(entryId)", () => {
 	async function createSeededSession(extensionRunner?: ExtensionRunner) {
 		const agent = new Agent({
 			getApiKey: () => "test-key",
-			initialState: { model: getBundledModel("anthropic", "claude-sonnet-4-5")!, systemPrompt: ["Test"], tools: [] },
+			initialState: {
+				model: getBundledModel("github-copilot", "claude-sonnet-4.6")!,
+				systemPrompt: ["Test"],
+				tools: [],
+			},
 			streamFn: createMockModel({
 				handler: () => {
 					providerStarted.resolve();
@@ -47,7 +51,7 @@ describe("AgentSession.fork(entryId)", () => {
 			}).stream,
 		});
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		session = new AgentSession({
 			agent,
 			sessionManager: SessionManager.create(tempDir, path.join(tempDir, "sessions")),

@@ -6,15 +6,15 @@ import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 function getModelOrThrow(id: string) {
-	const model = getBundledModel("anthropic", id);
+	const model = getBundledModel("github-copilot", id);
 	if (!model) throw new Error(`Expected model ${id}`);
 	return model;
 }
 
 describe("commit role thinking selection", () => {
 	it("returns explicit thinking for commit and smol roles, including alias overrides", async () => {
-		const defaultModel = getModelOrThrow("claude-sonnet-4-5");
-		const commitModel = getModelOrThrow("claude-opus-4-5");
+		const defaultModel = getModelOrThrow("gpt-5-mini");
+		const commitModel = getModelOrThrow("gpt-5.6-sol");
 		const settings = Settings.isolated({
 			modelRoles: {
 				default: `${defaultModel.provider}/${defaultModel.id}:high`,

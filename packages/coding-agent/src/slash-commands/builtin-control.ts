@@ -1,6 +1,9 @@
+import * as ptree from "@oh-my-pi/pi-utils/ptree";
 import { type PauseWorkStatus, runPauseScreen } from "@oh-my-pi/pi-tui/overlays/pause-screen";
 import { AgentRegistry } from "../registry/agent-registry";
 import type { AgentSession } from "../session/agent-session";
+import { resolveCliEntryCmd } from "../subprocess/worker-client";
+import { parseCommandArgs } from "../utils/command-args";
 import { clearApprovalGrants } from "../tools/approval-cache";
 import { clearSubmittedText } from "./helpers/draft";
 import { shutdownHandlerTui } from "./builtin-lifecycle";
@@ -39,6 +42,23 @@ function pauseWorkStatus(root: AgentSession): PauseWorkStatus {
 }
 
 export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
+	{
+		name: "update",
+		icon: "restart",
+		description: "Show managed-update guidance or update plugins (--plugins [--check])",
+		allowArgs: true,
+		inlineHint: "[--plugins] [--check]",
+		handle: async (command, runtime) => {
+			const result = await ptree.exec(
+				[...resolveCliEntryCmd(), "update", ...parseCommandArgs(command.args, { strict: true })],
+				{ cwd: runtime.cwd, stderr: "full", allowNonZero: true },
+			);
+			if (result.stdout.trim()) await runtime.output(result.stdout.trim());
+			if (result.stderr.trim()) await runtime.output(result.stderr.trim());
+			if (result.exitCode !== 0) throw new Error(`Update exited with code ${result.exitCode}.`);
+			return commandConsumed();
+		},
+	},
 	{
 		name: "force",
 		icon: "hammer",
@@ -87,15 +107,6 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 
 			// If a prompt was provided, pass it through as input
 			if (prompt) return { prompt };
-		},
-	},
-	{
-		name: "live",
-		icon: "voice",
-		description: "Start Codex-backed realtime voice mode",
-		handleTui: async (_command, runtime) => {
-			clearSubmittedText(runtime);
-			await runtime.ctx.handleLiveCommand();
 		},
 	},
 	{

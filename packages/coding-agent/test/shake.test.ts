@@ -45,13 +45,13 @@ describe("AgentSession shake", () => {
 	beforeEach(async () => {
 		tempDir = TempDir.createSync("@pi-shake-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 		sessionManager = SessionManager.create(tempDir.path(), tempDir.path());
 		events = [];
 
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected built-in anthropic model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected bundled Copilot model");
 		apiInfo = { api: model.api, provider: model.provider, model: model.id };
 
 		const agent = new Agent({ initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] } });
@@ -169,7 +169,6 @@ describe("AgentSession shake", () => {
 				data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",
 				mimeType: "image/png",
 				detail: "original",
-				providerFile: { provider: "openai", id: "file_shake_image" },
 				url: "https://images.example.invalid/shake.png",
 			};
 			const imageSnapshot = structuredClone(image);

@@ -26,13 +26,7 @@
       // ============================================================
       // BOOT
       // ============================================================
-      //
-      // Two boot paths share this template:
-      //  - Static export: session JSON rides base64-embedded in #session-data.
-      //  - Share viewer: share-loader.js sets `window.__OMP_SESSION_DATA__` to
-      //    a promise resolving to the session JSON (fetched + decrypted).
-      // The entire app lives in bootSession(); its body keeps the original
-      // one-level indentation to avoid a whole-file reindent.
+      // Session JSON is embedded as base64 in #session-data.
       function bootSession(data) {
       const { systemPrompt, tools, subSessions, trace } = data;
       let { header, entries } = data;
@@ -471,6 +465,11 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+      }
+
+      // Attribute values need quotes escaped; textContent/innerHTML only escapes & < >.
+      function escapeAttr(text) {
+        return escapeHtml(text).replaceAll('"', '&quot;').replaceAll("'", '&#39;');
       }
 
       function canonicalizeMessage(text) {
@@ -912,8 +911,7 @@
       // TOOL CALL RENDERING
       // ============================================================
       //
-      // Tool calls use the hosted viewer's <omp-tool-view> web component,
-      // shared with collab-web.
+      // Tool calls use the embedded <omp-tool-view> web component shared with collab-web.
       // Payloads are handed over via a global store keyed by data-key, which
       // survives innerHTML serialization and cloneNode round trips.
 
@@ -1043,31 +1041,17 @@
 
 
       /**
-       * Build a shareable URL for a specific message.
-       * URL format: base?gistId&leafId=<leafId>&targetId=<entryId>
+       * Build a link to a specific message in this export.
+       * URL format: current-location?leafId=<leafId>&targetId=<entryId>
        */
       function buildShareUrl(entryId) {
-        // Check for injected base URL (used when loaded in iframe via srcdoc)
-        const baseUrlMeta = document.querySelector('meta[name="pi-share-base-url"]');
-        const baseUrl = baseUrlMeta ? baseUrlMeta.content : window.location.href.split('?')[0];
-
-        const url = new URL(window.location.href);
-        // Find the gist ID (first query param without value, e.g., ?abc123)
-        const gistId = Array.from(url.searchParams.keys()).find(k => !url.searchParams.get(k));
-
-        // Build the share URL
         const params = new URLSearchParams();
         params.set('leafId', currentLeafId);
         params.set('targetId', entryId);
         if (activeSessionKey) params.set('session', activeSessionKey);
 
-        // If we have an injected base URL (iframe context), use it directly
-        if (baseUrlMeta) {
-          return `${baseUrl}&${params.toString()}`;
-        }
-
-        // Otherwise build from current location (direct file access)
-        url.search = gistId ? `?${gistId}&${params.toString()}` : `?${params.toString()}`;
+        const url = new URL(window.location.href);
+        url.search = `?${params.toString()}`;
         return url.toString();
       }
 
@@ -1487,6 +1471,27 @@
         breaks: true,
         gfm: true,
         renderer: {
+          html(token) {
+            return escapeHtml(token.text);
+          },
+          link(token) {
+            const label = this.parser.parseInline(token.tokens);
+            let protocol;
+            try { protocol = new URL(token.href, 'https://relative.invalid/').protocol; } catch { return label; }
+            if (!['https:', 'http:', 'mailto:'].includes(protocol)) return label;
+            const title = token.title ? ` title="${escapeAttr(token.title)}"` : '';
+            return `<a href="${escapeAttr(token.href)}"${title} target="_blank" rel="noopener noreferrer">${label}</a>`;
+          },
+          // Remote images remain navigable without making requests when the export opens.
+          image(token) {
+            if (/^data:image\/(?:png|jpeg|gif|webp|avif|bmp);base64,[a-z0-9+/=\s]+$/i.test(token.href)) {
+              return `<img src="${escapeAttr(token.href)}" alt="${escapeAttr(token.text)}">`;
+            }
+            let protocol;
+            try { protocol = new URL(token.href, 'https://relative.invalid/').protocol; } catch { return escapeHtml(token.text); }
+            if (!['https:', 'http:'].includes(protocol)) return escapeHtml(token.text);
+            return `<a href="${escapeAttr(token.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(token.text || token.href)}</a>`;
+          },
           // Code blocks: syntax highlight, no HTML escaping
           code(token) {
             const code = token.text;
@@ -1784,25 +1789,11 @@
       setView(urlParams.get('view'));
       } // end bootSession
 
-      function showLoadError(err) {
-        const messages = document.getElementById('messages');
-        if (!messages) return;
-        const div = document.createElement('div');
-        div.className = 'share-load-error';
-        div.textContent = 'Failed to load session: ' + (err && err.message ? err.message : String(err));
-        messages.appendChild(div);
+      const base64 = document.getElementById('session-data').textContent;
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
       }
-
-      const pending = window.__OMP_SESSION_DATA__;
-      if (pending && typeof pending.then === 'function') {
-        pending.then(bootSession, showLoadError);
-      } else {
-        const base64 = document.getElementById('session-data').textContent;
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        bootSession(JSON.parse(new TextDecoder('utf-8').decode(bytes)));
-      }
+      bootSession(JSON.parse(new TextDecoder('utf-8').decode(bytes)));
     })();

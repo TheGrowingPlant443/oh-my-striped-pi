@@ -10,6 +10,22 @@ beforeAll(async () => {
 	await initTheme();
 });
 
+/** A model whose catalog card carries a weekday UTC peak window (00:00-04:00) and a half-price off-peak tariff. */
+const SCHEDULED_MODEL = {
+	provider: "company",
+	id: "scheduled",
+	cost: {
+		input: 1,
+		output: 2,
+		cacheRead: 0.1,
+		cacheWrite: 0,
+		timeBased: {
+			offPeakMultiplier: 0.5,
+			peakWindows: [{ weekdays: [1, 2, 3, 4, 5], startMinute: 0, endMinute: 240 }],
+		},
+	},
+} as unknown as Model;
+
 interface CostCtxOptions {
 	cost?: number;
 	/** Task-result portion of `cost`. */
@@ -76,7 +92,7 @@ describe("cost status-line segment", () => {
 	});
 
 	it("shows the active scheduled tariff without repricing accumulated spend", () => {
-		const model: Model = getBundledModel("deepseek", "deepseek-v4-flash");
+		const model: Model = SCHEDULED_MODEL;
 		const ctx = costCtx({
 			cost: 1.25,
 			model,
@@ -96,7 +112,7 @@ describe("cost status-line segment", () => {
 
 	it("shows a scheduled tariff before the first paid request but keeps ordinary zero spend hidden", () => {
 		const ctx = costCtx({
-			model: getBundledModel("deepseek", "deepseek-v4-flash"),
+			model: SCHEDULED_MODEL,
 			now: new Date("2026-09-12T02:00:00Z"),
 			onAdvisorSubscriptionProbe: () => {},
 		});
@@ -114,7 +130,7 @@ describe("cost status-line segment", () => {
 			advisorCost: 0.5,
 			premiumRequests: 2,
 			usingSubscription: true,
-			model: getBundledModel("deepseek", "deepseek-v4-flash"),
+			model: SCHEDULED_MODEL,
 			now: new Date("2026-09-10T02:00:00Z"),
 			onAdvisorSubscriptionProbe: () => {},
 		});
@@ -137,7 +153,7 @@ describe("cost status-line segment", () => {
 		// A lagging tree total (roster not hydrated yet) never drops below task results.
 		expect(render({ cost: 0.5, subagentCost: 0.12, subagentTreeCost: 0.05 })).toBe("$0.38 (+0.12)");
 		// Subscription spend keeps the icon only on the session's own amount.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "gpt-5.5");
 		expect(render({ cost: 0.38, subagentTreeCost: 0.2, usingSubscription: true, model })).toMatch(
 			/0\.38 \(\+0\.20\)$/,
 		);
@@ -154,7 +170,7 @@ describe("cost status-line segment", () => {
 		expect(metered.split("$")).toHaveLength(2);
 		expect(metered).toMatch(/^\$0\.42 \(\+0\.10\) \+ .*0\.08/);
 		// Differently billed advisor spend keeps its own unit.
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "gpt-5.5");
 		expect(render({ cost: 0.42, advisorCost: 0.08, usingSubscription: true, model })).toMatch(/\$0\.08/);
 	});
 });

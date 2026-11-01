@@ -49,7 +49,7 @@ describe("InteractiveMode shutdown when the session store keeps failing (#12238)
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		const modelRegistry = new ModelRegistry(authStorage);
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!model) throw new Error("expected bundled model");
 		// File-backed (not inMemory): the failure under test comes from the real
 		// storage backend's write path.

@@ -14,7 +14,6 @@ import type {
 	ToolCall,
 	ToolResultMessage,
 } from "@oh-my-pi/pi-ai/types";
-import { type CursorExecResolvedCarrier, kCursorExecResolved } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { Effort } from "@oh-my-pi/pi-catalog/effort";
@@ -70,62 +69,65 @@ async function collectSse(stream: ReadableStream<Uint8Array>): Promise<SseEvent[
 
 describe("anthropic-messages parseRequest", () => {
 	it("parses system + user + assistant(thinking,text,tool_use) + tool_result", () => {
-		const parsed = parseRequest({
-			model: "claude-opus-4-7",
-			max_tokens: 1024,
-			temperature: 0.2,
-			top_p: 0.9,
-			stop_sequences: ["\n\n"],
-			tool_choice: { type: "any" },
-			thinking: { type: "enabled", budget_tokens: 2048 },
-			output_config: { task_budget: { type: "tokens", total: 64_000, remaining: 60_000 } },
-			system: [
-				{ type: "text", text: "You are X" },
-				{ type: "text", text: "Be brief." },
-			],
-			tools: [
-				{
-					name: "lookup",
-					description: "find a thing",
-					input_schema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
-				},
-			],
-			messages: [
-				{ role: "user", content: "hi" },
-				{
-					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "hmm", signature: "sig-1" },
-						{ type: "redacted_thinking", data: "REDACTED" },
-						{ type: "text", text: "calling tool" },
-						{ type: "tool_use", id: "toolu_abc", name: "lookup", input: { q: "x" } },
-					],
-				},
-				{
-					role: "user",
-					content: [
-						{
-							type: "tool_result",
-							tool_use_id: "toolu_abc",
-							content: [{ type: "text", text: "result text" }],
-							is_error: false,
-						},
-					],
-				},
-				{
-					role: "user",
-					content: [
-						{
-							type: "tool_result",
-							tool_use_id: "toolu_def",
-							content: "string body",
-							is_error: true,
-						},
-						{ type: "text", text: "and another result coming" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "claude-opus-4-7",
+				max_tokens: 1024,
+				temperature: 0.2,
+				top_p: 0.9,
+				stop_sequences: ["\n\n"],
+				tool_choice: { type: "any" },
+				thinking: { type: "enabled", budget_tokens: 2048 },
+				output_config: { task_budget: { type: "tokens", total: 64_000, remaining: 60_000 } },
+				system: [
+					{ type: "text", text: "You are X" },
+					{ type: "text", text: "Be brief." },
+				],
+				tools: [
+					{
+						name: "lookup",
+						description: "find a thing",
+						input_schema: { type: "object", properties: { q: { type: "string" } }, required: ["q"] },
+					},
+				],
+				messages: [
+					{ role: "user", content: "hi" },
+					{
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "hmm", signature: "sig-1" },
+							{ type: "redacted_thinking", data: "REDACTED" },
+							{ type: "text", text: "calling tool" },
+							{ type: "tool_use", id: "toolu_abc", name: "lookup", input: { q: "x" } },
+						],
+					},
+					{
+						role: "user",
+						content: [
+							{
+								type: "tool_result",
+								tool_use_id: "toolu_abc",
+								content: [{ type: "text", text: "result text" }],
+								is_error: false,
+							},
+						],
+					},
+					{
+						role: "user",
+						content: [
+							{
+								type: "tool_result",
+								tool_use_id: "toolu_def",
+								content: "string body",
+								is_error: true,
+							},
+							{ type: "text", text: "and another result coming" },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "claude-opus-4-7" },
+		);
 
 		expect(parsed.modelId).toBe("claude-opus-4-7");
 		expect(parsed.stream).toBe(false);
@@ -166,7 +168,7 @@ describe("anthropic-messages parseRequest", () => {
 			{ type: "toolCall", id: "toolu_abc", name: "lookup", arguments: { q: "x" } },
 		]);
 		expect(asst.api).toBe("anthropic-messages");
-		expect(asst.provider).toBe("anthropic");
+		expect(asst.provider).toBe("github-copilot");
 		expect(asst.model).toBe("claude-opus-4-7");
 
 		const tr1 = msgs[2] as ToolResultMessage;
@@ -185,37 +187,40 @@ describe("anthropic-messages parseRequest", () => {
 	});
 
 	it("preserves thinking binding and mid-conversation controls", () => {
-		const parsed = parseRequest({
-			model: "claude-fable-5-1",
-			max_tokens: 1024,
-			thinking: {
-				type: "adaptive",
-				block_binding: { prefix_mismatch_behavior: "drop_block" },
+		const parsed = parseRequest(
+			{
+				model: "claude-fable-5-1",
+				max_tokens: 1024,
+				thinking: {
+					type: "adaptive",
+					block_binding: { prefix_mismatch_behavior: "drop_block" },
+				},
+				tools: [
+					{
+						name: "lookup",
+						description: "find a thing",
+						input_schema: { type: "object", properties: {} },
+						defer_loading: true,
+					},
+				],
+				messages: [
+					{ role: "user", content: "hi" },
+					{
+						role: "system",
+						clear_at: "next_user_message",
+						output_config: { effort: "low" },
+						content: [
+							{ type: "text", text: "Use fewer tokens." },
+							{
+								type: "tool_addition",
+								tool: { type: "tool_reference", name: "lookup" },
+							},
+						],
+					},
+				],
 			},
-			tools: [
-				{
-					name: "lookup",
-					description: "find a thing",
-					input_schema: { type: "object", properties: {} },
-					defer_loading: true,
-				},
-			],
-			messages: [
-				{ role: "user", content: "hi" },
-				{
-					role: "system",
-					clear_at: "next_user_message",
-					output_config: { effort: "low" },
-					content: [
-						{ type: "text", text: "Use fewer tokens." },
-						{
-							type: "tool_addition",
-							tool: { type: "tool_reference", name: "lookup" },
-						},
-					],
-				},
-			],
-		});
+			{ provider: "github-copilot", id: "claude-fable-5-1" },
+		);
 
 		expect(parsed.options.anthropicPrefixMismatchBehavior).toBe("drop_block");
 		expect(parsed.context.tools?.[0]?.deferLoading).toBe(true);
@@ -231,51 +236,58 @@ describe("anthropic-messages parseRequest", () => {
 	});
 
 	it("maps tool_choice variants and suppresses user wrappers that hold only tool_result", () => {
-		const auto = parseRequest({
-			model: "m",
-			max_tokens: 8,
-			tool_choice: { type: "auto" },
-			messages: [{ role: "user", content: "hi" }],
-		});
+		const auto = parseRequest(
+			{ model: "m", max_tokens: 8, tool_choice: { type: "auto" }, messages: [{ role: "user", content: "hi" }] },
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(auto.options.toolChoice).toBe("auto");
 
-		const named = parseRequest({
-			model: "m",
-			max_tokens: 8,
-			tool_choice: { type: "tool", name: "lookup" },
-			messages: [{ role: "user", content: "hi" }],
-		});
+		const named = parseRequest(
+			{
+				model: "m",
+				max_tokens: 8,
+				tool_choice: { type: "tool", name: "lookup" },
+				messages: [{ role: "user", content: "hi" }],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(named.options.toolChoice).toEqual({ name: "lookup" });
 
-		const onlyResult = parseRequest({
-			model: "m",
-			max_tokens: 8,
-			messages: [
-				{
-					role: "user",
-					content: [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "ok" }] }],
-				},
-			],
-		});
+		const onlyResult = parseRequest(
+			{
+				model: "m",
+				max_tokens: 8,
+				messages: [
+					{
+						role: "user",
+						content: [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: "ok" }] }],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		// no user wrapper, just the toolResult
 		expect(onlyResult.context.messages).toHaveLength(1);
 		expect(onlyResult.context.messages[0]!.role).toBe("toolResult");
 	});
 
 	it("splits user text/image blocks into a separate UserMessage before a tool_result", () => {
-		const parsed = parseRequest({
-			model: "m",
-			max_tokens: 8,
-			messages: [
-				{
-					role: "user",
-					content: [
-						{ type: "text", text: "preface text" },
-						{ type: "tool_result", tool_use_id: "t1", content: "ok" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "m",
+				max_tokens: 8,
+				messages: [
+					{
+						role: "user",
+						content: [
+							{ type: "text", text: "preface text" },
+							{ type: "tool_result", tool_use_id: "t1", content: "ok" },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		// Expect a flush before the tool result: user("preface text") then toolResult(t1).
 		expect(parsed.context.messages).toHaveLength(2);
 		expect(parsed.context.messages[0]).toMatchObject({ role: "user", content: "preface text" });
@@ -291,37 +303,39 @@ describe("anthropic-messages parseRequest", () => {
 			["max", Effort.Max],
 		] as const;
 		for (const [wire, effort] of cases) {
-			const parsed = parseRequest({
-				model: "m",
-				max_tokens: 8,
-				output_config: { effort: wire },
-				messages: [{ role: "user", content: "hi" }],
-			});
+			const parsed = parseRequest(
+				{ model: "m", max_tokens: 8, output_config: { effort: wire }, messages: [{ role: "user", content: "hi" }] },
+				{ provider: "github-copilot", id: "m" },
+			);
 			expect(parsed.options.reasoning).toBe(effort);
 		}
 
-		const absent = parseRequest({
-			model: "m",
-			max_tokens: 8,
-			messages: [{ role: "user", content: "hi" }],
-		});
+		const absent = parseRequest(
+			{ model: "m", max_tokens: 8, messages: [{ role: "user", content: "hi" }] },
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(absent.options.reasoning).toBeUndefined();
 	});
 
 	it("rejects missing required fields and unsupported request controls", () => {
-		expect(() => parseRequest({})).toThrow(/model/);
-		expect(() => parseRequest({ model: "m", messages: [] })).toThrow(/max_tokens/);
-		expect(() => parseRequest({ model: "m", max_tokens: 1 })).toThrow(/messages/);
-		const topK = parseRequest({ model: "m", max_tokens: 1, messages: [{ role: "user", content: "hi" }], top_k: 50 });
+		expect(() => parseRequest({}, { provider: "github-copilot", id: "m" })).toThrow(/model/);
+		expect(() => parseRequest({ model: "m", messages: [] }, { provider: "github-copilot", id: "m" })).toThrow(
+			/max_tokens/,
+		);
+		expect(() => parseRequest({ model: "m", max_tokens: 1 }, { provider: "github-copilot", id: "m" })).toThrow(
+			/messages/,
+		);
+		const topK = parseRequest(
+			{ model: "m", max_tokens: 1, messages: [{ role: "user", content: "hi" }], top_k: 50 },
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(topK.options.topK).toBe(50);
 		// `metadata` is tolerated permissively and surfaced on options for
 		// downstream forwarding (Anthropic clients ship `metadata.user_id`).
-		const withMetadata = parseRequest({
-			model: "m",
-			max_tokens: 1,
-			messages: [{ role: "user", content: "hi" }],
-			metadata: { user_id: "u_1" },
-		});
+		const withMetadata = parseRequest(
+			{ model: "m", max_tokens: 1, messages: [{ role: "user", content: "hi" }], metadata: { user_id: "u_1" } },
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(withMetadata.options.extra).toBeUndefined();
 		expect(withMetadata.options.metadata).toEqual({ user_id: "u_1" });
 	});
@@ -330,30 +344,35 @@ describe("anthropic-messages parseRequest", () => {
 		// `{type:"text", text: 123}` fails the typed schema and must not fall
 		// into the loose catch-all (would corrupt history and TypeError downstream).
 		expect(() =>
-			parseRequest({
-				model: "m",
-				max_tokens: 1,
-				messages: [{ role: "user", content: [{ type: "text", text: 123 }] }],
-			}),
+			parseRequest(
+				{ model: "m", max_tokens: 1, messages: [{ role: "user", content: [{ type: "text", text: 123 }] }] },
+				{ provider: "github-copilot", id: "m" },
+			),
 		).toThrow();
 		expect(() =>
-			parseRequest({
+			parseRequest(
+				{
+					model: "m",
+					max_tokens: 1,
+					messages: [
+						{ role: "user", content: "hi" },
+						{ role: "assistant", content: [{ type: "tool_use", id: "", name: "lookup" }] },
+					],
+				},
+				{ provider: "github-copilot", id: "m" },
+			),
+		).toThrow();
+		// Genuinely unknown variants are still accepted and flattened.
+		const unknown = parseRequest(
+			{
 				model: "m",
 				max_tokens: 1,
 				messages: [
-					{ role: "user", content: "hi" },
-					{ role: "assistant", content: [{ type: "tool_use", id: "", name: "lookup" }] },
+					{ role: "user", content: [{ type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [] }] },
 				],
-			}),
-		).toThrow();
-		// Genuinely unknown variants are still accepted and flattened.
-		const unknown = parseRequest({
-			model: "m",
-			max_tokens: 1,
-			messages: [
-				{ role: "user", content: [{ type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [] }] },
-			],
-		});
+			},
+			{ provider: "github-copilot", id: "m" },
+		);
 		expect(unknown.context.messages).toHaveLength(1);
 	});
 
@@ -376,22 +395,25 @@ describe("anthropic-messages parseRequest", () => {
 				},
 			],
 		};
-		const parsed = parseRequest({
-			model: "claude-opus-4-7",
-			max_tokens: 8,
-			messages: [
-				{ role: "user", content: "weather?" },
-				{
-					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "search", signature: "sig-1" },
-						serverToolUse,
-						searchResult,
-						{ type: "text", text: "forecast ready" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "claude-opus-4-7",
+				max_tokens: 8,
+				messages: [
+					{ role: "user", content: "weather?" },
+					{
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "search", signature: "sig-1" },
+							serverToolUse,
+							searchResult,
+							{ type: "text", text: "forecast ready" },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "claude-opus-4-7" },
+		);
 		const assistant = parsed.context.messages.find(message => message.role === "assistant");
 		expect(assistant?.content).toEqual([
 			{ type: "thinking", thinking: "search", thinkingSignature: "sig-1" },
@@ -416,22 +438,25 @@ describe("anthropic-messages parseRequest", () => {
 				tool_references: [{ type: "tool_reference", tool_name: "_read" }],
 			},
 		};
-		const parsed = parseRequest({
-			model: "claude-opus-4-7",
-			max_tokens: 8,
-			messages: [
-				{ role: "user", content: "read notes" },
-				{
-					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "find read", signature: "sig-1" },
-						serverToolUse,
-						searchResult,
-						{ type: "text", text: "tool loaded" },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "claude-opus-4-7",
+				max_tokens: 8,
+				messages: [
+					{ role: "user", content: "read notes" },
+					{
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "find read", signature: "sig-1" },
+							serverToolUse,
+							searchResult,
+							{ type: "text", text: "tool loaded" },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "claude-opus-4-7" },
+		);
 		const assistant = parsed.context.messages.find(message => message.role === "assistant");
 
 		expect(assistant?.content).toEqual([
@@ -443,21 +468,24 @@ describe("anthropic-messages parseRequest", () => {
 	});
 
 	it("flattens malformed web-search history blocks instead of preserving invalid replay state", () => {
-		const parsed = parseRequest({
-			model: "claude-opus-4-7",
-			max_tokens: 8,
-			messages: [
-				{ role: "user", content: "weather?" },
-				{
-					role: "assistant",
-					content: [
-						{ type: "server_tool_use", name: "web_search" },
-						{ type: "web_search_tool_result", tool_use_id: "srvtoolu_1" },
-						{ type: "web_search_tool_result", content: [] },
-					],
-				},
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "claude-opus-4-7",
+				max_tokens: 8,
+				messages: [
+					{ role: "user", content: "weather?" },
+					{
+						role: "assistant",
+						content: [
+							{ type: "server_tool_use", name: "web_search" },
+							{ type: "web_search_tool_result", tool_use_id: "srvtoolu_1" },
+							{ type: "web_search_tool_result", content: [] },
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "claude-opus-4-7" },
+		);
 		const assistant = parsed.context.messages.find(message => message.role === "assistant");
 		expect(assistant?.content).toHaveLength(3);
 		expect(assistant?.content.every(block => block.type === "text")).toBe(true);
@@ -465,35 +493,38 @@ describe("anthropic-messages parseRequest", () => {
 	});
 
 	it("does not retain a partial code-execution server-tool history", () => {
-		const parsed = parseRequest({
-			model: "claude-opus-4-7",
-			max_tokens: 8,
-			messages: [
-				{ role: "user", content: "run code" },
-				{
-					role: "assistant",
-					content: [
-						{
-							type: "server_tool_use",
-							id: "srvtoolu_code",
-							name: "bash_code_execution",
-							input: { command: "printf ok" },
-						},
-						{
-							type: "bash_code_execution_tool_result",
-							tool_use_id: "srvtoolu_code",
-							content: {
-								type: "bash_code_execution_result",
-								stdout: "ok",
-								stderr: "",
-								return_code: 0,
-								content: [],
+		const parsed = parseRequest(
+			{
+				model: "claude-opus-4-7",
+				max_tokens: 8,
+				messages: [
+					{ role: "user", content: "run code" },
+					{
+						role: "assistant",
+						content: [
+							{
+								type: "server_tool_use",
+								id: "srvtoolu_code",
+								name: "bash_code_execution",
+								input: { command: "printf ok" },
 							},
-						},
-					],
-				},
-			],
-		});
+							{
+								type: "bash_code_execution_tool_result",
+								tool_use_id: "srvtoolu_code",
+								content: {
+									type: "bash_code_execution_result",
+									stdout: "ok",
+									stderr: "",
+									return_code: 0,
+									content: [],
+								},
+							},
+						],
+					},
+				],
+			},
+			{ provider: "github-copilot", id: "claude-opus-4-7" },
+		);
 		const assistant = parsed.context.messages.find(message => message.role === "assistant");
 		expect(assistant?.content).toHaveLength(2);
 		expect(assistant?.content.every(block => block.type === "text")).toBe(true);
@@ -507,37 +538,49 @@ describe("anthropic-messages parseRequest", () => {
 		};
 		const base = { max_tokens: 64, messages: [{ role: "user" as const, content: "hi" }, assistantTurn] };
 
-		const prefixed = parseRequest({ ...base, model: "anthropic/claude-fable-5-1" });
+		const prefixed = parseRequest(
+			{ ...base, model: "github-copilot/claude-fable-5-1" },
+			{ provider: "github-copilot", id: "claude-fable-5-1" },
+		);
 		expect(prefixed.context.messages.find(m => m.role === "assistant")?.model).toBe("claude-fable-5-1");
-		expect(prefixed.modelId).toBe("anthropic/claude-fable-5-1");
+		expect(prefixed.modelId).toBe("github-copilot/claude-fable-5-1");
 
-		const bare = parseRequest({ ...base, model: "claude-fable-5-1" });
+		const bare = parseRequest(
+			{ ...base, model: "claude-fable-5-1" },
+			{ provider: "github-copilot", id: "claude-fable-5-1" },
+		);
 		expect(bare.context.messages.find(m => m.role === "assistant")?.model).toBe("claude-fable-5-1");
 
-		// Another provider's prefix does not describe this route, so it stays put.
-		const foreign = parseRequest({ ...base, model: "zenmux/claude-opus-4-8" });
-		expect(foreign.context.messages.find(m => m.role === "assistant")?.model).toBe("zenmux/claude-opus-4-8");
+		const local = parseRequest({ ...base, model: "local/selected" }, { provider: "local", id: "selected" });
+		expect(local.context.messages.find(m => m.role === "assistant")).toMatchObject({
+			provider: "local",
+			model: "selected",
+			api: "anthropic-messages",
+		});
 	});
 
 	it("stamps a tool-calling replayed turn as toolUse", () => {
-		const parsed = parseRequest({
-			model: "anthropic/claude-fable-5-1",
-			max_tokens: 64,
-			messages: [
-				{ role: "user", content: "check the shards" },
-				{
-					role: "assistant",
-					content: [
-						{ type: "thinking", thinking: "prior reasoning", signature: "sig-1" },
-						{ type: "text", text: "checking" },
-						{ type: "tool_use", id: "toolu_01", name: "bash", input: { cmd: "check" } },
-					],
-				},
-				{ role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_01", content: "runs=63" }] },
-				{ role: "assistant", content: [{ type: "text", text: "every ticker is one run" }] },
-				{ role: "user", content: "so is it sorted?" },
-			],
-		});
+		const parsed = parseRequest(
+			{
+				model: "github-copilot/claude-fable-5-1",
+				max_tokens: 64,
+				messages: [
+					{ role: "user", content: "check the shards" },
+					{
+						role: "assistant",
+						content: [
+							{ type: "thinking", thinking: "prior reasoning", signature: "sig-1" },
+							{ type: "text", text: "checking" },
+							{ type: "tool_use", id: "toolu_01", name: "bash", input: { cmd: "check" } },
+						],
+					},
+					{ role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_01", content: "runs=63" }] },
+					{ role: "assistant", content: [{ type: "text", text: "every ticker is one run" }] },
+					{ role: "user", content: "so is it sorted?" },
+				],
+			},
+			{ provider: "github-copilot", id: "claude-fable-5-1" },
+		);
 		const assistants = parsed.context.messages.filter(message => message.role === "assistant");
 		expect(assistants).toHaveLength(2);
 		expect(assistants[0].stopReason).toBe("toolUse");
@@ -545,7 +588,7 @@ describe("anthropic-messages parseRequest", () => {
 
 		const model: Model<"anthropic-messages"> = buildModel({
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			id: "claude-fable-5-1",
 			name: "Claude Fable 5.1",
 			baseUrl: "https://api.anthropic.com",
@@ -555,7 +598,7 @@ describe("anthropic-messages parseRequest", () => {
 			contextWindow: 200_000,
 			reasoning: true,
 		});
-		const wire = convertAnthropicMessages(parsed.context.messages, model, false);
+		const wire = convertAnthropicMessages(parsed.context.messages, model);
 		const replayed = wire.find(message => message.role === "assistant");
 		expect(replayed?.content).toContainEqual({
 			type: "thinking",
@@ -576,7 +619,7 @@ describe("anthropic-messages encodeResponse", () => {
 				{ type: "toolCall", id: "toolu_999", name: "lookup", arguments: { q: "hello" } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-opus-4-7",
 			usage: { ...emptyUsage(), input: 12, output: 34, cacheRead: 5, cacheWrite: 7, totalTokens: 58 },
 			stopReason: "toolUse",
@@ -608,7 +651,7 @@ describe("anthropic-messages encodeResponse", () => {
 			role: "assistant",
 			content: [],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "m",
 			usage: emptyUsage(),
 			stopReason: "stop",
@@ -626,11 +669,6 @@ describe("anthropic-messages encodeResponse", () => {
 	});
 
 	it("reports tool_use when a client-executed tool call ends the turn on `stop`", () => {
-		// Cursor's exec protocol has no tool-use stop: it hands a tool the
-		// caller declared back for the caller to run and then ends the turn,
-		// leaving `stopReason: "stop"` with the call unpaired. An Anthropic
-		// client runs tools while `stop_reason === "tool_use"`, so `end_turn`
-		// here strands the call it was asked to execute.
 		const message: AssistantMessage = {
 			role: "assistant",
 			content: [
@@ -638,13 +676,13 @@ describe("anthropic-messages encodeResponse", () => {
 				{ type: "toolCall", id: "toolu_handoff", name: "get_weather", arguments: { city: "Paris" } },
 			],
 			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			usage: emptyUsage(),
 			stopReason: "stop",
 			timestamp: 0,
 		};
-		const encoded = encodeResponse(message, "cursor/cursor-grok-4.6");
+		const encoded = encodeResponse(message, "github-copilot/claude-sonnet-4.5");
 		expect(encoded.stop_reason).toBe("tool_use");
 		expect(encoded.content).toContainEqual({
 			type: "tool_use",
@@ -652,53 +690,6 @@ describe("anthropic-messages encodeResponse", () => {
 			name: "get_weather",
 			input: { city: "Paris" },
 		});
-	});
-
-	it("keeps a Cursor-resolved native call out of the turn and off the wire", () => {
-		// Cursor runs `todo` / `web_fetch` / `connect_scm` (and any native the
-		// gateway declined) on its own exec channel and stamps the block
-		// resolved. The client never declared those tools and the operation is
-		// already committed, so reporting `tool_use` would make the canonical
-		// loop repeat a side effect and post a result for a tool it does not
-		// have.
-		const resolved: ToolCall = { type: "toolCall", id: "call_todo", name: "todo", arguments: { todos: [] } };
-		(resolved as CursorExecResolvedCarrier)[kCursorExecResolved] = true;
-		const message: AssistantMessage = {
-			role: "assistant",
-			content: [resolved, { type: "text", text: "Plan updated." }],
-			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
-			usage: emptyUsage(),
-			stopReason: "stop",
-			timestamp: 0,
-		};
-		const encoded = encodeResponse(message, "cursor/cursor-grok-4.6");
-		expect(encoded.stop_reason).toBe("end_turn");
-		expect(encoded.content).toEqual([{ type: "text", text: "Plan updated." }]);
-	});
-
-	it("still hands back an unresolved call when a resolved one precedes it", () => {
-		const resolved: ToolCall = { type: "toolCall", id: "call_todo", name: "todo", arguments: { todos: [] } };
-		(resolved as CursorExecResolvedCarrier)[kCursorExecResolved] = true;
-		const message: AssistantMessage = {
-			role: "assistant",
-			content: [
-				resolved,
-				{ type: "toolCall", id: "toolu_handoff", name: "get_weather", arguments: { city: "Paris" } },
-			],
-			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
-			usage: emptyUsage(),
-			stopReason: "stop",
-			timestamp: 0,
-		};
-		const encoded = encodeResponse(message, "cursor/cursor-grok-4.6");
-		expect(encoded.stop_reason).toBe("tool_use");
-		expect(encoded.content).toEqual([
-			{ type: "tool_use", id: "toolu_handoff", name: "get_weather", input: { city: "Paris" } },
-		]);
 	});
 
 	it("drops the fallback marker and keeps only the first segment's reasoning", () => {
@@ -712,7 +703,7 @@ describe("anthropic-messages encodeResponse", () => {
 				{ type: "toolCall", id: "toolu_1", name: "go", arguments: { x: 1 } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-primary",
 			usage: emptyUsage(),
 			stopReason: "toolUse",
@@ -737,7 +728,7 @@ describe("anthropic-messages encodeResponse", () => {
 				{ type: "text", text: "answer" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-fallback",
 			usage: emptyUsage(),
 			stopReason: "stop",
@@ -760,7 +751,7 @@ describe("anthropic-messages encodeResponse", () => {
 				{ type: "text", text: "answer" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-primary",
 			usage: emptyUsage(),
 			stopReason: "stop",
@@ -784,7 +775,7 @@ describe("anthropic-messages encodeStream", () => {
 				{ type: "toolCall", id: "toolu_1", name: "go", arguments: { x: 1 } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-opus-4-7",
 			usage: { ...emptyUsage(), input: 11, output: 42, cacheRead: 3, cacheWrite: 5 },
 			stopReason: "toolUse",
@@ -952,7 +943,7 @@ describe("anthropic-messages encodeStream", () => {
 				{ type: "text", text: "forecast ready" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-opus-4-7",
 			usage: emptyUsage(),
 			stopReason: "stop",
@@ -1018,7 +1009,7 @@ describe("anthropic-messages encodeStream", () => {
 			role: "assistant",
 			content: [],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "m",
 			usage: emptyUsage(),
 			stopReason: "error",
@@ -1046,8 +1037,8 @@ describe("anthropic-messages encodeStream", () => {
 			role: "assistant",
 			content: [toolCall],
 			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			usage: emptyUsage(),
 			stopReason: "stop",
 			timestamp: 0,
@@ -1058,91 +1049,11 @@ describe("anthropic-messages encodeStream", () => {
 			{ type: "toolcall_end", contentIndex: 0, toolCall, partial: finalMessage },
 			{ type: "done", reason: "stop", message: finalMessage },
 		];
-		const sse = await collectSse(encodeStream(makeStream(events), "cursor/cursor-grok-4.6"));
+		const sse = await collectSse(encodeStream(makeStream(events), "github-copilot/claude-sonnet-4.5"));
 		const delta = sse.find(event => event.event === "message_delta")!.data as {
 			delta: { stop_reason: string };
 		};
 		expect(delta.delta.stop_reason).toBe("tool_use");
-	});
-
-	it("drops a Cursor-resolved call from the stream and renumbers the blocks after it", async () => {
-		const resolved: ToolCall = { type: "toolCall", id: "call_todo", name: "todo", arguments: { todos: [] } };
-		(resolved as CursorExecResolvedCarrier)[kCursorExecResolved] = true;
-		const handoff: ToolCall = {
-			type: "toolCall",
-			id: "toolu_handoff",
-			name: "get_weather",
-			arguments: { city: "Paris" },
-		};
-		const finalMessage: AssistantMessage = {
-			role: "assistant",
-			content: [resolved, { type: "text", text: "Plan updated." }, handoff],
-			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
-			usage: emptyUsage(),
-			stopReason: "stop",
-			timestamp: 0,
-		};
-		const events: AssistantMessageEvent[] = [
-			{ type: "start", partial: finalMessage },
-			{ type: "toolcall_start", contentIndex: 0, partial: finalMessage },
-			{ type: "toolcall_delta", contentIndex: 0, delta: '{"todos":[]}', partial: finalMessage },
-			{ type: "toolcall_end", contentIndex: 0, toolCall: resolved, partial: finalMessage },
-			{ type: "text_start", contentIndex: 1, partial: finalMessage },
-			{ type: "text_delta", contentIndex: 1, delta: "Plan updated.", partial: finalMessage },
-			{ type: "text_end", contentIndex: 1, content: "Plan updated.", partial: finalMessage },
-			{ type: "toolcall_start", contentIndex: 2, partial: finalMessage },
-			{ type: "toolcall_end", contentIndex: 2, toolCall: handoff, partial: finalMessage },
-			{ type: "done", reason: "stop", message: finalMessage },
-		];
-		const sse = await collectSse(encodeStream(makeStream(events), "cursor/cursor-grok-4.6"));
-		// The resolved `todo` never reaches the client, and every block after it
-		// shifts down so the client's index-addressed snapshot stays aligned.
-		const blocks = sse.filter(event => event.event === "content_block_start").map(event => event.data);
-		expect(blocks).toEqual([
-			{ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
-			{
-				type: "content_block_start",
-				index: 1,
-				content_block: { type: "tool_use", id: "toolu_handoff", name: "get_weather", input: {} },
-			},
-		]);
-		expect(sse.filter(event => event.event === "content_block_delta").map(event => event.data)).toEqual([
-			{ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Plan updated." } },
-		]);
-		expect(sse.filter(event => event.event === "content_block_stop").map(event => event.data.index)).toEqual([0, 1]);
-		expect(sse.find(event => event.event === "message_delta")?.data.delta).toEqual({
-			stop_reason: "tool_use",
-			stop_sequence: null,
-		});
-	});
-
-	it("ends the turn when every call in it was resolved by Cursor's exec channel", async () => {
-		const resolved: ToolCall = { type: "toolCall", id: "call_todo", name: "todo", arguments: { todos: [] } };
-		(resolved as CursorExecResolvedCarrier)[kCursorExecResolved] = true;
-		const finalMessage: AssistantMessage = {
-			role: "assistant",
-			content: [resolved],
-			api: "anthropic-messages",
-			provider: "cursor",
-			model: "cursor-grok-4.6",
-			usage: emptyUsage(),
-			stopReason: "stop",
-			timestamp: 0,
-		};
-		const events: AssistantMessageEvent[] = [
-			{ type: "start", partial: finalMessage },
-			{ type: "toolcall_start", contentIndex: 0, partial: finalMessage },
-			{ type: "toolcall_end", contentIndex: 0, toolCall: resolved, partial: finalMessage },
-			{ type: "done", reason: "stop", message: finalMessage },
-		];
-		const sse = await collectSse(encodeStream(makeStream(events), "cursor/cursor-grok-4.6"));
-		expect(sse.map(event => event.event)).toEqual(["message_start", "message_delta", "message_stop"]);
-		expect(sse.find(event => event.event === "message_delta")?.data.delta).toEqual({
-			stop_reason: "end_turn",
-			stop_sequence: null,
-		});
 	});
 
 	it("emits a complete envelope when the stream ends without an explicit done", async () => {
@@ -1163,7 +1074,7 @@ describe("anthropic-messages encodeStream", () => {
 				{ type: "toolCall", id: "toolu_1", name: "go", arguments: { x: 1 } },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-primary",
 			usage: emptyUsage(),
 			stopReason: "toolUse",
@@ -1240,7 +1151,7 @@ describe("anthropic-messages encodeStream", () => {
 				{ type: "text", text: "answer" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-fallback",
 			usage: emptyUsage(),
 			stopReason: "stop",
@@ -1286,7 +1197,7 @@ describe("anthropic-messages encodeStream", () => {
 				{ type: "text", text: "answer" },
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: "claude-primary",
 			usage: emptyUsage(),
 			stopReason: "stop",

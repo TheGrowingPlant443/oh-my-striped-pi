@@ -1,6 +1,6 @@
 import { createAgentHubRuntime } from "@oh-my-pi/pi-coding-agent/modes/agent-hub-runtime";
 /**
- * Hub Enter contract: activating a non-remote agent row delegates to the
+ * Hub Enter contract: activating a local agent row delegates to the
  * `focusAgent` dep (session focus proxy) and closes the hub on success; a
  * focus failure keeps the hub open and surfaces the error as a notice.
  */
@@ -169,6 +169,7 @@ describe("Agent hub Enter activation", () => {
 	});
 
 	afterEach(() => {
+		vi.restoreAllMocks();
 		resetSettingsForTest();
 	});
 
@@ -585,6 +586,7 @@ describe("Agent hub Enter activation", () => {
 
 	it("selector controller restores focus to the editor after Enter focuses an agent", async () => {
 		const agents = new AgentRegistry();
+		vi.spyOn(AgentRegistry, "global").mockReturnValue(agents);
 		agents.register({
 			id: AGENT_ID,
 			displayName: AGENT_ID,
@@ -621,7 +623,6 @@ describe("Agent hub Enter activation", () => {
 			},
 			editor,
 			editorContainer,
-			collabGuest: { agentRegistry: agents, hubRemote: undefined },
 			focusAgentSession: async (id: string) => {
 				focusedIds.push(id);
 				focusResolved.resolve();
@@ -652,10 +653,12 @@ describe("Agent hub double-← gating", () => {
 	});
 
 	afterEach(() => {
+		vi.restoreAllMocks();
 		resetSettingsForTest();
 	});
 
 	function setup(agents: AgentRegistry, sessionFile: string | null = null) {
+		vi.spyOn(AgentRegistry, "global").mockReturnValue(agents);
 		let shown: AgentHubOverlayComponent | undefined;
 		let overlayOptions: Record<string, unknown> | undefined;
 		const shownReady = Promise.withResolvers<AgentHubOverlayComponent>();
@@ -681,7 +684,6 @@ describe("Agent hub double-← gating", () => {
 				clear: () => {},
 				addChild: () => {},
 			},
-			collabGuest: { agentRegistry: agents, hubRemote: undefined },
 			focusAgentSession: async () => {},
 			session: { getToolByName: () => undefined, extensionRunner: undefined },
 			sessionManager: { getCwd: () => TEST_CWD, getSessionFile: () => sessionFile },

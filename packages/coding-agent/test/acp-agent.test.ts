@@ -3480,9 +3480,9 @@ describe("ACP agent", () => {
 		const runner = harness.findSession(created.sessionId)?.extensionRunner;
 
 		// Commands such as /review branch on hasUI and cancel when the selector answers nothing.
-		// Saved-reset consent reads the session's `interactivePrompts: false` instead.
+		// Tool prompts separately respect the client's interactivePrompts capability.
 		expect(runner?.hasUI()).toBe(true);
-		expect(await runner?.getUIContext().select("Spend a saved reset?", ["Yes", "No"])).toBeUndefined();
+		expect(await runner?.getUIContext().select("Approve this operation?", ["Yes", "No"])).toBeUndefined();
 		expect(messages).toEqual([]);
 		expect(harness.sessionFactoryOptions).toEqual([{ interactivePrompts: false }]);
 

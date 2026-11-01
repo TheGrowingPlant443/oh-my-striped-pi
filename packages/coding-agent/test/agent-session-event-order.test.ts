@@ -37,7 +37,7 @@ describe("AgentSession subscriber event order", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-event-order-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
+		authStorage.keys.setRuntime("github-copilot", "anthropic-test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
 	});
 
@@ -55,8 +55,7 @@ describe("AgentSession subscriber event order", () => {
 	});
 
 	it("delivers message_start before message_end when extension handlers are asymmetric", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled test model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 		// Instant terminal error turn: start and end reach the session pipeline
 		// in the same tick, exactly like a real classifier refusal.
@@ -128,8 +127,7 @@ describe("AgentSession subscriber event order", () => {
 	});
 
 	it("preserves every completion from a batch of exclusive todo calls", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled test model to exist");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.6");
 
 		const tasks = ["one", "two", "three", "four", "five", "six"];
 		const calls: ToolCall[] = tasks.map((task, index) => ({

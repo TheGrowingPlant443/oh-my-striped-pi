@@ -9,15 +9,16 @@
 import { describe, expect, it } from "bun:test";
 import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
-import { convertCodexResponsesMessages } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
+import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { SessionMaintenance, type SessionMaintenanceHost } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
 
-const active = getBundledModel<"openai-codex-responses">("openai-codex", "gpt-6.1-sol");
+const active = getBundledModel<"openai-responses">("github-copilot", "gpt-5.4");
 // Same encoding, another model: it gets the turns re-encoded without their reasoning.
-const candidate: Model<"openai-codex-responses"> = {
-	...getBundledModel<"openai-codex-responses">("openai-codex", "gpt-6-sol"),
+const candidate: Model<"openai-responses"> = {
+	...active,
+	id: "candidate",
 	contextWindow: 2_000,
 };
 const reasoningItem = { type: "reasoning", id: "rs_1", summary: [], encrypted_content: "e".repeat(16_000) };
@@ -49,7 +50,7 @@ function responsesTurn(producer: Model, text: string, timestamp: number): Assist
 	};
 }
 
-const codexTurn = (text: string, timestamp: number) => responsesTurn(active, text, timestamp);
+const activeTurn = (text: string, timestamp: number) => responsesTurn(active, text, timestamp);
 
 /**
  * Maintenance over `messages`. Without `usageTokens` there is no provider usage,
@@ -78,17 +79,16 @@ function maintenance(
 
 describe("SessionMaintenance.contextFitsModel", () => {
 	it("fits a candidate whose request drops the active model's replayed reasoning", () => {
-		const turn = codexTurn("Important conclusion.", 1);
-		expect(convertCodexResponsesMessages(candidate, { messages: [turn] }).some(i => i.type === "reasoning")).toBe(
-			false,
-		);
+		const turn = activeTurn("Important conclusion.", 1);
+		const input = buildParams(candidate, { messages: [turn] }, undefined, undefined).params.input;
+		expect(Array.isArray(input) && input.some(item => item.type === "reasoning")).toBe(false);
 		expect(maintenance([turn]).contextFitsModel(candidate)).toBe(true);
 		// Control: the producing model replays the 5,000 reasoning tokens, so the same window cannot hold them.
 		expect(maintenance([turn]).contextFitsModel({ ...active, contextWindow: 2_000 })).toBe(false);
 	});
 
 	it("moves provider usage off the reasoning the active model's request replayed", () => {
-		const earlier = codexTurn("Important conclusion.", 1);
+		const earlier = activeTurn("Important conclusion.", 1);
 		const retained: AgentMessage[] = [
 			{ role: "user", content: "Question?", timestamp: 0 },
 			earlier,
@@ -103,7 +103,7 @@ describe("SessionMaintenance.contextFitsModel", () => {
 
 	it("moves provider usage off a replay with no reported reasoning tokens at its signature price", () => {
 		const unreported: AssistantMessage = {
-			...codexTurn("Important conclusion.", 1),
+			...activeTurn("Important conclusion.", 1),
 			content: [
 				{ type: "thinking", thinking: "", thinkingSignature: JSON.stringify(reasoningItem) },
 				{ type: "text", text: "Important conclusion." },
@@ -134,7 +134,7 @@ describe("SessionMaintenance.contextFitsModel", () => {
 		// 1,900 tokens of retained text (test counts are bytes/4) overflow the
 		// candidate's 1,800-token budget whether or not the failed turn is dropped.
 		const retained: AgentMessage = { role: "user", content: "x".repeat(7_600), timestamp: 0 };
-		const failed = codexTurn("Partial answer.", 1);
+		const failed = activeTurn("Partial answer.", 1);
 		expect(maintenance([retained, failed]).contextFitsModel(candidate, failed)).toBe(false);
 	});
 });

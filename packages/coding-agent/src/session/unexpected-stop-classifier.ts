@@ -8,7 +8,7 @@ import { type AssistantMessage, type JudgmentState, judgeQuestions, type Model }
 import { logger } from "@oh-my-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
-import { type JudgmentUsage, resolveJudge, sharedJudgmentCache } from "../judgment";
+import { type JudgmentUsage, resolveJudge } from "../judgment";
 import questionFile from "../prompts/judge/unexpected-stop.json" with { type: "json" };
 
 /**
@@ -94,7 +94,6 @@ export async function classifyUnexpectedStop(
 			purpose: "unexpected-stop",
 			onUsage: deps.onUsage,
 			telemetry: deps.telemetry,
-			cache: sharedJudgmentCache(),
 		});
 		const request = stop.request?.trim().slice(0, REQUEST_CHARS);
 		const state: JudgmentState = request ? { request, message: stop.message } : { message: stop.message };

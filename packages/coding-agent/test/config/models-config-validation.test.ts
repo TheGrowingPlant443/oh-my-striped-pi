@@ -40,17 +40,17 @@ describe("validateProviderConfiguration (models-config auth)", () => {
 	});
 });
 
-describe("ModelsConfigSchema Bedrock compat overrides", () => {
-	test("rejects a non-boolean supportsThinkingBindingControls override instead of passing the typo through", () => {
-		// A truthy string would keep the binding controls on for a gateway the user meant to opt out.
+describe("ModelsConfigSchema Anthropic-compatible gateway overrides", () => {
+	test("rejects a non-boolean supportsContextManagement override instead of passing the typo through", () => {
+		// A truthy string would keep context management on for a gateway meant to opt out.
 		const checked = ModelsConfigSchema({
 			providers: {
-				"amazon-bedrock": {
+				"company-gateway": {
 					models: [
 						{
-							id: "us.anthropic.claude-fable-5-1",
-							api: "bedrock-converse-stream",
-							compat: { supportsThinkingBindingControls: "false" },
+							id: "company-chat",
+							api: "anthropic-messages",
+							compat: { supportsContextManagement: "false" },
 						},
 					],
 				},
@@ -59,7 +59,7 @@ describe("ModelsConfigSchema Bedrock compat overrides", () => {
 		if (!(checked instanceof OmpErrors)) throw new Error("expected the schema to reject a string value");
 		expect(checked.map(error => `${error.path.join(".")}: ${error.problem}`)).toEqual([
 			expect.stringMatching(
-				/^providers\.amazon-bedrock\.models\.0\.compat\.supportsThinkingBindingControls: must be boolean/,
+				/^providers\.company-gateway\.models\.0\.compat\.supportsContextManagement: must be boolean/,
 			),
 		]);
 	});
@@ -153,11 +153,10 @@ describe("model kind must match its api", () => {
 		expect(validate({ models: [{ id: "img", api: "openai-images", kind: "image" }] })).not.toThrow();
 	});
 
-	test("chat transports serve chat and tiny, plus image where generate_image runs them", () => {
-		expect(validate({ models: [{ id: "gpt-image-2", api: "openai-responses", kind: "image" }] })).not.toThrow();
-		expect(
-			validate({ models: [{ id: "gemini-3-pro-image", api: "google-generative-ai", kind: "image" }] }),
-		).not.toThrow();
+	test("chat transports serve chat and tiny", () => {
+		expect(validate({ models: [{ id: "gpt-image-2", api: "openai-responses", kind: "image" }] })).toThrow(
+			/model gpt-image-2: kind "image" does not match api "openai-responses", which serves kind "chat" or "tiny"/,
+		);
 		expect(validate({ models: [{ id: "qwen-small", api: "openai-completions", kind: "tiny" }] })).not.toThrow();
 		expect(validate({ models: [{ id: "voice", api: "openai-responses", kind: "tts" }] })).toThrow(
 			/model voice: kind "tts" does not match api "openai-responses"/,

@@ -25,8 +25,8 @@ export default class DryBalance extends Command {
 
 	static examples = [
 		"# Dry-run the configured default model with 100 random session ids\n  omp dry-balance",
-		"# Dry-run a specific model\n  omp dry-balance anthropic/claude-sonnet-4-5",
-		"# Larger run with bounded concurrency\n  omp dry-balance --model openai-codex/gpt-5-codex --count 1000 --concurrency 64",
+		"# Dry-run a specific model\n  omp dry-balance github-copilot/gpt-5.5",
+		"# Larger run with bounded concurrency\n  omp dry-balance --model github-copilot/gpt-5.5 --count 1000 --concurrency 64",
 		"# Benchmark every OAuth account in parallel\n  omp dry-balance --bench",
 		"# Machine-readable output\n  omp dry-balance --json",
 	];

@@ -51,7 +51,7 @@ afterEach(() => {
 
 describe("openai-responses sampling-param gating (#5606)", () => {
 	it("omits temperature for OpenAI reasoning models that reject it", async () => {
-		const model = getBundledModel("openai", "gpt-5") as Model<"openai-responses">;
+		const model = getBundledModel("github-copilot", "gpt-5") as Model<"openai-responses">;
 		expect(model.compat.supportsSamplingParams).toBe(false);
 		const body = await drain(model);
 		expect(body).not.toHaveProperty("temperature");
@@ -65,14 +65,14 @@ describe("openai-responses sampling-param gating (#5606)", () => {
 	});
 
 	it("still forwards temperature for non-restricted OpenAI models", async () => {
-		const model = getBundledModel("openai", "gpt-4o-mini") as Model<"openai-responses">;
+		const model = getBundledModel("github-copilot", "gpt-4o") as Model<"openai-responses">;
 		expect(model.compat.supportsSamplingParams).toBe(true);
 		const body = await drain(model);
 		expect(body.temperature).toBe(0);
 	});
 
 	it("disables native reasoning with effort none when an external scratchpad replaces it", async () => {
-		const model = getBundledModel("openai", "gpt-5") as Model<"openai-responses">;
+		const model = getBundledModel("github-copilot", "gpt-5") as Model<"openai-responses">;
 		const body = await drain(model, { forceReasoningOff: true });
 		expect(body.reasoning).toEqual({ effort: "none" });
 	});

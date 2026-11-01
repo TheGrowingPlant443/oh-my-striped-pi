@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "bun:
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -10,8 +10,23 @@ import { buildSessionOptions } from "@oh-my-pi/pi-coding-agent/main";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 import { cfgPrewalkEnabled } from "@oh-my-pi/pi-coding-agent/session/settings";
+const prewalkModels = ["company-primary", "company-secondary"].map(provider =>
+	buildModel({
+		id: "prewalk-chat",
+		name: "Prewalk Chat",
+		provider,
+		api: "openai-completions",
+		baseUrl: "https://models.company.test/v1",
+		reasoning: false,
+		input: ["text"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 16_384,
+	}),
+);
 
 // Regression for #6064: prewalk is an optional, off-by-default optimization.
 // A missing key (or unresolvable target) for the prewalk hand-off model must
@@ -27,6 +42,14 @@ describe("prewalk startup degradation", () => {
 		fs.mkdirSync(tempDir, { recursive: true });
 		authStorage = await AuthStorage.create(path.join(tempDir, "auth.db"));
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir, "models.yml"));
+		for (const model of prewalkModels) {
+			modelRegistry.registerProvider(model.provider, {
+				api: model.api,
+				apiKey: "test-key",
+				baseUrl: model.baseUrl,
+				models: [toProviderModelConfig(model)],
+			});
+		}
 	});
 
 	afterAll(() => {
@@ -41,11 +64,8 @@ describe("prewalk startup degradation", () => {
 	test("leaves prewalk unarmed instead of crashing when the target has no configured auth", async () => {
 		const settings = Settings.isolated();
 		cfgPrewalkEnabled.set(settings, true);
-		settings.setModelRole("smol", "cerebras/zai-glm-4.7");
-		// Force the no-auth condition: hasAuth() also consults $HOME/.env via
-		// getEnvApiKey (packages/utils/src/env.ts), so a CEREBRAS_API_KEY in the
-		// runner's home .env would otherwise legitimately arm prewalk and make
-		// this test environment-dependent.
+		settings.setModelRole("smol", `${prewalkModels[0]!.provider}/${prewalkModels[0]!.id}`);
+		// Exercise a resolvable private target, independent of ambient credentials.
 		vi.spyOn(modelRegistry, "hasConfiguredAuth").mockReturnValue(false);
 
 		const options = await buildSessionOptions(parseArgs([]), [], SessionManager.inMemory(), modelRegistry, settings);
@@ -54,8 +74,7 @@ describe("prewalk startup degradation", () => {
 	});
 
 	test("arms prewalk when the target resolves and has configured auth", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected claude-sonnet-4-5 to be bundled");
+		const model = prewalkModels[0]!;
 		const settings = Settings.isolated();
 		cfgPrewalkEnabled.set(settings, true);
 		settings.setModelRole("smol", `${model.provider}/${model.id}`);
@@ -68,9 +87,8 @@ describe("prewalk startup degradation", () => {
 	});
 
 	test("skips a disabled provider and arms the next enabled prewalk candidate", async () => {
-		const disabled = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const enabled = getBundledModel("openai", "gpt-4o");
-		if (!disabled || !enabled) throw new Error("expected claude-sonnet-4-5 and gpt-4o to be bundled");
+		const disabled = prewalkModels[0]!;
+		const enabled = prewalkModels[1]!;
 		const settings = Settings.isolated({ disabledProviders: [disabled.provider] });
 		authStorage.keys.setRuntime(disabled.provider, "test-key");
 		authStorage.keys.setRuntime(enabled.provider, "test-key");
@@ -88,8 +106,7 @@ describe("prewalk startup degradation", () => {
 	});
 
 	test("does not implicitly re-arm configured prewalk while restoring a session", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected claude-sonnet-4-5 to be bundled");
+		const model = prewalkModels[0]!;
 		const settings = Settings.isolated();
 		cfgPrewalkEnabled.set(settings, true);
 		settings.setModelRole("smol", `${model.provider}/${model.id}`);
@@ -102,8 +119,7 @@ describe("prewalk startup degradation", () => {
 	});
 
 	test("honors an explicit prewalk flag while restoring a session", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("expected claude-sonnet-4-5 to be bundled");
+		const model = prewalkModels[0]!;
 		const settings = Settings.isolated();
 		settings.setModelRole("smol", `${model.provider}/${model.id}`);
 		authStorage.keys.setRuntime(model.provider, "test-key");

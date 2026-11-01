@@ -60,11 +60,11 @@ describe("InteractiveMode prompt-template autocomplete (#2462)", () => {
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		cfgStartupQuiet.set(Settings.instance, true);
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		// ModelRegistry (bundled-model load) and the resolved model are immutable across
 		// these tests, so build them once rather than per test.
 		registry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
-		model = modelOrThrow(registry, "claude-sonnet-4-5");
+		model = modelOrThrow(registry, "claude-sonnet-4.5");
 		tools = [makeTool("read")];
 	});
 
@@ -93,8 +93,8 @@ describe("InteractiveMode prompt-template autocomplete (#2462)", () => {
 	});
 
 	function modelOrThrow(registry: ModelRegistry, id: string): Model<Api> {
-		const model = registry.find("anthropic", id);
-		if (!model) throw new Error(`Expected anthropic model ${id} to exist`);
+		const model = registry.find("github-copilot", id);
+		if (!model) throw new Error(`Expected Copilot model ${id} to exist`);
 		return model;
 	}
 

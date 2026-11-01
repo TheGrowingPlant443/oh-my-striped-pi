@@ -10,6 +10,10 @@
 
 - Fixed `untilAborted` so promises passed to an already-aborted signal are still observed, preventing later rejections from being reported as unhandled.
 
+### Removed
+
+- Removed the QA-report storage path helper.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

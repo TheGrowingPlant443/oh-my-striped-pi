@@ -1,4 +1,4 @@
-import type { FetchImpl } from "../../types";
+import type { Api, FetchImpl, Model } from "../../types";
 import type { OAuthProviderUnion } from "../registry";
 
 export type OAuthCredentials = {
@@ -11,9 +11,8 @@ export type OAuthCredentials = {
 	accountId?: string;
 	apiEndpoint?: string;
 	/**
-	 * Organization/workspace the token is scoped to (e.g. an Anthropic org
-	 * UUID or canonical Factory org ID). Lets one account email hold
-	 * credentials for multiple subscriptions.
+	 * Organization/workspace the token is scoped to, when an independent
+	 * credential exchange supplies one. Preserved by the credential store.
 	 */
 	orgId?: string;
 	/** Human-readable organization name for display (may embed the email). */
@@ -30,11 +29,8 @@ export type OAuthCredentials = {
 	/** WorkOS selected organization; never used as a Factory API organization header. */
 	activeOrganizationId?: string;
 	/**
-	 * Epoch ms of the interactive login that minted this grant. Set by
-	 * `AuthStorage.oauth.login`; token refreshes preserve it. Providers with an
-	 * absolute grant lifetime (Anthropic expires the whole refresh-token
-	 * family ~30 days after authorization regardless of rotation) use it to
-	 * surface re-login deadlines before the grant dies.
+	 * Epoch ms of the interactive login that minted this grant.
+	 * `AuthStorage.oauth.login` sets it; token refreshes preserve it.
 	 */
 	authorizedAt?: number;
 };
@@ -116,4 +112,5 @@ export interface OAuthProviderInterface {
 	getApiKey?(credentials: OAuthCredentials): string;
 	/** Store resulting OAuth credentials under a different provider id. */
 	readonly storeCredentialsAs?: string;
+	modifyModels?(models: Model<Api>[], credentials: OAuthCredentials): Model<Api>[];
 }

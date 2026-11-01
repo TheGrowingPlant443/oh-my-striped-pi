@@ -20,13 +20,13 @@ import {
 	cfgRetryEnabled,
 } from "@oh-my-pi/pi-coding-agent/session/settings";
 
-function makeConverseModel(): Model {
+function makeCacheModel(): Model {
 	return buildModel({
-		id: "us.anthropic.claude-opus-5-5",
-		name: "Claude Opus 5.5",
-		api: "bedrock-converse-stream",
-		provider: "amazon-bedrock",
-		baseUrl: "https://bedrock-runtime.us-east-1.amazonaws.com",
+		id: "claude-sonnet-4.6",
+		name: "Claude Sonnet 4.6",
+		api: "anthropic-messages",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
@@ -34,10 +34,7 @@ function makeConverseModel(): Model {
 		contextWindow: 200_000,
 		maxTokens: 8_192,
 		compat: {
-			promptCacheMode: "explicit",
-			supportsLongPromptCacheRetention: true,
-			promptCacheMinimumTokens: 0,
-			promptCacheMaximumCheckpoints: 2,
+			supportsLongCacheRetention: true,
 		},
 	});
 }
@@ -65,10 +62,13 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
 		configPath = path.join(agentDir, "config.yml");
 
 		authStorage = await AuthStorage.create(path.join(agentDir, "auth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 
-		model = { ...getBundledModel("anthropic", "claude-sonnet-4-5"), promptCache: { short: 11 } } as Model;
+		model = {
+			...getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.6"),
+			promptCache: { short: 11 },
+		};
 		settings = await Settings.loadIsolated({ agentDir, cwd: agentDir });
 		refreshCount = 0;
 		warmer = new CacheWarmer({
@@ -154,9 +154,9 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
 		expect(onDisk).toContain("enabled: true");
 	});
 
-	it("schedules Converse warming from configured long retention", () => {
+	it("schedules Copilot Anthropic warming from configured long retention", () => {
 		vi.useFakeTimers();
-		model = makeConverseModel();
+		model = makeCacheModel();
 		session.agent.setModel(model);
 		cfgProvidersCacheRetention.override(settings, "long");
 
@@ -168,7 +168,7 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
 
 	it("does not replay requests when retention is configured as none", async () => {
 		vi.useFakeTimers();
-		model = makeConverseModel();
+		model = makeCacheModel();
 		session.agent.setModel(model);
 		cfgProvidersCacheRetention.override(settings, "none");
 
@@ -182,7 +182,7 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
 
 	it("lets explicit per-request short retention override the long setting", () => {
 		vi.useFakeTimers();
-		model = makeConverseModel();
+		model = makeCacheModel();
 		session.agent.setModel(model);
 		cfgProvidersCacheRetention.override(settings, "long");
 
@@ -197,7 +197,7 @@ describe("AgentSession auto-maintenance controls and cache-warming retention", (
 		process.env.PI_CACHE_RETENTION = "long";
 		try {
 			vi.useFakeTimers();
-			model = makeConverseModel();
+			model = makeCacheModel();
 			session.agent.setModel(model);
 			cfgProvidersCacheRetention.override(settings, "auto");
 

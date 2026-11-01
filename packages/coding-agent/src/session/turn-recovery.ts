@@ -9,21 +9,17 @@ import type {
 	AssistantMessage,
 	AssistantRetryRecovery,
 	AssistantRetryRecoveryKind,
-	CodexCompactionContext,
 	Effort,
 	Model,
 	ModelUsageHealth,
 	TextContent,
 	ToolChoice,
-	AnthropicFallbackCreditHandle,
 } from "@oh-my-pi/pi-ai";
 import { calculateRateLimitBackoffMs, parseRateLimitReason } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
 import { shouldDropTruncatedThinkingOnlyAssistant } from "@oh-my-pi/pi-ai/providers/transform-messages";
 import { extractProviderRetryHint } from "@oh-my-pi/pi-ai/utils/retry-after";
-import { fallbackCreditTargets } from "@oh-my-pi/pi-catalog/compat/fallback-credit";
 import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
-import { isFireworksFastModelId, toFireworksBaseModelId } from "@oh-my-pi/pi-catalog/fireworks-model-id";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
 import { isUnexpectedSocketCloseMessage, logger, prompt, sleepLong } from "@oh-my-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
@@ -46,7 +42,6 @@ import {
 } from "@oh-my-pi/pi-tui/thinking";
 import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
 import type { AgentSessionEvent } from "./agent-session-events";
-import type { ResetRecoveryResult } from "./codex-auto-reset";
 import type {
 	InitialRetryFallbackState,
 	UsageFallbackConfirmation,
@@ -113,14 +108,11 @@ const USAGE_PREFLIGHT_BLOCKED_PREFIX = "Usage preflight blocked:";
 const STREAM_STALL_ERROR_RE = /stream stall/i;
 const HTTP2_STREAM_RESET_ERROR_RE =
 	/stream closed with error code\s+nghttp2_(?:internal_error|refused_stream)|nghttp2_(?:internal_error|refused_stream)|HTTP2(?:StreamReset|RefusedStream)/i;
-// Gateway/provider closes a stream mid-generation without its terminal chunk
-// (openai-completions "finish_reason", openai/azure responses "terminal
-// response event", Codex "terminal completion event", Cursor "turnEnded" —
-// an HTTP/2 reset can settle as the stream end rather than the RST error).
+// Gateway/provider closes a stream mid-generation without its terminal chunk;
+// an HTTP/2 reset can settle as the stream end rather than the RST error.
 // Same transport-failure class as the stall/reset entries: retriable, and
 // eligible for preserved-turn continuation on resolved tool turns.
-const PREMATURE_STREAM_CLOSE_ERROR_RE =
-	/(?:stream closed before a (?:finish_reason|terminal response event)|Codex stream ended before terminal completion event|Cursor stream ended before turnEnded)/i;
+const PREMATURE_STREAM_CLOSE_ERROR_RE = /stream closed before a (?:finish_reason|terminal response event)/i;
 
 /**
  * Bare abort sentinels with no provider reason: our own `"Request was aborted"`
@@ -312,12 +304,6 @@ export interface TurnRecoveryHost {
 	 */
 	syncAfterModelChange(previousEditMode: EditMode, options?: { retryFallback?: boolean }): Promise<void>;
 	resetCurrentResponsesProviderSession(reason: string): void;
-	/**
-	 * Spend an eligible saved reset for the blocked provider pool.
-	 * `activeBlockUnblockAtMs` is the absolute unblock time parsed from the live
-	 * usage-limit error and never substitutes for live grant eligibility.
-	 */
-	maybeAutoRedeemReset(activeBlockUnblockAtMs?: number): Promise<ResetRecoveryResult>;
 	runAutoCompaction(
 		reason: "overflow" | "threshold" | "idle" | "incomplete",
 		willRetry: boolean,
@@ -326,7 +312,6 @@ export interface TurnRecoveryHost {
 			triggerContextTokens?: number;
 			suppressContinuation?: boolean;
 			suppressHandoff?: boolean;
-			phase?: CodexCompactionContext["phase"];
 			terminalTextAnswer?: boolean;
 			/** Skip `snapcompact` — a byte/payload-limit 413 recovery must not
 			 *  retry with an even larger, media-heavy request (#11482). */
@@ -367,7 +352,6 @@ type RetrySagaEnd = Omit<Extract<AgentSessionEvent, { type: "auto_retry_end" }>,
 /** How {@link TurnRecovery.handleRetryableError} may recover a failed turn. */
 type RetryPolicyOptions = {
 	allowModelFallback?: boolean;
-	fireworksFastFallback?: boolean;
 	hardErrorFallback?: boolean;
 	preserveFailedTurn?: boolean;
 };
@@ -398,10 +382,6 @@ export class TurnRecovery {
 	#retryPromise: Promise<void> | undefined;
 	#retryResolve: (() => void) | undefined;
 	#activeRetryFallback: ActiveRetryFallbackState | undefined;
-	#activeFallbackCreditRedemption?: {
-		targetSelector: string;
-		handle: AnthropicFallbackCreditHandle;
-	};
 	#usageReserveApproval: { model: string; sessionId: string } | undefined;
 	#pendingRetryErrors: PendingRetryError[] = [];
 	#usageLimitOutcomes = new WeakMap<AssistantMessage, Promise<UsageLimitOutcome>>();
@@ -426,11 +406,9 @@ export class TurnRecovery {
 	#lastServed: { attribution: ServingModel; sessionId: string } | undefined;
 	/**
 	 * Session whose current model was reached by fallback routing rather than by
-	 * the configured primary, or `undefined` when it was not. Tracked separately
-	 * from {@link #activeRetryFallback} because the Fireworks Fast degrade swaps
-	 * models without arming a chain, and anchored like {@link #lastServed}:
-	 * switching transcripts in place must not describe a fresh session's model
-	 * with how the previous one was routed.
+	 * the configured primary, or `undefined` when it was not. Anchored like
+	 * {@link #lastServed}: switching transcripts in place must not describe a
+	 * fresh session's model with how the previous one was routed.
 	 */
 	#fallbackRoutedFor: string | undefined;
 	/** Memoized bootstrap answer, for the window before anything has served. */
@@ -548,26 +526,11 @@ export class TurnRecovery {
 		this.#malformedFunctionCallRetryCount = 0;
 		this.#streamStallContinueCount = 0;
 		this.#acceptTerminalEmptyStopForPrompt = false;
-		this.#activeFallbackCreditRedemption = undefined;
 	}
 
 	/** Sets whether one terminal empty stop is accepted for the current prompt. */
 	setAcceptTerminalEmptyStop(accept: boolean): void {
 		this.#acceptTerminalEmptyStopForPrompt = accept;
-	}
-
-	/** Consumes any queued Anthropic fallback credit handle for the retry turn. */
-	consumeActiveFallbackCreditRedemption(targetModel?: Model): AnthropicFallbackCreditHandle | undefined {
-		const active = this.#activeFallbackCreditRedemption;
-		if (!active) return undefined;
-		if (targetModel && `${targetModel.provider}/${targetModel.id}` !== active.targetSelector) {
-			return undefined;
-		}
-		this.#activeFallbackCreditRedemption = undefined;
-		if (Date.now() >= active.handle.expiresAt) {
-			return undefined;
-		}
-		return active.handle;
 	}
 
 	/**
@@ -718,9 +681,7 @@ export class TurnRecovery {
 	 * reminder to pick up where the text stopped, and continue. Honors
 	 * `retry.enabled`; bounded per prompt, past the cap the error surfaces as before.
 	 * A socket close counts here but not for tool turns: without tool calls there
-	 * is no executed side effect whose resumption policy it could change. So does a
-	 * Codex native-lane steer rejection: the server dropped the response over our
-	 * own `response.steer`, and the rejected steer drains as ordinary input next.
+	 * is no executed side effect whose resumption policy it could change.
 	 */
 	handleCommittedTextStreamStall(message: AssistantMessage): boolean {
 		const id = this.#classifyRetryMessage(message);
@@ -729,7 +690,7 @@ export class TurnRecovery {
 			AIError.retriable(id) &&
 			!this.#host.streamingEditAbortTriggered() &&
 			isUnexpectedSocketCloseMessage(message.errorMessage ?? "");
-		if (!socketClosed && !AIError.isCodexSteerRejection(message) && !this.#isMidStreamTransportFailure(message, id)) {
+		if (!socketClosed && !this.#isMidStreamTransportFailure(message, id)) {
 			this.#streamStallContinueCount = 0;
 			return false;
 		}
@@ -1341,7 +1302,6 @@ export class TurnRecovery {
 		const result = await this.#host.runAutoCompaction(reason, true, {
 			autoContinue: options.autoContinue,
 			triggerContextTokens: options.triggerContextTokens,
-			phase: "mid_turn",
 			excludeMediaMethods: options.excludeMediaMethods,
 		});
 		const compactionEntryAfter = getLatestCompactionEntry(this.#host.sessionManager.getBranch());
@@ -2274,12 +2234,6 @@ export class TurnRecovery {
 			: this.#host.agent.state.messages.findLast(
 					(message): message is AssistantMessage => message.role === "assistant" && message !== failedMessage,
 				);
-		// Permitted redemption targets are catalog policy on the refused model.
-		const creditHandle = failedMessage.fallbackCreditHandle;
-		const failedModel = creditHandle
-			? this.#host.modelRegistry.find(failedMessage.provider, failedMessage.model)
-			: undefined;
-		const creditTargets = failedModel ? fallbackCreditTargets(failedModel) : [];
 		// Deferring a sibling Anthropic candidate below is only worth it while
 		// another attempt on the model that signed the replayed thinking follows:
 		// the active model is that model, and the retry policy will retry it. Any
@@ -2317,15 +2271,6 @@ export class TurnRecovery {
 				// failure — an unbounded retry loop against a model that cannot work.
 				if (this.#isNoOpRetryFallback(candidate, selector)) continue;
 				if (options?.excludeProvider === candidate.provider) continue;
-				// Redeeming Anthropic fallback credit replays the refused request's frozen
-				// body; the server validates thinking blocks across the boundary itself
-				// using the credit token.
-				const canRedeemFallbackCredit =
-					creditHandle !== undefined &&
-					candidate.api === "anthropic-messages" &&
-					candidate.provider === failedMessage.provider &&
-					creditTargets.includes(candidate.id) &&
-					Date.now() < creditHandle.expiresAt;
 				// Anthropic signatures and redacted blocks are model-bound, while the
 				// latest assistant response must remain byte-identical. While another
 				// attempt on the model that signed them is still allowed, prefer it to a
@@ -2341,19 +2286,13 @@ export class TurnRecovery {
 				// the history unchanged on another Claude model, which drops the thinking
 				// blocks it cannot read (preserved thinking, "Switching models
 				// mid-conversation").
-				// While the refusal's fallback credit can still be redeemed, only its
-				// targets pass, so an earlier non-target entry cannot forfeit the credit.
 				// An Anthropic-compatible proxy that will not verify a sibling model's
 				// signature is covered by the transport, not by skipping the hop: the
 				// `Invalid signature in thinking block` 400 escalates to a retry that
 				// replays no thinking and succeeds, and the session stops replaying it
 				// afterwards.
-				const creditLive =
-					creditHandle !== undefined && creditTargets.length > 0 && Date.now() < creditHandle.expiresAt;
-				const refusalKeepsCredit = options?.refusalWalk === true && creditLive;
 				if (
-					(signerRetryRemains || refusalKeepsCredit) &&
-					!canRedeemFallbackCredit &&
+					signerRetryRemains &&
 					candidate.api === "anthropic-messages" &&
 					latestAssistant?.api === "anthropic-messages" &&
 					latestAssistant.provider === candidate.provider &&
@@ -2385,76 +2324,15 @@ export class TurnRecovery {
 					if (!(error instanceof AIError.MissingApiKeyError)) throw error;
 				}
 				if (!apiKey) continue;
-				const previousEditMode = this.#host.resolveActiveEditMode();
-				const previousSystemPrompt = [...this.#host.agent.state.systemPrompt];
-				const previousTools = [...this.#host.agent.state.tools];
 				const applied = await this.applyRetryFallbackCandidate(role, selector, currentSelector, {
 					...options,
 					reason: `Request failed: ${failedMessage.errorMessage ?? "provider returned an error without details"}`,
 				});
-				// Redemption replays the refused request's frozen `system` and `tools`. If the
-				// swap rebuilt either, the fallback model would be prompted with, and call tools
-				// through, a surface the agent no longer runs: send a fresh request instead.
-				const { systemPrompt, tools } = this.#host.agent.state;
-				const requestSurfaceUnchanged =
-					this.#host.resolveActiveEditMode() === previousEditMode &&
-					Bun.deepEquals(systemPrompt, previousSystemPrompt) &&
-					tools.length === previousTools.length &&
-					tools.every((tool, index) => tool === previousTools[index]);
-				if (
-					applied &&
-					options?.pinFallback === true &&
-					creditHandle !== undefined &&
-					canRedeemFallbackCredit &&
-					requestSurfaceUnchanged
-				) {
-					this.#activeFallbackCreditRedemption = {
-						targetSelector: `${candidate.provider}/${candidate.id}`,
-						handle: creditHandle,
-					};
-				}
 				return applied;
 			}
 		}
 
 		return false;
-	}
-
-	/** The active model when it is a Fireworks Fast (`-fast`) variant, else undefined. */
-	#activeFireworksFastModel(): Model | undefined {
-		const model = this.#host.model();
-		return model?.provider === "fireworks" && isFireworksFastModelId(model.id) ? model : undefined;
-	}
-
-	/**
-	 * True when the current turn failed on a Fireworks Fast (`-fast`) model in a
-	 * way that should degrade to the reliable base (Standard) model. Fast is a
-	 * speed-optimized router with no SLA, so any *pre-content* failure — a
-	 * transient overload/5xx or a hard "router/model not found / unsupported" —
-	 * is worth retrying on the base id. Skips failures the base model shares:
-	 * context overflow (compaction's job), usage limits and auth errors (same
-	 * account/key), and turns that already emitted any replay-unsafe output.
-	 * Requires the base model to exist in the registry.
-	 */
-	isFireworksFastFallbackEligible(message: AssistantMessage): boolean {
-		const model = this.#activeFireworksFastModel();
-		if (!model) return false;
-		if (message.stopReason !== "error") return false;
-		if (this.#isUsagePreflightBlocked(message)) return false;
-		if (this.#hasReplayUnsafeOutput(message)) return false;
-		// A content refusal/sensitivity stop is the model's decision, not a route
-		// failure — switching to the base model would just re-trigger it.
-		if (this.isClassifierRefusal(message)) return false;
-		const id = this.#classifyRetryMessage(message);
-		if (AIError.isContextOverflow(message, model.contextWindow ?? 0)) return false;
-		if (AIError.is(id, AIError.Flag.UsageLimit)) return false;
-		if (AIError.is(id, AIError.Flag.AuthFailed)) return false;
-		// A thinking loop is a same-model resample signal, not a router fault, so a
-		// base-model swap would abandon the loop-guard redirect (issue #8760).
-		if (AIError.is(id, AIError.Flag.ThinkingLoop)) return false;
-		// Byte/media budget 413s fail identically on the base model — swapping cannot fix them (#9235).
-		if (AIError.isPayloadRejection(message)) return false;
-		return this.#host.modelRegistry.find("fireworks", toFireworksBaseModelId(model.id)) !== undefined;
 	}
 
 	/**
@@ -2496,38 +2374,6 @@ export class TurnRecovery {
 		return this.retryFallbackChainKeys(currentSelector).some(
 			role => this.findRetryFallbackCandidates(role, currentSelector).length > 0,
 		);
-	}
-
-	/**
-	 * Switch the active model from a Fireworks Fast (`-fast`) variant to its base
-	 * (Standard) id and stick there for the rest of the session — the auto
-	 * fallback that makes Fast a safe default. Returns false when the current
-	 * model is not a fast variant, the base id is missing, or it has no key.
-	 */
-	async #tryFireworksFastFallback(currentSelector: string): Promise<boolean> {
-		const model = this.#activeFireworksFastModel();
-		if (!model) return false;
-		const baseModel = this.#host.modelRegistry.find("fireworks", toFireworksBaseModelId(model.id));
-		if (!baseModel) return false;
-		const apiKey = await this.#host.modelRegistry.getApiKey(baseModel, this.#host.sessionId());
-		if (!apiKey) return false;
-		const baseSelector = formatModelStringWithRouting(baseModel);
-		const previousEditMode = this.#host.resolveActiveEditMode();
-		// A capability degrade is fallback routing too, even though it arms no
-		// chain: the base model must not be reported as the configured primary.
-		this.#markFallbackRouted();
-		await this.#host.setModelWithProviderSessionReset(baseModel);
-		this.#host.sessionManager.appendModelChange(baseSelector, EPHEMERAL_MODEL_CHANGE_ROLE, true);
-		this.#host.settings.getStorage()?.recordModelUsage(baseSelector);
-		await this.#host.syncAfterModelChange(previousEditMode, { retryFallback: true });
-		await this.#host.emitSessionEvent({
-			type: "retry_fallback_applied",
-			from: currentSelector,
-			to: baseSelector,
-			role: "fireworks-fast",
-			reason: "Request rejected by the Fast tier. Retrying on the Standard tier.",
-		});
-		return true;
 	}
 
 	async #maybeRestoreRetryFallbackPrimary(): Promise<boolean> {
@@ -2604,7 +2450,7 @@ export class TurnRecovery {
 	/**
 	 * Handle retryable errors with exponential backoff, credential rotation, and
 	 * model-fallback chains. Also entered for NON-retryable errors when a switch
-	 * is the recovery (`fireworksFastFallback`, `hardErrorFallback`): then a
+	 * is the recovery (`hardErrorFallback`): then a
 	 * successful model switch retries immediately, and a failed switch surfaces
 	 * the error without a same-model backoff retry.
 	 * @returns true if retry was initiated, false if max retries exceeded or disabled
@@ -2635,10 +2481,7 @@ export class TurnRecovery {
 	async #applyRetryPolicy(message: AssistantMessage, options?: RetryPolicyOptions): Promise<boolean> {
 		const retrySettings = cfgRetry.get(this.#host.settings);
 		if (this.#host.abortInProgress() || this.#host.isDisposed()) return false;
-		// The Fireworks Fast→base degrade is an intrinsic model-selection safety net,
-		// not a retry loop, so it runs even when the user disabled retries: it switches
-		// the model once and lets the base turn proceed.
-		if (!retrySettings.enabled && !options?.fireworksFastFallback) return false;
+		if (!retrySettings.enabled) return false;
 		const classifierRefusal = this.isClassifierRefusal(message);
 
 		const generation = this.#host.promptGeneration();
@@ -2720,47 +2563,10 @@ export class TurnRecovery {
 			this.#host.resetCurrentResponsesProviderSession("stale replay error");
 		}
 
-		// Rotation can spend the same-route retry budget before the last account
-		// hits its quota. Past the budget only a confirmed reset may continue: a
-		// rotation that keeps claiming a usable sibling would otherwise retry forever.
+		// Rotation cannot extend the same-route retry budget indefinitely.
 		if (!staleOpenAIResponsesReplayError && recordedUsageLimitOutcome) {
 			const rotated = recordedUsageLimitOutcome.switchedCredential && !retryBudgetExhausted;
-			let restored = false;
-			if (!rotated) {
-				const resetAbortController = new AbortController();
-				this.#retryAbortController?.abort();
-				this.#retryAbortController = resetAbortController;
-				const startedAtMs = Date.now();
-				const unblockAtMs = parsedRetryAfterMs === undefined ? undefined : startedAtMs + parsedRetryAfterMs;
-				try {
-					for (let attempt = 0; ; attempt++) {
-						const result = await this.#host.maybeAutoRedeemReset(unblockAtMs);
-						resetAbortController.signal.throwIfAborted();
-						if (result.restored) {
-							restored = true;
-							break;
-						}
-						if (result.retryAfterMs === undefined || attempt >= maxRetries) break;
-						// Only retry the safe eligibility read, never the reset mutation or
-						// model request. Respect provider pacing within the configured wait cap.
-						const readDelayMs = Math.max(
-							1_000,
-							result.retryAfterMs,
-							calculateRetryBackoffDelayMs(retrySettings.baseDelayMs, attempt + 1),
-						);
-						if (retrySettings.maxDelayMs > 0 && Date.now() - startedAtMs + readDelayMs > retrySettings.maxDelayMs)
-							break;
-						await sleepLong(readDelayMs, resetAbortController.signal);
-					}
-				} catch (error) {
-					if (!resetAbortController.signal.aborted) throw error;
-					if (this.#retryAbortController !== resetAbortController) return false;
-					return this.#endCancelledRetry();
-				} finally {
-					if (this.#retryAbortController === resetAbortController) this.#retryAbortController = undefined;
-				}
-			}
-			if (rotated || restored) {
+			if (rotated) {
 				switchedCredential = true;
 				delayMs = 0;
 			} else {
@@ -2865,12 +2671,6 @@ export class TurnRecovery {
 		// contents, not model health (issue #8760). Keep it on the same model; the
 		// retry budget still bounds a genuinely stuck stream.
 		const thinkingLoop = AIError.is(id, AIError.Flag.ThinkingLoop);
-		// A Codex steering rejection answers our own `response.steer`, not the
-		// model's health, and the provider already stopped steering the session:
-		// replay on the same model while same-model retries remain. Once the
-		// budget is spent, the chain keeps its last-resort consult.
-		const sameModelSteerReplay =
-			!retryBudgetExhausted && AIError.isCodexSteerRejection({ api: currentModel?.api, errorMessage });
 		const effectiveUsageLimitWaitMs =
 			usageLimitWaitMs ??
 			(siblingAvailabilityWaitMs === undefined
@@ -2940,7 +2740,6 @@ export class TurnRecovery {
 				retrySettings.modelFallback &&
 				retryFallbackAdmits(retrySettings.fallbackOn, AIError.is(id, AIError.Flag.UsageLimit)) &&
 				!thinkingLoop &&
-				!sameModelSteerReplay &&
 				!waitForSiblingCredential &&
 				!refusalWalkRepeats &&
 				!this.#isFirstAttemptMidStreamSocketDrop(message, id, retryBudgetExhausted)
@@ -2965,8 +2764,8 @@ export class TurnRecovery {
 					// Deferring a chain candidate only pays when the code below makes
 					// another attempt on this model that can succeed. Each term is a
 					// branch below that, with no switch, ends the turn instead (a spent
-					// budget, a refusal or account-policy denial, a hard-error or
-					// Fast-degrade consult the classifier would not retry, a wait past
+					// budget, a refusal or account-policy denial, a hard-error
+					// consult the classifier would not retry, a wait past
 					// the fail-fast cap), or, under `retry.rateLimitWalksChain`, a rate
 					// limit on this model, which the next attempt re-hits.
 					sameModelRetryAvailable:
@@ -2974,23 +2773,13 @@ export class TurnRecovery {
 						!sourceRateLimited &&
 						!classifierRefusal &&
 						!accountPolicyDenial &&
-						!(
-							(options?.fireworksFastFallback || options?.hardErrorFallback) &&
-							!this.isRetryableError(message)
-						) &&
+						!(options?.hardErrorFallback && !this.isRetryableError(message)) &&
 						!exceedsDelayCap(
 							usageLimitWaitMs === undefined && parsedRetryAfterMs && parsedRetryAfterMs > delayMs
 								? parsedRetryAfterMs
 								: delayMs,
 						),
 				});
-			}
-			// Auto fallback from a Fireworks Fast variant to its base model. Independent
-			// of the role-fallback setting: it's intrinsic to the Fast contract (speed
-			// best-effort, degrade to Standard on failure) and triggers on hard router
-			// errors the generic retry classifier would otherwise reject.
-			if (!switchedModel && allowModelFallback && options?.fireworksFastFallback) {
-				switchedModel = await this.#tryFireworksFastFallback(currentSelector);
 			}
 			if (switchedModel) {
 				delayMs = 0;
@@ -3037,11 +2826,7 @@ export class TurnRecovery {
 		// has a credential). Don't fall through to backing-off and retrying the
 		// failing model for an error the generic classifier wouldn't retry —
 		// surface it instead.
-		if (
-			(options?.fireworksFastFallback || options?.hardErrorFallback) &&
-			!switchedModel &&
-			!this.isRetryableError(message)
-		) {
+		if (options?.hardErrorFallback && !switchedModel && !this.isRetryableError(message)) {
 			// Same auto_retry_end backstop as the classifier-refusal branch above.
 			if (this.#retryAttempt > 1) {
 				await this.#closeRetrySaga(

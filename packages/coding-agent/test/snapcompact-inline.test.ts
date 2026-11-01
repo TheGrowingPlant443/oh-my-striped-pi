@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { Tokenizer } from "@oh-my-pi/pi-agent-core";
 import type {
 	AssistantMessage,
@@ -11,7 +11,6 @@ import type {
 } from "@oh-my-pi/pi-ai";
 import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import toolResultNote from "../src/prompts/system/snapcompact-toolresult-note.md" with { type: "text" };
 import {
 	estimateInlineSavings,
@@ -22,6 +21,8 @@ import {
 import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
 import * as snapcompact from "@oh-my-pi/snapcompact";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
+
+afterEach(() => mock.restore());
 
 /**
  * Token-dense deterministic word salad: each word is `w` + ≤5 digits, ~7
@@ -68,18 +69,22 @@ function makeModel(
 		id?: string;
 		provider?: string;
 		input?: ("text" | "image")[];
-		api?: "anthropic-messages" | "google-generative-ai";
+		api?: "anthropic-messages" | "google-generative-ai" | "openai-completions";
 		baseUrl?: string;
+		stripImageInput?: boolean;
 	} = {},
 ) {
 	return buildModel({
 		id: overrides.id ?? "test-model",
 		name: "Test Model",
 		api: overrides.api ?? "anthropic-messages",
-		provider: overrides.provider ?? "anthropic",
+		provider: overrides.provider ?? "company-anthropic",
 		baseUrl: overrides.baseUrl ?? "https://example.invalid",
 		reasoning: false,
 		input: overrides.input ?? ["text", "image"],
+		...(overrides.stripImageInput ? { compat: { stripImageInput: true } } : {}),
+		// The company deployment permits 100 images; explicitly named unknown gateways retain the fallback cap.
+		...(overrides.provider === undefined ? { imageCountBudget: 100 } : {}),
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000,
 		maxTokens: 8_192,
@@ -119,7 +124,11 @@ describe("SnapcompactInlineTransformer", () => {
 	it("is a no-op for models whose wire strips image input", async () => {
 		// Declares image input, but the Chat Completions guard replaces every
 		// image with a placeholder, so imaged tool results would reach it empty.
-		const model = getBundledModel("venice", "deepseek-v4-1-flash");
+		const model = makeModel({
+			provider: "company-stripped",
+			api: "openai-completions",
+			stripImageInput: true,
+		});
 		const options = withTestShape({ renderSystemPrompt: "all", renderToolResults: true });
 		const context = makeContext();
 		expect(await new SnapcompactInlineTransformer(options).transform(context, model)).toBe(context);
@@ -369,15 +378,15 @@ describe("SnapcompactInlineTransformer", () => {
 	it("applies option changes on the next request, re-rendering cached frames when the shape changes", async () => {
 		const options = withTestShape({ renderSystemPrompt: "none", renderToolResults: false });
 		const renderedFonts: string[] = [];
-		const transformer = new SnapcompactInlineTransformer(options, undefined, {
-			async framesFor(text, shape) {
-				renderedFonts.push(shape.font);
-				return Array.from({ length: snapcompact.frames(text, { shape }) }, () => ({
-					type: "image" as const,
-					data: "ZnJhbWU=",
-					mimeType: "image/png",
-				}));
-			},
+		const transformer = new SnapcompactInlineTransformer(options);
+		spyOn(snapcompact, "renderMany").mockImplementation(async (text, options) => {
+			const shape = options!.shape!;
+			renderedFonts.push(shape.font);
+			return Array.from({ length: snapcompact.frames(text, { shape }) }, () => ({
+				type: "image" as const,
+				data: "ZnJhbWU=",
+				mimeType: "image/png",
+			}));
 		});
 		const context = makeContext();
 
@@ -454,23 +463,22 @@ describe("SnapcompactInlineTransformer", () => {
 	it("compacts text in mixed tool results while preserving every source image and the input context", async () => {
 		const options = withTestShape({ renderSystemPrompt: "all", renderToolResults: true });
 		const renderedTexts: string[] = [];
-		const transformer = new SnapcompactInlineTransformer(options, undefined, {
-			async framesFor(text, shape, maxFrames) {
-				renderedTexts.push(text);
-				const count = Math.min(snapcompact.frames(text, { shape }), maxFrames ?? Number.POSITIVE_INFINITY);
-				return Array.from({ length: count }, () => ({
-					type: "image" as const,
-					data: "ZnJhbWU=",
-					mimeType: "image/png",
-				}));
-			},
+		const transformer = new SnapcompactInlineTransformer(options);
+		spyOn(snapcompact, "renderMany").mockImplementation(async (text, options) => {
+			const shape = options!.shape!;
+			renderedTexts.push(text);
+			const count = Math.min(snapcompact.frames(text, { shape }), options?.maxFrames ?? Number.POSITIVE_INFINITY);
+			return Array.from({ length: count }, () => ({
+				type: "image" as const,
+				data: "ZnJhbWU=",
+				mimeType: "image/png",
+			}));
 		});
 		const toolImage: ImageContent = {
 			type: "image",
 			data: "dG9vbC1pbWFnZS1ieXRlcw==",
 			mimeType: "image/webp",
 			detail: "original",
-			providerFile: { provider: "anthropic", id: "file_tool_source" },
 			url: "https://images.example.invalid/tool-source.webp",
 		};
 		const secondToolImage: ImageContent = {
@@ -760,6 +768,8 @@ describe("SnapcompactInlineTransformer", () => {
 				{ type: "text", text },
 			],
 			model: "test-model",
+			api: "anthropic-messages",
+			provider: "company-anthropic",
 			timestamp,
 		});
 		const history: Message[] = [
@@ -813,6 +823,8 @@ describe("SnapcompactInlineTransformer", () => {
 				{ type: "text", text: `turn ${timestamp}` },
 			],
 			model: "test-model",
+			api: "anthropic-messages",
+			provider: "company-anthropic",
 			timestamp,
 		});
 		const thinkingKept = (messages: Message[]) =>

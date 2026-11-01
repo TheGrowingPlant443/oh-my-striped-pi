@@ -26,7 +26,7 @@ function assistant(texts: string[] = []): AssistantMessage {
 		role: "assistant",
 		content: texts.map(text => ({ type: "text" as const, text })),
 		api: "openai-completions",
-		provider: "test",
+		provider: "github-copilot",
 		model: "test-model",
 		timestamp: 1,
 		stopReason: "stop",

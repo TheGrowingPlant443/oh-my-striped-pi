@@ -88,7 +88,7 @@ const DEFAULT_PREAMBLE =
  */
 export function loadHindsightConfig(settings: Settings): HindsightConfig {
 	const config: HindsightConfig = {
-		hindsightApiUrl: cfgHindsightApiUrl.get(settings),
+		hindsightApiUrl: cfgHindsightApiUrl.get(settings) ?? null,
 		hindsightApiToken: cfgHindsightApiToken.get(settings) ?? null,
 
 		bankId: cfgHindsightBankId.get(settings) ?? null,

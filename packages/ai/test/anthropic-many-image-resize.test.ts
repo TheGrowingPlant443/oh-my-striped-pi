@@ -11,7 +11,7 @@ function makeAnthropicModel(compat?: { maxImageDimension?: number }): Model<"ant
 		id: "claude-sonnet-4-5",
 		name: "Claude Sonnet 4.5",
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		baseUrl: "https://api.anthropic.com",
 		reasoning: false,
 		input: ["text", "image"],
@@ -75,7 +75,7 @@ function makeToolResultContext(images: ImageContent[]): Context {
 	const assistant: AssistantMessage = {
 		role: "assistant",
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: model.id,
 		content: [{ type: "toolCall", id: "toolu_test", name: "plot", arguments: {} }],
 		usage: emptyUsage,
@@ -105,7 +105,6 @@ function capturePayload(
 	const { promise, resolve } = Promise.withResolvers<AnthropicPayload>();
 	void streamAnthropic(requestModel, context, {
 		apiKey: "sk-ant-test",
-		isOAuth: false,
 		signal: abortedSignal(),
 		onPayload: payload => {
 			resolve(payload as AnthropicPayload);
@@ -225,11 +224,7 @@ describe("Anthropic many-image payload resizing", () => {
 		expect(images[0].source.data).toBe(largeData);
 	});
 
-	it("clamps referenced images and drops the reference when the bytes change", async () => {
-		// Anthropic fetches a URL mirror or file reference and then validates the
-		// image, so an oversized referenced block 400s exactly like inline bytes.
-		// Narrow on purpose: the assertion is the height clamp, and two
-		// full-height encoder passes per image are the slow part of this file.
+	it("clamps URL-referenced images and drops the reference when the bytes change", async () => {
 		const tallData = await makeRedPng(240, 8570);
 		const mirrored: ImageContent = {
 			type: "image",
@@ -237,24 +232,17 @@ describe("Anthropic many-image payload resizing", () => {
 			mimeType: "image/png",
 			url: "https://blobs.test/tall.png",
 		};
-		const referenced: ImageContent = {
-			type: "image",
-			data: tallData,
-			mimeType: "image/png",
-			providerFile: { provider: "anthropic", id: "file_tall" },
-		};
 
-		const payload = await capturePayload(makeToolResultContext([mirrored, referenced]));
+		const payload = await capturePayload(makeToolResultContext([mirrored]));
 
 		const images = extractToolResultImages(payload);
-		expect(images).toHaveLength(2);
+		expect(images).toHaveLength(1);
 		for (const image of images) {
 			expect(image.source.data).not.toBe(tallData);
 			const { height } = await new Bun.Image(Buffer.from(image.source.data, "base64")).metadata();
 			expect(height).toBe(8000);
 		}
 		expect(mirrored.url).toBe("https://blobs.test/tall.png");
-		expect(referenced.providerFile?.id).toBe("file_tall");
 	});
 
 	it("keeps the reference on a referenced image already inside the caps", async () => {

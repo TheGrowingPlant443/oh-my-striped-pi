@@ -1,4 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import {
+	convertResponsesInputContent,
+	normalizeResponsesToolCallIdForTransform,
+} from "@oh-my-pi/pi-ai/providers/openai-shared";
 import { normalizeResponsesToolCallId } from "@oh-my-pi/pi-ai/utils";
 
 describe("normalizeResponsesToolCallId", () => {
@@ -65,5 +69,42 @@ describe("normalizeResponsesToolCallId", () => {
 		expect(normalized.callId).toBe("call_abc");
 		expect(normalized.itemId.startsWith("ctc_")).toBe(true);
 		expect(normalized.itemId).not.toBe("legacy");
+	});
+});
+
+describe("Responses wire normalization", () => {
+	it("preserves valid call ids without rewriting", () => {
+		expect(normalizeResponsesToolCallIdForTransform("call_abc")).toBe("call_abc");
+	});
+
+	it("keeps the same canonical call id across different replay item ids", () => {
+		const first = normalizeResponsesToolCallIdForTransform("call/abc|fc_first").split("|");
+		const second = normalizeResponsesToolCallIdForTransform("call/abc|fc_second").split("|");
+		expect(first[0]).toBe(second[0]);
+		expect(first[0]).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+		expect(first[1]).not.toBe(second[1]);
+	});
+
+	it("does not collide when invalid characters normalize to the same spelling", () => {
+		const slash = normalizeResponsesToolCallIdForTransform("call/abc|fc_item").split("|")[0];
+		const dot = normalizeResponsesToolCallIdForTransform("call.abc|fc_item").split("|")[0];
+		expect(slash).not.toBe(dot);
+	});
+
+	it("bounds oversized call ids and normalizes newline composites", () => {
+		const normalized = normalizeResponsesToolCallIdForTransform(`${"call".repeat(40)}\nfc_item`);
+		const [callId, itemId] = normalized.split("|");
+		expect(callId).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+		expect(itemId).toMatch(/^fc_[a-zA-Z0-9_-]+$/);
+	});
+
+	it("keeps embedded images and clamps original detail for Copilot", () => {
+		expect(
+			convertResponsesInputContent(
+				[{ type: "image", data: "ZmFrZQ==", mimeType: "image/png", detail: "original" }],
+				true,
+				false,
+			),
+		).toEqual([{ type: "input_image", image_url: "data:image/png;base64,ZmFrZQ==", detail: "auto" }]);
 	});
 });

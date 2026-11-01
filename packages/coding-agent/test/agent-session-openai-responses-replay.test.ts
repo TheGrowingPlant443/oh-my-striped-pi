@@ -11,23 +11,35 @@ import type {
 	Usage,
 } from "@oh-my-pi/pi-ai/types";
 import { createOpenAIResponsesHistoryPayload } from "@oh-my-pi/pi-ai/utils";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import type { Model } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
 import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import type { SessionEntry, SessionMessageEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
-import { getTestModel } from "./helpers/model-fixtures";
+import { getTestModel, toProviderModelConfig } from "./helpers/model-fixtures";
 
-const openaiModel = getTestModel("openai", model => model.api === "openai-responses" && model.reasoning);
-const alternateOpenaiModel = getTestModel(
-	"openai",
-	model => model.api === "openai-responses" && model.reasoning && model.id !== openaiModel.id,
-);
-const codexModel = getTestModel("openai-codex", model => model.api === "openai-codex-responses" && model.reasoning);
+function privateResponsesModel(id: string, provider: "company-responses" | "company-responses-other") {
+	return buildModel({
+		id,
+		name: id,
+		provider,
+		api: "openai-responses",
+		baseUrl: "https://models.company.invalid/v1",
+		reasoning: true,
+		input: ["text", "image"],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: 128_000,
+		maxTokens: 16_384,
+	});
+}
+
+const openaiModel = privateResponsesModel("primary", "company-responses");
+const alternateOpenaiModel = privateResponsesModel("alternate", "company-responses");
+const otherProviderModel = privateResponsesModel("other", "company-responses-other");
 const copilotModel = getTestModel("github-copilot", model => model.api === "openai-responses" && model.reasoning);
 
 function modelSelector(model: Model): string {
@@ -200,7 +212,7 @@ function expectAssistantReplayMetadataSanitized(message: AssistantMessage): void
 }
 
 function expectAssistantReplayMetadataPreserved(message: AssistantMessage): void {
-	// Non-Copilot Responses-family turns (OpenAI, OpenAI-Codex, Azure) keep their
+	// Non-Copilot Responses-family turns (private OpenAI-compatible endpoints, Azure) keep their
 	// native replay payload across rehydration so remote compaction can rebuild
 	// faithful native history. The encrypted reasoning lives in
 	// `providerPayload.items`; the per-block `thinkingSignature` was a byte-for-byte
@@ -264,12 +276,6 @@ async function createSessionHarness(
 		modelRegistry: sharedModelRegistry,
 		sessionManager,
 		model,
-		// These tests seed bare `{ close }` stubs into `providerSessionState` and
-		// assert reload closes them. The SDK's fire-and-forget Codex websocket
-		// prewarm (models with `preferWebsockets`) would race in and replace the
-		// stub via `getCodexProviderSessionState`, orphaning the spy — disable
-		// websockets since these tests exercise reload semantics, not transport.
-		settings: Settings.isolated({ "providers.openaiWebsockets": "off" }),
 		disableExtensionDiscovery: true,
 		skills: [],
 		contextFiles: [],
@@ -297,9 +303,22 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 	beforeAll(async () => {
 		sharedRegistryDir = fs.mkdtempSync(path.join(os.tmpdir(), `pi-issue-505-registry-${Snowflake.next()}-`));
 		const authStorage = await AuthStorage.create(path.join(sharedRegistryDir, "auth.db"));
-		authStorage.keys.setRuntime("openai", "test-key");
-		authStorage.keys.setRuntime("openai-codex", "test-key");
+		for (const model of [openaiModel, alternateOpenaiModel, otherProviderModel, copilotModel]) {
+			authStorage.keys.setRuntime(model.provider, "test-key");
+		}
 		sharedModelRegistry = new ModelRegistry(authStorage);
+		sharedModelRegistry.registerProvider(openaiModel.provider, {
+			api: openaiModel.api,
+			baseUrl: openaiModel.baseUrl,
+			apiKey: "test-key",
+			models: [toProviderModelConfig(openaiModel), toProviderModelConfig(alternateOpenaiModel)],
+		});
+		sharedModelRegistry.registerProvider(otherProviderModel.provider, {
+			api: otherProviderModel.api,
+			baseUrl: otherProviderModel.baseUrl,
+			apiKey: "test-key",
+			models: [toProviderModelConfig(otherProviderModel)],
+		});
 	});
 
 	afterAll(() => {
@@ -365,19 +384,19 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		expect(runtimeUser.providerPayload).toEqual(preservedUserPayload);
 	});
 
-	it("preserves codex assistant replay metadata for direct SessionManager.open consumers", async () => {
+	it("preserves non-Copilot Responses assistant replay metadata for direct SessionManager.open consumers", async () => {
 		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `pi-issue-505-open-${Snowflake.next()}-`));
 		tempDirs.push(tempDir);
-		const assistantText = "Codex assistant snapshot";
+		const assistantText = "Private Responses assistant snapshot";
 
 		const { sessionFile } = await createPersistedSession(tempDir, sessionManager => {
-			appendStaleAssistantTurn(sessionManager, assistantText, codexModel);
+			appendStaleAssistantTurn(sessionManager, assistantText, otherProviderModel);
 		});
 
 		const openedSessionManager = await SessionManager.open(sessionFile, tempDir);
 		const persistedAssistant = findPersistedMessageEntry(openedSessionManager, "assistant", assistantText).message;
 		if (persistedAssistant.role !== "assistant") {
-			throw new Error("Expected persisted codex assistant message");
+			throw new Error("Expected persisted private Responses assistant message");
 		}
 		expectAssistantReplayMetadataPreserved(persistedAssistant);
 		await openedSessionManager.close();
@@ -421,18 +440,18 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		const assistantText = "Reloaded assistant response";
 
 		const { sessionFile } = await createPersistedSession(tempDir, sessionManager => {
-			sessionManager.appendModelChange(modelSelector(codexModel));
+			sessionManager.appendModelChange(modelSelector(otherProviderModel));
 			sessionManager.appendMessage({ role: "user", content: "Reload summary", timestamp: Date.now() - 2 });
-			appendStaleAssistantTurn(sessionManager, assistantText, codexModel);
+			appendStaleAssistantTurn(sessionManager, assistantText, otherProviderModel);
 			sessionManager.appendMessage({ role: "user", content: "Reload follow-up", timestamp: Date.now() - 1 });
 		});
 
 		const reloadedSessionManager = await SessionManager.open(sessionFile, tempDir);
-		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, codexModel);
+		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, otherProviderModel);
 		sessions.push(session);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-codex-responses", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set("openai-responses", { close: closeSpy } satisfies ProviderSessionState);
 
 		await session.reload();
 
@@ -453,16 +472,16 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		const assistantText = "Reloaded metadata-only response";
 
 		const { sessionFile } = await createPersistedSession(tempDir, sessionManager => {
-			sessionManager.appendModelChange(modelSelector(codexModel));
-			appendStaleAssistantTurn(sessionManager, assistantText, codexModel);
+			sessionManager.appendModelChange(modelSelector(otherProviderModel));
+			appendStaleAssistantTurn(sessionManager, assistantText, otherProviderModel);
 		});
 
 		const reloadedSessionManager = await SessionManager.open(sessionFile, tempDir);
-		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, codexModel);
+		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, otherProviderModel);
 		sessions.push(session);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-codex-responses", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set("openai-responses", { close: closeSpy } satisfies ProviderSessionState);
 
 		const rewrittenLines = fs
 			.readFileSync(sessionFile, "utf8")
@@ -481,8 +500,8 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 
 		expect(closeSpy).not.toHaveBeenCalled();
 		expect(session.providerSessionState.size).toBe(1);
-		expect(session.model?.provider).toBe(codexModel.provider);
-		expect(session.model?.id).toBe(codexModel.id);
+		expect(session.model?.provider).toBe(otherProviderModel.provider);
+		expect(session.model?.id).toBe(otherProviderModel.id);
 		expectAssistantReplayMetadataPreserved(findRuntimeAssistant(session, assistantText));
 	});
 
@@ -537,16 +556,16 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		const assistantText = "Reloaded content change response";
 
 		const { sessionFile } = await createPersistedSession(tempDir, sessionManager => {
-			sessionManager.appendModelChange(modelSelector(codexModel));
-			appendStaleAssistantTurn(sessionManager, assistantText, codexModel);
+			sessionManager.appendModelChange(modelSelector(otherProviderModel));
+			appendStaleAssistantTurn(sessionManager, assistantText, otherProviderModel);
 		});
 
 		const reloadedSessionManager = await SessionManager.open(sessionFile, tempDir);
-		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, codexModel);
+		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, otherProviderModel);
 		sessions.push(session);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-codex-responses", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set("openai-responses", { close: closeSpy } satisfies ProviderSessionState);
 
 		const mutatedSessionManager = await SessionManager.open(sessionFile, tempDir);
 		mutatedSessionManager.appendMessage({
@@ -561,8 +580,8 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 
 		expect(closeSpy).toHaveBeenCalledTimes(1);
 		expect(session.providerSessionState.size).toBe(0);
-		expect(session.model?.provider).toBe(codexModel.provider);
-		expect(session.model?.id).toBe(codexModel.id);
+		expect(session.model?.provider).toBe(otherProviderModel.provider);
+		expect(session.model?.id).toBe(otherProviderModel.id);
 		expect(
 			session.messages.some(
 				message => message.role === "user" && getTextContent(message) === "Externally appended follow-up",
@@ -576,16 +595,18 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		const assistantText = "Reloaded model change response";
 
 		const { sessionFile } = await createPersistedSession(tempDir, sessionManager => {
-			sessionManager.appendModelChange(modelSelector(codexModel));
-			appendStaleAssistantTurn(sessionManager, assistantText, codexModel);
+			sessionManager.appendModelChange(modelSelector(otherProviderModel));
+			appendStaleAssistantTurn(sessionManager, assistantText, otherProviderModel);
 		});
 
 		const reloadedSessionManager = await SessionManager.open(sessionFile, tempDir);
-		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, codexModel);
+		const { session } = await createSessionHarness(tempDir, reloadedSessionManager, otherProviderModel);
 		sessions.push(session);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-codex-responses", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set(`openai-responses:${otherProviderModel.provider}`, {
+			close: closeSpy,
+		} satisfies ProviderSessionState);
 
 		const mutatedSessionManager = await SessionManager.open(sessionFile, tempDir);
 		mutatedSessionManager.appendModelChange(modelSelector(openaiModel));
@@ -617,7 +638,9 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		sessions.push(session);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-responses:openai", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set(`openai-responses:${openaiModel.provider}`, {
+			close: closeSpy,
+		} satisfies ProviderSessionState);
 
 		const mutatedSessionManager = await SessionManager.open(sessionFile, tempDir);
 		mutatedSessionManager.appendModelChange(modelSelector(alternateOpenaiModel));
@@ -651,7 +674,9 @@ describe("AgentSession OpenAI Responses replay boundaries", () => {
 		fs.chmodSync(sessionDir, 0o555);
 
 		const closeSpy = vi.fn();
-		session.providerSessionState.set("openai-responses:openai", { close: closeSpy } satisfies ProviderSessionState);
+		session.providerSessionState.set(`openai-responses:${openaiModel.provider}`, {
+			close: closeSpy,
+		} satisfies ProviderSessionState);
 
 		try {
 			await expect(session.switchSession(sessionFile)).resolves.toBe(true);

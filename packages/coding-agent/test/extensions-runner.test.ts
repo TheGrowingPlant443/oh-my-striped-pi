@@ -10,7 +10,6 @@ import type { AgentMessage, AgentTool, AgentToolContext } from "@oh-my-pi/pi-age
 import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
 import type { MessageCreateParams } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
 import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import { kCursorExecResolved } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { convertToLlm, wrapSteeringForModel } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
@@ -755,47 +754,6 @@ describe("ExtensionRunner", () => {
 			expect(errors[0]?.event).toBe("assistant_message");
 			expect(errors[0]?.error).toContain("rewrite failed");
 		});
-		it("preserves Cursor-resolved tool markers across no-op and text rewrite handlers", async () => {
-			fs.writeFileSync(
-				path.join(extensionsDir, "assistant-message-cursor.ts"),
-				`
-				export default function(pi) {
-					pi.on("assistant_message", event => ({ content: event.message.content }));
-					pi.on("assistant_message", event => ({
-						content: [
-							{ ...event.message.content[0], text: "rewritten" },
-							event.message.content[1],
-						],
-					}));
-				}
-				`,
-			);
-			const result = await loadTestExtensions();
-			const runner = new ExtensionRunner(
-				result.extensions,
-				result.runtime,
-				tempDir.path(),
-				sessionManager,
-				modelRegistry,
-			);
-			const resolvedToolCall = {
-				type: "toolCall" as const,
-				id: "call-cursor",
-				name: "read",
-				arguments: { path: "x" },
-				[kCursorExecResolved]: true as const,
-			};
-			const message = {
-				...createAssistantMessage("original"),
-				content: [{ type: "text" as const, text: "original" }, resolvedToolCall],
-			};
-
-			const rewritten = await runner.emitAssistantMessage(message);
-
-			expect(rewritten?.[0]).toMatchObject({ type: "text", text: "rewritten" });
-			expect(rewritten?.[1]).toBe(resolvedToolCall);
-			expect((rewritten?.[1] as typeof resolvedToolCall | undefined)?.[kCursorExecResolved]).toBe(true);
-		});
 
 		it("normalizes each text signature against its original text across chained rewrites", async () => {
 			fs.writeFileSync(
@@ -982,8 +940,8 @@ describe("ExtensionRunner", () => {
 
 	describe("before_provider_request chaining", () => {
 		it("exposes the request model instead of the primary session model", async () => {
-			const primaryModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-			const requestModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const primaryModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+			const requestModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!primaryModel || !requestModel) throw new Error("Expected bundled cross-provider models to exist");
 
 			const extCode = `
@@ -1199,8 +1157,8 @@ describe("ExtensionRunner", () => {
 		});
 
 		it("exposes the response model instead of the primary session model", async () => {
-			const primaryModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-			const requestModel = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const primaryModel = getBundledModel("github-copilot", "gpt-5.6-sol");
+			const requestModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!primaryModel || !requestModel) throw new Error("Expected bundled cross-provider models to exist");
 
 			const eventsPath = path.join(tempDir.path(), "after-provider-response-model.jsonl");
@@ -1311,8 +1269,8 @@ describe("ExtensionRunner", () => {
 				role: "assistant",
 				content: [{ type: "text", text: "main session finished" }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				usage: {
 					input: 0,
 					output: 0,
@@ -1560,8 +1518,8 @@ describe("ExtensionRunner", () => {
 				role: "assistant",
 				content: [{ type: "text", text: "main session finished" }],
 				api: "anthropic-messages",
-				provider: "anthropic",
-				model: "claude-sonnet-4-5",
+				provider: "github-copilot",
+				model: "claude-sonnet-4.5",
 				usage: {
 					input: 0,
 					output: 0,
@@ -2534,7 +2492,7 @@ describe("ExtensionRunner", () => {
 						const tiers = pi.getServiceTiers();
 						tiers.openai = "scale";
 						pi.appendEntry("service-tier-snapshot", tiers);
-						pi.setServiceTier("google", "flex");
+						pi.setServiceTier("openai", "flex");
 						pi.setServiceTier("openai", undefined);
 					});
 					pi.on("session_start", () => {
@@ -2601,7 +2559,7 @@ describe("ExtensionRunner", () => {
 			expect(serviceTiers).toEqual({ openai: "priority" });
 			expect(snapshots).toEqual([{ openai: "scale" }]);
 			expect(setCalls).toEqual([
-				["google", "flex"],
+				["openai", "flex"],
 				["openai", undefined],
 			]);
 			expect(errors).toHaveLength(2);
@@ -3942,7 +3900,7 @@ describe("ExtensionRunner", () => {
 			// The agent loop emits tool_call at arg-prep time (session beforeToolCall
 			// wiring) and marks the dispatch on the runner; the wrapper must not fire
 			// handlers a second time for the same call. The marker is consume-once,
-			// so a dispatch the loop never marked (nested xd://, Cursor direct)
+			// so a dispatch the loop never marked (nested xd://)
 			// still emits.
 			const recordPath = path.join(tempDir.path(), "loop-marker.jsonl");
 			const extCode = `
@@ -4250,7 +4208,7 @@ describe("ExtensionRunner", () => {
 				modelRegistry,
 			);
 
-			await runner.emit({ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" });
+			await runner.emit({ type: "credential_disabled", provider: "github-copilot", disabledCause: "invalid_grant" });
 
 			const events = fs
 				.readFileSync(eventsPath, "utf8")
@@ -4258,7 +4216,7 @@ describe("ExtensionRunner", () => {
 				.split("\n")
 				.map(line => JSON.parse(line));
 			expect(events).toEqual([
-				{ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" },
+				{ type: "credential_disabled", provider: "github-copilot", disabledCause: "invalid_grant" },
 			]);
 		});
 
@@ -4299,14 +4257,14 @@ describe("ExtensionRunner", () => {
 				errors.push(err);
 			});
 
-			await runner.emit({ type: "credential_disabled", provider: "anthropic", disabledCause: "invalid_grant" });
+			await runner.emit({ type: "credential_disabled", provider: "github-copilot", disabledCause: "invalid_grant" });
 
 			const events = fs
 				.readFileSync(eventsPath, "utf8")
 				.trim()
 				.split("\n")
 				.map(line => JSON.parse(line));
-			expect(events).toEqual([{ provider: "anthropic" }]);
+			expect(events).toEqual([{ provider: "github-copilot" }]);
 			expect(errors).toHaveLength(1);
 			expect(errors[0]?.event).toBe("credential_disabled");
 			expect(errors[0]?.error).toContain("subscriber exploded");
@@ -4795,7 +4753,7 @@ describe("ExtensionRunner", () => {
 					pi.on("context", async event => ({
 						messages: [...event.messages.map(message => ({ ...message })), {
 							role: "custom",
-							customType: "collab-prompt",
+							customType: "test-prompt",
 							content: "<probe-" + name + ">",
 							display: false,
 							attribution: "user",
@@ -4814,7 +4772,7 @@ describe("ExtensionRunner", () => {
 				sessionManager,
 				modelRegistry,
 			);
-			const model = getBundledModel<"anthropic-messages">("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled Anthropic model to exist");
 			const messages: AgentMessage[] = [
 				{ role: "user", content: "persisted user", timestamp: 1 },
@@ -4822,7 +4780,7 @@ describe("ExtensionRunner", () => {
 					role: "assistant",
 					content: [{ type: "text", text: "persisted assistant" }],
 					api: "anthropic-messages",
-					provider: "anthropic",
+					provider: "github-copilot",
 					model: model.id,
 					usage: {
 						input: 1,

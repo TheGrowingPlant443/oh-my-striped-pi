@@ -58,12 +58,16 @@ describe("flushCompactionQueue failure", () => {
 		const agent = new Agent({
 			getApiKey: () => "test-key",
 			convertToLlm,
-			initialState: { model: getBundledModel("anthropic", "claude-sonnet-4-5")!, systemPrompt: ["Test"], tools: [] },
+			initialState: {
+				model: getBundledModel("github-copilot", "claude-sonnet-4.5")!,
+				systemPrompt: ["Test"],
+				tools: [],
+			},
 			streamFn: mock.stream,
 		});
 		const authStorage = await AuthStorage.create(":memory:");
 		authStorages.push(authStorage);
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const live = new AgentSession({
 			agent,
 			sessionManager: SessionManager.inMemory(),

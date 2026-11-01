@@ -5,7 +5,7 @@ This document describes how MCP servers are discovered, connected, exposed as to
 ## Lifecycle at a glance
 
 1. **SDK startup** kicks off MCP discovery (unless MCP is disabled or tool names are restricted): headless/SDK sessions await `discoverAndLoadMCPTools()`; interactive sessions (`hasUI: true`) create the manager up front and defer `discoverAndConnect()` until the session is live.
-2. **Discovery** (`loadAllMCPConfigs`) resolves MCP server configs from capability sources, filters disabled/project/Exa entries and browser MCP servers when the built-in browser prelude is callable, and preserves source metadata.
+2. **Discovery** (`loadAllMCPConfigs`) resolves MCP server configs from capability sources, filters disabled/project entries and browser MCP servers when the built-in browser prelude is callable, and preserves source metadata.
 3. **Manager connect phase** (`MCPManager.connectServers`) starts per-server connect + `tools/list` in parallel.
 4. **Fast startup gate** waits up to 250ms, then may return:
    - fully loaded `MCPTool`s,
@@ -29,7 +29,6 @@ This document describes how MCP servers are discovered, connected, exposed as to
 Both paths:
 
 - pass `authStorage`, cache storage, `mcp.startupTimeoutMs`, and `mcp.enableProjectConfig`; browser-MCP filtering requires `browser.enabled`, registered and active Eval, and an unrestricted session,
-- always set `filterExa: true`,
 - log per-server load/connect errors,
 - store the manager in `toolSession.mcpManager` and the session result.
 
@@ -43,7 +42,7 @@ Filtering behavior:
 
 - `enableProjectConfig: false` removes project-level entries (`_source.level === "project"`).
 - `enabled: false` entries are suppressed unless the active-profile user `enabledServers` allowlist names them; the user `disabledServers` denylist always suppresses a same-named entry.
-- Exa servers are filtered out by default and API keys are extracted for native Exa tool integration, unless the config explicitly requests Exa tools the native integration does not provide (`web_fetch_exa`, `web_search_advanced_exa`); browser automation MCP servers are filtered when `filterBrowser` is true.
+- Browser automation MCP servers are filtered when `filterBrowser` is true. There is no Exa-specific filtering or credential extraction; explicitly configured MCP entries retain their normal behavior.
 
 Result includes both `configs` and `sources` (metadata used later for provider labeling).
 
@@ -247,7 +246,7 @@ Top-level sessions own managers they create. `AgentSession.dispose()` disconnect
 
 ## Public API surface
 
-`src/mcp/index.ts` re-exports client operations, config loader/writer APIs, loader and manager APIs, OAuth discovery, tool bridges/cache, HTTP and stdio transports, protocol types, plus the lightweight HTTP helpers `callMCP`, `readMcpJsonRpcResponse`, and `redactUrlForLog`. `src/sdk.ts` exposes `discoverMCPServers()` as a convenience wrapper over `discoverAndLoadMCPTools`; it returns `{ manager, tools, errors, connectedServers, exaApiKeys }`.
+`src/mcp/index.ts` re-exports client operations, config loader/writer APIs, loader and manager APIs, OAuth discovery, tool bridges/cache, HTTP and stdio transports, protocol types, plus the lightweight HTTP helpers `callMCP`, `readMcpJsonRpcResponse`, and `redactUrlForLog`. `src/sdk.ts` exposes `discoverMCPServers()` over `discoverAndLoadMCPTools`, returning `{ manager, tools, errors, connectedServers }`.
 
 ## Implementation files
 

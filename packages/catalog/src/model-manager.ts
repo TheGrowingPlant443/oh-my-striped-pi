@@ -1,7 +1,6 @@
 import { logger, VERSION } from "@oh-my-pi/pi-utils";
 import { buildModel } from "./build";
 import { collapseBuiltVariants } from "./compat/collapse";
-import { applyCatalogMetrics, CatalogMetricsIndex } from "./identity/metrics";
 import { readModelCache, writeModelCache } from "./model-cache";
 import { type GeneratedProvider, getBundledModels } from "./models";
 import { isTimeBasedCost } from "./pricing";
@@ -25,21 +24,9 @@ const NON_AUTHORITATIVE_RETRY_MS = 5 * 60 * 1000;
 export type ModelRefreshStrategy = "online" | "offline" | "online-if-uncached";
 
 /**
- * Hook for loading and mapping stencil.so fallback data into canonical model objects.
- */
-export interface ModelsDevFallback<TApi extends Api = Api, TPayload = unknown> {
-	/** Fetches raw fallback payload (for example from stencil.so). */
-	fetch(): Promise<TPayload>;
-	/** Maps payload into provider models. */
-	map(payload: TPayload, providerId: Provider): readonly ModelSpec<TApi>[];
-	/** When true, mapped rows can add model ids but cannot replace static metadata. */
-	additiveOnly?: boolean;
-}
-
-/**
  * Configuration for provider model resolution.
  */
-export interface ModelManagerOptions<TApi extends Api = Api, TModelsDevPayload = unknown> {
+export interface ModelManagerOptions<TApi extends Api = Api> {
 	/** Provider id used for static lookup and cache namespacing. */
 	providerId: Provider;
 	/**
@@ -108,8 +95,6 @@ export interface ModelManagerOptions<TApi extends Api = Api, TModelsDevPayload =
 	restoreCachedHeaders?: (model: Readonly<Model>) => Pick<Model, "headers" | "resolveHeaders"> | undefined;
 	/** Optional dynamic endpoint fetcher. */
 	fetchDynamicModels?: () => Promise<readonly ModelSpec<TApi>[] | null>;
-	/** Optional stencil.so fallback hook. */
-	modelsDev?: ModelsDevFallback<TApi, TModelsDevPayload>;
 	/** Clock override for deterministic tests. */
 	now?: () => number;
 }
@@ -117,7 +102,7 @@ export interface ModelManagerOptions<TApi extends Api = Api, TModelsDevPayload =
 /**
  * Catalog source that most recently refreshed the resolved provider snapshot.
  */
-export type ModelResolutionSource = "bundled" | "cache" | "models.dev" | "provider";
+export type ModelResolutionSource = "bundled" | "cache" | "provider";
 
 /**
  * Resolution result.
@@ -125,7 +110,6 @@ export type ModelResolutionSource = "bundled" | "cache" | "models.dev" | "provid
  * `stale` is false when the resolved catalog is authoritative for the selected provider:
  * - a provider endpoint fetch succeeded in this call (an empty catalog is still
  *   authoritative for the cycle, so downstream pruning of removed models runs),
- * - a models.dev fetch succeeded for a provider without endpoint discovery,
  * - a still-fresh authoritative cache was reused in `online-if-uncached` mode, or
  * - the provider has no remote fetcher configured.
  */
@@ -146,9 +130,7 @@ export interface ModelManager<TApi extends Api = Api> {
 /**
  * Creates a reusable provider model manager.
  */
-export function createModelManager<TApi extends Api = Api, TModelsDevPayload = unknown>(
-	options: ModelManagerOptions<TApi, TModelsDevPayload>,
-): ModelManager<TApi> {
+export function createModelManager<TApi extends Api = Api>(options: ModelManagerOptions<TApi>): ModelManager<TApi> {
 	return {
 		refresh(strategy: ModelRefreshStrategy = "online-if-uncached") {
 			return resolveProviderModels(options, strategy);
@@ -240,13 +222,13 @@ function restoreCachedModelHeaders<TApi extends Api>(
 
 /**
  * Resolves provider models with source precedence:
- * static -> cached fallback -> stencil.so -> dynamic.
+ * static -> cached fallback -> dynamic.
  *
  * Later sources override earlier ones by model id. Cached rows participate only
  * when at least one configured remote source did not refresh successfully.
  */
-export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPayload = unknown>(
-	options: ModelManagerOptions<TApi, TModelsDevPayload>,
+export async function resolveProviderModels<TApi extends Api = Api>(
+	options: ModelManagerOptions<TApi>,
 	strategy: ModelRefreshStrategy = "online-if-uncached",
 ): Promise<ModelResolutionResult<TApi>> {
 	if (options.alwaysRefetchDynamicModels && strategy === "online-if-uncached") {
@@ -260,14 +242,9 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 	const staticModels = options.staticModels
 		? materializeStaticModels<TApi>(options.staticModels)
 		: (getBundledModels(options.providerId as GeneratedProvider) as Model<TApi>[]);
-	const modelsDevAdditiveStaticModelIds =
-		options.modelsDev?.additiveOnly && staticModels.length > 0
-			? new Set(staticModels.map(model => model.id))
-			: undefined;
 	const cache = readModelCache<TApi>(cacheProviderId, ttlMs, now, dbPath);
 	const dynamicModelsAuthoritative = options.dynamicModelsAuthoritative ?? false;
 	const isAuthoritativeDynamicCache = dynamicModelsAuthoritative && (cache?.payloadAuthoritative ?? false);
-	const cacheAdditiveStaticModelIds = isAuthoritativeDynamicCache ? undefined : modelsDevAdditiveStaticModelIds;
 	const restoredCache = restoreCachedModelHeaders(
 		cache?.models ?? [],
 		staticModels,
@@ -305,8 +282,7 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 		(!dynamicModelsAuthoritative || cacheFingerprintMatches);
 	const dynamicFetcher = options.fetchDynamicModels;
 	const hasDynamicFetcher = typeof dynamicFetcher === "function";
-	const hasModelsDevFetcher = options.modelsDev !== undefined;
-	const hasRemoteFetcher = hasDynamicFetcher || hasModelsDevFetcher;
+	const hasRemoteFetcher = hasDynamicFetcher;
 	const hasAuthoritativeCache = ((cache?.authoritative ?? false) && hasUsableFreshCache) || !hasRemoteFetcher;
 	const cacheAgeMs = cache ? now() - cache.updatedAt : Number.POSITIVE_INFINITY;
 	const shouldFetchFromNetwork =
@@ -324,15 +300,8 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 		cacheFingerprintMatches &&
 		!cacheHasUnresolvedHeaders
 	) {
-		const cacheContribution = cacheAdditiveStaticModelIds
-			? restoredCache.models.filter(model => !cacheAdditiveStaticModelIds.has(model.id))
-			: restoredCache.models;
-		const cachedModels = cacheAdditiveStaticModelIds
-			? mergeCatalogMetrics(
-					mergeDynamicModels(staticModels, cacheContribution, mergeAuthority),
-					restoredCache.models,
-				)
-			: restoredCache.models;
+		const cacheContribution = restoredCache.models;
+		const cachedModels = restoredCache.models;
 		const source: ModelResolutionSource = cacheContribution.length > 0 ? "cache" : "bundled";
 		return {
 			models: collapseBuiltVariants(cachedModels),
@@ -342,22 +311,13 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 		};
 	}
 
-	const [fetchedModelsDevModels, fetchedDynamicModels] = shouldFetchFromNetwork
-		? await Promise.all([fetchModelsDev(options), dynamicFetcher ? fetchDynamicModels(dynamicFetcher) : null])
-		: [null, null];
-	const modelsDevFetchSucceeded = fetchedModelsDevModels !== null;
-	const normalizedModelsDevModels = fetchedModelsDevModels?.models ?? [];
-	const modelsDevModels = modelsDevAdditiveStaticModelIds
-		? normalizedModelsDevModels.filter(model => !modelsDevAdditiveStaticModelIds.has(model.id))
-		: normalizedModelsDevModels;
+	const fetchedDynamicModels =
+		shouldFetchFromNetwork && dynamicFetcher ? await fetchDynamicModels(dynamicFetcher) : null;
 	const shouldUseFreshCacheAsAuthoritative =
 		strategy === "online-if-uncached" && hasUsableFreshCache && hasAuthoritativeCache;
 	const dynamicFetchSucceeded = fetchedDynamicModels !== null;
-	const anyRemoteFetchSucceeded = modelsDevFetchSucceeded || dynamicFetchSucceeded;
-	const allConfiguredRemoteFetchesSucceeded =
-		hasRemoteFetcher &&
-		(!hasModelsDevFetcher || modelsDevFetchSucceeded) &&
-		(!hasDynamicFetcher || dynamicFetchSucceeded);
+	const anyRemoteFetchSucceeded = dynamicFetchSucceeded;
+	const allConfiguredRemoteFetchesSucceeded = hasRemoteFetcher && dynamicFetchSucceeded;
 	const authoritativeDynamicFetchSucceeded = dynamicModelsAuthoritative && dynamicFetchSucceeded;
 	const remoteResolutionComplete = authoritativeDynamicFetchSucceeded || allConfiguredRemoteFetchesSucceeded;
 	const preparedCacheModels = remoteResolutionComplete
@@ -368,35 +328,14 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 				cacheFingerprintMatches,
 				options.dropCachedModelIdsOnStaticMismatch,
 			);
-	const cacheModels = cacheAdditiveStaticModelIds
-		? preparedCacheModels.filter(model => !cacheAdditiveStaticModelIds.has(model.id))
-		: preparedCacheModels;
+	const cacheModels = preparedCacheModels;
 	const dynamicModels = fetchedDynamicModels?.models ?? [];
-	// A successful empty endpoint result stays authoritative for THIS cycle (so an
-	// intentional catalog emptying still prunes removed models downstream), but
-	// is NOT pinned into the cache as authoritative — that would suppress the
-	// short retry that recovers a transient empty response (#6620). Shared
-	// models.dev snapshots may be empty for one provider and remain authoritative.
-	const cacheAuthoritative = hasDynamicFetcher
-		? dynamicFetchSucceeded &&
-			dynamicModels.length > 0 &&
-			(dynamicModelsAuthoritative || !hasModelsDevFetcher || modelsDevFetchSucceeded)
-		: modelsDevFetchSucceeded;
+	// A successful empty endpoint result stays authoritative for this cycle,
+	// but is retried rather than pinned as an authoritative cache.
+	const cacheAuthoritative = dynamicFetchSucceeded && dynamicModels.length > 0;
 	const mergedWithCache = mergeDynamicModels(staticModels, cacheModels, mergeAuthority);
-	const mergedWithModelsDev = mergeDynamicModels(
-		mergedWithCache,
-		modelsDevModels,
-		mergeAuthority,
-		fetchedModelsDevModels?.explicitKindModels,
-	);
-	const catalogMetricsSource = modelsDevFetchSucceeded ? normalizedModelsDevModels : preparedCacheModels;
-	const mergedWithCatalogMetrics = (
-		modelsDevFetchSucceeded ? modelsDevAdditiveStaticModelIds : cacheAdditiveStaticModelIds
-	)
-		? mergeCatalogMetrics(mergedWithModelsDev, catalogMetricsSource)
-		: mergedWithModelsDev;
 	const mergedModels = mergeDynamicModels(
-		mergedWithCatalogMetrics,
+		mergedWithCache,
 		dynamicModels,
 		mergeAuthority,
 		fetchedDynamicModels?.explicitKindModels,
@@ -451,14 +390,8 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 				cacheFingerprintMatches,
 				options.dropCachedModelIdsOnStaticMismatch,
 			);
-			const latestCacheModels = cacheAdditiveStaticModelIds
-				? preparedLatestCacheModels.filter(model => !cacheAdditiveStaticModelIds.has(model.id))
-				: preparedLatestCacheModels;
-			const mergedFallbackModels = mergeDynamicModels(
-				mergeDynamicModels(staticModels, latestCacheModels, mergeAuthority),
-				modelsDevModels,
-				mergeAuthority,
-			);
+			const latestCacheModels = preparedLatestCacheModels;
+			const mergedFallbackModels = mergeDynamicModels(staticModels, latestCacheModels, mergeAuthority);
 			const fallbackSnapshotModels = collapseBuiltVariants(
 				isAuthoritativeDynamicCache && latestUsableCacheModels.length > 0
 					? retainModelIds(mergedFallbackModels, latestUsableCacheModels)
@@ -479,13 +412,7 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 		}
 	}
 	const cacheContributed = cacheModels.length > 0;
-	const source: ModelResolutionSource = dynamicFetchSucceeded
-		? "provider"
-		: modelsDevFetchSucceeded
-			? "models.dev"
-			: cacheContributed
-				? "cache"
-				: "bundled";
+	const source: ModelResolutionSource = dynamicFetchSucceeded ? "provider" : cacheContributed ? "cache" : "bundled";
 	return {
 		models,
 		stale: !resolutionAuthoritative,
@@ -502,21 +429,6 @@ export async function resolveProviderModels<TApi extends Api = Api, TModelsDevPa
 interface DiscoveredModelSet<TApi extends Api> {
 	models: Model<TApi>[];
 	explicitKindModels: ReadonlySet<Model<TApi>>;
-}
-
-async function fetchModelsDev<TApi extends Api, TModelsDevPayload>(
-	options: ModelManagerOptions<TApi, TModelsDevPayload>,
-): Promise<DiscoveredModelSet<TApi> | null> {
-	if (!options.modelsDev) {
-		return null;
-	}
-
-	try {
-		const payload = await options.modelsDev.fetch();
-		return buildDiscoveredModelSpecs<TApi>(options.modelsDev.map(payload, options.providerId));
-	} catch {
-		return null;
-	}
 }
 
 async function fetchDynamicModels<TApi extends Api>(
@@ -580,14 +492,6 @@ function prepareCacheModelsForStaticMismatch<TApi extends Api>(
 		sanitizedModels.push(staticIds?.has(model.id) ? { ...model, contextWindow: null, maxTokens: null } : model);
 	}
 	return sanitizedModels;
-}
-
-function mergeCatalogMetrics<TApi extends Api>(
-	models: Model<TApi>[],
-	catalogModels: readonly Model<TApi>[],
-): Model<TApi>[] {
-	if (models.length === 0 || catalogModels.length === 0) return models;
-	return applyCatalogMetrics(models, new CatalogMetricsIndex(catalogModels));
 }
 
 /**

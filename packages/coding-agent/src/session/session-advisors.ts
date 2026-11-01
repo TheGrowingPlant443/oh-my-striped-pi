@@ -3,7 +3,6 @@ import {
 	Agent,
 	type AgentMessage,
 	type AgentTool,
-	type AgentToolContext,
 	AppendOnlyContextManager,
 	type CompactionSummaryMessage,
 	resolveTelemetry,
@@ -28,7 +27,6 @@ import {
 } from "@oh-my-pi/pi-agent-core/compaction";
 import type {
 	AssistantMessage,
-	CodexCompactionContext,
 	Context,
 	Message,
 	Model,
@@ -84,8 +82,6 @@ import {
 import { MODEL_ROLES } from "../config/model-roles";
 import { serviceTierForAllFamilies, serviceTierSettingToTier } from "../config/service-tier";
 import type { Settings } from "../config/settings";
-import { CursorExecHandlers, type CursorMcpResourceAdapter } from "../cursor";
-import { bridgeToolMap } from "../cursor-bridge-tools";
 import { estimateContextToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
 import type { PlanModeState } from "../plan-mode/state";
 import advisorBoundaryGuidance from "../prompts/advisor/boundary-guidance.md" with { type: "text" };
@@ -132,8 +128,6 @@ import {
 import { cfgCompaction, cfgContextPromotionEnabled } from "./context-settings";
 import { resolveModelCompactionSettings } from "./model-compaction-threshold";
 import { cfgRetry, cfgTierAdvisor } from "./settings";
-
-const ADVISOR_CODEX_SSE_MAX_ATTEMPTS = 1;
 
 /**
  * Buffer added to a sibling credential's unblock deadline before the advisor
@@ -415,37 +409,6 @@ export interface AdvisorCatchupOptions {
 export interface SessionAdvisorsOptions {
 	enabled: boolean;
 	tools?: AgentTool[];
-	/**
-	 * Build a `grep` honoring a Cursor `pi_grep` frame's own context width and
-	 * match cap. The advisor's tools are fixed instances carrying session
-	 * defaults, so without this an advisor running against Cursor silently
-	 * drops both fields — the same gap the primary bridge closes.
-	 */
-	createGrepTool?(options: { context?: number; totalMatchLimit?: number }): AgentTool | undefined;
-	/**
-	 * Build the `replace`-mode `edit` a Cursor `pi_edit` frame needs. The
-	 * advisor's own instance follows the configured `edit.mode` (`hashline` by
-	 * default), whose schema the frame's `old_string`/`new_string` args do not
-	 * match, so without this every native advisor edit fails validation.
-	 */
-	createEditTool?(): AgentTool | undefined;
-	/**
-	 * The execute-time context the bridge's tools resolve approval from.
-	 *
-	 * `ExtensionToolWrapper` reads the approval mode, per-tool policies and
-	 * `autoApprove` only from here; with none it fails closed to `always-ask`
-	 * with empty policies (no user grant), so a native frame that needs a
-	 * prompt cannot run unattended.
-	 */
-	getToolContext?: () => AgentToolContext | undefined;
-	/**
-	 * The live MCP connections Cursor's resource frames answer from.
-	 *
-	 * Advisors share the session's connections and may hold tools from those
-	 * same servers, so without this their frames report that every server
-	 * advertises nothing.
-	 */
-	mcpResources?: CursorMcpResourceAdapter;
 	watchdogPrompt?: string;
 	sharedInstructions?: string;
 	sharedMaxNotesPerUpdate?: number;
@@ -477,8 +440,6 @@ export interface SessionAdvisorsHost {
 	yieldQueue: YieldQueue;
 	obfuscator(): SecretObfuscator | undefined;
 	providerSessionState: Map<string, ProviderSessionState>;
-	/** Live `providers.openaiWebsockets` hint for provider calls. */
-	preferWebsockets(): boolean | undefined;
 	onPayload: SimpleStreamOptions["onPayload"] | undefined;
 	onResponse: SimpleStreamOptions["onResponse"] | undefined;
 	onSseEvent: SimpleStreamOptions["onSseEvent"] | undefined;
@@ -519,11 +480,6 @@ export interface SessionAdvisorsHost {
 	): RetryFallbackSelector[];
 	isRetryFallbackSelectorSuppressed(selector: RetryFallbackSelector): boolean;
 	noteRetryFallbackCooldown(currentSelector: string, retryAfterMs: number | undefined, errorMessage: string): void;
-	createCodexCompactionContext(options: {
-		trigger: CodexCompactionContext["trigger"];
-		reason: CodexCompactionContext["reason"];
-		phase: CodexCompactionContext["phase"];
-	}): CodexCompactionContext;
 	sessionId(): string;
 	/** Put an advisor's provider session under the primary session's account pools. */
 	restrictOAuthAccounts(providerSessionId: string): void;
@@ -549,10 +505,6 @@ export class SessionAdvisors {
 	readonly #host: SessionAdvisorsHost;
 	#advisorEnabled: boolean;
 	#advisorTools: AgentTool[] | undefined;
-	#advisorCreateGrepTool: SessionAdvisorsOptions["createGrepTool"];
-	#advisorCreateEditTool: SessionAdvisorsOptions["createEditTool"];
-	#advisorGetToolContext: SessionAdvisorsOptions["getToolContext"];
-	#advisorMcpResources: SessionAdvisorsOptions["mcpResources"];
 	#advisorWatchdogPrompt: string | undefined;
 	#advisorSharedInstructions: string | undefined;
 	#advisorSharedMaxNotesPerUpdate: number | undefined;
@@ -622,10 +574,6 @@ export class SessionAdvisors {
 		this.#host = host;
 		this.#advisorEnabled = options.enabled;
 		this.#advisorTools = options.tools;
-		this.#advisorCreateGrepTool = options.createGrepTool;
-		this.#advisorCreateEditTool = options.createEditTool;
-		this.#advisorGetToolContext = options.getToolContext;
-		this.#advisorMcpResources = options.mcpResources;
 		this.#advisorWatchdogPrompt = options.watchdogPrompt;
 		this.#advisorSharedInstructions = options.sharedInstructions;
 		this.#advisorSharedMaxNotesPerUpdate = options.sharedMaxNotesPerUpdate;
@@ -1026,11 +974,7 @@ export class SessionAdvisors {
 		advisor.agent.sessionId = providerSessionId;
 		advisor.agent.promptCacheKey = this.#host.agent.promptCacheKey ?? providerSessionId;
 		advisor.agent.getApiKey = requestModel => this.#host.modelRegistry.resolver(requestModel, providerSessionId);
-		advisor.agent.setMetadataResolver(
-			providerSessionId
-				? provider => buildSessionMetadata(providerSessionId, provider, this.#host.modelRegistry.authStorage)
-				: undefined,
-		);
+		advisor.agent.setMetadataResolver(providerSessionId ? () => buildSessionMetadata(providerSessionId) : undefined);
 
 		const telemetry = advisor.agent.telemetry;
 		if (telemetry?.agent) {
@@ -1185,16 +1129,8 @@ export class SessionAdvisors {
 				autoThinking = sel.thinkingLevel === AUTO_THINKING;
 				thinkingLevel = concreteThinkingLevel(sel.thinkingLevel);
 			}
-			// Clamp the effort against the resolved model. Historically we defaulted
-			// to `ThinkingLevel.Medium` unconditionally, which threw at first stream
-			// on reasoning models that expose no controllable effort surface
-			// (e.g. `devin-agent`: Cascade routes by sibling model id, not a wire
-			// param; `getSupportedEfforts` returns `[]`). `resolveThinkingLevelForModel`
-			// preserves an explicit `off`, clamps a concrete effort into the model's
-			// supported range, and returns `undefined` for reasoning models without
-			// controllable efforts — for that case we forward `Inherit` so no effort
-			// is sent and reasoning stays enabled (matching the `auto`-path fix for
-			// Devin models via `clampAutoThinkingEffort`). See #4579.
+			// Clamp controllable effort while preserving explicit off. Models without
+			// an effort control inherit their reasoning behavior without a wire override.
 			const requestedLevel = autoThinking
 				? automaticThinkingLevel(model, this.#autoAdvisorThinkingLevel())
 				: (thinkingLevel ?? automaticThinkingLevel(model, ThinkingLevel.Medium));
@@ -1342,19 +1278,14 @@ export class SessionAdvisors {
 			if (config.instructions?.trim()) systemPrompt.push(config.instructions.trim());
 
 			// The default roster additionally gets `recall` when the active memory
-			// backend built it (MemoryRecallTool.createIf — hindsight/mnemopi only;
-			// sharpshooter/local expose no recall tool, so the extra name filters
+			// backend built it (MemoryRecallTool.createIf — mnemopi only;
+			// local exposes no recall tool, so the extra name filters
 			// nothing there). The advisor's instance reads the same bank as the
 			// primary. Explicit `tools` lists stay user-owned and are not widened.
 			const names =
 				config.tools === undefined ? new Set([...ADVISOR_DEFAULT_TOOL_NAMES, "recall"]) : new Set(config.tools);
 			const tools = (this.#advisorTools ?? []).filter(t => names.has(t.name));
 			const advisorLoopTools: AgentTool<any>[] = [adviseTool, ...tools];
-			const advisorToolMap = new Map<string, AgentTool<any>>();
-			for (const tool of advisorLoopTools) {
-				advisorToolMap.set(tool.name, tool);
-				if (tool.customWireName !== undefined) advisorToolMap.set(tool.customWireName, tool);
-			}
 			let quarantinedAdvisorOutput: string | undefined;
 			let currentAdvisorInput = "";
 
@@ -1385,67 +1316,9 @@ export class SessionAdvisors {
 			// advisor's requests cache, route, and obfuscate like the main turn.
 			// `promptCacheKey` preserves an explicitly pinned provider cache key
 			// unchanged so tan/shared-session advisor calls read the exact shard the
-			// parent turn populated. Otherwise the advisor uses its provider UUIDv7 so
-			// Codex request identity remains UUID-shaped while local labels keep the
-			// `-advisor` suffix.
+			// parent turn populated. Otherwise use the advisor's provider session id.
 			const advisorPromptCacheKey = this.#host.agent.promptCacheKey ?? advisorProviderSessionId;
-			// On the Cursor provider every tool runs server-side and is dispatched
-			// back through `cursorExecHandlers`; without this bridge the advisor's
-			// own tools (including the MCP `advise` tool) return `toolNotFound` and
-			// no advice is ever routed (issue #5680). Mirrors the primary agent's
-			// bridge (`sdk.ts`), scoped to this advisor's granted tool set.
-			// Cursor's native `delete` frame removes files directly, bypassing the
-			// tool map, so gate it on the advisor actually holding a file-mutating
-			// tool. A default read-only advisor (advise/read/grep/glob) never gets
-			// to delete workspace files it was never granted (issue #5680 review).
-			const advisorCanMutateFiles = advisorToolMap.has("write") || advisorToolMap.has("edit");
-			// `pi_edit` speaks `replace`'s `old_string`/`new_string` schema, which the
-			// advisor's ordinary `EditTool` (built at the session's configured
-			// `edit.mode`, `hashline` by default) does not accept. The bridge map
-			// swaps in a `replace` instance for the exec channel only — the
-			// advisor's own loop keeps the tool it was given — and only when
-			// `edit` was actually granted.
-			const advisorCursorExecHandlers = new CursorExecHandlers({
-				cwd: this.#host.sessionManager.getCwd(),
-				getCwd: () => this.#host.sessionManager.getCwd(),
-				tools: bridgeToolMap(advisorToolMap, this.#advisorCreateEditTool),
-				// Approval mode, per-tool policies and `autoApprove` live only on
-				// this context; without it every bridge tool fails closed to
-				// `always-ask`.
-				getToolContext: this.#advisorGetToolContext,
-				allowDirectFileMutation: advisorCanMutateFiles,
-				// Gated on the advisor's own grant: the factory builds a fresh
-				// tool, so handing it over unconditionally would give a roster
-				// without `grep` a search tool it was denied.
-				createGrepTool: advisorToolMap.has("grep") ? this.#advisorCreateGrepTool : undefined,
-				// Advisors share the session's live MCP connections, so their
-				// resource frames answer from the same catalog the primary sees.
-				// Not gated on a tool grant: reading what a server advertises is
-				// not the same permission as calling one of its tools.
-				mcpResources: this.#advisorMcpResources,
-			});
-			const baseAdvisorStreamFn = this.#advisorStreamFn ?? streamSimple;
-			const advisorStreamFn: StreamFn = (requestModel, context, streamOptions) => {
-				// Read per request so a mid-session `providers.openaiWebsockets` change reaches advisors.
-				const options = {
-					...streamOptions,
-					preferWebsockets: streamOptions?.preferWebsockets ?? this.#host.preferWebsockets(),
-				};
-				if (requestModel.api === "openai-codex-responses") {
-					return baseAdvisorStreamFn(requestModel, context, {
-						...options,
-						codexSseMaxAttempts: ADVISOR_CODEX_SSE_MAX_ATTEMPTS,
-					});
-				}
-				if (
-					requestModel.api === "google-generative-ai" ||
-					requestModel.api === "google-gemini-cli" ||
-					requestModel.api === "google-vertex"
-				) {
-					return baseAdvisorStreamFn(requestModel, context, { ...options, acceptEmptyResponse: true });
-				}
-				return baseAdvisorStreamFn(requestModel, context, options);
-			};
+			const advisorStreamFn = this.#advisorStreamFn ?? streamSimple;
 			const advisorAgent = new Agent({
 				initialState: {
 					systemPrompt,
@@ -1457,7 +1330,6 @@ export class SessionAdvisors {
 				sessionId: advisorProviderSessionId,
 				promptCacheKey: advisorPromptCacheKey,
 				providerSessionState: this.#host.providerSessionState,
-				cursorExecHandlers: advisorCursorExecHandlers,
 				cwdResolver: () => this.#host.sessionManager.getCwd(),
 				getApiKey: requestModel => this.#host.modelRegistry.resolver(requestModel, advisorProviderSessionId),
 				streamFn: advisorStreamFn,
@@ -2447,9 +2319,6 @@ export class SessionAdvisors {
 					type: "compaction",
 					id,
 					parentId,
-					// ISO like every CompactionEntry: the next round reads this
-					// back as previousSummaryTimestamp (the reused rewrite marker),
-					// and a millis string does not survive `new Date()` (NaN marker).
 					timestamp: new Date(message.historyRewriteAt ?? (message.timestamp || Date.now())).toISOString(),
 					summary: message.summary,
 					shortSummary: message.shortSummary,
@@ -2517,12 +2386,6 @@ export class SessionAdvisors {
 		// compaction path so the advisor model's maintenance call also emits spans.
 		const telemetry = resolveTelemetry(agent.telemetry, advisorProviderSessionId);
 
-		const codexCompaction = this.#host.createCodexCompactionContext({
-			trigger: "auto",
-			reason: "context_limit",
-			phase: "pre_turn",
-		});
-
 		for (const candidate of candidates) {
 			const apiKey = await this.#host.modelRegistry.getApiKey(candidate, advisorProviderSessionId, { signal });
 			if (!apiKey) continue;
@@ -2546,9 +2409,7 @@ export class SessionAdvisors {
 			// after the session-sticky credential is selected) so summarization
 			// requests carry the advisor session id like every other advisor call
 			// (issue #6625).
-			const advisorMetadata = advisorProviderSessionId
-				? buildSessionMetadata(advisorProviderSessionId, candidate.provider, this.#host.modelRegistry.authStorage)
-				: undefined;
+			const advisorMetadata = advisorProviderSessionId ? buildSessionMetadata(advisorProviderSessionId) : undefined;
 			try {
 				compactResult = await compact(
 					candidatePreparation,
@@ -2569,8 +2430,6 @@ export class SessionAdvisors {
 						promptCacheKey: advisorProviderSessionId,
 						metadata: advisorMetadata,
 						providerSessionState: this.#host.providerSessionState,
-						preferWebsockets: this.#host.preferWebsockets(),
-						codexCompaction,
 					},
 				);
 				break;
@@ -2621,12 +2480,7 @@ export class SessionAdvisors {
 		// only assistants appended afterward can become the next usage anchor.
 		const advisorUsageAnchorStartIndex = recentMessages.length + 1;
 		const anthropicPayload = getAnthropicCompactionPayload(compactResult.preserveData);
-		// A native summary replays its block on later requests, so its rewrite
-		// marker must precede the retained tail: the commit time would make
-		// `historyRewriteAt` newer than the tail and strip its bound thinking
-		// on the very next request. Reuse the previous compaction's marker when
-		// one exists, else sit just before the retained tail. Local summaries
-		// use the commit time, which the summary always keeps as its timestamp.
+		// Native replay must keep the retained tail's signed thinking intact.
 		const firstRetained = preparation.recentMessages[0];
 		const historyRewriteAt =
 			anthropicPayload === undefined
@@ -2811,7 +2665,7 @@ export class SessionAdvisors {
 	/**
 	 * Store the memory backend's developer instructions for advisor system
 	 * prompts. Unlike {@link setContextPrompt} this never rebuilds live
-	 * runtimes: hindsight/mnemopi refresh their instructions on every turn
+	 * runtimes: mnemopi refreshes its instructions on every turn
 	 * (per-turn recall snippets), and tearing the advisor down each time would
 	 * drop its append-only context and prompt cache. Live advisors pick the new
 	 * value up at the next natural runtime build (compaction, reset, toggle).

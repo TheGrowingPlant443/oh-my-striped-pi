@@ -12,9 +12,9 @@ export function createAssistantMessage(text: string): AssistantMessage {
 	return {
 		role: "assistant",
 		content: [{ type: "text", text }],
-		api: "anthropic-messages",
-		provider: "anthropic",
-		model: "mock",
+		api: "openai-completions",
+		provider: "github-copilot",
+		model: "gpt-4o",
 		usage: {
 			input: 0,
 			output: 0,

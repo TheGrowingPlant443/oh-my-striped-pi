@@ -6,7 +6,7 @@ import { removeDsmlToolMarkupLeak } from "@oh-my-pi/pi-ai/utils/dsml-leak";
 
 const model: Model<"anthropic-messages"> = buildModel({
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	id: "claude-sonnet-4-6",
 	name: "Claude Sonnet 4.6",
 	baseUrl: "https://api.anthropic.com",
@@ -39,7 +39,7 @@ describe("Anthropic thinking replay immutability", () => {
 				},
 			],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			usage: {
 				input: 0,
@@ -53,7 +53,7 @@ describe("Anthropic thinking replay immutability", () => {
 			timestamp: Date.now(),
 		};
 
-		const params = convertAnthropicMessages([user, assistant], model, false);
+		const params = convertAnthropicMessages([user, assistant], model);
 		const assistantParam = params.find(message => message.role === "assistant");
 		expect(assistantParam).toBeDefined();
 		expect(assistantParam?.content).toEqual([
@@ -72,7 +72,7 @@ describe("Anthropic thinking replay immutability", () => {
 					{ type: "text", text: "Reading.</｜｜DSML｜｜ calls>" },
 				],
 				api: "anthropic-messages",
-				provider: "anthropic",
+				provider: "github-copilot",
 				model: model.id,
 				usage: {
 					input: 0,
@@ -87,7 +87,7 @@ describe("Anthropic thinking replay immutability", () => {
 			};
 
 			expect(removeDsmlToolMarkupLeak(assistant)).toBe(true);
-			const replay = convertAnthropicMessages([assistant], model, false);
+			const replay = convertAnthropicMessages([assistant], model);
 			const message = replay.find(message => message.role === "assistant");
 			expect(message?.content).toEqual([
 				{ type: "text", text: "Reading." },

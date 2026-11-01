@@ -9,8 +9,8 @@ const REFRESHER = {
 	nextSweepInMs: Number.MAX_SAFE_INTEGER,
 };
 const BLOCK = {
-	providerKey: "anthropic:oauth",
-	blockScope: "tier:fable",
+	providerKey: "github-copilot:oauth",
+	blockScope: "tier:standard",
 	blockedUntilMs: 4_000,
 	updatedAtMs: 3_000,
 };
@@ -26,7 +26,7 @@ const REAL_OAUTH = { ...REMOTE_OAUTH, refresh: "real-refresh" };
 const API_KEY = { type: "api_key", key: "secret", source: "login" };
 const CREDENTIAL_ENTRY = {
 	id: 7,
-	provider: "anthropic",
+	provider: "github-copilot",
 	credential: REMOTE_OAUTH,
 	identityKey: "account:test",
 };
@@ -58,14 +58,14 @@ const STREAM_REMOVED = {
 	id: 7,
 };
 const USAGE_REPORT = {
-	provider: "anthropic",
+	provider: "github-copilot",
 	fetchedAt: 2_000,
 	limits: [
 		{
 			id: "rolling",
 			label: "Rolling window",
 			scope: {
-				provider: "anthropic",
+				provider: "github-copilot",
 				windowId: "rolling",
 				shared: true,
 				sharedGroup: "3p:rolling",
@@ -85,8 +85,8 @@ const USAGE_REPORT = {
 };
 const OBSERVED_USAGE = {
 	at: 1_000,
-	provider: "anthropic",
-	model: "claude",
+	provider: "github-copilot",
+	model: "copilot-test",
 	requests: 1,
 	inputTokens: 2,
 	outputTokens: 3,
@@ -155,7 +155,7 @@ const validSamples: Record<SchemaName, unknown> = {
 		entries: [
 			{
 				recordedAt: 1_000,
-				provider: "anthropic",
+				provider: "github-copilot",
 				accountKey: "account:test",
 				limitId: "rolling",
 				label: "Rolling window",
@@ -183,7 +183,7 @@ const validSamples: Record<SchemaName, unknown> = {
 	credentialDisableResponseSchema: { ok: true },
 	disabledCredentialSummarySchema: {
 		id: 7,
-		provider: "anthropic",
+		provider: "github-copilot",
 		type: "oauth",
 		email: "user@example.test",
 		cause: "revoked",
@@ -191,14 +191,14 @@ const validSamples: Record<SchemaName, unknown> = {
 	},
 	disabledCredentialsResponseSchema: {
 		generatedAt: 2_000,
-		disabled: [{ id: 7, provider: "anthropic", type: "oauth", cause: "revoked" }],
+		disabled: [{ id: 7, provider: "github-copilot", type: "oauth", cause: "revoked" }],
 	},
 	credentialBlockRequestSchema: BLOCK,
 	credentialBlockDeleteRequestSchema: { providerKey: BLOCK.providerKey, blockScope: BLOCK.blockScope },
 	credentialBlockResponseSchema: { ok: true },
 	credentialBlocksDeleteResponseSchema: { ok: true },
 	usageStaleResponseSchema: { ok: true },
-	credentialUploadRequestSchema: { provider: "anthropic", credential: REAL_OAUTH },
+	credentialUploadRequestSchema: { provider: "github-copilot", credential: REAL_OAUTH },
 	credentialUploadResponseSchema: { entries: [CREDENTIAL_ENTRY] },
 };
 

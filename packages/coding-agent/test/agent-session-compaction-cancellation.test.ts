@@ -38,7 +38,7 @@ describe.each([false, true])("AgentSession compaction cancellation source (exper
 			new Error("Network access is forbidden in compaction cancellation tests"),
 		);
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -75,8 +75,8 @@ describe.each([false, true])("AgentSession compaction cancellation source (exper
 		const sessionManager = SessionManager.inMemory(tempDir.path());
 		const modelRegistry = new ModelRegistry(authStorage);
 		const extensionRunner = new ExtensionRunner([extension], runtime, tempDir.path(), sessionManager, modelRegistry);
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected bundled Anthropic model");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected bundled Copilot model");
 		const settings = Settings.isolated({
 			"compaction.keepRecentTokens": 1,
 			"compaction.experimentalContextManagement": experimental,
@@ -107,7 +107,7 @@ describe.each([false, true])("AgentSession compaction cancellation source (exper
 			role: "assistant",
 			content: [{ type: "text", text: "first answer" }],
 			api: "anthropic-messages",
-			provider: "anthropic",
+			provider: "github-copilot",
 			model: model.id,
 			stopReason: "stop",
 			usage: {

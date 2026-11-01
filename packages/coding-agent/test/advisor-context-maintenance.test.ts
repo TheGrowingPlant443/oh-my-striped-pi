@@ -7,7 +7,9 @@ import type { AssistantMessage, Model, OpenAIResponsesHistoryPayload } from "@oh
 import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
 import { createMockModel, type MockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
 import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { estimateToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
@@ -28,6 +30,35 @@ const CONTEXT_WINDOW = 372_000;
 const CACHE_READ_TOKENS = 371_200;
 const INPUT_TOKENS = 200;
 const OUTPUT_TOKENS = 150;
+
+const summaryModelSpec = {
+	id: "claude-sonnet-4-5",
+	name: "Private advisor summary fixture",
+	api: "anthropic-messages",
+	provider: "anthropic",
+	baseUrl: "https://messages.company.invalid",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 16_384,
+	compat: { supportsServerCompaction: false },
+	remoteCompaction: { enabled: false },
+} satisfies ModelSpec<"anthropic-messages">;
+
+const nativeModelSpec = {
+	id: "gpt-5",
+	name: "Private advisor Responses fixture",
+	api: "openai-responses",
+	provider: "openai",
+	baseUrl: "https://responses.company.invalid/v1",
+	reasoning: true,
+	input: ["text", "image"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_000,
+	remoteCompaction: { enabled: true, v2StreamingEnabled: false },
+} satisfies ModelSpec<"openai-responses">;
 
 interface MaintenanceHarness {
 	advisor: Agent;
@@ -74,6 +105,12 @@ describe("AgentSession advisor context maintenance", () => {
 		});
 		Object.assign(advisorMock, { contextPromotionTarget });
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+		modelRegistry.registerProvider(summaryModelSpec.provider, {
+			apiKey: "test-key",
+			api: summaryModelSpec.api,
+			baseUrl: summaryModelSpec.baseUrl,
+			models: [summaryModelSpec],
+		});
 		const settings = Settings.isolated({
 			"advisor.syncBacklog": "1",
 			"compaction.enabled": true,
@@ -172,19 +209,31 @@ describe("AgentSession advisor context maintenance", () => {
 			provider: "openai",
 			responses: [{ content: ["advisor reviewed current update"] }],
 		});
-		const nativeModel = getBundledModel("openai", "gpt-5");
-		const sameProviderBase = getBundledModel("openai", "gpt-5-mini");
+		const nativeModel = buildModel(nativeModelSpec);
+		const sameProviderBase = buildModel({ ...nativeModelSpec, id: "gpt-5-mini" });
 		const sameProviderModel =
-			sameProviderBase && options?.sameProviderNativeEnabled === false
+			options?.sameProviderNativeEnabled === false
 				? { ...sameProviderBase, remoteCompaction: { ...sameProviderBase.remoteCompaction, enabled: false } }
 				: sameProviderBase;
-		const crossProviderModel = getBundledModel<"anthropic-messages">("anthropic", "claude-sonnet-4-5");
-		if (!nativeModel || !sameProviderModel || !crossProviderModel) {
-			throw new Error("Expected bundled compaction models");
-		}
+		const crossProviderModel = buildModel(summaryModelSpec);
 
 		authStorage.keys.setRuntime(nativeModel.provider, "openai-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+		modelRegistry.registerProvider(nativeModelSpec.provider, {
+			apiKey: "test-key",
+			api: nativeModelSpec.api,
+			baseUrl: nativeModelSpec.baseUrl,
+			models: [
+				nativeModelSpec,
+				{ ...nativeModelSpec, id: sameProviderModel.id, remoteCompaction: sameProviderModel.remoteCompaction },
+			],
+		});
+		modelRegistry.registerProvider(summaryModelSpec.provider, {
+			apiKey: "test-key",
+			api: summaryModelSpec.api,
+			baseUrl: summaryModelSpec.baseUrl,
+			models: [summaryModelSpec],
+		});
 		const settings = Settings.isolated({
 			"advisor.syncBacklog": "1",
 			"compaction.enabled": true,
@@ -420,6 +469,12 @@ describe("AgentSession advisor context maintenance", () => {
 			},
 		});
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
+		modelRegistry.registerProvider(summaryModelSpec.provider, {
+			apiKey: "test-key",
+			api: summaryModelSpec.api,
+			baseUrl: summaryModelSpec.baseUrl,
+			models: [summaryModelSpec],
+		});
 		const settings = Settings.isolated({
 			"advisor.syncBacklog": "1",
 			"compaction.enabled": true,
@@ -586,7 +641,7 @@ describe("AgentSession advisor context maintenance", () => {
 			});
 			Object.assign(summarizer, { remoteCompaction: { enabled: true, v2StreamingEnabled: false } });
 			const active: Model<"anthropic-messages"> = {
-				...getBundledModel<"anthropic-messages">("anthropic", "claude-sonnet-4-5"),
+				...buildModel(summaryModelSpec),
 				provider,
 				contextWindow: CONTEXT_WINDOW,
 				compactionModel: `${summarizer.provider}/${summarizer.id}`,
@@ -617,7 +672,7 @@ describe("AgentSession advisor context maintenance", () => {
 
 			await session.prompt("review after foreign-target maintenance");
 
-			const wire = JSON.stringify(convertAnthropicMessages(advisorMock.calls[0].context.messages, active, false));
+			const wire = JSON.stringify(convertAnthropicMessages(advisorMock.calls[0].context.messages, active));
 			expect(wire).toContain("portable archived decision");
 			expect(wire.match(/retained-readable-tail/g)).toHaveLength(1);
 			expect(JSON.stringify(summarizer.calls[0].context.messages)).toContain("archived readable decision");
@@ -660,7 +715,7 @@ describe("AgentSession advisor context maintenance", () => {
 		await session.prompt("promote and compact the advisor");
 
 		expect(advisor.state.model.id).toBe(promoted.id);
-		const wire = JSON.stringify(convertAnthropicMessages(advisorMock.calls[0].context.messages, promoted, false));
+		const wire = JSON.stringify(convertAnthropicMessages(advisorMock.calls[0].context.messages, promoted));
 		expect(wire).toContain("portable promoted-model summary");
 		expect(wire.match(/post-promotion-retained-tail/g)).toHaveLength(1);
 	});
@@ -808,11 +863,7 @@ describe("AgentSession advisor context maintenance", () => {
 
 		expect(advisor.state.messages.slice(0, previousMessages.length)).toEqual(previousMessages);
 		const wire = JSON.stringify(
-			convertAnthropicMessages(
-				advisorMock.calls[0].context.messages,
-				getBundledModel<"anthropic-messages">("anthropic", "claude-sonnet-4-5"),
-				false,
-			),
+			convertAnthropicMessages(advisorMock.calls[0].context.messages, buildModel(summaryModelSpec)),
 		);
 		expect(wire.match(/original-private-advisor-decision/g)).toHaveLength(1);
 		expect(wire).not.toContain("unusable replacement");
@@ -993,15 +1044,21 @@ describe("AgentSession advisor context maintenance", () => {
 		expect(JSON.stringify(advisor.state.messages)).toContain("authenticated fallback summary");
 	});
 
-	it("preserves native compaction state across advisor compactions", async () => {
-		const opus46 = getBundledModel("anthropic", "claude-opus-4-6");
-		if (!opus46) throw new Error("Expected bundled opus model");
+	it("preserves Copilot Anthropic native compaction state across advisor compactions", async () => {
+		const bundled = getBundledModel<"anthropic-messages">("github-copilot", "claude-sonnet-4.6");
+		if (!bundled) throw new Error("Expected Copilot Anthropic model");
+		const nativeModel = {
+			...bundled,
+			contextWindow: 1_000_000,
+			compat: { ...bundled.compat, supportsServerCompaction: true },
+			remoteCompaction: { ...bundled.remoteCompaction, enabled: true },
+		};
 		const primaryMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: [{ content: ["primary complete"] }, { content: ["primary complete again"] }],
 		});
 		const advisorMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			contextWindow: CONTEXT_WINDOW,
 			responses: [
 				{ content: ["advisor reviewed current update"] },
@@ -1009,6 +1066,7 @@ describe("AgentSession advisor context maintenance", () => {
 				{ content: ["advisor reviewed third update"] },
 			],
 		});
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 		const settings = Settings.isolated({
 			"advisor.syncBacklog": "1",
@@ -1016,7 +1074,7 @@ describe("AgentSession advisor context maintenance", () => {
 			"compaction.methodOrder": ["soft"],
 			"contextPromotion.enabled": false,
 		});
-		settings.setModelRole("advisor", `${opus46.provider}/${opus46.id}`);
+		settings.setModelRole("advisor", `${nativeModel.provider}/${nativeModel.id}`);
 		const agent = new Agent({
 			getApiKey: () => "test-key",
 			initialState: { model: primaryMock, systemPrompt: [], tools: [] },
@@ -1032,30 +1090,28 @@ describe("AgentSession advisor context maintenance", () => {
 		});
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 		const advisor = session.getAdvisorAgent();
-		if (!advisor) throw new Error("Expected advisor agent to be active");
-		advisor.setModel(opus46);
+		if (!advisor) throw new Error("Expected active advisor");
+		advisor.setModel(nativeModel);
 		vi.spyOn(modelRegistry, "getApiKey").mockResolvedValue("test-key");
-		vi.spyOn(modelRegistry, "getAvailable").mockReturnValue([opus46]);
-		// Opus 4-6 has a 1M-token window against a reserve-based threshold, and
-		// only the newest usage report anchors the estimate — so the anchors
-		// themselves must each clear ~850k, where the shared helper's 371k
-		// suffices for the fallback harness's 400k windows.
-		const hugeAnchor = (timestamp: number): AssistantMessage => {
-			const anchor = usageAnchor(advisorMock, timestamp);
-			const usage = { ...anchor.usage, cacheRead: 950_000 };
-			return { ...anchor, usage: { ...usage, totalTokens: usage.input + usage.output + usage.cacheRead } };
-		};
+		vi.spyOn(modelRegistry, "getAvailable").mockReturnValue([nativeModel]);
 		const seedOverflow = (base: number): void => {
-			for (let i = 0; i < 2; i++) advisor.state.messages.push(hugeAnchor(base + i));
+			for (let i = 0; i < 2; i++) {
+				const anchor = usageAnchor(advisorMock, base + i);
+				const usage = { ...anchor.usage, cacheRead: 950_000 };
+				advisor.state.messages.push({
+					...anchor,
+					usage: { ...usage, totalTokens: usage.input + usage.output + usage.cacheRead },
+				});
+			}
 		};
 		seedOverflow(Date.now() - 4_000);
 		const nativePreserveData = {
 			anthropicCompaction: {
-				provider: "anthropic",
+				provider: "github-copilot",
 				content: "native advisor summary",
 				encryptedContent: "enc_advisor_0",
 				filesText: "<files>\n# /repo/\nold.ts (Read)\n</files>",
-				model: "claude-opus-4-6",
+				model: nativeModel.id,
 				usedTokens: 60_000,
 			},
 		};
@@ -1066,40 +1122,28 @@ describe("AgentSession advisor context maintenance", () => {
 			tokensBefore: 60_000,
 			preserveData: nativePreserveData,
 		}));
-
 		await session.prompt("small current update");
-
-		// The in-memory summary replays the native block on later requests...
 		expect(compactSpy.mock.calls).toHaveLength(1);
 		const [summaryMessage] = advisor.state.messages;
-		expect(summaryMessage?.role).toBe("compactionSummary");
 		if (summaryMessage?.role !== "compactionSummary") throw new Error("Expected advisor compaction summary");
 		expect(summaryMessage.providerPayload).toEqual({
 			type: "anthropicCompaction",
-			provider: "anthropic",
+			provider: "github-copilot",
 			content: "native advisor summary",
 			encryptedContent: "enc_advisor_0",
 			filesText: "<files>\n# /repo/\nold.ts (Read)\n</files>",
 		});
-		expect((summaryMessage as unknown as { preserveData?: unknown }).preserveData).toEqual(nativePreserveData);
-		// The native summary's rewrite marker predates the retained tail, so
-		// the next request keeps the tail's bound thinking and cached prefix.
+		expect("preserveData" in summaryMessage ? summaryMessage.preserveData : undefined).toEqual(nativePreserveData);
 		const retainedTail = advisor.state.messages[1];
 		if (!retainedTail) throw new Error("Expected retained advisor tail");
 		expect(summaryMessage.historyRewriteAt).toBeLessThan(retainedTail.timestamp);
 		const firstRewriteMarker = summaryMessage.historyRewriteAt;
-		// ...and the next maintenance round feeds it back into preparation.
 		seedOverflow(Date.now());
 		await session.prompt("second update");
-
 		expect(compactSpy.mock.calls).toHaveLength(2);
-		const secondPreparation = compactSpy.mock.calls[1]?.[0];
-		expect(secondPreparation?.previousSummary).toBe("native advisor summary");
-		expect(secondPreparation?.previousPreserveData).toEqual(nativePreserveData);
-		// The second summary reuses the first round's marker instead of minting
-		// a fresh one, keeping one stable rewrite point across compactions.
+		expect(compactSpy.mock.calls[1]?.[0].previousSummary).toBe("native advisor summary");
+		expect(compactSpy.mock.calls[1]?.[0].previousPreserveData).toEqual(nativePreserveData);
 		const [secondSummary] = advisor.state.messages;
-		expect(secondSummary?.role).toBe("compactionSummary");
 		if (secondSummary?.role !== "compactionSummary") throw new Error("Expected second advisor summary");
 		expect(secondSummary.historyRewriteAt).toBe(firstRewriteMarker);
 	});

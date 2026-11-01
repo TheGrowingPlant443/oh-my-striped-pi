@@ -28,7 +28,7 @@ function makeModel(spec: {
 		id: spec.id,
 		name: spec.id,
 		api: spec.api,
-		provider: "myproxy",
+		provider: "github-copilot",
 		baseUrl: "https://proxy.example.com/v1",
 		reasoning: false,
 		input: (spec.input ?? ["text", "image"]) as ("text" | "image")[],
@@ -146,50 +146,6 @@ describe("omp models image support column", () => {
 		expect(imagesCell(makeModel({ id: "text-only-model", api: "openai-completions", input: ["text"] }))).toBe("no");
 	});
 
-	it("strips images on the OpenRouter chat fallback", () => {
-		// PI_OPENROUTER_RESPONSES=0 dispatches openrouter models through
-		// streamOpenAICompletions, so the Chat Completions guard applies.
-		const previous = Bun.env.PI_OPENROUTER_RESPONSES;
-		Bun.env.PI_OPENROUTER_RESPONSES = "0";
-		try {
-			expect(imagesCell(makeModel({ id: "deepseek-v4-flash", api: "openrouter" }))).toBe("no");
-		} finally {
-			if (previous === undefined) delete Bun.env.PI_OPENROUTER_RESPONSES;
-			else Bun.env.PI_OPENROUTER_RESPONSES = previous;
-		}
-	});
-
-	it("honours the strip opt-out on the OpenRouter chat fallback", () => {
-		const previous = Bun.env.PI_OPENROUTER_RESPONSES;
-		Bun.env.PI_OPENROUTER_RESPONSES = "0";
-		try {
-			expect(
-				imagesCell(
-					makeModel({
-						id: "deepseek-v4-flash",
-						api: "openrouter",
-						compat: { stripImageInput: false },
-					}),
-				),
-			).toBe("yes");
-		} finally {
-			if (previous === undefined) delete Bun.env.PI_OPENROUTER_RESPONSES;
-			else Bun.env.PI_OPENROUTER_RESPONSES = previous;
-		}
-	});
-
-	it("reports declared input on the OpenRouter Responses path", () => {
-		// The default Responses transport ignores stripImageInput (openai-shared
-		// derives supportsImages from the declared input), so the column must too.
-		const previous = Bun.env.PI_OPENROUTER_RESPONSES;
-		delete Bun.env.PI_OPENROUTER_RESPONSES;
-		try {
-			expect(imagesCell(makeModel({ id: "deepseek-v4-flash", api: "openrouter" }))).toBe("yes");
-		} finally {
-			if (previous === undefined) delete Bun.env.PI_OPENROUTER_RESPONSES;
-			else Bun.env.PI_OPENROUTER_RESPONSES = previous;
-		}
-	});
 	it("forwards declared images on the pi-native transport despite the strip rule", () => {
 		// pi-native short-circuits to streamPiNative before the Chat Completions
 		// encoder, so compat.stripImageInput never runs client-side.

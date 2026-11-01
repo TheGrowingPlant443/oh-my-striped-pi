@@ -36,7 +36,7 @@ describe("ctx.sessionModes in the interactive TUI", () => {
 	beforeAll(() => {
 		initTheme();
 		registry = new ModelRegistry(createInMemoryAuthStorage());
-		registry.authStorage.keys.setRuntime("openai", "test-key");
+		registry.authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 	beforeEach(() => {
 		resetSettingsForTest();
@@ -65,7 +65,7 @@ describe("ctx.sessionModes in the interactive TUI", () => {
 			cwd: dir.path(),
 			agentDir: dir.path(),
 			modelRegistry: registry,
-			model: getBundledModel("openai", "gpt-4o-mini"),
+			model: getBundledModel("github-copilot", "gpt-4o"),
 			sessionManager: SessionManager.create(dir.path(), dir.path()),
 			settings: Settings.isolated({
 				"plan.enabled": true,

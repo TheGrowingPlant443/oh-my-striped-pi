@@ -14,13 +14,14 @@ function makeAnthropicModel(id: string): Model<"anthropic-messages"> {
 		id,
 		name: id,
 		api: "anthropic-messages",
-		provider: "anthropic",
-		baseUrl: "https://api.anthropic.com",
+		provider: "github-copilot",
+		baseUrl: "https://api.githubcopilot.com",
 		reasoning: true,
 		input: ["text", "image"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: 200_000,
 		maxTokens: 8_192,
+		compat: { fastMode: true },
 	});
 }
 
@@ -44,7 +45,6 @@ function capturePayload(model: Model<"anthropic-messages">, opts: CaptureOptions
 	const { promise, resolve } = Promise.withResolvers<unknown>();
 	streamAnthropic(model, CONTEXT, {
 		apiKey: "sk-ant-oat-test",
-		isOAuth: true,
 		signal: abortedSignal(),
 		serviceTier: opts.serviceTier,
 		providerSessionState: opts.providerSessionState,
@@ -55,32 +55,14 @@ function capturePayload(model: Model<"anthropic-messages">, opts: CaptureOptions
 
 withOfficialAnthropicEndpoint();
 
-describe("Anthropic priority service tier → speed='fast'", () => {
-	it("forwards speed='fast' for any model — server decides what's supported", async () => {
-		// Not gated client-side so future model additions (Opus 4.8, Sonnet 4.x, etc.)
-		// don't need an SDK release. Server returns invalid_request_error naming the
-		// model when unsupported.
+describe("Anthropic priority service tier with an explicit fast-mode override", () => {
+	it("forwards speed='fast' when the caller opts into fast mode", async () => {
 		const payload = (await capturePayload(makeAnthropicModel("claude-opus-4-5"), {
 			serviceTier: "priority",
 		})) as { speed?: string };
 		expect(payload.speed).toBe("fast");
 	});
 
-	it("omits speed when serviceTier is unset", async () => {
-		const payload = (await capturePayload(makeAnthropicModel("claude-opus-4-7"), {
-			serviceTier: undefined,
-		})) as Record<string, unknown>;
-		expect(payload.speed).toBeUndefined();
-	});
-
-	it("omits speed for non-priority tiers (`flex`, `scale`, `auto`, `default`)", async () => {
-		for (const tier of ["flex", "scale", "auto", "default"] as const) {
-			const payload = (await capturePayload(makeAnthropicModel("claude-opus-4-7"), {
-				serviceTier: tier,
-			})) as Record<string, unknown>;
-			expect(payload.speed).toBeUndefined();
-		}
-	});
 	describe("provider-session fallback scope", () => {
 		function stateKey(model: Model<"anthropic-messages">): string {
 			return `anthropic-messages:${model.baseUrl}\u0000${model.id}`;

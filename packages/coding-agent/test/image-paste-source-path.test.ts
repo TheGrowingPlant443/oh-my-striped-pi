@@ -110,9 +110,9 @@ describe("path-pasted image source path (#12244)", () => {
 		// Keep blob materialization for clipboard payloads inside the temp dir.
 		setAgentDir(tmpDir);
 		authStorage = await AuthStorage.create(":memory:");
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+		if (!model) throw new Error("Expected claude-sonnet-4.5 model to exist");
 		const agent = new Agent({
 			getApiKey: () => "test-key",
 			initialState: { model, systemPrompt: ["Test"], tools: [], messages: [] },
@@ -227,7 +227,7 @@ describe("path-pasted image source path (#12244)", () => {
 	}
 
 	function createSession(sessionManager: SessionManager): AgentSession {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+		const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		if (!model || !authStorage) throw new Error("Expected test model and auth storage");
 		return new AgentSession({
 			agent: new Agent({

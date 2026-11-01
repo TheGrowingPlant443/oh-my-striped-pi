@@ -1,32 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, ModelSpec, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
+import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
-import { classifyModel } from "@oh-my-pi/pi-catalog/compat/taxonomy";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import * as utils from "@oh-my-pi/pi-utils";
 
-const model = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+const model = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 
 const explicitPromptCacheModel: Model<"openai-responses"> = {
 	...model,
-	id: "gpt-5.6",
-	identity: classifyModel("openai", "gpt-5.6"),
-	name: "GPT-5.6",
-	compat: resolveModelPolicy({
-		id: "gpt-5.6",
-		api: "openai-responses",
-		name: "GPT-5.6",
-		provider: "openai",
-		baseUrl: "https://api.openai.com/v1",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 128_000,
-		maxTokens: 16_384,
-	}).compat,
+	compat: {
+		...model.compat,
+		supportsPromptCacheBreakpoints: true,
+		promptCacheBreakpointTtl: "30m",
+	},
 };
 
 afterEach(() => {
@@ -785,30 +773,21 @@ describe("openai-responses stateful chaining", () => {
 	});
 
 	it.each([
-		["opts a custom endpoint into chaining without official-only fields", "custom", true, undefined, undefined, true],
-		["opts an official endpoint out of chaining", "openai", false, undefined, undefined, false],
-		["lets the env opt-out override model opt-in", "custom", true, "0", undefined, false],
-		["lets the env opt-in override model opt-out", "openai", false, "1", undefined, true],
-		["lets the call opt-in override env and model opt-outs", "custom", false, "0", true, true],
-		["lets the call opt-out override env and model opt-ins", "openai", true, "1", false, false],
-		[
-			"preserves model opt-in through OpenRouter's Responses dispatch",
-			"openrouter",
-			true,
-			undefined,
-			undefined,
-			true,
-		],
-	] as const)("%s", async (_name, provider, compatValue, envValue, callValue, enabled) => {
+		["opts the model into chaining", true, undefined, undefined, true],
+		["opts the model out of chaining", false, undefined, undefined, false],
+		["lets the env opt-out override model opt-in", true, "0", undefined, false],
+		["lets the env opt-in override model opt-out", false, "1", undefined, true],
+		["lets the call opt-in override env and model opt-outs", false, "0", true, true],
+		["lets the call opt-out override env and model opt-ins", true, "1", false, false],
+	] as const)("%s", async (_name, compatValue, envValue, callValue, enabled) => {
 		const originalFlag = utils.$flag;
 		vi.spyOn(utils, "$flag").mockImplementation((name, fallback) =>
 			name === "PI_OPENAI_STATEFUL" ? utils.parseFlag(envValue, fallback) : originalFlag(name, fallback),
 		);
 		const endpointModel = buildModel({
 			...model,
-			api: provider === "openrouter" ? "openrouter" : "openai-responses",
-			provider,
-			baseUrl: provider === "openai" ? model.baseUrl : "https://proxy.example.com/v1",
+			api: "openai-responses",
+			provider: "github-copilot",
 			compat: { statefulResponses: compatValue },
 		});
 		const sentRequests: Array<Record<string, unknown>> = [];
@@ -817,7 +796,6 @@ describe("openai-responses stateful chaining", () => {
 			sessionId: "stateful-compat-session",
 			providerSessionState: new Map<string, ProviderSessionState>(),
 			statefulResponses: callValue,
-			textVerbosity: "medium" as const,
 			fetch: createCapturingFetch(sentRequests),
 		};
 		const firstUser = { role: "user" as const, content: "First question", timestamp: 1000 };
@@ -844,54 +822,12 @@ describe("openai-responses stateful chaining", () => {
 		} else {
 			expect(JSON.stringify(sentRequests[1]?.input)).toContain("First question");
 		}
-		if (provider !== "openai") {
-			expect(sentRequests[0]?.text).toBeUndefined();
-			expect(sentRequests[0]?.stream_options).toBeUndefined();
-			expect(sentRequests[0]?.prompt_cache_retention).toBeUndefined();
-		}
+		expect(sentRequests[0]?.text).toBeUndefined();
+		expect(sentRequests[0]?.stream_options).toBeUndefined();
+		expect(sentRequests[0]?.prompt_cache_retention).toBeUndefined();
 	});
 
-	it("chains by default against the official OpenAI API", async () => {
-		const sentRequests: Array<Record<string, unknown>> = [];
-		const fetchMock = createCapturingFetch(sentRequests);
-		const providerSessionState = new Map<string, ProviderSessionState>();
-		// No statefulResponses option: the official-API default applies.
-		const options = {
-			apiKey: "test-key",
-			sessionId: "stateful-default-session",
-			providerSessionState,
-			reasoning: "low" as const,
-			fetch: fetchMock,
-		};
-
-		const firstUser = { role: "user" as const, content: "First question", timestamp: 1000 };
-		const firstResponse = await streamOpenAIResponses(
-			model,
-			{ systemPrompt, messages: [firstUser] },
-			options,
-		).result();
-		await streamOpenAIResponses(
-			model,
-			{
-				systemPrompt,
-				messages: [firstUser, firstResponse, { role: "user", content: "Second question", timestamp: 1001 }],
-			},
-			options,
-		).result();
-
-		expect(sentRequests).toHaveLength(2);
-		expect(sentRequests[0]?.store).toBe(true);
-		expect(sentRequests[1]?.store).toBe(true);
-		expect(sentRequests[1]?.previous_response_id).toBe("resp_1");
-		expect(sentRequests[1]?.input as unknown[]).toHaveLength(1);
-	});
-
-	it("stays stateless by default off the official OpenAI API", async () => {
-		const proxyModel = buildModel({
-			...model,
-			baseUrl: "https://proxy.example.com/v1",
-			compat: model.compatConfig,
-		} as ModelSpec<"openai-responses">) as Model<"openai-responses">;
+	it("keeps Copilot stateless by default", async () => {
 		const sentRequests: Array<Record<string, unknown>> = [];
 		const fetchMock = createCapturingFetch(sentRequests);
 		const providerSessionState = new Map<string, ProviderSessionState>();
@@ -905,12 +841,12 @@ describe("openai-responses stateful chaining", () => {
 
 		const firstUser = { role: "user" as const, content: "First question", timestamp: 1000 };
 		const firstResponse = await streamOpenAIResponses(
-			proxyModel,
+			model,
 			{ systemPrompt, messages: [firstUser] },
 			options,
 		).result();
 		await streamOpenAIResponses(
-			proxyModel,
+			model,
 			{
 				systemPrompt,
 				messages: [firstUser, firstResponse, { role: "user", content: "Second question", timestamp: 1001 }],

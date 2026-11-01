@@ -23,7 +23,7 @@ import { ASIDE_MESSAGE_COMMIT, ASIDE_MESSAGE_DISCARD, SPECULATIVE_STREAM_SESSION
 import type { AssistantMessage, AssistantMessageEvent, Context, Message, ToolResultMessage } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
 import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { kCursorExecResolved, setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
+import { setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
 import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
 import type { HarmonyDetection } from "@oh-my-pi/pi-ai/utils/harmony-leak";
 import * as harmonyLeak from "@oh-my-pi/pi-ai/utils/harmony-leak";
@@ -373,7 +373,7 @@ describe("agentLoop with AgentMessage", () => {
 	it("leaves DSML in a non-DeepSeek model's prose untouched", async () => {
 		const prose = 'The literal token <｜DSML｜parameter name="x"> is part of the specification.';
 		const context: AgentContext = { systemPrompt: ["You are helpful."], messages: [], tools: [] };
-		const mock = createMockModel({ id: "claude-sonnet-4-6", responses: [{ content: [prose] }] });
+		const mock = createMockModel({ id: "claude-sonnet-4.6", responses: [{ content: [prose] }] });
 		const config: AgentLoopConfig = { model: mock.model, convertToLlm: identityConverter };
 
 		const messages = await agentLoop([createUserMessage("Hello")], context, config, undefined, mock.stream).result();
@@ -382,17 +382,17 @@ describe("agentLoop with AgentMessage", () => {
 		expect((messages.at(-1) as AssistantMessage).content).toEqual([{ type: "text", text: prose }]);
 	});
 
-	it("retries when harmony leakage reaches the committed assistant message (openai-codex)", async () => {
+	it("retries when harmony leakage reaches a mitigation-enabled Copilot assistant message", async () => {
 		const context: AgentContext = {
 			systemPrompt: ["You are helpful."],
 			messages: [],
 			tools: [],
 		};
 		// First response leaks a harmony payload as visible assistant text; the
-		// retry is clean. Mitigation only engages for openai-codex.
+		// retry is clean. The fixture explicitly enables generic mitigation.
 		const leak = "Some prose. analysis to=functions.edit code 大发官网";
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [{ content: [leak] }, { content: ["clean retry response"] }],
 		});
 		const config: AgentLoopConfig = { model: harmonyMitigationModel, convertToLlm: identityConverter };
@@ -434,7 +434,7 @@ describe("agentLoop with AgentMessage", () => {
 		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [tool] };
 		const leakyArg = "@fixtures/corpus.json\n+\tanalysis to=functions.edit code 大发官网\n";
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [
 				{ content: [{ type: "toolCall", id: "tool-1", name: "edit", arguments: { input: leakyArg } }] },
 				{ content: ["done"] },
@@ -1284,7 +1284,7 @@ describe("agentLoop with AgentMessage", () => {
 				{
 					content: [{ type: "toolCall", id: "tool-1", name: "edit", arguments: { value: "hello" } }],
 					stopReason: "error",
-					errorMessage: "Codex websocket transport error: websocket closed (1000)",
+					errorMessage: "Responses stream transport error: connection closed",
 				},
 			],
 		});
@@ -1312,7 +1312,7 @@ describe("agentLoop with AgentMessage", () => {
 		expect(text).not.toContain("Tool execution failed due to an error");
 		expect(text.toLowerCase()).toContain("not executed");
 		expect(text.toLowerCase()).toContain("provider");
-		expect(text).toContain("Codex websocket transport error: websocket closed (1000)");
+		expect(text).toContain("Responses stream transport error: connection closed");
 
 		// Structured details on the synthetic result let downstream consumers
 		// (UI, telemetry, ACP) distinguish it from a real tool failure without
@@ -1326,7 +1326,7 @@ describe("agentLoop with AgentMessage", () => {
 		expect(details.__synthetic).toBe(true);
 		expect(details.source).toBe("assistant_stop_error");
 		expect(details.executed).toBe(false);
-		expect(details.upstreamError).toBe("Codex websocket transport error: websocket closed (1000)");
+		expect(details.upstreamError).toBe("Responses stream transport error: connection closed");
 
 		const endEvent = events.find(
 			(e): e is Extract<AgentEvent, { type: "tool_execution_end" }> =>
@@ -2194,7 +2194,7 @@ describe("agentLoop with AgentMessage", () => {
 		// line boundary and resumes with its `*** Abort` sentinel.
 		const leakyInput = "@fixtures/x.ts\n+line\nanalysis to=functions.edit code 大发官网\n";
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [
 				{ content: [{ type: "toolCall", id: "", name: "edit", arguments: { input: leakyInput } }] },
 				{ content: ["done"] },
@@ -5614,7 +5614,7 @@ describe("agentLoop pre-model-call gate", () => {
 	it("closes an open Harmony retry turn when the gate stops the retry", async () => {
 		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [] };
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [{ content: ["Some prose. analysis to=functions.edit code"] }],
 		});
 		const retryModel = { ...harmonyMitigationModel, id: "retry-model" };
@@ -5657,7 +5657,7 @@ describe("agentLoop pre-model-call gate", () => {
 	it("closes an open Harmony retry turn when abort lands inside the retry gate", async () => {
 		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [] };
 		const mock = createMockModel({
-			provider: "openai-codex",
+			provider: "local",
 			responses: [{ content: ["Some prose. analysis to=functions.edit code"] }],
 		});
 		const gateEntered = Promise.withResolvers<void>();
@@ -6274,8 +6274,8 @@ describe("agentLoop passive additionalContext", () => {
 			role: "assistant",
 			content: [{ type: "toolCall", id: "tail-1", name: "echo", arguments: { value: "replay me" } }],
 			api: "anthropic-messages",
-			provider: "anthropic",
-			model: "claude-sonnet-4-5",
+			provider: "github-copilot",
+			model: "claude-sonnet-4.5",
 			usage: {
 				input: 0,
 				output: 0,
@@ -7480,101 +7480,8 @@ describe("agentLoop streaming snapshots", () => {
 	});
 });
 
-describe("agentLoop kCursorExecResolved (issue #4348)", () => {
-	it("skips execute for a toolCall block marked as already run by Cursor's exec channel", async () => {
-		const { kCursorExecResolved } = await import("@oh-my-pi/pi-ai/utils/block-symbols");
-
-		const toolSchema = type({ command: "string" });
-		let executeCalls = 0;
-		const tool: AgentTool<typeof toolSchema, { command: string }> = {
-			name: "bash",
-			label: "Bash",
-			description: "Run shell commands",
-			parameters: toolSchema,
-			async execute(_id, params) {
-				executeCalls += 1;
-				return {
-					content: [{ type: "text", text: `local run: ${params.command}` }],
-					details: { command: params.command },
-				};
-			},
-		};
-
-		const context: AgentContext = { systemPrompt: [""], messages: [], tools: [tool] };
-		const config: AgentLoopConfig = {
-			model: createMockModel().model,
-			convertToLlm: identityConverter,
-		};
-
-		// Simulate the shape the Cursor provider now emits after
-		// `synthesizeCursorExecToolCall`: a `toolCall` content block stamped
-		// with `kCursorExecResolved` because the server-driven exec channel
-		// already ran the tool. `agent-loop.ts` MUST NOT invoke `tool.execute`
-		// again — that would double-execute bash/write/delete/etc. and append a
-		// second `toolResult` with the same `toolCallId`.
-		const streamFn = () => {
-			const stream = new AssistantMessageEventStream();
-			queueMicrotask(() => {
-				const resolvedBlock = {
-					type: "toolCall" as const,
-					id: "cursor-exec-tc-1",
-					name: "bash",
-					arguments: { command: "rm -rf /tmp/cursor-once" },
-					[kCursorExecResolved]: true as const,
-				};
-				const finalMessage: AssistantMessage = {
-					role: "assistant",
-					content: [{ type: "text", text: "Ran the command." }, resolvedBlock],
-					api: "cursor-agent",
-					provider: "cursor",
-					model: "cursor-composer-2.5",
-					usage: {
-						input: 0,
-						output: 0,
-						cacheRead: 0,
-						cacheWrite: 0,
-						totalTokens: 0,
-						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-					},
-					stopReason: "stop",
-					timestamp: Date.now(),
-				};
-				stream.push({ type: "start", partial: finalMessage });
-				stream.push({ type: "done", reason: "stop", message: finalMessage });
-			});
-			return stream;
-		};
-
-		const events: AgentEvent[] = [];
-		const stream = agentLoop([createUserMessage("run bash")], context, config, undefined, streamFn);
-		for await (const event of stream) {
-			events.push(event);
-		}
-
-		// Tool MUST NOT have been executed — Cursor already ran it server-side.
-		expect(executeCalls).toBe(0);
-
-		// No `tool_execution_start`/`tool_execution_end` from agent-loop —
-		// those live-events belong to the bridge that already ran the tool.
-		const startFromLoop = events.find(e => e.type === "tool_execution_start");
-		const endFromLoop = events.find(e => e.type === "tool_execution_end");
-		expect(startFromLoop).toBeUndefined();
-		expect(endFromLoop).toBeUndefined();
-
-		// And no duplicate `toolResult` message emitted for the resolved block:
-		// the buffered result flows via the Agent-class path, not agent-loop.
-		const orphanToolResult = events.find(
-			(e): e is Extract<AgentEvent, { type: "message_end" }> =>
-				e.type === "message_end" && e.message.role === "toolResult",
-		);
-		expect(orphanToolResult).toBeUndefined();
-	});
-
-	it("still runs a normal, unmarked toolCall block in the same turn", async () => {
-		// Guards against the filter over-matching: a mixed turn where only
-		// SOME blocks are Cursor-resolved must still execute the unmarked one.
-		const { kCursorExecResolved } = await import("@oh-my-pi/pi-ai/utils/block-symbols");
-
+describe("agentLoop ordinary tool execution", () => {
+	it("runs an ordinary toolCall block", async () => {
 		const toolSchema = type({ value: "string" });
 		const executed: string[] = [];
 		const tool: AgentTool<typeof toolSchema, { value: string }> = {
@@ -7602,13 +7509,6 @@ describe("agentLoop kCursorExecResolved (issue #4348)", () => {
 			const stream = new AssistantMessageEventStream();
 			queueMicrotask(() => {
 				if (turn++ === 0) {
-					const resolvedBlock = {
-						type: "toolCall" as const,
-						id: "resolved-1",
-						name: "bash",
-						arguments: { command: "true" },
-						[kCursorExecResolved]: true as const,
-					};
 					const runnableBlock = {
 						type: "toolCall" as const,
 						id: "runnable-1",
@@ -7617,10 +7517,10 @@ describe("agentLoop kCursorExecResolved (issue #4348)", () => {
 					};
 					const partial: AssistantMessage = {
 						role: "assistant",
-						content: [resolvedBlock, runnableBlock],
-						api: "cursor-agent",
-						provider: "cursor",
-						model: "cursor-composer-2.5",
+						content: [runnableBlock],
+						api: "local-inference",
+						provider: "local",
+						model: "mock-model",
 						usage: {
 							input: 0,
 							output: 0,
@@ -7639,9 +7539,9 @@ describe("agentLoop kCursorExecResolved (issue #4348)", () => {
 					const partial: AssistantMessage = {
 						role: "assistant",
 						content: [{ type: "text", text: "finished" }],
-						api: "cursor-agent",
-						provider: "cursor",
-						model: "cursor-composer-2.5",
+						api: "local-inference",
+						provider: "local",
+						model: "mock-model",
 						usage: {
 							input: 0,
 							output: 0,
@@ -7669,8 +7569,6 @@ describe("agentLoop kCursorExecResolved (issue #4348)", () => {
 		expect(executed).toEqual(["hi"]);
 
 		const executionStarts = events.filter(e => e.type === "tool_execution_start");
-		// Exactly one execution: the unmarked `echo` block. The resolved
-		// `bash` block is passed through untouched.
 		expect(executionStarts).toHaveLength(1);
 		if (executionStarts[0]?.type !== "tool_execution_start") throw new Error("expected tool_execution_start");
 		expect(executionStarts[0].toolCallId).toBe("runnable-1");
@@ -7897,11 +7795,7 @@ describe("speculative tool execution", () => {
 			{ type: "toolcall_delta", contentIndex: 0, delta: '"discard"}', partial: streamingPartial },
 			{ type: "toolcall_end", contentIndex: 0, toolCall: finalizedToolCall, partial: streamingPartial },
 		];
-		const cursorResolvedToolCall = { ...finalizedToolCall, [kCursorExecResolved]: true as const };
-		const trailingMessages = [
-			createAssistantMessage([{ type: "text", text: "finished without the call" }], "stop"),
-			createAssistantMessage([cursorResolvedToolCall], "stop"),
-		];
+		const trailingMessages = [createAssistantMessage([{ type: "text", text: "finished without the call" }], "stop")];
 		for (const trailing of trailingMessages) {
 			const previousDiscardCount = discarded.length;
 			const streamFn = () => {

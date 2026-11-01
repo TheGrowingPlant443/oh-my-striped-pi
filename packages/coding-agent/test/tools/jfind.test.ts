@@ -4,11 +4,16 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Judge, JudgmentRequest, JudgmentResult, NoulAnswer, Questions } from "@oh-my-pi/pi-ai";
 import { tokenUsage } from "@oh-my-pi/pi-ai";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
+import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
 import { InternalUrlFilesystem } from "@oh-my-pi/pi-coding-agent/internal-urls/url-filesystem";
 import { ChainJudge } from "@oh-my-pi/pi-coding-agent/judgment";
-import { FindTool } from "@oh-my-pi/pi-coding-agent/tools/jfind";
+import { FindTool, isFindEnabled } from "@oh-my-pi/pi-coding-agent/tools/jfind";
+import { cfgFindEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
 import { runCascade } from "@oh-my-pi/pi-coding-agent/tools/jfind/cascade";
 import { keywordsFromQuery } from "@oh-my-pi/pi-coding-agent/tools/jfind/keywords";
 import { grepIndex } from "@oh-my-pi/pi-coding-agent/tools/jfind/lexical";
@@ -28,6 +33,72 @@ import { removeWithRetries } from "@oh-my-pi/pi-utils";
 function urlFs(cwd: string): InternalUrlFilesystem {
 	return new InternalUrlFilesystem({ context: { cwd }, tier: "read" });
 }
+
+describe("jfind automatic native judgment gate", () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it.each([
+		[getBundledModel("local", "qwen2.5-1.5b"), false],
+		[getBundledModel("github-copilot", "claude-sonnet-4.6"), false],
+		[
+			buildModel({
+				id: "openjev",
+				name: "Company judge",
+				provider: "company",
+				api: "typesafe",
+				baseUrl: "https://judge.company.example",
+				kind: "judge",
+				input: ["text"],
+				reasoning: false,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 8192,
+				maxTokens: 0,
+			}),
+			true,
+		],
+		[
+			buildModel({
+				id: "decisions",
+				name: "Company Decisions",
+				provider: "company",
+				api: "openai-decisions",
+				baseUrl: "https://judge.company.example/v1",
+				kind: "judge",
+				input: ["text"],
+				reasoning: false,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 8192,
+				maxTokens: 0,
+			}),
+			true,
+		],
+	] as const)(
+		"auto gates $0.provider/$0.id by native capability; explicit on still enables any judge",
+		async (model, automatic) => {
+			const storage = await AuthStorage.create(":memory:");
+			try {
+				const settings = Settings.isolated({ modelRoles: { judge: `${model.provider}/${model.id}` } });
+				const registry = new ModelRegistry(storage, "/nonexistent/find-gate-models.yml", { settings });
+				vi.spyOn(registry, "getAvailable").mockReturnValue([model]);
+				const session = {
+					cwd: "/tmp",
+					hasUI: false,
+					getSessionFile: () => null,
+					getSessionSpawns: () => "*",
+					settings,
+					modelRegistry: registry,
+				};
+				expect(isFindEnabled(session)).toBe(automatic);
+				cfgFindEnabled.set(settings, "on");
+				expect(isFindEnabled(session)).toBe(true);
+				cfgFindEnabled.set(settings, "off");
+				expect(isFindEnabled(session)).toBe(false);
+			} finally {
+				storage.close();
+			}
+		},
+	);
+});
 
 describe("jfind keywords", () => {
 	it("keeps quoted phrases whole, drops stopwords and numbers, and stems inflections", () => {

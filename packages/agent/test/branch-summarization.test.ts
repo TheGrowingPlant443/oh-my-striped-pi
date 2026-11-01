@@ -13,8 +13,8 @@ import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 const MODEL: Model = buildModel({
 	id: "mock-model",
 	name: "mock-model",
-	api: "mock",
-	provider: "mock",
+	api: "local-inference",
+	provider: "local",
 	baseUrl: "mock://",
 	reasoning: false,
 	input: ["text"],
@@ -50,8 +50,8 @@ describe("branch summarization", () => {
 				message: {
 					role: "assistant",
 					content: [{ type: "toolCall", id: "call-read", name: "read", arguments: { path: "config.txt" } }],
-					api: "mock",
-					provider: "mock",
+					api: "local-inference",
+					provider: "local",
 					model: "mock-model",
 					usage: ZERO_USAGE,
 					stopReason: "toolUse",
@@ -80,8 +80,8 @@ describe("branch summarization", () => {
 				message: {
 					role: "assistant",
 					content: [{ type: "toolCall", id: "call-search", name: "search", arguments: { pattern: "absent" } }],
-					api: "mock",
-					provider: "mock",
+					api: "local-inference",
+					provider: "local",
 					model: "mock-model",
 					usage: ZERO_USAGE,
 					stopReason: "toolUse",
@@ -120,8 +120,8 @@ describe("branch summarization", () => {
 			const response: AssistantMessage = {
 				role: "assistant",
 				content: [{ type: "text", text: "branch summary text" }],
-				api: "mock",
-				provider: "mock",
+				api: "local-inference",
+				provider: "local",
 				model: "mock-model",
 				usage: ZERO_USAGE,
 				stopReason: "stop",
@@ -184,7 +184,7 @@ describe("branch summarization", () => {
 			};
 		};
 
-		for (const id of ["claude-opus-5-5", "gpt-5.4"]) {
+		for (const id of ["claude-opus-5.5", "gpt-5.4"]) {
 			await generateBranchSummary(entries, {
 				model: { ...MODEL, id },
 				apiKey: "test-api-key",
@@ -218,8 +218,8 @@ describe("branch summarization", () => {
 				message: {
 					role: "assistant",
 					content: [{ type: "toolCall", id: "call-search", name: "search", arguments: { pattern: "absent" } }],
-					api: "mock",
-					provider: "mock",
+					api: "local-inference",
+					provider: "local",
 					model: "mock-model",
 					usage: ZERO_USAGE,
 					stopReason: "toolUse",
@@ -263,8 +263,8 @@ describe("branch summarization", () => {
 				message: {
 					role: "assistant",
 					content: [{ type: "toolCall", id: "call-read", name: "read", arguments: { path: "big.txt" } }],
-					api: "mock",
-					provider: "mock",
+					api: "local-inference",
+					provider: "local",
 					model: "mock-model",
 					usage: ZERO_USAGE,
 					stopReason: "toolUse",
@@ -296,7 +296,7 @@ describe("branch summarization", () => {
 	// turn's native reasoning, charged at its reported tokens when the same model
 	// replays it, never takes up the selection budget.
 	test("replayed reasoning does not consume the text-only summary budget", async () => {
-		const codex = getBundledModel("openai-codex", "gpt-6.1-sol");
+		const codex = getBundledModel("github-copilot", "gpt-6.1-sol");
 		const reasoningItem = { type: "reasoning", id: "rs_1", summary: [], encrypted_content: "e".repeat(16_000) };
 		const conclusion = "BRANCH_CONCLUSION_5000: keep the retry loop.";
 		const answerItem = {
@@ -409,8 +409,8 @@ describe("branch summarization", () => {
 				return {
 					role: "assistant",
 					content: [],
-					api: "mock",
-					provider: "mock",
+					api: "local-inference",
+					provider: "local",
 					model: "mock-model",
 					usage: ZERO_USAGE,
 					stopReason: "error",

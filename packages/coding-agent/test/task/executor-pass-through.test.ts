@@ -10,8 +10,8 @@ import * as path from "node:path";
 import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import { resolveThresholdTokens, shouldCompact } from "@oh-my-pi/pi-agent-core/compaction";
 import type { Model, ServiceTierByFamily } from "@oh-my-pi/pi-ai";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { Effort, THINKING_EFFORTS } from "@oh-my-pi/pi-catalog/effort";
 import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
 import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -33,6 +33,33 @@ import { manyToolName } from "../fixtures/many-tools-mcp";
 import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
 
 import { cfgTierAnthropic, cfgTierGoogle, cfgTierOpenai } from "@oh-my-pi/pi-coding-agent/session/settings";
+
+const companyResponsesModel = buildModel({
+	provider: "company-responses",
+	id: "gpt-5.6-sol",
+	name: "Company Responses",
+	api: "openai-responses",
+	baseUrl: "https://models.company.internal/v1",
+	reasoning: true,
+	thinking: { mode: "effort", efforts: THINKING_EFFORTS },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_768,
+});
+const companyMessagesModel = buildModel({
+	provider: "company-messages",
+	id: "claude-sonnet-4-5",
+	name: "Company Messages",
+	api: "anthropic-messages",
+	baseUrl: "https://messages.company.internal",
+	reasoning: true,
+	thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 200_000,
+	maxTokens: 32_768,
+});
 
 function createMockSession(
 	onPrompt: (params: { emit: (event: AgentSessionEvent) => void }) => void | Promise<void>,
@@ -431,8 +458,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 	});
 
 	it("caps caller-requested effort at task.maxEffort", async () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!model) throw new Error("Expected gpt-5.6-sol model to exist");
+		const model = companyResponsesModel;
 		const settings = Settings.isolated({ "task.maxEffort": "low" });
 		settings.setModelRole("task", `${model.provider}/${model.id}`);
 		const session = yieldEmittingSession();
@@ -455,8 +481,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 	});
 
 	it("rejects a spawn when task.maxEffort is below the model floor", async () => {
-		const baseModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!baseModel) throw new Error("Expected gpt-5.6-sol model to exist");
+		const baseModel = companyResponsesModel;
 		const model = {
 			...baseModel,
 			id: "mock-high-only",
@@ -484,8 +509,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 	});
 
 	it("preserves the model's full effort range by default", async () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!model) throw new Error("Expected gpt-5.6-sol model to exist");
+		const model = companyResponsesModel;
 		const settings = Settings.isolated();
 		settings.setModelRole("task", `${model.provider}/${model.id}`);
 		const session = yieldEmittingSession();
@@ -505,8 +529,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 	});
 
 	it("resolves an explicit task-role effort suffix over the agent-definition default", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = companyMessagesModel;
 		const settings = Settings.isolated();
 		settings.setModelRole("task", `${model.provider}/${model.id}:high`);
 		const session = yieldEmittingSession();
@@ -529,8 +552,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 	});
 
 	it("falls back to the agent-definition thinking level without an explicit suffix", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = companyMessagesModel;
 		const settings = Settings.isolated();
 		settings.setModelRole("task", `${model.provider}/${model.id}`);
 		const session = yieldEmittingSession();
@@ -550,8 +572,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 		expect(forwarded?.thinkingLevel).toBe(ThinkingLevel.Low);
 	});
 	it("persists an explicit role from a caller model override", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = companyMessagesModel;
 		const settings = Settings.isolated({
 			modelRoles: { reviewer: `${model.provider}/${model.id}` },
 		});
@@ -630,9 +651,8 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	}
 
 	it("applies the dispatch-resolved override to the effective model selected by task policy", async () => {
-		const effectiveModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		const definitionModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!effectiveModel || !definitionModel) throw new Error("Expected bundled service-tier models to exist");
+		const effectiveModel = companyResponsesModel;
+		const definitionModel = companyMessagesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
@@ -651,8 +671,7 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	});
 
 	it("keeps tier.subagent when dispatch resolved no override for the agent", async () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!model) throw new Error("Expected gpt-5.6-sol model to exist");
+		const model = companyResponsesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
@@ -675,8 +694,7 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	});
 
 	it("drops inherited live tiers a family can't realize instead of failing the spawn", async () => {
-		const model = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!model) throw new Error("Expected gpt-5.6-sol model to exist");
+		const model = companyResponsesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
@@ -701,8 +719,7 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	});
 
 	it("lets an unsupported concrete override beat the global tier without crossing families", async () => {
-		const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!model) throw new Error("Expected claude-sonnet-4-5 model to exist");
+		const model = companyMessagesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
@@ -720,12 +737,11 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	});
 
 	it("resolves the override against the auth-fallback model rather than the requested one", async () => {
-		const requested = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const parentModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		if (!requested || !parentModel) throw new Error("Expected bundled service-tier models to exist");
+		const requested = companyMessagesModel;
+		const parentModel = companyResponsesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
-		// The requested Anthropic model has no working credentials; the parent's OpenAI model does.
+		// Only the parent's company Responses endpoint has working credentials.
 		const modelRegistry = createModelRegistry([requested, parentModel], async model =>
 			model.provider === parentModel.provider ? "test-key" : undefined,
 		);
@@ -747,9 +763,8 @@ describe("runSubprocess per-agent service-tier overrides", () => {
 	});
 
 	it("scopes a concrete override to the model the session resolves instead of broadcasting it", async () => {
-		const openAIModel = getBundledModel("openai-codex", "gpt-5.6-sol");
-		const anthropicModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!openAIModel || !anthropicModel) throw new Error("Expected bundled service-tier models to exist");
+		const openAIModel = companyResponsesModel;
+		const anthropicModel = companyMessagesModel;
 		const session = yieldEmittingSession();
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 

@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, FetchImpl, Model, ProviderSessionState, Usage } from "@oh-my-pi/pi-ai";
-import { streamGoogle } from "@oh-my-pi/pi-ai/providers/google";
 import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
 import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
 import type { ResponseInput, ResponseOutputItem } from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
@@ -89,27 +88,12 @@ const ZERO_USAGE: Usage = {
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
 };
 
-function googleInteractionsModel(): Model<"google-generative-ai"> {
-	return buildModel({
-		id: "gemini-3.5-flash",
-		name: "Gemini 3.5 Flash",
-		api: "google-generative-ai",
-		provider: "google",
-		baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-		reasoning: true,
-		input: ["text"],
-		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 1_000_000,
-		maxTokens: 8_192,
-	});
-}
-
 function storedAssistant(responseId: string): AssistantMessage {
 	return {
 		role: "assistant",
-		api: "google-generative-ai",
-		provider: "google",
-		model: "gemini-3.5-flash",
+		api: "local-inference",
+		provider: "local",
+		model: "mock-model",
 		content: [{ type: "text", text: "Primary answer" }],
 		usage: ZERO_USAGE,
 		stopReason: "stop",
@@ -117,27 +101,6 @@ function storedAssistant(responseId: string): AssistantMessage {
 		responseId,
 		providerPayload: { type: "openaiResponsesHistory", items: [{ id: "primary-native-item" }] },
 	};
-}
-
-function interactionsResponse(): Response {
-	const events = [
-		{ event_type: "interaction.created", interaction: { id: "capture-interaction", status: "in_progress" } },
-		{ event_type: "step.start", index: 0, step: { type: "model_output" } },
-		{ event_type: "step.delta", index: 0, delta: { type: "text", text: "Captured." } },
-		{ event_type: "step.stop", index: 0 },
-		{
-			event_type: "interaction.completed",
-			interaction: {
-				id: "capture-interaction",
-				status: "completed",
-				usage: { total_input_tokens: 10, total_output_tokens: 2, total_tokens: 12 },
-			},
-		},
-	];
-	return new Response(`${events.map(event => `data: ${JSON.stringify(event)}`).join("\n\n")}\n\n`, {
-		status: 200,
-		headers: { "content-type": "text/event-stream" },
-	});
 }
 
 describe("AutoLearnController", () => {
@@ -342,18 +305,17 @@ describe("isolated auto-learn capture", () => {
 
 	const replayCases = [
 		{ api: "openai-responses", history: "native" },
-		{ api: "openrouter", history: "native" },
 		{ api: "openai-responses", history: "signature-only" },
 		{ api: "openai-responses", history: "cross-model" },
 	] as const;
 	for (const { api, history } of replayCases) {
 		it(`keeps inherited ${api} ${history} history stable after a capture tool round`, async () => {
 			const model = buildModel({
-				id: "gpt-5-mini",
-				name: "Capture test",
+				id: "company-capture",
+				name: "Company capture test",
 				api,
-				provider: "capture-test",
-				baseUrl: "https://example.invalid/v1",
+				provider: "company-capture",
+				baseUrl: "https://capture.company.invalid/v1",
 				reasoning: true,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -481,19 +443,7 @@ describe("isolated auto-learn capture", () => {
 							}),
 					}),
 			});
-			const previousOpenRouterResponses = Bun.env.PI_OPENROUTER_RESPONSES;
-			if (api === "openrouter") Bun.env.PI_OPENROUTER_RESPONSES = "1";
-			try {
-				await runCapture("Record the lesson");
-			} finally {
-				if (api === "openrouter") {
-					if (previousOpenRouterResponses === undefined) {
-						delete Bun.env.PI_OPENROUTER_RESPONSES;
-					} else {
-						Bun.env.PI_OPENROUTER_RESPONSES = previousOpenRouterResponses;
-					}
-				}
-			}
+			await runCapture("Record the lesson");
 			expect(requests).toHaveLength(2);
 			const [first, second] = requests;
 			expect(second.input.slice(0, first.input.length)).toEqual(first.input);
@@ -521,8 +471,9 @@ describe("isolated auto-learn capture", () => {
 		});
 	}
 
-	it("uses constrained tools and sends full Google context without the primary anchor", async () => {
-		const model = googleInteractionsModel();
+	it("uses constrained tools and sends full context without the primary anchor", async () => {
+		const mock = createMockModel({ handler: { content: ["Captured."] } });
+		const model = mock.model;
 		const manageSkillTool = captureTool("manage_skill", "Manage reusable skills");
 		const readTool = captureTool("read", "Read files");
 		const primaryAssistant = storedAssistant("primary-interaction");
@@ -545,12 +496,6 @@ describe("isolated auto-learn capture", () => {
 		let primaryEvents = 0;
 		sourceAgent.subscribe(() => primaryEvents++);
 
-		let requestBody = "";
-		const fetchMock: FetchImpl = async (_input, init) => {
-			requestBody = String(init?.body ?? "");
-			return interactionsResponse();
-		};
-		Object.assign(fetchMock, { preconnect: fetch.preconnect });
 		let captureMessages: AgentMessage[] = [];
 		let captureProviderState: Map<string, ProviderSessionState> | undefined;
 		let captureSessionId: string | undefined;
@@ -565,12 +510,7 @@ describe("isolated auto-learn capture", () => {
 				return new Agent({
 					...options,
 					convertToLlm,
-					streamFn: (_requestModel, context, streamOptions) =>
-						streamGoogle(model, context, {
-							...streamOptions,
-							apiKey: "test-key",
-							fetch: fetchMock,
-						}),
+					streamFn: mock.stream,
 				});
 			},
 		});
@@ -585,7 +525,7 @@ describe("isolated auto-learn capture", () => {
 		);
 		expect(detachedAssistant?.responseId).toBeUndefined();
 		expect(detachedAssistant?.providerPayload).toBeUndefined();
-		expect(requestBody).not.toContain("previous_interaction_id");
+		const requestBody = JSON.stringify(mock.calls[0]?.context);
 		expect(requestBody).toContain("Earlier task");
 		expect(requestBody).toContain("Automated capture prompt");
 		expect(requestBody).toContain("manage_skill");
@@ -602,7 +542,7 @@ describe("isolated auto-learn capture", () => {
 
 	it("keeps source credentials and account metadata while using a fresh transport session", async () => {
 		const captureMock = createMockModel({
-			provider: "anthropic",
+			provider: "local",
 			responses: [{ content: ["Captured."] }],
 		});
 		const manageSkillTool = captureTool("manage_skill", "Manage reusable skills");
@@ -648,7 +588,7 @@ describe("isolated auto-learn capture", () => {
 	});
 
 	it("aborts a blocked detached capture and closes its provider state", async () => {
-		const model = googleInteractionsModel();
+		const model = createMockModel().model;
 		const manageSkillTool = captureTool("manage_skill", "Manage reusable skills");
 		const sourceAgent = new Agent({
 			initialState: { model, systemPrompt: ["Test"], tools: [manageSkillTool] },

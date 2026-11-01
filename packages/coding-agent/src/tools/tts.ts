@@ -1,11 +1,11 @@
 // Ported from NousResearch/hermes-agent (MIT) — tools/tts_tool.py L167-171, L896-959.
-// Speech backends are catalog models selected through the speech role chain.
+// On-device and configured-endpoint speech models share the speech role chain.
 
 import { type } from "@oh-my-pi/omptype";
 import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import type { Model } from "@oh-my-pi/pi-ai";
-import { MissingApiKeyError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { DEFAULT_XAI_VOICE_ID, synthesizeSpeech, XAI_MAX_TEXT_LENGTH } from "@oh-my-pi/pi-ai/speech";
+import { ConfigurationError, MissingApiKeyError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
+import { synthesizeSpeech } from "@oh-my-pi/pi-ai/speech";
 import { prompt } from "@oh-my-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { resolveRoleChain, type RoleChainCandidate } from "../config/model-resolver";
@@ -20,26 +20,10 @@ import { formatPathRelativeToCwd, resolveToCwd } from "./path-utils";
 
 import { cfgTtsLocalSpeed, cfgTtsLocalVoice } from "../tts/settings";
 
-// Built-in voices per xAI Tier-1 docs (2026-05-16). xAI also accepts custom voice IDs,
-// so the schema does NOT enum-restrict voice_id; this constant only drives the description.
-const XAI_BUILTIN_VOICES = ["ara", "eve", "leo", "rex", "sal"] as const;
-
-const formatVoiceList = (): string =>
-	XAI_BUILTIN_VOICES.map(v => (v === DEFAULT_XAI_VOICE_ID ? `${v} (default)` : v)).join(", ");
-
-type TtsCodec = "mp3" | "wav";
-type TtsBackend = "local-inference" | "xai-tts" | "openai-speech";
-
 const ttsSchema = type({
 	text: "1 <= string <= 15000",
-	// Optional (no schema default) so an explicit "eve" stays distinguishable
-	// from an omitted voice: xAI applies its own default, DeepInfra forwards
-	// the voice only when the caller actually set one.
 	"voice_id?": "string",
-	language: "string = 'en'",
 	output_path: "string",
-	sample_rate: "number.integer?",
-	bit_rate: "number.integer?",
 });
 
 type TtsSchemaType = typeof ttsSchema.infer;
@@ -47,27 +31,18 @@ type TtsSchemaType = typeof ttsSchema.infer;
 interface TtsToolDetails {
 	bytes: number;
 	voiceId: string;
-	codec: TtsCodec;
-	backend: TtsBackend;
+	codec: "wav" | "mp3";
+	backend: "local-inference" | "openai-speech";
 }
 
-/** Resolve speech candidates while preserving every explicitly configured slot. */
+/** Resolve speech candidates in their configured role order. */
 export function resolveSpeechCandidates(
 	settingsInstance: Settings,
 	modelRegistry: ModelRegistry,
-	wantsMp3: boolean,
 ): RoleChainCandidate[] {
 	const pool = roleCandidatePool("speech", settingsInstance, modelRegistry);
 	const candidates = resolveRoleChain("speech", settingsInstance, pool);
-	if (!wantsMp3) return candidates;
-
-	const nonExplicit = candidates.filter(candidate => !candidate.explicit);
-	const cloudFirst = [
-		...nonExplicit.filter(candidate => candidate.model.api !== "local-inference"),
-		...nonExplicit.filter(candidate => candidate.model.api === "local-inference"),
-	];
-	let next = 0;
-	return candidates.map(candidate => (candidate.explicit ? candidate : cloudFirst[next++]!));
+	return candidates;
 }
 
 /**
@@ -91,45 +66,6 @@ function readLocalVoice(settingsInstance: Settings): string {
 	} catch {
 		return DEFAULT_TTS_VOICE;
 	}
-}
-
-async function synthesizeCloud(
-	model: Model,
-	params: TtsSchemaType,
-	ctx: CustomToolContext,
-	outputPath: string,
-	displayPath: string,
-	codec: TtsCodec,
-	signal: AbortSignal | undefined,
-): Promise<AgentToolResult<TtsToolDetails, TtsSchemaType>> {
-	const sessionId = ctx.sessionManager.getSessionId();
-	const result = await synthesizeSpeech(
-		model,
-		{
-			text: params.text,
-			format: codec,
-			...(params.voice_id !== undefined ? { voice: params.voice_id } : {}),
-			...(model.api === "xai-tts" && params.sample_rate !== undefined ? { sampleRate: params.sample_rate } : {}),
-			...(model.api === "xai-tts" && params.bit_rate !== undefined ? { bitRate: params.bit_rate } : {}),
-		},
-		{
-			apiKey: ctx.modelRegistry.resolver(model, sessionId),
-			fetch: ctx.fetch,
-			signal,
-		},
-	);
-	await Bun.write(outputPath, result.audio);
-	const voiceId = params.voice_id ?? (model.api === "xai-tts" ? DEFAULT_XAI_VOICE_ID : "default");
-	const backend: Exclude<TtsBackend, "local-inference"> = model.api === "xai-tts" ? "xai-tts" : "openai-speech";
-	return {
-		content: [
-			{
-				type: "text",
-				text: `Saved ${result.audio.length} bytes to ${displayPath} (model=${model.provider}/${model.id}, voice=${voiceId}, codec=${codec}).`,
-			},
-		],
-		details: { bytes: result.audio.length, voiceId, codec, backend },
-	};
 }
 
 async function synthesizeLocal(
@@ -159,9 +95,7 @@ async function synthesizeLocal(
 	const wav = encodeWav(audio.pcm, audio.sampleRate);
 	await Bun.write(wavPath, wav);
 	const displayPath = formatPathRelativeToCwd(wavPath, cwd);
-	const note = substituted
-		? ` No local MP3 encoder is bundled, so WAV (PCM16) was written instead of the requested container.`
-		: "";
+	const note = substituted ? ` Local output is WAV (PCM16), so the requested path was changed to .wav.` : "";
 	return {
 		content: [
 			{
@@ -180,8 +114,6 @@ export const ttsTool: CustomTool<typeof ttsSchema, TtsToolDetails> = {
 	approval: "write",
 	description: prompt.render(ttsDescription, {
 		localVoices: KOKORO_VOICES.map(v => (v.id === DEFAULT_TTS_VOICE ? `${v.id} (default)` : v.id)).join(", "),
-		xaiVoices: formatVoiceList(),
-		maxLength: XAI_MAX_TEXT_LENGTH.toLocaleString("en-US"),
 	}),
 	parameters: ttsSchema,
 	async execute(
@@ -193,11 +125,9 @@ export const ttsTool: CustomTool<typeof ttsSchema, TtsToolDetails> = {
 	): Promise<AgentToolResult<TtsToolDetails, TtsSchemaType>> {
 		const cwd = ctx.sessionManager.getCwd();
 		const outputPath = resolveToCwd(params.output_path, cwd);
-		const displayPath = formatPathRelativeToCwd(outputPath, cwd);
-		const codec: TtsCodec = outputPath.toLowerCase().endsWith(".wav") ? "wav" : "mp3";
 
 		const settingsInstance = ctx.settings ?? settings;
-		const candidates = resolveSpeechCandidates(settingsInstance, ctx.modelRegistry, codec === "mp3");
+		const candidates = resolveSpeechCandidates(settingsInstance, ctx.modelRegistry);
 		if (candidates.length === 0) {
 			return {
 				isError: true,
@@ -211,20 +141,42 @@ export const ttsTool: CustomTool<typeof ttsSchema, TtsToolDetails> = {
 				if (model.api === "local-inference") {
 					return await synthesizeLocal(model, params, settingsInstance, cwd, outputPath, signal);
 				}
-				if (model.api === "xai-tts" || model.api === "openai-speech") {
-					return await synthesizeCloud(model, params, ctx, outputPath, displayPath, codec, signal);
-				}
-				throw new Error(`Unsupported speech model API: ${model.api}`);
+				if (model.api !== "openai-speech") throw new ConfigurationError(`Unsupported speech API: ${model.api}`);
+				if (!model.baseUrl?.trim()) throw new ConfigurationError("Speech model requires an explicit base URL");
+				const codec = outputPath.toLowerCase().endsWith(".wav") ? "wav" : "mp3";
+				const result = await synthesizeSpeech(
+					{
+						...model,
+						resolveHeaders: headerSignal => ctx.modelRegistry.resolveModelHeaders(model, headerSignal),
+					},
+					{
+						text: params.text,
+						format: codec,
+						...(params.voice_id !== undefined ? { voice: params.voice_id } : {}),
+					},
+					{
+						apiKey: ctx.modelRegistry.resolver(model, ctx.sessionManager.getSessionId()),
+						fetch: ctx.fetch,
+						signal,
+					},
+				);
+				await Bun.write(outputPath, result.audio);
+				const voiceId = params.voice_id ?? "default";
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Saved ${result.audio.length} bytes to ${formatPathRelativeToCwd(outputPath, cwd)} (model=${model.provider}/${model.id}, voice=${voiceId}, codec=${codec}).`,
+						},
+					],
+					details: { bytes: result.audio.length, voiceId, codec, backend: "openai-speech" },
+				};
 			} catch (error) {
 				if (signal?.aborted) throw error;
-				if (error instanceof MissingApiKeyError || error instanceof ProviderHttpError) {
-					failures.push(`${model.provider}/${model.id}: ${error.message}`);
-					continue;
-				}
-				throw error;
+				if (!(error instanceof MissingApiKeyError || error instanceof ProviderHttpError)) throw error;
+				failures.push(`${model.provider}/${model.id}: ${error.message}`);
 			}
 		}
-
 		return {
 			isError: true,
 			content: [{ type: "text", text: `Speech synthesis failed for every candidate: ${failures.join("; ")}` }],

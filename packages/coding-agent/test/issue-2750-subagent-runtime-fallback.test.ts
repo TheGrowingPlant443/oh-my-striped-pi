@@ -32,7 +32,7 @@ function model(provider: string, id: string): Model<Api> {
 		id,
 		name: id,
 		api: "openai-completions",
-		baseUrl: provider === "openrouter" ? "https://openrouter.ai/api/v1" : `https://${provider}.example.test`,
+		baseUrl: `https://${provider}.example.test`,
 		reasoning: false,
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -645,37 +645,6 @@ describe("subagent runtime model resolution", () => {
 		expect(childModelRole).toBeUndefined();
 	});
 
-	it("preserves upstream routing selectors in the child retry fallback chain", async () => {
-		const routedModel = model("openrouter", "z-ai/glm-4.7");
-		let childFallbackChains: Record<string, string[]> | undefined;
-		vi.spyOn(sdkModule, "createAgentSession").mockImplementation(async options => {
-			if (!options) throw new Error("Expected createAgentSession options");
-			childFallbackChains = (options.settings ? cfgRetryFallbackChains.get(options.settings) : undefined) as
-				| Record<string, string[]>
-				| undefined;
-			return { session: createYieldingSession(), extensionsResult: {}, setToolUIContext: () => {} } as never;
-		});
-
-		const agent: AgentDefinition = { name: "task", description: "test", systemPrompt: "test", source: "bundled" };
-		await runSubprocess({
-			cwd: "/tmp",
-			agent,
-			task: "work",
-			index: 0,
-			id: "issue-2750-routed",
-			modelOverride: ["openrouter/z-ai/glm-4.7@cerebras", "openrouter/z-ai/glm-4.7@fireworks"],
-			settings: Settings.isolated(),
-			modelRegistry: {
-				refresh: async () => {},
-				getAvailable: () => [routedModel],
-				getApiKey: async () => "test-key",
-			} as never,
-			enableLsp: false,
-		});
-
-		expect(childFallbackChains?.["subagent:issue-2750-routed"]).toEqual(["openrouter/z-ai/glm-4.7@fireworks"]);
-	});
-
 	it("defers unresolved explicit subagent model selectors instead of picking an available default", async () => {
 		const defaultModel = model("zai", "glm-5.2");
 		let childModel: Model | undefined;
@@ -791,16 +760,19 @@ describe("subagent runtime fallback on a real provider error", () => {
 					: { content: [{ type: "toolCall", name: "yield", arguments: { type: "result", data: "recovered" } }] },
 		});
 		const mocks = [primary, fallback];
-		const find = modelRegistry.find.bind(modelRegistry);
-		vi.spyOn(modelRegistry, "find").mockImplementation(
-			(provider, modelId) => mocks.find(m => m.provider === provider && m.id === modelId) ?? find(provider, modelId),
-		);
-		const hasProvider = modelRegistry.hasProvider.bind(modelRegistry);
-		vi.spyOn(modelRegistry, "hasProvider").mockImplementation(
-			provider => mocks.some(m => m.provider === provider) || hasProvider(provider),
-		);
-		const available = modelRegistry.getAvailable.bind(modelRegistry);
-		vi.spyOn(modelRegistry, "getAvailable").mockImplementation(kind => [...mocks, ...available(kind)]);
+		for (const mock of mocks) {
+			modelRegistry.registerProvider(mock.provider, {
+				api: mock.api,
+				baseUrl: mock.baseUrl,
+				apiKey: "test-key",
+				models: [mock],
+				streamSimple: (requestModel, context, options) => {
+					const target = mocks.find(candidate => candidate.provider === requestModel.provider);
+					if (!target) throw new Error(`Unknown mock provider: ${requestModel.provider}`);
+					return target.stream(requestModel, context, options);
+				},
+			});
+		}
 		try {
 			const result = await runSubprocess({
 				cwd: path.join(root, "home", "work"),

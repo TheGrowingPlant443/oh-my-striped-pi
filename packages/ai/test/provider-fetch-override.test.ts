@@ -4,9 +4,9 @@ import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-response
 import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 
-const openAIResponsesModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
+const openAIResponsesModel = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 const openAICompletionsModel = {
-	...(getBundledModel("openai", "gpt-4o-mini") as Model<"openai-completions">),
+	...(getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">),
 	api: "openai-completions",
 } satisfies Model<"openai-completions">;
 

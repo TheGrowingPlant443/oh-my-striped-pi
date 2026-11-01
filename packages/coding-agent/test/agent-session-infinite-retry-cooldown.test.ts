@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as path from "node:path";
 import { Agent } from "@oh-my-pi/pi-agent-core";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -10,8 +11,33 @@ import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 const COOLDOWN_MS = 5 * 60 * 1000; // matches UNKNOWN reason cooldown in noteRetryFallbackCooldown
+const fallbackA = buildModel({
+	id: "fallback-a",
+	name: "Company fallback A",
+	provider: "company-retry-a",
+	api: "openai-completions",
+	baseUrl: "https://company.example.invalid/v1",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 8192,
+});
+const fallbackB = buildModel({
+	id: "fallback-b",
+	name: "Company fallback B",
+	provider: "company-retry-b",
+	api: "ollama-chat",
+	baseUrl: "http://127.0.0.1:11434",
+	reasoning: false,
+	input: ["text"],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+	contextWindow: 128_000,
+	maxTokens: 8192,
+});
 
 /**
  * Reproduces the zombie retry loop: when ALL models in a fallback chain hit a
@@ -29,10 +55,17 @@ describe("AgentSession infinite retry via cooldown-expiry revert", () => {
 	beforeAll(async () => {
 		tempDir = TempDir.createSync("@pi-infinite-retry-");
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "anthropic-test-key");
-		authStorage.keys.setRuntime("openai", "openai-test-key");
-		authStorage.keys.setRuntime("google", "google-test-key");
+		authStorage.keys.setRuntime("github-copilot", "anthropic-test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		for (const model of [fallbackA, fallbackB]) {
+			authStorage.keys.setRuntime(model.provider, `${model.provider}-test-key`);
+			modelRegistry.registerProvider(model.provider, {
+				api: model.api,
+				baseUrl: model.baseUrl,
+				apiKey: `${model.provider}-test-key`,
+				models: [toProviderModelConfig(model)],
+			});
+		}
 	});
 
 	afterAll(() => {
@@ -53,10 +86,8 @@ describe("AgentSession infinite retry via cooldown-expiry revert", () => {
 	});
 
 	it("does not revert to the primary model while an automatic retry saga is in flight", async () => {
-		const primaryModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		const fallbackA = getBundledModel("openai", "gpt-4o-mini");
-		const fallbackB = getBundledModel("google", "gemini-2.0-flash");
-		if (!primaryModel || !fallbackA || !fallbackB) {
+		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.6");
+		if (!primaryModel) {
 			throw new Error("Expected bundled test models to exist");
 		}
 

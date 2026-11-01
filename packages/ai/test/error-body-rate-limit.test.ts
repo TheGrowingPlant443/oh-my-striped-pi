@@ -28,7 +28,7 @@ import { classify, Flag, is, retriable } from "@oh-my-pi/pi-ai/error/flags";
 import { isUsageLimitOutcome } from "@oh-my-pi/pi-ai/error/rate-limit";
 import { ProviderHttpError } from "@oh-my-pi/pi-ai/error/classes";
 import { createInBandProviderError, createInBandProviderErrorFromText } from "@oh-my-pi/pi-ai/error/body-error";
-import { minimaxTokenPlanOpenAIModel } from "./helpers";
+import { copilotCompletionsModel } from "./helpers";
 
 function createSseResponse(events: unknown[]): Response {
 	const payload = `${events
@@ -56,7 +56,7 @@ function baseContext(): Context {
 
 /** Stream one in-band frame through the real provider and return the finalized message. */
 async function streamFrame(frame: unknown) {
-	const model = minimaxTokenPlanOpenAIModel("minimax-code-cn", "MiniMax-M3");
+	const model = copilotCompletionsModel("MiniMax-M3");
 	return streamOpenAICompletions(model, baseContext(), {
 		apiKey: "test-key",
 		fetch: createMockFetch([frame, "[DONE]"]),
@@ -210,7 +210,7 @@ function makeResponsesModel(): Model<"openai-responses"> {
 		api: "openai-responses",
 		name: "GPT Test",
 		id: "gpt-test",
-		provider: "openai",
+		provider: "github-copilot",
 		baseUrl: "https://api.openai.com/v1",
 		contextWindow: 8192,
 		maxTokens: 2048,
@@ -225,7 +225,7 @@ function makeResponsesOutput(): AssistantMessage {
 		role: "assistant",
 		content: [],
 		timestamp: Date.now(),
-		provider: "openai",
+		provider: "github-copilot",
 		model: "gpt-test",
 		api: "openai-responses",
 		usage: {

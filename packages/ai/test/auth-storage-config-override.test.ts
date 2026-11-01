@@ -1,3 +1,7 @@
+import { beforeEach as beforeEachOAuthFixture, afterEach as afterEachOAuthFixture } from "bun:test";
+import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
+beforeEachOAuthFixture(() => mockOAuthApiKey());
+afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
@@ -47,56 +51,56 @@ describe("AuthStorage config-override apiKey", () => {
 	test("setConfigApiKey beats OAuth access token for getApiKey", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await seedOAuth("anthropic", "oauth-from-broker");
-			authStorage.keys.setConfig("anthropic", "gateway-bearer");
+			await seedOAuth("github-copilot", "oauth-from-broker");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer");
 
-			expect(await authStorage.keys.get("anthropic")).toBe("gateway-bearer");
-			expect(await authStorage.keys.peek("anthropic")).toBe("gateway-bearer");
+			expect(await authStorage.keys.get("github-copilot")).toBe("gateway-bearer");
+			expect(await authStorage.keys.peek("github-copilot")).toBe("gateway-bearer");
 		});
 	});
 
 	test("runtime override (--api-key) still beats setConfigApiKey", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await seedOAuth("anthropic", "oauth-from-broker");
-			authStorage.keys.setConfig("anthropic", "gateway-bearer");
-			authStorage.keys.setRuntime("anthropic", "cli-flag-bearer");
+			await seedOAuth("github-copilot", "oauth-from-broker");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer");
+			authStorage.keys.setRuntime("github-copilot", "cli-flag-bearer");
 
-			expect(await authStorage.keys.get("anthropic")).toBe("cli-flag-bearer");
+			expect(await authStorage.keys.get("github-copilot")).toBe("cli-flag-bearer");
 		});
 	});
 
 	test("removeConfigApiKey restores OAuth resolution", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await seedOAuth("anthropic", "oauth-from-broker");
-			authStorage.keys.setConfig("anthropic", "gateway-bearer");
-			expect(await authStorage.keys.get("anthropic")).toBe("gateway-bearer");
+			await seedOAuth("github-copilot", "oauth-from-broker");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer");
+			expect(await authStorage.keys.get("github-copilot")).toBe("gateway-bearer");
 
-			authStorage.keys.removeConfig("anthropic");
-			expect(await authStorage.keys.get("anthropic")).toBe("oauth-from-broker");
+			authStorage.keys.removeConfig("github-copilot");
+			expect(await authStorage.keys.get("github-copilot")).toBe("oauth-from-broker");
 		});
 	});
 
 	test("clearConfigApiKeys drops every config override at once", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await seedOAuth("anthropic", "oauth-anthropic");
-			await seedOAuth("openai-codex", "oauth-codex");
-			authStorage.keys.setConfig("anthropic", "gateway-bearer-A");
-			authStorage.keys.setConfig("openai-codex", "gateway-bearer-B");
+			await seedOAuth("github-copilot", "oauth-github-copilot");
+			await seedOAuth("local", "oauth-codex");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer-A");
+			authStorage.keys.setConfig("local", "gateway-bearer-B");
 
 			authStorage.keys.clearConfig();
 
-			expect(await authStorage.keys.get("anthropic")).toBe("oauth-anthropic");
-			expect(await authStorage.keys.get("openai-codex")).toBe("oauth-codex");
+			expect(await authStorage.keys.get("github-copilot")).toBe("oauth-github-copilot");
+			expect(await authStorage.keys.get("local")).toBe("oauth-codex");
 		});
 	});
 
 	test("setConfigApiKey suppresses OAuth account_uuid attribution", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await authStorage.credentials.set("anthropic", [
+			await authStorage.credentials.set("github-copilot", [
 				{
 					type: "oauth",
 					access: "oauth-with-account",
@@ -106,21 +110,21 @@ describe("AuthStorage config-override apiKey", () => {
 				},
 			]);
 			// Sanity: without override, accountId is exposed.
-			expect(authStorage.oauth.identity("anthropic")?.accountId).toBe("acc-123");
+			expect(authStorage.oauth.identity("github-copilot")?.accountId).toBe("acc-123");
 
-			authStorage.keys.setConfig("anthropic", "gateway-bearer");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer");
 			// With an explicit config bearer in play, OAuth account attribution
 			// must NOT leak — outbound auth is the gateway bearer, not OAuth.
-			expect(authStorage.oauth.identity("anthropic")?.accountId).toBeUndefined();
+			expect(authStorage.oauth.identity("github-copilot")?.accountId).toBeUndefined();
 		});
 	});
 
 	test("describeCredentialSource reports config override", async () => {
 		await withEnv(SUPPRESS_ANTHROPIC_ENV, async () => {
 			if (!authStorage) throw new Error("test setup failed");
-			await seedOAuth("anthropic", "oauth-from-broker");
-			authStorage.keys.setConfig("anthropic", "gateway-bearer");
-			expect(authStorage.keys.describe("anthropic")).toBe("config override (models.yml)");
+			await seedOAuth("github-copilot", "oauth-from-broker");
+			authStorage.keys.setConfig("github-copilot", "gateway-bearer");
+			expect(authStorage.keys.describe("github-copilot")).toBe("config override (models.yml)");
 		});
 	});
 });

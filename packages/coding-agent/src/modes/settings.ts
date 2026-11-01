@@ -481,7 +481,7 @@ export const cfgTuiAutoGraph = register({
 			{
 				value: "auto",
 				label: "Auto",
-				description: "Smart when the judge role resolves to a native TypeSafe jev model, else Always",
+				description: "Smart when a local or GitHub Copilot judge is available, else Always",
 			},
 			{
 				value: "smart",
@@ -508,20 +508,6 @@ export const cfgTuiReactions = register({
 		group: "Display",
 		label: "Agent Reactions",
 		description: "Invite the agent to react to your message with an emoji badge on its bubble",
-	},
-});
-
-export const cfgTuiCodexResetFireworks = register({
-	id: "tui.codexResetFireworks",
-	type: "boolean",
-	default: false,
-	ui: {
-		tab: "appearance",
-		group: "Display",
-		label: "Codex Reset Fireworks",
-		get description() {
-			return `Celebrate unscheduled Codex weekly usage resets and newly banked saved resets with a top-third fireworks overlay that remains until ${formatKeyHint("escape")}`;
-		},
 	},
 });
 
@@ -1131,35 +1117,6 @@ export const cfgStartupSetupWizard = register({
 		group: "Startup & Updates",
 		label: "Setup Wizard",
 		description: "Show newly added onboarding steps once per setup version",
-	},
-});
-
-export const cfgStartupCheckUpdate = register({
-	id: "startup.checkUpdate",
-	type: "boolean",
-	default: true,
-	ui: {
-		tab: "interaction",
-		group: "Startup & Updates",
-		label: "Check for Updates",
-		description: "Check for omp updates on startup",
-	},
-});
-
-export const cfgUpdateChannel = register({
-	id: "update.channel",
-	type: "enum",
-	values: ["stable", "canary"] as const,
-	default: "stable",
-	ui: {
-		tab: "interaction",
-		group: "Startup & Updates",
-		label: "Update Channel",
-		description: "Update channel used by omp update and the startup update check",
-		options: [
-			{ value: "stable", label: "Stable" },
-			{ value: "canary", label: "Canary" },
-		],
 	},
 });
 

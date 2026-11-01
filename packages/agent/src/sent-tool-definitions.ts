@@ -2,7 +2,7 @@ import type { Message, Tool } from "@oh-my-pi/pi-ai";
 
 /**
  * Last wire definition this Agent sent for each tool name, so a provider that keeps
- * withdrawn tools declared (Anthropic `tool_removal`) can re-declare them byte-identically.
+ * withdrawn tools declared (`tool_removal`) can re-declare them byte-identically.
  * Used by prepareProviderCall and Agent.buildSideRequestContext.
  */
 export class SentToolDefinitions {

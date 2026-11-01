@@ -186,7 +186,7 @@ await Settings.init({ inMemory: true, cwd: dir.path() });
 initTheme();
 const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 const registry = new ModelRegistry(auth);
-const model = registry.find("anthropic", "claude-sonnet-4-5");
+const model = registry.getAll().find(model => model.provider === "github-copilot");
 if (!model) throw new Error("expected bundled model");
 const session = new AgentSession({
 	agent: new Agent({ initialState: { model, systemPrompt: ["test"], tools: [], messages: [] } }),

@@ -11,6 +11,10 @@
 - Added `AgentTool.approvalRestrictionPaths` so tools can report the paths they read, allowing restricted-folder approvals to cover those paths without remembering approval separately for each path.
 - Added `Agent.logContext`, which adds custom context fields to every log record written during an agent run.
 
+### Removed
+
+- Removed hosted Codex/Bedrock-specific compaction and Cursor execution hooks; local token accounting and retained generic protocols remain.
+
 ## [18.13.3] - 2026-10-28
 
 ### Changed

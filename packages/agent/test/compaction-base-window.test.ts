@@ -43,8 +43,8 @@ describe("baseWindowTokens", () => {
 			timestamp: new Date(Date.UTC(2026, 9, 1, 0, 0, index)).toISOString(),
 			message: { role: "user", content: `turn-${index} ${"word ".repeat(2_000)}`, timestamp: index },
 		}));
-		const bundled = getBundledModel("anthropic", "claude-haiku-4-5");
-		if (!bundled) throw new Error("Expected bundled anthropic/claude-haiku-4-5 model");
+		const bundled = getBundledModel("github-copilot", "claude-haiku-4.5");
+		if (!bundled) throw new Error("Expected bundled github-copilot/claude-haiku-4.5 model");
 		const model = { ...bundled, contextWindow: 100_000 };
 		// 20K of ~2K-token turns would leave the compacted context above 0.8 × 40K once the
 		// 16K reserve is counted, so it would compact again at once; the tail is capped at
@@ -75,8 +75,8 @@ describe("baseWindowTokens", () => {
 					role: "assistant",
 					content: [{ type: "text", text: `old-assistant ${"word ".repeat(800)}` }],
 					api: "anthropic-messages",
-					provider: "anthropic",
-					model: "claude-haiku-4-5",
+					provider: "github-copilot",
+					model: "claude-haiku-4.5",
 					usage: {
 						input: 180_000,
 						output: 1_000,
@@ -120,8 +120,8 @@ describe("baseWindowTokens", () => {
 				message: { role: "user", content: `turn-3 ${"word ".repeat(5_000)}`, timestamp: 5 },
 			},
 		];
-		const bundled = getBundledModel("anthropic", "claude-haiku-4-5");
-		if (!bundled) throw new Error("Expected bundled anthropic/claude-haiku-4-5 model");
+		const bundled = getBundledModel("github-copilot", "claude-haiku-4.5");
+		if (!bundled) throw new Error("Expected bundled github-copilot/claude-haiku-4.5 model");
 		const smallModel = { ...bundled, contextWindow: 32_000, maxTokens: 4_096 };
 		const prep = prepareCompaction(
 			entries,

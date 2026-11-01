@@ -191,8 +191,6 @@ jobs:
               cargo deny --locked --offline check licenses sources
          - name: Type check workspace
            run: bun run ci:check:full
-         - name: Build collab web
-           run: bun run collab:web:build
 
    # MODULE.bazel.lock caches the crate_universe (@crates) extension result,
    # keyed by Cargo.toml/Cargo.lock/member-manifest hashes. While current, a
@@ -590,7 +588,7 @@ jobs:
               # Not `test:scripts`: scripts/install.test.ts fails on main
               # (its install.sh smoke-check executes a fake binary), so running
               # the whole group here would red this job on an unrelated break.
-              bun test scripts/release.test.ts scripts/ci-build-upload.test.ts
+              bun test scripts/release.test.ts
 
    test_coding_agent_singleton:
       name: Test coding-agent singleton/global-state (TS)
@@ -729,7 +727,7 @@ jobs:
    # whose artifacts supply their addons. bun cross-compiles every target;
    # macOS binaries are Developer ID signed and notarized here too
    # (rcodesign). release_smoke then runs each binary on its own platform.
-   # Publishing (npm leaves, GitHub release, build.stencil.so, core npm) is gated on
+   # Publishing (npm leaves, GitHub release, core npm) is gated on
    # release_gate downstream.
    release_binary:
       name: "Release binary: ${{ matrix.target_id }}"
@@ -861,7 +859,7 @@ jobs:
    # artifact, then `--version` and `--smoke-test` in a throwaway home. macOS
    # legs first run Apple's own signature check, and launch under the final
    # signature (hardened runtime and entitlements included when signed). These
-   # are the exact bytes release_github and release_build publish, so no job
+   # are the exact bytes release_github publishes, so no job
    # re-verifies the published assets.
    release_smoke:
       name: "Smoke release binary: ${{ matrix.target_id }}"
@@ -1102,60 +1100,17 @@ jobs:
               body_path: release-notes.md
               generate_release_notes: true
 
-   # Publishes the release binaries to build.stencil.so, which serves them
-   # (with binary patches between releases) to `omp update`, the install
-   # scripts' binary mode, and the Homebrew formula. Canary tags upload to the
-   # canary channel (derived script-side). Also publishes the integrity-pinned
-   # shared HTML export viewer before npm consumers can reference its URL.
-   # Not gated on skip_npm: binary clients never read npm.
-   release_build:
-      name: Publish to build.stencil.so
-      if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
-         needs.release_gate.result == 'success' &&
-         needs.release_binary.result == 'success' &&
-         needs.release_smoke.result == 'success' &&
-         needs.release_github.result == 'success' }}
-      needs: [release_metadata, release_gate, release_binary, release_smoke, release_github]
-      runs-on: ubuntu-22.04
-      # `id-token: write` lets the upload mint the GitHub OIDC token (audience
-      # build.stencil.so) the service authenticates the publisher with.
-      permissions:
-         id-token: write
-         contents: read
-      steps:
-         - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-         - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-           with:
-              bun-version: 1.4.4
-         - name: Download release binaries
-           uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-           with:
-              pattern: omp-binary-*
-              path: packages/coding-agent/binaries
-              merge-multiple: true
-         - name: Download shared export viewer
-           uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-           with:
-              name: omp-export-viewer
-              path: packages/coding-agent/export-assets
-         # Dependency-free script (bun APIs + curl), so no `bun install`.
-         - name: Publish to build.stencil.so
-           run: bun scripts/ci-build-upload.ts "${{ needs.release_metadata.outputs.release-tag }}" packages/coding-agent/binaries/omp-*
-
    release_npm:
       name: Publish to npm
       if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
          needs.release_binary.result == 'success' &&
          needs.release_smoke.result == 'success' &&
-         needs.release_build.result == 'success' &&
          needs.release_native_leaves.result == 'success' &&
          !inputs.skip_npm }}
       # release_native_leaves must finish first: the core package lists the
       # leaf packages as lockstep-versioned optionalDependencies, so installs
-      # resolve them the moment the core version is live. release_build too:
-      # binary updates install what build.stencil.so published (update-cli.ts),
-      # and HTML exports load its pinned viewer, so the build service must lead npm.
-      needs: [release_metadata, release_binary, release_smoke, release_build, release_native_leaves]
+      # resolve them the moment the core version is live.
+      needs: [release_metadata, release_binary, release_smoke, release_native_leaves]
       runs-on: ubuntu-22.04
       # `id-token: write` lets npm mint the GitHub OIDC token it exchanges for a
       # short-lived publish token (trusted publishing + provenance). When a
@@ -1208,17 +1163,17 @@ jobs:
               NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
            run: bun run ci:release:publish
 
-   # Regenerate the Homebrew tap formula (can1357/homebrew-tap) from the build
-   # release_build just published to build.stencil.so and push it; the formula
-   # downloads from there. release_smoke already ran those binaries on their
+   # Regenerate the Homebrew tap formula (can1357/homebrew-tap) from the GitHub
+   # release and push it; the formula downloads the release assets.
+   # release_smoke already ran those binaries on their
    # own platforms. No-ops when HOMEBREW_TAP_DEPLOY_KEY is unset, so a release
    # never blocks on tap access.
    release_brew:
       name: Update Homebrew tap
       if: ${{ needs.release_metadata.outputs.is-release == 'true' && !cancelled() &&
          needs.release_metadata.outputs.channel != 'canary' &&
-         needs.release_build.result == 'success' }}
-      needs: [release_metadata, release_build]
+         needs.release_github.result == 'success' }}
+      needs: [release_metadata, release_github]
       runs-on: ubuntu-22.04
       env:
          HAS_TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY != '' }}

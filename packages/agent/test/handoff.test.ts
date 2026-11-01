@@ -18,9 +18,9 @@ function createAssistantMessage(content: AssistantMessage["content"]): Assistant
 		role: "assistant",
 		content,
 		timestamp: Date.now(),
-		provider: "mock",
+		provider: "local",
 		model: "mock",
-		api: "mock",
+		api: "local-inference",
 		usage: {
 			input: 0,
 			output: 0,
@@ -56,9 +56,9 @@ function createHandoffTool(): AgentTool<typeof handoffToolSchema> {
 }
 
 function getTestModel(): Model {
-	const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 	if (!model) {
-		throw new Error("Expected built-in anthropic model to exist");
+		throw new Error("Expected bundled github-copilot model");
 	}
 	return model;
 }

@@ -1,16 +1,4 @@
-/**
- * Resolves the {@link Judge} that answers typed judgments through the `judge`
- * model role. The chain is re-resolved at most every {@link CANDIDATE_TTL_MS}
- * so live catalog discovery, role edits, credential changes, and session
- * fallback all take effect without recreating feature consumers, while bulk
- * callers (`judge_batch`) do not re-scan the whole catalog per item.
- *
- * Every provider attempt is attributed exactly once: native judgment
- * requests by {@link nativeJudge}, prompted chat attempts by the chat
- * backend's `onAttempt`. Each report reaches both {@link JudgeDeps.onUsage}
- * (the session ledger) and one `judgment` telemetry span, so a judgment backed
- * by a chat model is never billed again from its aggregated result.
- */
+/** Typed judgments through local, configured native, or chat-backed judge roles. */
 import {
 	type AgentTelemetry,
 	type AgentTelemetryConfig,
@@ -19,9 +7,7 @@ import {
 } from "@oh-my-pi/pi-agent-core";
 import {
 	type Answer,
-	type AssistantMessage,
 	type BoxEdges,
-	chatTextBackend,
 	checkBoxQuestions,
 	createNativeJudge,
 	type ImageContent,
@@ -30,24 +16,25 @@ import {
 	nativeJudgmentImageBounds,
 	nativeJudgmentSupportsBoxes,
 	nativeJudgmentSupportsImages,
+	type NativeJudge,
+	type Question,
+	tokenUsage,
+	type AssistantMessage,
+	chatTextBackend,
 	type Judge,
 	type JudgeOptions,
 	type JudgmentRequest,
 	type JudgmentResult,
 	type Model,
-	type NativeJudge,
-	type Question,
 	type Questions,
 	type TextBackend,
 	type TextCompletion,
 	type TextPrompt,
 	TextJudge,
-	TYPESAFE_PROVIDER,
-	tokenUsage,
 	type Usage,
 } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
-import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/images/shared";
+import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/judgment";
 import { sendsImageInputOnWire } from "@oh-my-pi/pi-ai/providers/vision-guard";
 import { calculateCost } from "@oh-my-pi/pi-catalog/models";
 import { logger, prompt } from "@oh-my-pi/pi-utils";
@@ -70,7 +57,7 @@ export * from "./cache";
 export interface JudgmentUsage {
 	/** Why the judgment ran; see {@link JudgeDeps.purpose}. */
 	purpose: string;
-	/** Model role the call resolved through, or `typesafe` for native judgments. */
+	/** Model role used for this judgment. */
 	role: string;
 	api: string;
 	provider: string;
@@ -89,24 +76,17 @@ export interface JudgeDeps {
 	metadataResolver?: (provider: string) => Record<string, unknown> | undefined;
 	/** Why the judgment runs (`find`, `ttsr`, `judge_batch`, …); labels ledger entries and telemetry spans. */
 	purpose: string;
-	/**
-	 * Receives every billed attempt exactly once — failed ones included, cache
-	 * hits never. Wire {@link journalJudgmentUsage} here to bill the session.
-	 */
+	/** Receives every billed attempt, including failures, for the session ledger. */
 	onUsage?: (usage: JudgmentUsage) => void;
-	/** Host telemetry; every attempt, cache hits included, emits one `judgment` span. */
+	/** Host telemetry; every billed attempt emits one `judgment` span. */
 	telemetry?: AgentTelemetryConfig;
-	/** Answer cache for native judgments; omitted runs every question against the provider. */
+	/** Local answer cache for native protocols; absent means no cache. */
 	cache?: JudgmentCache;
 	/** The session tree's cost gate: refuses each candidate attempt at the cap and adds billed attempts' cost. */
 	costGate?: CostGate;
 }
 
-/**
- * One attempt as observed by a backend wrapper, before {@link ChainJudge}
- * stamps its purpose. `questions`/`cachedQuestions` are set by native
- * judgments, which consult the answer cache.
- */
+/** One backend attempt before its purpose is stamped by the role chain. */
 interface JudgmentAttempt extends Omit<JudgmentUsage, "purpose"> {
 	startedAt: number;
 	responseModel?: string;
@@ -173,12 +153,7 @@ interface RegistryWithRejections extends ModelRegistry {
 	};
 }
 
-/**
- * The resolved `judge` role chain and its text {@link judgeRoleChain}, reused for {@link CANDIDATE_TTL_MS}
- * across judges over the same settings and registry. A settings change (e.g. a new judge role) resolves
- * afresh; registry or credential changes still wait out the TTL, so {@link hasNativeJudge} (uncached) can
- * briefly see a different chain after a login or discovery change.
- */
+/** Reuse the resolved role chain briefly across bulk judgment requests. */
 function cachedJudgeRoleChain(
 	settings: Settings,
 	registry: RegistryWithRejections,
@@ -201,7 +176,7 @@ function cachedJudgeRoleChain(
 	return entry;
 }
 
-/** Append a compatible session model when no candidate is native and the chain does not already route to it. */
+/** Append a compatible session model when the role does not already route to it. */
 function withSessionFallback(
 	candidates: RoleChainCandidate[],
 	sessionModel: Model | undefined,
@@ -221,7 +196,7 @@ function withSessionFallback(
 	return [...candidates, { model: sessionModel, explicit: false }];
 }
 
-/** Which backend a judge-role candidate routes to: native System One decisions, on-device keywords, or a chat model. */
+/** Native protocols, on-device keywords, or prompted chat judgments. */
 export type JudgeKind = "native" | "local" | "online";
 
 /** Classify a role candidate by model API, never by provider identity. */
@@ -246,23 +221,19 @@ function supportsImageJudgment(model: Model): boolean {
 	}
 }
 
-/**
- * The `judge` role's candidates in attempt order, drawn from credentialed
- * judge-capable models. From the first native candidate on, only native
- * candidates remain: a prompted model never stands in for a failed native
- * judgment, whose calibrated probabilities it cannot reproduce.
- */
+/** A prompted model must not replace a native judge's calibrated probabilities. */
 function textJudgeRoleChain(chain: RoleChainCandidate[]): RoleChainCandidate[] {
 	const firstNative = chain.findIndex(candidate => kindOf(candidate) === "native");
-	if (firstNative < 0) return chain;
-	return chain.filter((candidate, index) => index < firstNative || kindOf(candidate) === "native");
+	return firstNative < 0
+		? chain
+		: chain.filter((candidate, index) => index < firstNative || kindOf(candidate) === "native");
 }
 
-/**
- * Filter candidates that cannot take `images` before applying the native-only tail policy. A native
- * judge gets each image fitted into its bounds ({@link fitNativeImages}), so only its image support and
- * count cap decide; prompted chat models normalize images per model, so their image support alone decides.
- */
+function nativeTakesImages(model: Model, images: readonly ImageContent[]): boolean {
+	const bounds = nativeJudgmentImageBounds(model);
+	return bounds !== undefined && images.length <= (bounds.maxCount ?? images.length);
+}
+
 function imageJudgeRoleChain(chain: RoleChainCandidate[], images: readonly ImageContent[]): RoleChainCandidate[] {
 	return textJudgeRoleChain(
 		chain.filter(candidate =>
@@ -273,26 +244,14 @@ function imageJudgeRoleChain(chain: RoleChainCandidate[], images: readonly Image
 	);
 }
 
-/** Whether native `model` takes `images`: image support within its count cap. Size bounds never decide; {@link fitNativeImages} fits every image into them. */
-function nativeTakesImages(model: Model, images: readonly ImageContent[]): boolean {
-	const bounds = nativeJudgmentImageBounds(model);
-	return bounds !== undefined && images.length <= (bounds.maxCount ?? images.length);
-}
-
-/** Whether `questions` include a box question, which only natives whose wire forwards them answer. */
 function asksForBoxes(questions: Questions): boolean {
 	for (const id in questions) if (questions[id].type === "box") return true;
 	return false;
 }
 
-/** {@link FittedImage.content} of an image sent as is. */
 const WHOLE_IMAGE: BoxEdges = { top: 0, bottom: 1, left: 0, right: 1 };
 
-/**
- * `images` sized into `model`'s native judgment bounds, which the API enforces by rejecting rather than
- * resizing: an image already within them is sent as is, any other goes through {@link fitImage}. A
- * request-wide byte cap is split evenly so the fitted set also fits as a whole.
- */
+/** Fit images to native transport bounds before sending; split the total byte cap evenly. */
 async function fitNativeImages(model: Model, images: readonly ImageContent[]): Promise<FittedImage[]> {
 	const bounds = nativeJudgmentImageBounds(model);
 	if (!bounds) return images.map(image => ({ image, content: WHOLE_IMAGE }));
@@ -301,7 +260,6 @@ async function fitNativeImages(model: Model, images: readonly ImageContent[]): P
 		Math.floor((bounds.maxTotalBytes ?? Infinity) / images.length),
 	);
 	const fitted: FittedImage[] = [];
-	// Sequential on purpose: each fit decodes and re-encodes a whole image.
 	for (const image of images) {
 		const within = nativeJudgmentAcceptsImages(model, [image]) && Buffer.byteLength(image.data, "base64") <= maxBytes;
 		fitted.push(within ? { image, content: WHOLE_IMAGE } : await fitImage(image, { ...bounds, maxBytes }));
@@ -309,11 +267,7 @@ async function fitNativeImages(model: Model, images: readonly ImageContent[]): P
 	return fitted;
 }
 
-/**
- * `result` with each box answer re-measured on the source image its question names: Jev measures the
- * image it was sent, and padding a fit shrinks the source to {@link FittedImage.content} of it. Answers
- * are copied, never mutated, since the answer cache may share them.
- */
+/** Re-measure cached/sent-image boxes on their source images without mutating cached answers. */
 function sourceBoxes<Q extends Questions>(
 	questions: Q,
 	result: JudgmentResult<Q>,
@@ -325,31 +279,22 @@ function sourceBoxes<Q extends Questions>(
 		const answer: Answer = result.answers[id];
 		if (question.type !== "box" || answer.type !== "box") continue;
 		answers ??= { ...result.answers };
-		answers[id] = { ...answer, box: unfitBox(answer.box, fitted[question.image].content) };
+		const content = fitted[question.image].content;
+		const x = (edge: number) => Math.min(1, Math.max(0, (edge - content.left) / (content.right - content.left)));
+		const y = (edge: number) => Math.min(1, Math.max(0, (edge - content.top) / (content.bottom - content.top)));
+		const box = answer.box;
+		answers[id] = {
+			...answer,
+			box: { top: y(box.top), bottom: y(box.bottom), left: x(box.left), right: x(box.right) },
+		};
 	}
-	// Only box answers change, and they stay box answers.
 	return answers ? { ...result, answers: answers as JudgmentResult<Q>["answers"] } : result;
 }
 
-/** `box`, measured on a fitted canvas, measured on the source whose edges on it are `content`; edges in the padding clamp onto the source. */
-function unfitBox(box: BoxEdges, content: BoxEdges): BoxEdges {
-	const x = (edge: number) => Math.min(1, Math.max(0, (edge - content.left) / (content.right - content.left)));
-	const y = (edge: number) => Math.min(1, Math.max(0, (edge - content.top) / (content.bottom - content.top)));
-	return { top: y(box.top), bottom: y(box.bottom), left: x(box.left), right: x(box.right) };
-}
-
-function judgeRoleChain(settings: Settings, registry: ModelRegistry): RoleChainCandidate[] {
-	return textJudgeRoleChain(resolveRoleChain("judge", settings, roleCandidatePool("judge", settings, registry)));
-}
-
-/**
- * Whether the `judge` role resolves first to a native judgment backend
- * (TypeSafe jev, OpenRouter or OpenAI Decisions, Workers AI Clef) rather than a
- * prompted on-device or chat model. Judge-heavy features gate on it, e.g. the `find`
- * tool under `find.enabled: auto`.
- */
 export function hasNativeJudge(settings: Settings, registry: ModelRegistry): boolean {
-	const [primary] = judgeRoleChain(settings, registry);
+	const [primary] = textJudgeRoleChain(
+		resolveRoleChain("judge", settings, roleCandidatePool("judge", settings, registry)),
+	);
 	return primary !== undefined && kindOf(primary) === "native";
 }
 
@@ -484,16 +429,15 @@ export class ChainJudge implements Judge {
 			throw new Error("judgment: no compatible judge candidate supports images");
 		}
 		if (candidates.length === 0) {
-			if (request && asksForBoxes(request.questions)) {
+			if (request && asksForBoxes(request.questions))
 				throw new Error("judgment: no judge candidate answers box questions");
-			}
 			if (requiresImages) throw new Error("judgment: no compatible judge candidate supports images");
 			throw new Error("judgment: no judge model available");
 		}
 		throw new Error(`judgment: every judge candidate failed: ${lastFailure ?? lastUnavailable ?? "unknown error"}`);
 	}
 
-	/** Attribute one attempt: the ledger unless answered wholly from cache, and one telemetry span. */
+	/** Attribute one billed attempt to the ledger and telemetry. */
 	#report(attempt: JudgmentAttempt): void {
 		const { startedAt, responseModel, questions, cachedQuestions, ...rest } = attempt;
 		const usage: JudgmentUsage = { purpose: this.#deps.purpose, ...rest };
@@ -524,7 +468,6 @@ export class ChainJudge implements Judge {
 		const { settings, registry, sessionModel } = this.#deps;
 		const { roleChain, list: chain } = cachedJudgeRoleChain(settings, registry);
 		const images = request?.images ?? [];
-		// A prompted model cannot locate anything, so no session fallback either.
 		if (request && asksForBoxes(request.questions)) {
 			return roleChain.filter(
 				candidate => nativeJudgmentSupportsBoxes(candidate.model) && nativeTakesImages(candidate.model, images),
@@ -540,11 +483,19 @@ export class ChainJudge implements Judge {
 	async #createJudge(candidate: RoleChainCandidate, signal: AbortSignal | undefined): Promise<Judge | undefined> {
 		const model = candidate.model;
 		if (model.api === "local-inference") return new TextJudge(new LocalTextBackend(model.id));
+		if (isJudgmentApi(model.api) && !model.baseUrl?.trim()) {
+			throw new AIError.ConfigurationError("Native judgment requires an explicit base URL");
+		}
 		if (!(await this.#deps.registry.getApiKey(model, this.#deps.sessionId, { signal }))) return undefined;
 		const apiKey = this.#deps.registry.resolver(model, this.#deps.sessionId);
 		if (isJudgmentApi(model.api)) {
-			const headers = await this.#deps.registry.resolveModelHeaders(model, signal);
-			const judge = createNativeJudge(model, { apiKey, headers });
+			const judge = createNativeJudge(
+				{
+					...model,
+					resolveHeaders: headerSignal => this.#deps.registry.resolveModelHeaders(model, headerSignal),
+				},
+				{ apiKey },
+			);
 			return nativeJudge(judge, model, this.#deps.cache, attempt => this.#report(attempt));
 		}
 		// Resolve metadata after getApiKey so the session-sticky credential is recorded first.
@@ -600,15 +551,7 @@ class LocalTextBackend implements TextBackend {
 	}
 }
 
-/**
- * Native judgment backend. Questions already answered about the same state
- * under this model come from `cache`; only the rest reach the provider (none
- * when every answer is cached). Each call reports exactly one attempt — failed
- * requests included so the ledger shows why a judgment errored. Most judgment
- * APIs report tokens only, so a response without a billed amount is priced from
- * the catalog model; a route that bills (OpenRouter) keeps its reported cost.
- * Attempts and results carry the catalog id, not the wire id the judge sends.
- */
+/** Bill native attempts once, use cached answers locally, and preserve partial usage on failed batches. */
 function nativeJudge(
 	judge: NativeJudge,
 	model: Model,
@@ -646,7 +589,7 @@ function nativeJudge(
 				pendingCount++;
 			}
 			const attempt = {
-				role: TYPESAFE_PROVIDER,
+				role: "judge",
 				api: judge.api,
 				provider: judge.provider,
 				model: model.id,
@@ -672,7 +615,6 @@ function nativeJudge(
 						},
 					);
 				} catch (error) {
-					// A split judgment that fails still billed the chunks that succeeded.
 					if (partial.cost.total === 0) calculateCost(model, partial);
 					report({
 						...attempt,
@@ -696,7 +638,6 @@ function nativeJudge(
 				api: judge.api,
 				provider: judge.provider,
 				model: fresh?.model ?? model.id,
-				// Every id was answered by the cache or by `fresh`, which NativeJudge validated per question type.
 				answers: answers as JudgmentResult<Q>["answers"],
 				usage,
 			};

@@ -8,8 +8,8 @@
  * provider's outbound fetch (via the shared `withHardTimeout` helper), and
  * an abort re-throw in the provider-fallback loop so the session sees a real
  * cancellation instead of "all providers failed". The provider wiring is
- * spot-checked on anthropic (LLM-backed) and brave (pure search API); the
- * helper itself is exercised directly.
+ * spot-checked on an explicitly configured Firecrawl API; the helper itself is
+ * exercised directly.
  */
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { AuthStorage, FetchImpl } from "@oh-my-pi/pi-ai";
@@ -18,9 +18,8 @@ import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config
 import { ToolAbortError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
 import { runSearchQuery } from "@oh-my-pi/pi-coding-agent/web/search";
 import * as provider from "@oh-my-pi/pi-coding-agent/web/search/provider";
-import { searchAnthropic } from "@oh-my-pi/pi-coding-agent/web/search/providers/anthropic";
 import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
-import { searchBrave } from "@oh-my-pi/pi-coding-agent/web/search/providers/brave";
+import { searchFirecrawl } from "@oh-my-pi/pi-coding-agent/web/search/providers/firecrawl";
 import { withHardTimeout } from "@oh-my-pi/pi-coding-agent/web/search/providers/utils";
 import { SearchProviderError } from "@oh-my-pi/pi-coding-agent/web/search/types";
 import { type SearchProviderId, type SearchResponse } from "@oh-my-pi/pi-coding-agent/web/search/types";
@@ -32,15 +31,7 @@ import {
 } from "@oh-my-pi/pi-coding-agent/session/settings";
 
 const openAuthStorages: AuthStorage[] = [];
-
-function createSearchContext(modelProvider: string, modelId: string) {
-	const authStorage = createInMemoryAuthStorage();
-	openAuthStorages.push(authStorage);
-	const modelRegistry = new ModelRegistry(authStorage);
-	const model = modelRegistry.find(modelProvider, modelId);
-	if (!model) throw new Error(`Missing catalog model: ${modelProvider}/${modelId}`);
-	return { authStorage, modelRegistry, model };
-}
+const originalFirecrawlBaseUrl = process.env.FIRECRAWL_BASE_URL;
 
 describe("withHardTimeout", () => {
 	it("returns a signal that aborts on the hard timeout when no caller signal is supplied", async () => {
@@ -65,67 +56,19 @@ describe("withHardTimeout", () => {
 	});
 });
 
-describe("Anthropic provider hard-timeout wiring", () => {
+describe("Firecrawl provider hard-timeout wiring", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
+		if (originalFirecrawlBaseUrl === undefined) delete process.env.FIRECRAWL_BASE_URL;
+		else process.env.FIRECRAWL_BASE_URL = originalFirecrawlBaseUrl;
 		for (const authStorage of openAuthStorages.splice(0)) authStorage.close();
 	});
 
-	it("passes a composed signal to fetch even when the caller did not supply one", async () => {
-		const context = createSearchContext("anthropic", "claude-sonnet-4-5");
-		context.authStorage.keys.setRuntime("anthropic", "sk-test");
-
-		let capturedSignal: AbortSignal | null | undefined;
-		const fetchMock: FetchImpl = async (_input, init) => {
-			capturedSignal = init?.signal;
-			return new Response(JSON.stringify({ content: [{ type: "text", text: "ok" }], usage: {} }), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
-		};
-
-		await searchAnthropic({ query: "ping", systemPrompt: "", fetch: fetchMock, ...context });
-
-		// Without the hard-timeout wrapper, init.signal would be undefined when
-		// the caller didn't supply one — leaving fetch with no cancellation at
-		// all on a stalled WinHTTP connection.
-		expect(capturedSignal).toBeInstanceOf(AbortSignal);
-		expect(capturedSignal?.aborted).toBe(false);
-	});
-
-	it("composes the caller signal with the hard timeout instead of forwarding it directly", async () => {
-		const context = createSearchContext("anthropic", "claude-sonnet-4-5");
-		context.authStorage.keys.setRuntime("anthropic", "sk-test");
-
-		const ac = new AbortController();
-		let capturedSignal: AbortSignal | null | undefined;
-		const fetchMock: FetchImpl = async (_input, init) => {
-			capturedSignal = init?.signal;
-			return new Response(JSON.stringify({ content: [{ type: "text", text: "ok" }], usage: {} }), {
-				status: 200,
-				headers: { "Content-Type": "application/json" },
-			});
-		};
-
-		await searchAnthropic({ query: "ping", systemPrompt: "", signal: ac.signal, fetch: fetchMock, ...context });
-
-		// The signal handed to fetch must be a *composed* one, not the raw
-		// caller signal: that's what guarantees the hard timeout fires even
-		// when Bun fails to honour the caller's abort.
-		expect(capturedSignal).toBeInstanceOf(AbortSignal);
-		expect(capturedSignal).not.toBe(ac.signal);
-	});
-});
-
-describe("Brave provider hard-timeout wiring", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-		for (const authStorage of openAuthStorages.splice(0)) authStorage.close();
-	});
-
-	it("hands fetch a composed signal even with no caller signal — confirms the rollout reaches non-Anthropic providers", async () => {
-		const context = createSearchContext("web", "brave");
-		context.authStorage.keys.setRuntime("brave", "brave-test-key");
+	it("hands fetch a composed signal even with no caller signal", async () => {
+		process.env.FIRECRAWL_BASE_URL = "http://firecrawl.internal";
+		const authStorage = createInMemoryAuthStorage();
+		openAuthStorages.push(authStorage);
+		authStorage.keys.setRuntime("firecrawl", "firecrawl-test-key");
 		let capturedSignal: AbortSignal | null | undefined;
 		const fetchMock: FetchImpl = async (_input, init) => {
 			capturedSignal = init?.signal;
@@ -135,11 +78,9 @@ describe("Brave provider hard-timeout wiring", () => {
 			});
 		};
 
-		await searchBrave({
-			query: "ping",
-			fetch: fetchMock,
-			authStorage: context.authStorage,
-		});
+		const model = provider.getSearchEngineModel("firecrawl");
+		if (!model) throw new Error("Firecrawl descriptor missing");
+		await searchFirecrawl({ query: "ping", fetch: fetchMock, authStorage, model });
 
 		expect(capturedSignal).toBeInstanceOf(AbortSignal);
 		expect(capturedSignal?.aborted).toBe(false);
@@ -186,38 +127,38 @@ describe("executeSearch abort propagation", () => {
 	it("passes the configured provider-request timeout into the search adapter", async () => {
 		let timeoutMs: number | undefined;
 		const context = await configureProviderChain([
-			fakeProvider("brave", async params => {
+			fakeProvider("firecrawl", async params => {
 				timeoutMs = params.timeoutMs;
 				return {
-					provider: "brave",
+					provider: "firecrawl",
 					sources: [{ title: "Configured result", url: "https://example.com/configured" }],
 				};
 			}),
 		]);
 		const config = await Settings.init({ inMemory: true });
-		config.setModelRole("web", "web/brave");
+		config.setModelRole("web", "web/firecrawl");
 		cfgRetryFallbackChains.set(config, { web: [] });
 		cfgProvidersWebSearchTimeoutSeconds.set(config, 180);
 
 		const result = await runSearchQuery({ query: "anything" }, context);
 
-		expect(result.details.response.provider).toBe("brave");
+		expect(result.details.response.provider).toBe("firecrawl");
 		expect(timeoutMs).toBe(180_000);
 	});
 
 	it("caps the configured provider-request timeout at five minutes", async () => {
 		let timeoutMs: number | undefined;
 		const context = await configureProviderChain([
-			fakeProvider("brave", async params => {
+			fakeProvider("firecrawl", async params => {
 				timeoutMs = params.timeoutMs;
 				return {
-					provider: "brave",
+					provider: "firecrawl",
 					sources: [{ title: "Capped result", url: "https://example.com/capped" }],
 				};
 			}),
 		]);
 		const config = await Settings.init({ inMemory: true });
-		config.setModelRole("web", "web/brave");
+		config.setModelRole("web", "web/firecrawl");
 		cfgRetryFallbackChains.set(config, { web: [] });
 		cfgProvidersWebSearchTimeoutSeconds.set(config, 600);
 
@@ -229,16 +170,16 @@ describe("executeSearch abort propagation", () => {
 	it("uses the default provider timeout for a non-positive setting", async () => {
 		let timeoutMs: number | undefined;
 		const context = await configureProviderChain([
-			fakeProvider("brave", async params => {
+			fakeProvider("firecrawl", async params => {
 				timeoutMs = params.timeoutMs;
 				return {
-					provider: "brave",
+					provider: "firecrawl",
 					sources: [{ title: "Default result", url: "https://example.com/default" }],
 				};
 			}),
 		]);
 		const config = await Settings.init({ inMemory: true });
-		config.setModelRole("web", "web/brave");
+		config.setModelRole("web", "web/firecrawl");
 		cfgRetryFallbackChains.set(config, { web: [] });
 		cfgProvidersWebSearchTimeoutSeconds.set(config, 0);
 
@@ -250,10 +191,10 @@ describe("executeSearch abort propagation", () => {
 	it("surfaces caller cancellation instead of falling through to the next role candidate", async () => {
 		const fallbackSearch = vi.fn();
 		const context = await configureProviderChain([
-			fakeProvider("brave", async () => {
+			fakeProvider("firecrawl", async () => {
 				throw new DOMException("aborted", "AbortError");
 			}),
-			fakeProvider("exa", fallbackSearch),
+			fakeProvider("searxng", fallbackSearch),
 		]);
 		const ac = new AbortController();
 		ac.abort();
@@ -266,7 +207,7 @@ describe("executeSearch abort propagation", () => {
 
 	it("still reports provider failures when the caller has not aborted", async () => {
 		const context = await configureProviderChain([
-			fakeProvider("brave", async () => {
+			fakeProvider("firecrawl", async () => {
 				throw new Error("upstream 500");
 			}),
 		]);
@@ -280,12 +221,12 @@ describe("executeSearch abort propagation", () => {
 	it("falls through when the configured role candidate returns no renderable content", async () => {
 		const emptySearch = vi.fn(async (): Promise<SearchResponse> => ({ provider: "searxng", sources: [] }));
 		const fallbackSearch = vi.fn(async (): Promise<SearchResponse> => ({
-			provider: "brave",
+			provider: "firecrawl",
 			sources: [{ title: "Fallback result", url: "https://example.com/fallback", snippet: "fallback body" }],
 		}));
 		const context = await configureProviderChain([
 			fakeProvider("searxng", emptySearch),
-			fakeProvider("brave", fallbackSearch),
+			fakeProvider("firecrawl", fallbackSearch),
 		]);
 
 		const result = await runSearchQuery({ query: "anything" }, context);
@@ -293,47 +234,47 @@ describe("executeSearch abort propagation", () => {
 		expect(emptySearch).toHaveBeenCalledTimes(1);
 		expect(fallbackSearch).toHaveBeenCalledTimes(1);
 		expect(result.content[0]?.text).toContain("Fallback result");
-		expect(result.details.response.provider).toBe("brave");
+		expect(result.details.response.provider).toBe("firecrawl");
 	});
 
 	it("stops loading the role chain after the preferred candidate succeeds", async () => {
 		const fallbackSearch = vi.fn();
 		const context = await configureProviderChain([
-			fakeProvider("exa", async () => ({
-				provider: "exa",
+			fakeProvider("searxng", async () => ({
+				provider: "searxng",
 				sources: [{ title: "Preferred result", url: "https://example.com/preferred" }],
 			})),
-			fakeProvider("duckduckgo", fallbackSearch),
+			fakeProvider("firecrawl", fallbackSearch),
 		]);
 
 		const result = await runSearchQuery({ query: "anything" }, context);
 
-		expect(result.details.response.provider).toBe("exa");
+		expect(result.details.response.provider).toBe("searxng");
 		expect(context.getProvider).toHaveBeenCalledTimes(1);
-		expect(context.getProvider).toHaveBeenCalledWith("exa");
+		expect(context.getProvider).toHaveBeenCalledWith("searxng");
 		expect(fallbackSearch).not.toHaveBeenCalled();
 		expect(result.content[0]?.text).not.toContain("Note: answered by");
 	});
 
 	it("advances through retry.fallbackChains.web after the preferred candidate fails", async () => {
 		const fallbackSearch = vi.fn(async (): Promise<SearchResponse> => ({
-			provider: "brave",
+			provider: "firecrawl",
 			sources: [{ title: "Fallback result", url: "https://example.com/fallback" }],
 		}));
 		const context = await configureProviderChain([
-			fakeProvider("exa", async () => {
-				throw new SearchProviderError("exa", "Preferred provider failed.", 500);
+			fakeProvider("searxng", async () => {
+				throw new SearchProviderError("searxng", "Preferred provider failed.", 500);
 			}),
-			fakeProvider("brave", fallbackSearch),
+			fakeProvider("firecrawl", fallbackSearch),
 		]);
 
 		const result = await runSearchQuery({ query: "anything" }, context);
 
-		expect(result.details.response.provider).toBe("brave");
+		expect(result.details.response.provider).toBe("firecrawl");
 		expect(context.getProvider).toHaveBeenCalledTimes(2);
 		expect(fallbackSearch).toHaveBeenCalledTimes(1);
 		expect(result.content[0]?.text).toStartWith(
-			"Note: answered by brave after exa failed (Preferred provider failed)\n",
+			"Note: answered by firecrawl after searxng failed (Preferred provider failed)\n",
 		);
 	});
 
@@ -343,8 +284,8 @@ describe("executeSearch abort propagation", () => {
 			fakeProvider("searxng", async () => {
 				throw new SearchProviderError("searxng", `SearXNG API error (502): ${htmlPage}`, 502);
 			}),
-			fakeProvider("brave", async () => ({
-				provider: "brave",
+			fakeProvider("firecrawl", async () => ({
+				provider: "firecrawl",
 				sources: [{ title: "Fallback result", url: "https://example.com/fallback" }],
 			})),
 		]);
@@ -353,7 +294,7 @@ describe("executeSearch abort propagation", () => {
 
 		const [note = ""] = (result.content[0]?.text ?? "").split("\n");
 		expect(note).toStartWith(
-			"Note: answered by brave after searxng failed (SearXNG API error (502): <html> <head><title>502 Bad Gateway",
+			"Note: answered by firecrawl after searxng failed (SearXNG API error (502): <html> <head><title>502 Bad Gateway",
 		);
 		expect(note).toEndWith("…)");
 		expect(note.length).toBeLessThan(320);
@@ -361,20 +302,20 @@ describe("executeSearch abort propagation", () => {
 
 	it("treats a request model override as a single explicit candidate", async () => {
 		const fallbackSearch = vi.fn(async (): Promise<SearchResponse> => ({
-			provider: "brave",
+			provider: "firecrawl",
 			sources: [{ title: "Hidden fallback", url: "https://example.com/fallback" }],
 		}));
 		const context = await configureProviderChain([
-			fakeProvider("exa", async () => {
-				throw new SearchProviderError("exa", "Explicit Exa search failed.", 400);
+			fakeProvider("searxng", async () => {
+				throw new SearchProviderError("searxng", "Explicit SearXNG search failed.", 400);
 			}),
-			fakeProvider("brave", fallbackSearch),
+			fakeProvider("firecrawl", fallbackSearch),
 		]);
 
-		const result = await runSearchQuery({ query: "anything", model: "web/exa" }, context);
+		const result = await runSearchQuery({ query: "anything", model: "web/searxng" }, context);
 
-		expect(result.details.error).toContain("Explicit Exa search failed.");
-		expect(result.details.response.provider).toBe("exa");
+		expect(result.details.error).toContain("Explicit SearXNG search failed.");
+		expect(result.details.response.provider).toBe("searxng");
 		expect(context.getProvider).toHaveBeenCalledTimes(1);
 		expect(fallbackSearch).not.toHaveBeenCalled();
 	});

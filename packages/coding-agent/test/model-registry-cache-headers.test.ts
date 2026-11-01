@@ -60,7 +60,7 @@ describe("startup model cache header restoration (#5780)", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					probe: {
+					"github-copilot": {
 						baseUrl: "https://example.invalid/v1/",
 						api: "openai-completions",
 						authHeader: true,
@@ -75,7 +75,7 @@ describe("startup model cache header restoration (#5780)", () => {
 			cacheDbPath,
 			fetch: async () => Response.json({ data: [{ id: "probe-model" }] }),
 		});
-		await primedRegistry.refreshProvider("probe", "online");
+		await primedRegistry.refreshProvider("github-copilot", "online");
 
 		expect(await Bun.file(cacheDbPath).exists()).toBe(true);
 		expect(await Bun.file(path.join(path.dirname(modelsPath), "models.db")).exists()).toBe(false);
@@ -84,7 +84,7 @@ describe("startup model cache header restoration (#5780)", () => {
 			cacheDbPath,
 			fetch: () => Promise.reject(new Error("offline")),
 		});
-		expect(restartedRegistry.find("probe", "probe-model")).toBeDefined();
+		expect(restartedRegistry.find("github-copilot", "probe-model")).toBeDefined();
 	});
 
 	test("cached configured-discovery models regain derived auth headers on registry startup", async () => {
@@ -93,7 +93,7 @@ describe("startup model cache header restoration (#5780)", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					probe: {
+					"github-copilot": {
 						baseUrl: "https://example.invalid/v1/",
 						api: "openai-completions",
 						apiKey: "test-key",
@@ -110,14 +110,14 @@ describe("startup model cache header restoration (#5780)", () => {
 				return Response.json({ data: [{ id: "probe-model" }] });
 			},
 		});
-		await primedRegistry.refreshProvider("probe", "online");
-		const primed = primedRegistry.find("probe", "probe-model");
+		await primedRegistry.refreshProvider("github-copilot", "online");
+		const primed = primedRegistry.find("github-copilot", "probe-model");
 		expect(primed && (await primedRegistry.resolveModelHeaders(primed))?.Authorization).toBe("Bearer test-key");
 		const cacheDbPath = path.join(tempDir, "models.db");
 		const restartedRegistry = new ModelRegistry(authStorage, modelsPath, {
 			fetch: () => Promise.reject(new Error("offline")),
 		});
-		const cached = restartedRegistry.find("probe", "probe-model");
+		const cached = restartedRegistry.find("github-copilot", "probe-model");
 		expect(cached).toBeDefined();
 		expect(cached && (await restartedRegistry.resolveModelHeaders(cached))?.Authorization).toBe("Bearer test-key");
 
@@ -127,11 +127,11 @@ describe("startup model cache header restoration (#5780)", () => {
 		const upgradedRegistry = new ModelRegistry(authStorage, modelsPath, {
 			fetch: () => Promise.reject(new Error("offline")),
 		});
-		const upgraded = upgradedRegistry.find("probe", "probe-model");
+		const upgraded = upgradedRegistry.find("github-copilot", "probe-model");
 		expect(upgraded && (await upgradedRegistry.resolveModelHeaders(upgraded))?.Authorization).toBe("Bearer test-key");
 		upgradedRegistry.refreshInBackground();
 		await upgradedRegistry.awaitBackgroundRefresh();
-		const refreshed = upgradedRegistry.find("probe", "probe-model");
+		const refreshed = upgradedRegistry.find("github-copilot", "probe-model");
 		expect(refreshed && (await upgradedRegistry.resolveModelHeaders(refreshed))?.Authorization).toBe(
 			"Bearer test-key",
 		);
@@ -139,7 +139,7 @@ describe("startup model cache header restoration (#5780)", () => {
 		const nextRestartRegistry = new ModelRegistry(authStorage, modelsPath, {
 			fetch: () => Promise.reject(new Error("offline")),
 		});
-		const nextRestart = nextRestartRegistry.find("probe", "probe-model");
+		const nextRestart = nextRestartRegistry.find("github-copilot", "probe-model");
 		expect(nextRestart && (await nextRestartRegistry.resolveModelHeaders(nextRestart))?.Authorization).toBe(
 			"Bearer test-key",
 		);
@@ -151,7 +151,7 @@ describe("startup model cache header restoration (#5780)", () => {
 			modelsPath,
 			JSON.stringify({
 				providers: {
-					probe: {
+					"github-copilot": {
 						baseUrl: "https://example.invalid/v1/",
 						api: "openai-completions",
 						apiKey: "test-key",
@@ -166,7 +166,7 @@ describe("startup model cache header restoration (#5780)", () => {
 				return Response.json({ data: [{ id: "probe-model" }] });
 			},
 		});
-		await primedRegistry.refreshProvider("probe", "online");
+		await primedRegistry.refreshProvider("github-copilot", "online");
 
 		// The discovery bearer used to be copied into every model's headers, so
 		// the cache flagged each row header-omitted and startup dropped them all.
@@ -176,8 +176,9 @@ describe("startup model cache header restoration (#5780)", () => {
 		expect(
 			restartedRegistry
 				.getAvailable("all")
-				.filter(model => model.provider === "probe")
+				.filter(model => model.provider === "github-copilot")
 				.map(m => m.id),
-		).toEqual(["probe-model"]);
+		).toContain("probe-model");
+		expect(restartedRegistry.find("github-copilot", "probe-model")?.headers?.Authorization).toBeUndefined();
 	});
 });

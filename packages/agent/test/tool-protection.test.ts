@@ -32,8 +32,8 @@ function assistantReadCall(toolCallId: string, path: string): SessionMessageEntr
 	return messageEntry(`assistant-${toolCallId}`, {
 		role: "assistant",
 		content: [{ type: "toolCall", id: toolCallId, name: "read", arguments: { path } }],
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock-model",
 		usage: usage(),
 		stopReason: "toolUse",

@@ -2,9 +2,7 @@
 //!
 //! The per-platform backends in [`crate::device`] own device access, format
 //! conversion, channel mixing, and resampling. The engine exposes one stable
-//! mono `f32` contract: the N-API classes in pi-natives adapt it to
-//! TypeScript, and [`crate::live`] shares [`PlaybackStream`] for remote-audio
-//! rendering.
+//! mono `f32` contract: the N-API classes in pi-natives adapt it to TypeScript.
 
 use std::sync::{
 	Arc,
@@ -102,8 +100,7 @@ impl PlaybackState {
 	}
 }
 
-/// Producer endpoint for one native playback device. Cloned into the WebRTC
-/// remote-audio decoder so it can feed the same speaker stream.
+/// Producer endpoint for one native playback device.
 #[derive(Clone)]
 pub struct PlaybackWriter {
 	tx:    flume::Sender<Vec<f32>>,
@@ -128,7 +125,7 @@ impl PlaybackWriter {
 	}
 }
 
-/// Running mono playback stream shared by N-API playback and native WebRTC.
+/// Running mono playback stream used by N-API playback.
 pub struct PlaybackStream {
 	device: Option<PlaybackDevice>,
 	writer: Option<PlaybackWriter>,
@@ -167,7 +164,7 @@ impl PlaybackStream {
 		})
 	}
 
-	/// Clone the producer endpoint used by the remote-audio decoder.
+	/// Clone the producer endpoint used by N-API playback.
 	pub fn writer(&self) -> VoiceResult<PlaybackWriter> {
 		self
 			.writer
@@ -596,15 +593,14 @@ mod tests {
 		assert_eq!(output, [2.0; 2], "next turn does not inherit stale audio");
 	}
 
-	/// Regression guard for #17114: live speech arrives as 20 ms Opus frames
-	/// paced by the network. Without a reserve, every packet landing after
-	/// its 20 ms device callback zero-filled a period mid-word (crackle).
+	/// Regression guard for #17114: paced input needs a reserve to avoid
+	/// zero-filling a period when a chunk arrives after its device callback.
 	#[test]
-	fn live_jitter_reserve_absorbs_network_jitter_without_dropouts() {
+	fn jitter_reserve_absorbs_paced_input_without_dropouts() {
 		const SAMPLE_RATE: usize = 48_000;
 		const FRAME: usize = SAMPLE_RATE / 50;
 		const PERIOD_US: u64 = 20_000;
-		let reserve = SAMPLE_RATE * crate::live::OUTPUT_JITTER_BUFFER_MS as usize / 1000;
+		let reserve = SAMPLE_RATE * 60 / 1000;
 		let mut seed: u64 = 17_114;
 		let mut random = move |modulo: u64| {
 			seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
@@ -669,12 +665,11 @@ mod tests {
 		const HZ: f32 = 440.0;
 		// Largest step the tone itself takes between adjacent samples.
 		let natural = AMPLITUDE * std::f32::consts::TAU * HZ / SAMPLE_RATE as f32;
-		let live_reserve = SAMPLE_RATE * crate::live::OUTPUT_JITTER_BUFFER_MS as usize / 1000;
+		let buffered_reserve = SAMPLE_RATE * 60 / 1000;
 		let fade = SAMPLE_RATE * PLAYBACK_FADE_MS / 1000;
-		// Live on macOS/Windows (stall lands on a callback boundary), live on
-		// Linux (stall lands mid-callback), and reserve-free local playback
-		// (resumes on the very next callback).
-		for (reserve, period) in [(live_reserve, FRAME), (live_reserve, 2_400), (0, FRAME)] {
+		// Buffered playback with a stall at or between callback boundaries,
+		// and reserve-free playback that resumes on the very next callback.
+		for (reserve, period) in [(buffered_reserve, FRAME), (buffered_reserve, 2_400), (0, FRAME)] {
 			let (writer, mut renderer) = renderer(LOCAL_DRAIN_CALLBACKS, reserve, fade);
 			let mut sent = 0;
 			let mut played = Vec::new();

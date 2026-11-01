@@ -27,7 +27,7 @@ describe("advisor stale tool-result eviction", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-advisor-tool-result-eviction-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 	});
 
 	afterEach(async () => {
@@ -42,10 +42,10 @@ describe("advisor stale tool-result eviction", () => {
 
 	function createAdvisor(advisorResponses: MockResponse[], primaryTurns: number, evictStaleResults = true) {
 		const primaryMock = createMockModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			responses: Array.from({ length: primaryTurns }, () => ({ content: ["primary complete"] })),
 		});
-		const advisorMock = createMockModel({ provider: "anthropic", responses: advisorResponses });
+		const advisorMock = createMockModel({ provider: "github-copilot", responses: advisorResponses });
 		const readTool: AgentTool = {
 			name: "read",
 			label: "Read",
@@ -72,7 +72,7 @@ describe("advisor stale tool-result eviction", () => {
 			advisorTools: [readTool],
 			advisorStreamFn: advisorMock.stream,
 		});
-		settings.setModelRole("advisor", "anthropic/claude-sonnet-4-5");
+		settings.setModelRole("advisor", "github-copilot/gpt-5.4");
 		expect(session.setAdvisorEnabled(true)).toBe(true);
 		const advisor = session.getAdvisorAgent();
 		if (!advisor) throw new Error("Expected advisor agent to be active");

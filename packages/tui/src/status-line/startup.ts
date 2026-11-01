@@ -81,7 +81,6 @@ export function createStartupStatusLine(data: StatusLineStartupData): StatusLine
 	const host: StatusLineHost = {
 		getSettings: () => data.settings,
 		gitEnabled: () => data.gitEnabled,
-		codexResetFireworksEnabled: () => false,
 		getSettingsRevision: () => 0,
 		getSessionSettingsIdentity: () => undefined,
 		getSessionSettingsRevision: () => 0,

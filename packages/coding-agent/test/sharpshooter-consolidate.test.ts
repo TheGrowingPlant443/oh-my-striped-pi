@@ -21,6 +21,9 @@ import {
 import type { SharpshooterDelta } from "@oh-my-pi/pi-coding-agent/sharpshooter/types";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { getTestModel } from "./helpers/model-fixtures";
+
+const model = getTestModel("github-copilot");
 
 interface Harness {
 	agentDir: string;
@@ -34,16 +37,13 @@ function createHarness(root: string): Harness {
 	const agentDir = path.join(root, "agent");
 	const cwd = path.join(root, "project");
 	const authStorage = createInMemoryAuthStorage();
-	authStorage.keys.setRuntime("anthropic", "test-key");
+	authStorage.keys.setRuntime(model.provider, "test-key");
 	const modelRegistry = new ModelRegistry(authStorage, path.join(root, "models.yml"));
-	if (!modelRegistry.find("anthropic", "claude-haiku-4-5")) {
-		throw new Error("Expected bundled anthropic/claude-haiku-4-5 model");
-	}
 	return {
 		agentDir,
 		cwd,
 		settings: Settings.isolated({
-			"sharpshooter.model": "anthropic/claude-haiku-4-5",
+			"sharpshooter.model": `${model.provider}/${model.id}`,
 			"sharpshooter.intervalMinutes": 5,
 		}),
 		modelRegistry,
@@ -73,9 +73,9 @@ function delta(
 function completion(files: Array<{ name: string; content: string }>): ai.AssistantMessage {
 	return {
 		role: "assistant",
-		api: "openai-completions",
-		provider: "test",
-		model: "claude-haiku-4-5",
+		api: model.api,
+		provider: model.provider,
+		model: model.id,
 		usage: {
 			input: 0,
 			output: 0,
@@ -170,7 +170,7 @@ describe("runSharpshooterConsolidation", () => {
 		expect(remaining).toHaveLength(1);
 		expect(remaining[0]?.deltas.map(item => item.delta.statement)).toEqual(["Late arrival."]);
 		const state = await readSharpshooterState(harness.agentDir, harness.cwd);
-		expect(state.lastResult).toMatchObject({ sessions: 2, deltas: 2, model: "claude-haiku-4-5" });
+		expect(state.lastResult).toMatchObject({ sessions: 2, deltas: 2, model: model.id });
 		expect(state.lastResult?.at).toBe(state.lastConsolidatedAt);
 	});
 

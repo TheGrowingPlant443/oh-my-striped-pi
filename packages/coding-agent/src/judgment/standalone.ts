@@ -6,7 +6,8 @@
 import { ModelRegistry } from "../config/model-registry";
 import { Settings } from "../config/settings";
 import { discoverAuthStorage, loadCliExtensionProviders } from "../sdk";
-import { type ChainJudge, resolveJudge, sharedJudgmentCache } from ".";
+import { type ChainJudge, resolveJudge } from ".";
+import { sharedJudgmentCache } from "./cache";
 
 export interface StandaloneJudge {
 	judge: ChainJudge;

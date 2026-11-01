@@ -9,10 +9,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
 import { AnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic-client";
-import {
-	servedModelFromAnthropicSignature,
-	servedModelFromOpenRouterReasoning,
-} from "@oh-my-pi/pi-ai/providers/anthropic-signature";
+import { servedModelFromAnthropicSignature } from "@oh-my-pi/pi-ai/providers/anthropic-signature";
 import type { Context, Model } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
@@ -76,31 +73,13 @@ console.log(servedModelFromAnthropicSignature(${JSON.stringify(signature)}));`,
 		]);
 		expect(servedModelFromAnthropicSignature(signature.toString("base64"))).toBe("claude-opus-5");
 	});
-
-	it("reads only OpenRouter items that forward an Anthropic signature", () => {
-		expect(
-			servedModelFromOpenRouterReasoning({
-				type: "reasoning.text",
-				format: "anthropic-claude-v1",
-				signature: OPUS_5_SIGNATURE,
-			}),
-		).toBe("claude-opus-5");
-		expect(
-			servedModelFromOpenRouterReasoning({
-				type: "reasoning.text",
-				format: "google-gemini-v1",
-				signature: OPUS_5_SIGNATURE,
-			}),
-		).toBeUndefined();
-		expect(servedModelFromOpenRouterReasoning({ type: "reasoning.encrypted", data: OPENAI_FERNET })).toBeUndefined();
-	});
 });
 
 const sonnetModel: Model<"anthropic-messages"> = buildModel({
 	id: "claude-sonnet-5",
 	name: "Claude Sonnet 5",
 	api: "anthropic-messages",
-	provider: "anthropic",
+	provider: "github-copilot",
 	baseUrl: "https://api.anthropic.com",
 	reasoning: true,
 	input: ["text"],
@@ -191,7 +170,7 @@ function v4Signature(kind: string, ciphertextBytes = 4): string {
 		...header,
 		0x12,
 		...varint(ciphertextBytes),
-		...new Array<number>(ciphertextBytes).fill(0xab),
+		...Array.from({ length: ciphertextBytes }, () => 0xab),
 	];
 	return Buffer.from([0x08, 0x04, 0x12, ...varint(envelope.length), ...envelope]).toString("base64");
 }

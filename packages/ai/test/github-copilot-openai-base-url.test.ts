@@ -223,7 +223,7 @@ describe("GitHub Copilot OpenAI transport base URL", () => {
 		expect(result.errorMessage).toContain("The requested model is not supported.");
 	});
 
-	it("omits OpenAI priority service tier while native OpenAI keeps it", async () => {
+	it("omits OpenAI priority service tier on Copilot", async () => {
 		const requestedBodies: Record<string, unknown>[] = [];
 		const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
 			requestedBodies.push(await getRequestBody(input, init));
@@ -238,12 +238,8 @@ describe("GitHub Copilot OpenAI transport base URL", () => {
 		const copilotModel = getBundledModel("github-copilot", "gpt-5.4") as Model<"openai-responses">;
 		await streamOpenAIResponses(copilotModel, testContext, requestOptions).result();
 
-		const openAIModel = getBundledModel("openai", "gpt-5-mini") as Model<"openai-responses">;
-		await streamOpenAIResponses(openAIModel, testContext, requestOptions).result();
-
-		expect(requestedBodies).toHaveLength(2);
+		expect(requestedBodies).toHaveLength(1);
 		expect(requestedBodies[0]?.service_tier).toBeUndefined();
-		expect(requestedBodies[1]?.service_tier).toBe("priority");
 	});
 
 	it("routes structured enterprise credentials to the enterprise chat completions host", async () => {

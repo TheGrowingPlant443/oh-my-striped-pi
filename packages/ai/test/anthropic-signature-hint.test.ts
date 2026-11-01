@@ -7,19 +7,16 @@ import {
 import type { Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 
-/**
- * Regression for #4297 — an unmarked custom `anthropic-messages` signing proxy
- * must return an actionable remediation instead of the raw Anthropic 400.
- */
+/** Signing-error classification and known Copilot signing-policy remediation. */
 function buildAnthropicMessagesModel(
 	overrides: Partial<ModelSpec<"anthropic-messages">> = {},
 ): Model<"anthropic-messages"> {
 	return buildModel({
 		api: "anthropic-messages",
-		provider: "cf-anthropic",
-		id: "cf-anthropic/claude-opus-4-8",
-		name: "Claude Opus 4.8 via cloudflared",
-		baseUrl: "https://opencode.cloudflare.dev/anthropic",
+		provider: "github-copilot",
+		id: "claude-opus-4.8",
+		name: "Claude Opus 4.8",
+		baseUrl: "https://api.githubcopilot.com",
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		maxTokens: 8_192,
@@ -70,26 +67,16 @@ describe("#4297 anthropic-messages replay-unsigned-thinking hint", () => {
 		expect(isInvalidThinkingSignatureError("messages.1.content.0.thinking.thinking: Field required")).toBe(false);
 	});
 
-	it("prepends a provider-scoped remediation on unmarked custom signing proxies", () => {
-		const model = buildAnthropicMessagesModel();
-		const surfaced = maybeAddReplayUnsignedThinkingHint(model, SIGNATURE_400);
-		expect(surfaced).not.toBe(SIGNATURE_400);
-		expect(surfaced).toContain('Provider "cf-anthropic"');
-		expect(surfaced).toContain("compat.replayUnsignedThinking: false");
-		expect(surfaced).toContain("providers.cf-anthropic");
-		expect(surfaced).toContain(SIGNATURE_400);
-	});
-
 	it("passes through when the user already set `compat.replayUnsignedThinking`", () => {
 		const model = buildAnthropicMessagesModel({ compat: { replayUnsignedThinking: false } });
 		expect(maybeAddReplayUnsignedThinkingHint(model, SIGNATURE_400)).toBe(SIGNATURE_400);
 	});
 
-	it("passes through on official Anthropic (already demoting)", () => {
+	it("passes through on Copilot's known signing endpoint", () => {
 		const model = buildAnthropicMessagesModel({
-			provider: "anthropic",
+			provider: "github-copilot",
 			id: "claude-opus-4-8",
-			baseUrl: "https://api.anthropic.com",
+			baseUrl: "https://api.githubcopilot.com",
 		});
 		expect(maybeAddReplayUnsignedThinkingHint(model, SIGNATURE_400)).toBe(SIGNATURE_400);
 	});

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { billingVariantPlain, classifyModel, collapseVariantId, routingVariantPlain } from "../src/compat/taxonomy";
+import { billingVariantPlain, classifyModel, collapseVariantId } from "../src/compat/taxonomy";
 import { Effort } from "../src/effort";
 
 describe("classifyModel", () => {
@@ -201,11 +201,6 @@ describe("classifyModel", () => {
 });
 
 describe("collapse and variant vocabulary", () => {
-	test("routing-variant suffix resolves on declared providers only", () => {
-		expect(routingVariantPlain("openai-codex", "gpt-5.6-luna-wm")).toBe("gpt-5.6-luna");
-		expect(routingVariantPlain("openai", "gpt-5.6-luna-wm")).toBeUndefined();
-	});
-
 	test("billing-variant suffix strips to the transport base", () => {
 		expect(billingVariantPlain("gpt-5.5-pro-free")).toBe("gpt-5.5-pro");
 		expect(billingVariantPlain("-free")).toBeUndefined();

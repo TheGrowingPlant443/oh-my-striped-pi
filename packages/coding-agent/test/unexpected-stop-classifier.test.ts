@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import type { Api, AssistantMessage, Model } from "@oh-my-pi/pi-ai";
 import * as ai from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import {
@@ -120,9 +120,18 @@ describe("isUnexpectedStopCandidate", () => {
 
 describe("classifyUnexpectedStop", () => {
 	it("uses a reasoning-safe online classifier budget when the catalog disables reasoning", async () => {
-		const baseModel = getBundledModel("anthropic", "claude-sonnet-4-5");
-		if (!baseModel) throw new Error("Expected bundled Claude Sonnet 4.5 model");
-		const model = { ...baseModel, reasoning: false };
+		const model = buildModel({
+			id: "company-judge",
+			name: "Company Judge",
+			provider: "company-messages",
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.test/v1",
+			reasoning: false,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 200_000,
+			maxTokens: 16_384,
+		});
 		const settings = Settings.isolated({ modelRoles: { judge: `${model.provider}/${model.id}` } });
 		const registry = makeRegistry([model], { [model.provider]: "test-key" });
 		const completeSimpleMock = vi.spyOn(ai, "completeSimple").mockResolvedValue({

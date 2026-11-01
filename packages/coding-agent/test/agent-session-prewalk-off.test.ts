@@ -4,7 +4,6 @@ import { type } from "@oh-my-pi/omptype";
 import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
 import { type Api, Effort, type Message, type Model } from "@oh-my-pi/pi-ai";
 import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
@@ -17,6 +16,7 @@ import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-comm
 import type { TuiSlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-commands/types";
 import { TempDir } from "@oh-my-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 describe("AgentSession /prewalk off", () => {
 	let tempDir: TempDir;
@@ -27,8 +27,28 @@ describe("AgentSession /prewalk off", () => {
 	beforeAll(() => {
 		tempDir = TempDir.createSync("@pi-prewalk-off-");
 		authStorage = createInMemoryAuthStorage();
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("company-prewalk", "test-key");
 		modelRegistry = new ModelRegistry(authStorage, path.join(tempDir.path(), "models.yml"));
+		modelRegistry.registerProvider("company-prewalk", {
+			api: "anthropic-messages",
+			baseUrl: "https://models.company.invalid",
+			apiKey: "test-key",
+			models: ["claude-sonnet-4-5", "claude-sonnet-4-6"].map(id =>
+				toProviderModelConfig({
+					id,
+					name: id,
+					provider: "company-prewalk",
+					api: "anthropic-messages",
+					baseUrl: "https://models.company.invalid",
+					reasoning: true,
+					thinking: { mode: "budget", efforts: [Effort.Low, Effort.Medium, Effort.High] },
+					input: ["text", "image"],
+					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+					contextWindow: 200_000,
+					maxTokens: 64_000,
+				}),
+			),
+		});
 	});
 
 	afterEach(async () => {
@@ -42,8 +62,8 @@ describe("AgentSession /prewalk off", () => {
 	});
 
 	function modelOrThrow(id: string): Model<Api> {
-		const model = getBundledModel("anthropic", id);
-		if (!model) throw new Error(`Expected bundled model ${id}`);
+		const model = modelRegistry.find("company-prewalk", id);
+		if (!model) throw new Error(`Expected configured prewalk model ${id}`);
 		return model;
 	}
 
@@ -114,7 +134,6 @@ describe("AgentSession /prewalk off", () => {
 			session,
 			sessionManager,
 			settings,
-			collabGuest: false,
 			showStatus: vi.fn(),
 			editor: { setText: vi.fn() },
 			refreshSlashCommandState: vi.fn(),
@@ -272,7 +291,7 @@ describe("AgentSession /prewalk off", () => {
 			[toolCall("todo", "todo"), toolCall("write", "write"), { content: ["done"] }],
 			true,
 		);
-		fixture.settings.setModelRole("smol", "anthropic/missing-prewalk-model");
+		fixture.settings.setModelRole("smol", "company-prewalk/missing-prewalk-model");
 
 		await executeBuiltinSlashCommand("/prewalk off", fixture.runtime);
 		expect(fixture.session.getPrewalkState()).toBeUndefined();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
-import { minimaxTokenPlanOpenAIModel } from "./helpers";
+import { copilotCompletionsModel } from "./helpers";
 
 function createSseResponse(events: unknown[]): Response {
 	const payload = `${events
@@ -32,16 +32,6 @@ function baseContext(): Context {
 	};
 }
 
-function minimaxChunk(model: Model<"openai-completions">, content: string): unknown {
-	return {
-		id: "chatcmpl-minimax-cn",
-		object: "chat.completion.chunk",
-		created: 0,
-		model: model.id,
-		choices: [{ index: 0, delta: { content, role: "assistant" } }],
-	};
-}
-
 function stopChunk(model: Model<"openai-completions">): unknown {
 	return {
 		id: "chatcmpl-minimax-cn",
@@ -52,31 +42,13 @@ function stopChunk(model: Model<"openai-completions">): unknown {
 	};
 }
 
-describe("issue #1203 - MiniMax Coding Plan CN think tags", () => {
-	it("parses minimax-code-cn <think> content into a thinking block", async () => {
-		const model = minimaxTokenPlanOpenAIModel("minimax-code-cn", "MiniMax-M2.5");
-		const fetchMock = createMockFetch([
-			minimaxChunk(model, "<think>"),
-			minimaxChunk(model, "hidden reasoning"),
-			minimaxChunk(model, "</think>"),
-			minimaxChunk(model, "visible answer"),
-			stopChunk(model),
-			"[DONE]",
-		]);
-
-		const result = await streamOpenAICompletions(model, baseContext(), {
-			apiKey: "test-key",
-			fetch: fetchMock,
-		}).result();
-
-		expect(result.content).toEqual([
-			{ type: "thinking", thinking: "hidden reasoning", thinkingSignature: undefined, summary: false },
-			{ type: "text", text: "visible answer" },
-		]);
-	});
-
-	it("dedupes MiniMax-M3 cumulative reasoning snapshots after answer text has started", async () => {
-		const model = minimaxTokenPlanOpenAIModel("minimax-code-cn", "MiniMax-M3");
+describe("issue #1203 — cumulative reasoning deltas", () => {
+	it("dedupes cumulative reasoning snapshots after answer text has started", async () => {
+		const base = copilotCompletionsModel("gpt-4o");
+		const model: Model<"openai-completions"> = {
+			...base,
+			compat: { ...base.compat, reasoningDeltasMayBeCumulative: true },
+		};
 		const fetchMock = createMockFetch([
 			{
 				id: "chatcmpl-minimax-cn",
@@ -88,7 +60,6 @@ describe("issue #1203 - MiniMax Coding Plan CN think tags", () => {
 						index: 0,
 						delta: {
 							role: "assistant",
-							content: "<think>The user just",
 							reasoning_content: "The user just",
 						},
 					},
@@ -103,7 +74,7 @@ describe("issue #1203 - MiniMax Coding Plan CN think tags", () => {
 					{
 						index: 0,
 						delta: {
-							content: " said hi.</think>Hello!",
+							content: "Hello!",
 							reasoning_content: "The user just said hi.",
 						},
 					},

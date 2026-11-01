@@ -18,8 +18,8 @@ const fable: Model<"anthropic-messages"> = buildModel({
 	id: "claude-fable-5",
 	name: "Claude Fable 5",
 	api: "anthropic-messages",
-	provider: "anthropic",
-	baseUrl: "https://api.anthropic.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
@@ -47,7 +47,7 @@ const handoffEvents: WireEvent[] = [
 	{
 		type: "content_block_start",
 		index: 2,
-		content_block: { type: "fallback", from: { model: "claude-fable-5" }, to: { model: "claude-opus-4-8" } },
+		content_block: { type: "fallback", from: { model: "claude-fable-5" }, to: { model: "claude-opus-4.8" } },
 	},
 	{ type: "content_block_stop", index: 2 },
 	{ type: "content_block_start", index: 3, content_block: { type: "text", text: "" } },
@@ -143,9 +143,9 @@ function runLoop(fetch: FetchImpl, calls: string[], signal?: AbortSignal) {
 		signal,
 		(_model, context, options) =>
 			streamAnthropic(fable, context, {
-				apiKey: "sk-ant-test",
+				apiKey: "test-key",
 				thinkingEnabled: true,
-				fallbacks: [{ model: "claude-opus-4-8" }],
+				fallbacks: [{ model: "claude-opus-4.8" }],
 				fetch,
 				signal: options?.signal,
 			}),

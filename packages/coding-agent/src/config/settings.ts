@@ -15,9 +15,6 @@ import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { roleDefaultModels } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { type GeneratedProvider, getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { type Api, type Model, modelKind } from "@oh-my-pi/pi-catalog/types";
 import {
 	getAgentDbPath,
 	getAgentDir,
@@ -40,7 +37,6 @@ import { loadCapability } from "../discovery";
 import { AgentStorage } from "../session/agent-storage";
 import { type CompactionMethod, DEFAULT_COMPACTION_METHOD_ORDER } from "../session/compaction-methods";
 import { writeFileAtomically } from "../utils/atomic-file";
-import { isRegisteredSearchEngine } from "../web/search/provider";
 import { stringifyYamlConfig } from "@oh-my-pi/pi-utils/yaml-config";
 import {
 	type AnySetting,
@@ -386,11 +382,8 @@ function stringArrayFromUnknown(value: unknown): string[] {
 }
 
 /**
- * Migrate a v17 leaf rename that used to nest under a boolean parent path
- * (`dev.autoqa.consent` → `dev.autoqaConsent`, `todo.reminders.max` →
- * `todo.remindersMax`). Pre-rename configs left the leaf beneath the parent,
- * so the parent path resolved to an object and truthy checks like
- * `isAutoQaEnabled` treated a consent-only container as "enabled".
+ * Migrate `todo.reminders.max` to `todo.remindersMax`. Pre-rename configs
+ * left the leaf beneath a boolean parent path, making the parent an object.
  *
  * Handles nested (`{ parent: { leaf } }`) and quoted-dotted (`"parent.leaf"`)
  * legacy sources. An explicit new key always wins; a separately configured
@@ -2889,19 +2882,25 @@ export class Settings {
 			raw["spelling.autocomplete"] = raw["spelling.autocomplete"] ? "auto" : "off";
 		}
 
-		// statusLine: rename "plan_mode" segment to "mode"
+		// statusLine: rename "plan_mode" segment to "mode" and "stream" to "record"
 		const statusLineObj = raw.statusLine as Record<string, unknown> | undefined;
 		if (statusLineObj) {
 			for (const key of ["leftSegments", "rightSegments"] as const) {
 				const segments = statusLineObj[key];
 				if (Array.isArray(segments)) {
-					statusLineObj[key] = segments.map(seg => (seg === "plan_mode" ? "mode" : seg));
+					statusLineObj[key] = segments.map(seg =>
+						seg === "plan_mode" ? "mode" : seg === "stream" ? "record" : seg,
+					);
 				}
 			}
 			const segmentOptions = statusLineObj.segmentOptions as Record<string, unknown> | undefined;
 			if (segmentOptions && "plan_mode" in segmentOptions && !("mode" in segmentOptions)) {
 				segmentOptions.mode = segmentOptions.plan_mode;
 				delete segmentOptions.plan_mode;
+			}
+			if (segmentOptions && "stream" in segmentOptions && !("record" in segmentOptions)) {
+				segmentOptions.record = segmentOptions.stream;
+				delete segmentOptions.stream;
 			}
 		}
 
@@ -2943,17 +2942,6 @@ export class Settings {
 			if (migrated !== undefined) providersObj.tinyModel = migrated;
 		}
 
-		// Saved-reset autoRedeem booleans -> tri-state enums. Existing explicit
-		// false keeps "do not run"; missing config falls through to "unset",
-		// which asks before the first eligible provider-specific spend.
-		const codexResetsObj = raw.codexResets as Record<string, unknown> | undefined;
-		if (codexResetsObj && typeof codexResetsObj.autoRedeem === "boolean") {
-			codexResetsObj.autoRedeem = codexResetsObj.autoRedeem ? "yes" : "no";
-		}
-		if (typeof raw["codexResets.autoRedeem"] === "boolean") {
-			raw["codexResets.autoRedeem"] = raw["codexResets.autoRedeem"] ? "yes" : "no";
-		}
-
 		// Map legacy `memories.enabled` boolean to the explicit `memory.backend`
 		// enum if the latter hasn't been set yet. Idempotent: subsequent
 		// migrations are no-ops once memory.backend is materialised.
@@ -2980,12 +2968,8 @@ export class Settings {
 		}
 
 		// hindsight: dynamicBankId/agentName -> scoping enum + bankId
-		// - dynamicBankId=true  → scoping="per-project" (closest semantic match;
-		//   the legacy `agent::project::channel::user` tuple was per-project in
-		//   practice — the channel/user env vars were rarely set).
-		// - hindsight.agentName was only used as the agent slot in the legacy
-		//   dynamic tuple; if the user customised it we surface it as the new
-		//   bankId base when no explicit bankId is set.
+		// - dynamicBankId=true  → scoping="per-project" (closest semantic match).
+		// - hindsight.agentName becomes bankId when no explicit bankId is set.
 		const hindsightObj = raw.hindsight as Record<string, unknown> | undefined;
 		if (hindsightObj) {
 			if ("dynamicBankId" in hindsightObj) {
@@ -3006,9 +2990,7 @@ export class Settings {
 				}
 				delete hindsightObj.agentName;
 			}
-			// mentalModelRefreshIntervalMs removed: the mental-model block is now
-			// frozen for the session lifetime rather than re-listed on a timer that
-			// rewrote the cached prompt prefix mid-session (#11961).
+			// mentalModelRefreshIntervalMs removed: the mental-model block is now frozen for the session lifetime (#11961).
 			delete hindsightObj.mentalModelRefreshIntervalMs;
 		}
 
@@ -3220,17 +3202,7 @@ export class Settings {
 			}
 		}
 
-		// v17 renames that used to nest under a boolean parent path:
-		//   dev.autoqa.consent -> dev.autoqaConsent
-		//   todo.reminders.max -> todo.remindersMax
-		migrateNestedLeafRename(
-			raw,
-			"dev",
-			"autoqa",
-			"consent",
-			"autoqaConsent",
-			value => value === "unset" || value === "granted" || value === "denied",
-		);
+		// v17 rename that used to nest under a boolean parent path.
 		migrateNestedLeafRename(
 			raw,
 			"todo",
@@ -3292,126 +3264,6 @@ export class Settings {
 				}
 			};
 
-			const legacyWebSearch = legacy(providerSettings, "webSearch", "providers.webSearch");
-			const legacyWebOrder = legacy(providerSettings, "webSearchOrder", "providers.webSearchOrder");
-			const legacyWebExclude = legacy(providerSettings, "webSearchExclude", "providers.webSearchExclude");
-			const legacyGeminiModel = legacy(providerSettings, "webSearchGeminiModel", "providers.webSearchGeminiModel");
-			// Legacy settings named a provider; its swap target is the catalog's
-			// resolved per-model policy (`web-search-model` / `image-model` / tts
-			// seed kind), uniform across that provider's bundled rows.
-			const bundledSelector = (
-				provider: string,
-				pick: (model: Model<Api>) => string | undefined,
-			): string | undefined => {
-				for (const model of getBundledModels(provider as GeneratedProvider)) {
-					const id = pick(model);
-					if (id) return `${provider}/${id}`;
-				}
-				return undefined;
-			};
-			const webSearchSelector = (provider: string): string[] => {
-				const selector = bundledSelector(provider, model => model.webSearchModel);
-				return selector ? [selector] : [];
-			};
-			const geminiSelectors = (model: string): string[] => [
-				`google-gemini-cli/${model}`,
-				`google-antigravity/${model}`,
-				`google/${model}`,
-			];
-			const webSelectors = (provider: string, geminiModel: string): string[] => {
-				switch (provider) {
-					case "gemini":
-						return geminiSelectors(geminiModel);
-					case "anthropic":
-						return webSearchSelector("anthropic");
-					case "codex":
-						return webSearchSelector("openai-codex");
-					case "xai":
-						return webSearchSelector("xai");
-					case "auto":
-						return [];
-					default:
-						return isRegisteredSearchEngine(provider) ? [`web/${provider}`] : [];
-				}
-			};
-			const geminiModel =
-				typeof legacyGeminiModel === "string" && legacyGeminiModel.trim()
-					? legacyGeminiModel.trim()
-					: (getBundledModels("google").find(model => model.webSearchModel)?.webSearchModel ?? "");
-			const excludedWebProviders = new Set(
-				Array.isArray(legacyWebExclude)
-					? legacyWebExclude.filter(
-							(value): value is string =>
-								typeof value === "string" && webSelectors(value, geminiModel).length > 0,
-						)
-					: [],
-			);
-			const isWebSelectorExcluded = (selector: string): boolean => {
-				if (excludedWebProviders.has("gemini") && geminiSelectors(geminiModel).includes(selector)) return true;
-				if (excludedWebProviders.has("anthropic") && selector.startsWith("anthropic/")) return true;
-				if (excludedWebProviders.has("codex") && selector.startsWith("openai-codex/")) return true;
-				if (excludedWebProviders.has("xai") && (selector.startsWith("xai/") || selector.startsWith("xai-oauth/"))) {
-					return true;
-				}
-				for (const provider of excludedWebProviders) {
-					if (selector === `web/${provider}`) return true;
-				}
-				return false;
-			};
-			const orderedWebProviders = Array.isArray(legacyWebOrder)
-				? legacyWebOrder
-				: typeof legacyWebSearch === "string" && legacyWebSearch !== "auto"
-					? [legacyWebSearch]
-					: [];
-			const orderedWebSelectors = orderedWebProviders.flatMap(value =>
-				typeof value === "string" ? webSelectors(value, geminiModel) : [],
-			);
-			// The Gemini model only shapes an ordered `gemini` entry; the defaults hold no chat models.
-			if (orderedWebSelectors.length > 0 || excludedWebProviders.size > 0) {
-				setRoleChain(
-					"web",
-					dedupe([...orderedWebSelectors, ...roleDefaultModels().web]).filter(
-						selector => !isWebSelectorExcluded(selector),
-					),
-				);
-			}
-
-			const legacyImage = legacy(providerSettings, "image", "providers.image");
-			const legacyImageOrder = legacy(providerSettings, "imageOrder", "providers.imageOrder");
-			const legacyImageProviders: Record<string, string> = {
-				openai: "openai",
-				"openai-codex": "openai-codex",
-				antigravity: "google-antigravity",
-				xai: "xai",
-				gemini: "google",
-				deepinfra: "deepinfra",
-			};
-			const imageSelector = (provider: string): string | undefined => {
-				// OpenRouter rows carry no gemini image-model swap (the gemini class
-				// binds to Google transports only), so its legacy target stays literal.
-				if (provider === "openrouter") return "openrouter/google/gemini-3-pro-image";
-				const catalogProvider = legacyImageProviders[provider];
-				return catalogProvider ? bundledSelector(catalogProvider, model => model.imageModel) : undefined;
-			};
-			const orderedImageProviders = Array.isArray(legacyImageOrder)
-				? legacyImageOrder
-				: typeof legacyImage === "string" && legacyImage !== "auto"
-					? [legacyImage]
-					: [];
-			const orderedImageSelectors = orderedImageProviders.flatMap(value =>
-				typeof value === "string" ? (imageSelector(value) ?? []) : [],
-			);
-			if (orderedImageSelectors.length > 0) {
-				setRoleChain("image", dedupe([...orderedImageSelectors, ...roleDefaultModels().image]));
-			}
-
-			const legacyTtsProvider = legacy(providerSettings, "tts", "providers.tts");
-			const speechSelector =
-				legacyTtsProvider === "local" || legacyTtsProvider === "xai" || legacyTtsProvider === "deepinfra"
-					? bundledSelector(legacyTtsProvider, model => (modelKind(model) === "tts" ? model.id : undefined))
-					: undefined;
-			if (speechSelector) setRoleChain("speech", [speechSelector]);
-
 			const legacySttModel = legacy(sttSettings, "modelName", "stt.modelName");
 			const dictationSelector =
 				legacySttModel === "fast" || legacySttModel === "whisper-base"
@@ -3426,7 +3278,6 @@ export class Settings {
 				rolesChanged = true;
 			}
 
-			const legacyJudgmentProvider = legacy(providerSettings, "judgmentProvider", "providers.judgmentProvider");
 			const legacyAutoThinkingModel = legacy(providerSettings, "autoThinkingModel", "providers.autoThinkingModel");
 			const legacyUnexpectedStopModel = legacy(
 				providerSettings,
@@ -3434,12 +3285,10 @@ export class Settings {
 				"providers.unexpectedStopModel",
 			);
 			const nonDefaultJudge =
-				(typeof legacyJudgmentProvider === "string" && legacyJudgmentProvider !== "auto") ||
 				(typeof legacyAutoThinkingModel === "string" && legacyAutoThinkingModel !== "online") ||
 				(typeof legacyUnexpectedStopModel === "string" && legacyUnexpectedStopModel !== "online");
 			if (nonDefaultJudge) {
 				const judgeCandidates: string[] = [];
-				if (legacyJudgmentProvider !== "llm") judgeCandidates.push("typesafe/jev-1.14.0");
 				if (typeof legacyAutoThinkingModel === "string" && legacyAutoThinkingModel !== "online") {
 					judgeCandidates.push(`local/${legacyAutoThinkingModel}`);
 				}
@@ -3496,58 +3345,6 @@ export class Settings {
 		}
 		migrateKindRoleSettings();
 
-		// The old web-provider migration persisted this pair of fuzzy defaults.
-		// Qualified selectors are now exact, so replace the pair without changing
-		// independently configured selectors or other role chains.
-		{
-			const retry = isRecord(raw.retry) ? raw.retry : undefined;
-			const chains = retry && isRecord(retry.fallbackChains) ? retry.fallbackChains : undefined;
-			const web = chains?.web;
-			if (chains && Array.isArray(web)) {
-				const index = web.findIndex(
-					(selector, i) => selector === "openai-codex/gpt-5.6" && web[i + 1] === "openai-codex/gpt-5.5",
-				);
-				if (index !== -1) {
-					chains.web = [...web.slice(0, index), "openai-codex/gpt-5.6-sol", ...web.slice(index + 2)];
-				}
-			}
-		}
-
-		// Consolidate the retired Exa suite toggles onto the sole remaining
-		// provider switch. The old runtime required both `enabled` and
-		// `enableSearch`, so preserve that AND semantics when both are present.
-		// Researcher and Websets were removed with the standalone Exa tools.
-		const exaObj = isRecord(raw.exa) ? raw.exa : undefined;
-		const exaEnabledValues = [
-			exaObj?.enabled,
-			raw["exa.enabled"],
-			exaObj?.enableSearch,
-			raw["exa.enableSearch"],
-		].filter((value): value is boolean => typeof value === "boolean");
-		const hasFlatExaSetting =
-			"exa.enabled" in raw ||
-			"exa.enableSearch" in raw ||
-			"exa.enableResearcher" in raw ||
-			"exa.enableWebsets" in raw;
-		if (exaObj || hasFlatExaSetting) {
-			const exaRoot = exaObj ?? {};
-			if (exaEnabledValues.length > 0) {
-				exaRoot.enabled = exaEnabledValues.every(Boolean);
-			}
-			delete exaRoot.enableSearch;
-			delete exaRoot.enableResearcher;
-			delete exaRoot.enableWebsets;
-			if (Object.keys(exaRoot).length > 0) {
-				raw.exa = exaRoot;
-			} else {
-				delete raw.exa;
-			}
-			delete raw["exa.enabled"];
-			delete raw["exa.enableSearch"];
-			delete raw["exa.enableResearcher"];
-			delete raw["exa.enableWebsets"];
-		}
-
 		// computer.backend and model-specific controller routing were removed
 		// when the computer tool moved to one native desktop implementation.
 		const computerObj = isRecord(raw.computer) ? raw.computer : undefined;
@@ -3558,8 +3355,6 @@ export class Settings {
 			}
 		}
 		delete raw["computer.backend"];
-
-		delete raw["hindsight.mentalModelRefreshIntervalMs"];
 
 		return raw;
 	}

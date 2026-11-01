@@ -12,26 +12,13 @@ const OPENAI_MODEL: Model<"openai-completions"> = buildModel({
 	id: "gpt-5",
 	name: "GPT-5",
 	api: "openai-completions",
-	provider: "openai",
-	baseUrl: "https://api.openai.com",
+	provider: "github-copilot",
+	baseUrl: "https://api.githubcopilot.com",
 	reasoning: true,
 	input: ["text"],
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	contextWindow: 200_000,
 	maxTokens: 8_192,
-});
-
-const OPENROUTER_MODEL: Model<"openai-completions"> = buildModel({
-	id: "deepseek/deepseek-v4-flash",
-	name: "DeepSeek V4 Flash",
-	api: "openai-completions",
-	provider: "openrouter",
-	baseUrl: "https://openrouter.ai/api/v1",
-	reasoning: true,
-	input: ["text"],
-	cost: { input: 0.098, output: 0.196, cacheRead: 0.02, cacheWrite: 0 },
-	contextWindow: 1_048_576,
-	maxTokens: 384_000,
 });
 
 function blankUsage(): Usage {
@@ -65,21 +52,6 @@ describe("openai-completions parseChunkUsage", () => {
 		expect(usage.cacheRead).toBe(200);
 		expect(usage.totalTokens).toBe(1_100);
 		expect(usage.reasoningTokens).toBe(40);
-	});
-
-	it("uses OpenRouter's reported account charge instead of the catalog estimate", () => {
-		const usage = parseChunkUsage(
-			{
-				prompt_tokens: 1_000_000,
-				completion_tokens: 100_000,
-				cost: 0.42,
-			},
-			OPENROUTER_MODEL,
-			undefined,
-		);
-
-		expect(usage.cost.total).toBe(0.42);
-		expect(usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite).toBeCloseTo(0.42);
 	});
 
 	it("omits reasoningTokens when no reasoning_tokens are reported", () => {
@@ -263,7 +235,7 @@ describe("shared OpenAI usage accounting", () => {
 			outputTokens: 250,
 			cachedTokens: 200,
 			reasoningTokens: 0,
-			cacheWriteOpenRouter: 5_000,
+			cacheWriteTokens: 5_000,
 			cacheWriteDeepSeek: 50,
 			hasDeepSeekCacheHitAndMiss: true,
 		});
@@ -280,7 +252,7 @@ describe("shared OpenAI usage accounting", () => {
 			outputTokens: 200,
 			cachedTokens: 100,
 			reasoningTokens: 0,
-			cacheWriteOpenRouter: undefined,
+			cacheWriteTokens: undefined,
 			cacheWriteDeepSeek: 50,
 			hasDeepSeekCacheHitAndMiss: true,
 		});
@@ -297,7 +269,7 @@ describe("shared OpenAI usage accounting", () => {
 			outputTokens: 25,
 			cachedTokens: 100,
 			reasoningTokens: 0,
-			cacheWriteOpenRouter: 0,
+			cacheWriteTokens: 0,
 			cacheWriteDeepSeek: 50,
 			hasDeepSeekCacheHitAndMiss: true,
 		});
@@ -315,8 +287,8 @@ describe("openai-responses usage attribution", () => {
 			role: "assistant",
 			content: [],
 			api: "openai-responses",
-			provider: "sakana",
-			model: "fugu-ultra",
+			provider: "github-copilot",
+			model: "gpt-5.5",
 			usage: blankUsage(),
 			stopReason: "stop",
 			timestamp: 0,
@@ -343,12 +315,12 @@ describe("openai-responses usage attribution", () => {
 		expect(output.usage.totalTokens).toBe(270);
 	});
 
-	it("does not label Codex orchestration input as an uncached prompt miss when primary totals include it", () => {
+	it("does not label orchestration input as an uncached prompt miss when primary totals include it", () => {
 		const output: AssistantMessage = {
 			role: "assistant",
 			content: [],
-			api: "openai-codex-responses",
-			provider: "openai-codex",
+			api: "openai-responses",
+			provider: "github-copilot",
 			model: "gpt-5.5",
 			usage: blankUsage(),
 			stopReason: "toolUse",

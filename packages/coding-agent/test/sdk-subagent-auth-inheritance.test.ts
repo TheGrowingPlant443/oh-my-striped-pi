@@ -37,20 +37,20 @@ function oauthCredential(suffix: string): OAuthCredential {
 	};
 }
 
-function claudeUsage(accountId: string, usedFraction: number): UsageReport {
+function copilotUsage(accountId: string, usedFraction: number): UsageReport {
 	const used = usedFraction * 100;
 	return {
-		provider: "anthropic",
+		provider: "github-copilot",
 		fetchedAt: Date.now(),
 		metadata: { accountId },
 		limits: [
 			{
-				id: "anthropic:5h",
-				label: "Claude 5 Hour",
-				scope: { provider: "anthropic", windowId: "5h", shared: true },
+				id: "github-copilot:5h",
+				label: "Copilot Test Window",
+				scope: { provider: "github-copilot", windowId: "5h", shared: true },
 				window: {
 					id: "5h",
-					label: "Claude 5 Hour",
+					label: "Copilot Test Window",
 					durationMs: 5 * 60 * 60_000,
 					resetsAt: Date.now() + 60 * 60_000,
 				},
@@ -73,34 +73,18 @@ function reserveAuthStorage(): AuthStorage {
 	const usedFractionByAccount: Record<string, number> = { "account-a": 0.2, "account-b": 0.7 };
 	return new AuthStorage(new SqliteAuthCredentialStore(new Database(":memory:")), {
 		usageProviderResolver: provider =>
-			provider === "anthropic"
+			provider === "github-copilot"
 				? {
-						id: "anthropic",
+						id: "github-copilot",
 						async fetchUsage({ credential }) {
 							const accountId = credential.accountId;
 							const usedFraction = accountId ? usedFractionByAccount[accountId] : undefined;
-							return accountId && usedFraction !== undefined ? claudeUsage(accountId, usedFraction) : null;
+							return accountId && usedFraction !== undefined ? copilotUsage(accountId, usedFraction) : null;
 						},
 					}
 				: undefined,
-		accountPolicies: [{ provider: "anthropic", account: { accountId: "account-b" }, reservePct: 50 }],
+		accountPolicies: [{ provider: "github-copilot", account: { accountId: "account-b" }, reservePct: 50 }],
 	});
-}
-
-function metadataUserId(metadata: Record<string, unknown> | undefined): {
-	session_id: unknown;
-	account_uuid: unknown;
-} {
-	const encoded = metadata?.user_id;
-	if (typeof encoded !== "string") throw new Error("Expected encoded user metadata");
-	const decoded: unknown = JSON.parse(encoded);
-	if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
-		throw new Error("Expected user metadata object");
-	}
-	return {
-		session_id: "session_id" in decoded ? decoded.session_id : undefined,
-		account_uuid: "account_uuid" in decoded ? decoded.account_uuid : undefined,
-	};
 }
 
 function subprocessResult(id: string): SingleResult {
@@ -128,22 +112,20 @@ afterEach(() => {
 });
 
 describe("task subagent OAuth pin inheritance", () => {
-	it("keeps inherited credentials and metadata on the parent's account affinity", async () => {
+	it("keeps inherited Copilot credentials on the parent's account affinity", async () => {
 		const tempDir = TempDir.createSync("@pi-subagent-auth-pin-");
 		const authStorage = createInMemoryAuthStorage();
 		const sessions: AgentSession[] = [];
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
-			const otherProviderModel = getBundledModel("openai", "gpt-5-mini");
-			if (!model || !otherProviderModel) throw new Error("Expected bundled test models");
-			await authStorage.credentials.set("anthropic", [oauthCredential("a"), oauthCredential("b")]);
-			authStorage.keys.setRuntime("openai", "openai-key");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
+			if (!model) throw new Error("Expected bundled Copilot model");
+			await authStorage.credentials.set("github-copilot", [oauthCredential("a"), oauthCredential("b")]);
 			const parentProviderSessionId = "parent-provider-session";
 			const accountB = authStorage.oauth
-				.accounts("anthropic", parentProviderSessionId)
+				.accounts("github-copilot", parentProviderSessionId)
 				.find(account => account.accountId === "account-b");
 			if (!accountB) throw new Error("Expected account B");
-			expect(authStorage.sessions.pin("anthropic", parentProviderSessionId, accountB.credentialId)).toBe(true);
+			expect(authStorage.sessions.pin("github-copilot", parentProviderSessionId, accountB.credentialId)).toBe(true);
 
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 			const settings = Settings.isolated({
@@ -213,17 +195,11 @@ describe("task subagent OAuth pin inheritance", () => {
 				children.push(child);
 				const childGetApiKey = child.agent.getApiKey;
 				if (!childGetApiKey) throw new Error("Expected child credential resolver");
-				expect(await resolveApiKeyOnce(await childGetApiKey(model))).toBe("access-b");
-				expect(metadataUserId(child.agent.metadataForProvider("anthropic"))).toMatchObject({
-					session_id: providerSessionId,
-					account_uuid: "account-b",
-				});
+				expect(JSON.parse((await resolveApiKeyOnce(await childGetApiKey(model)))!).token).toBe("access-b");
+				expect(authStorage.oauth.identity("github-copilot", providerSessionId)?.accountId).toBe("account-b");
 			}
 			const child = children[0];
 			if (!child) throw new Error("Expected first child session");
-			const childGetApiKey = child.agent.getApiKey;
-			if (!childGetApiKey) throw new Error("Expected first child credential resolver");
-			expect(await resolveApiKeyOnce(await childGetApiKey(otherProviderModel))).toBe("openai-key");
 
 			const childTask = child.getToolByName("task");
 			if (!childTask) throw new Error("Expected child task tool");
@@ -254,11 +230,10 @@ describe("task subagent OAuth pin inheritance", () => {
 			sessions.push(grandchild);
 			const grandchildGetApiKey = grandchild.agent.getApiKey;
 			if (!grandchildGetApiKey) throw new Error("Expected grandchild credential resolver");
-			expect(await resolveApiKeyOnce(await grandchildGetApiKey(model))).toBe("access-b");
-			expect(metadataUserId(grandchild.agent.metadataForProvider("anthropic"))).toMatchObject({
-				session_id: "grandchild-provider-session",
-				account_uuid: "account-b",
-			});
+			expect(JSON.parse((await resolveApiKeyOnce(await grandchildGetApiKey(model)))!).token).toBe("access-b");
+			expect(authStorage.oauth.identity("github-copilot", "grandchild-provider-session")?.accountId).toBe(
+				"account-b",
+			);
 		} finally {
 			for (const session of sessions.reverse()) await session.dispose();
 			authStorage.close();
@@ -279,25 +254,25 @@ describe("task subagent OAuth pin inheritance", () => {
 		const tempDir = TempDir.createSync("@pi-subagent-revive-pin-");
 		let child: AgentSession | undefined;
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled test model");
-			await authStorage.credentials.set("anthropic", [oauthCredential("a"), oauthCredential("b")]);
+			await authStorage.credentials.set("github-copilot", [oauthCredential("a"), oauthCredential("b")]);
 			const childTranscript = SessionManager.inMemory(tempDir.path());
-			const childHash = credentialPinHash("anthropic", {
+			const childHash = credentialPinHash("github-copilot", {
 				accountId: `account-${childAccount}`,
 				email: `${childAccount}@example.com`,
 			});
 			if (!childHash) throw new Error("Expected a pin hash");
-			childTranscript.appendCredentialPin("anthropic", childHash);
+			childTranscript.appendCredentialPin("github-copilot", childHash);
 
 			const parentProviderSessionId = "parent-provider-session";
 			const parentCredential = authStorage.oauth
-				.accounts("anthropic", parentProviderSessionId)
+				.accounts("github-copilot", parentProviderSessionId)
 				.find(account => account.accountId === `account-${parentAccount}`);
 			if (!parentCredential) throw new Error("Expected the parent's account");
 			expect(
 				authStorage.sessions.pin(
-					"anthropic",
+					"github-copilot",
 					parentProviderSessionId,
 					parentCredential.credentialId,
 					parentPinOptions,
@@ -319,7 +294,7 @@ describe("task subagent OAuth pin inheritance", () => {
 			}));
 			const childGetApiKey = child.agent.getApiKey;
 			if (!childGetApiKey) throw new Error("Expected child credential resolver");
-			return await resolveApiKeyOnce(await childGetApiKey(model));
+			return JSON.parse((await resolveApiKeyOnce(await childGetApiKey(model)))!).token;
 		} finally {
 			await child?.dispose();
 			authStorage.close();
@@ -342,7 +317,7 @@ describe("task subagent OAuth pin inheritance", () => {
 
 	it("keeps a revived child inside its account pool over the parent's explicit pin", async () => {
 		const key = await reviveChildKey(createInMemoryAuthStorage(), "b", "a", undefined, {
-			anthropic: ["email:b@example.com"],
+			"github-copilot": ["account:account-b"],
 		});
 		expect(key).toBe("access-b");
 	});
@@ -352,13 +327,15 @@ describe("task subagent OAuth pin inheritance", () => {
 		const authStorage = reserveAuthStorage();
 		let child: AgentSession | undefined;
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled test model");
-			await authStorage.credentials.set("anthropic", [oauthCredential("a"), oauthCredential("b")]);
+			await authStorage.credentials.set("github-copilot", [oauthCredential("a"), oauthCredential("b")]);
 			const parentProviderSessionId = "parent-provider-session";
-			const accountB = authStorage.oauth.accounts("anthropic").find(account => account.accountId === "account-b");
+			const accountB = authStorage.oauth
+				.accounts("github-copilot")
+				.find(account => account.accountId === "account-b");
 			if (!accountB) throw new Error("Expected account B");
-			expect(authStorage.sessions.pin("anthropic", parentProviderSessionId, accountB.credentialId)).toBe(true);
+			expect(authStorage.sessions.pin("github-copilot", parentProviderSessionId, accountB.credentialId)).toBe(true);
 
 			const childTranscript = SessionManager.create(tempDir.path(), tempDir.join("sessions"));
 			const childOptions = {
@@ -376,9 +353,9 @@ describe("task subagent OAuth pin inheritance", () => {
 			({ session: child } = await createAgentSession({ ...childOptions, sessionManager: childTranscript }));
 			const firstRunGetApiKey = child.agent.getApiKey;
 			if (!firstRunGetApiKey) throw new Error("Expected child credential resolver");
-			expect(await resolveApiKeyOnce(await firstRunGetApiKey(model))).toBe("access-b");
+			expect(JSON.parse((await resolveApiKeyOnce(await firstRunGetApiKey(model)))!).token).toBe("access-b");
 			const childSessionId = childTranscript.getSessionId();
-			recordCredentialPin(authStorage, childTranscript, childSessionId, "anthropic");
+			recordCredentialPin(authStorage, childTranscript, childSessionId, "github-copilot");
 			const laterTurn = createAssistantMessage("earlier child turn");
 			laterTurn.timestamp = Date.now() + 1000;
 			childTranscript.appendMessage(laterTurn);
@@ -386,16 +363,16 @@ describe("task subagent OAuth pin inheritance", () => {
 			if (!sessionFile) throw new Error("Expected a session file");
 			await child.dispose();
 			child = undefined;
-			authStorage.sessions.release("anthropic", childSessionId);
+			authStorage.sessions.release("github-copilot", childSessionId);
 
 			// Its reopened transcript pin is newer than the inherited explicit pin; restoring it
 			// must not downgrade B to an automatic pin that reserve ranks away to A.
 			const reopened = await SessionManager.open(sessionFile);
-			expect(reopened.getCredentialPins().has("anthropic")).toBe(true);
+			expect(reopened.getCredentialPins().has("github-copilot")).toBe(true);
 			({ session: child } = await createAgentSession({ ...childOptions, sessionManager: reopened }));
 			const childGetApiKey = child.agent.getApiKey;
 			if (!childGetApiKey) throw new Error("Expected child credential resolver");
-			expect(await resolveApiKeyOnce(await childGetApiKey(model))).toBe("access-b");
+			expect(JSON.parse((await resolveApiKeyOnce(await childGetApiKey(model)))!).token).toBe("access-b");
 		} finally {
 			await child?.dispose();
 			authStorage.close();
@@ -408,19 +385,21 @@ describe("task subagent OAuth pin inheritance", () => {
 		const authStorage = createInMemoryAuthStorage();
 		const sessions: AgentSession[] = [];
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled test model");
 			const accountA = { ...oauthCredential("a"), orgId: "org-a" };
 			const accountB = { ...oauthCredential("b"), orgId: "org-b" };
-			await authStorage.credentials.set("anthropic", [
+			await authStorage.credentials.set("github-copilot", [
 				accountA,
 				accountB,
 				{ ...oauthCredential("c"), orgId: "org-c" },
 			]);
 			const parentProviderSessionId = "parent-provider-session";
-			const storedB = authStorage.oauth.accounts("anthropic").find(account => account.accountId === "account-b");
+			const storedB = authStorage.oauth
+				.accounts("github-copilot")
+				.find(account => account.accountId === "account-b");
 			if (!storedB) throw new Error("Expected account B");
-			expect(authStorage.sessions.pin("anthropic", parentProviderSessionId, storedB.credentialId)).toBe(true);
+			expect(authStorage.sessions.pin("github-copilot", parentProviderSessionId, storedB.credentialId)).toBe(true);
 
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 			const settings = Settings.isolated({
@@ -429,7 +408,7 @@ describe("task subagent OAuth pin inheritance", () => {
 				"task.batch": true,
 				"task.isolation.enabled": false,
 				"todo.enabled": false,
-				"task.agentAccountPools": { task: { anthropic: ["email:c@example.com|org:org-c"] } },
+				"task.agentAccountPools": { task: { "github-copilot": ["account:account-c"] } },
 			});
 			vi.spyOn(discoveryModule, "discoverAgents").mockResolvedValue({ agents: [taskAgent], projectAgentsDir: null });
 			const dispatched: executorModule.ExecutorOptions[] = [];
@@ -461,7 +440,7 @@ describe("task subagent OAuth pin inheritance", () => {
 			expect(dispatched).toHaveLength(1);
 			const childOptions = dispatched[0];
 			if (!childOptions) throw new Error("Expected child options");
-			expect(childOptions.oauthAccountPools).toEqual({ anthropic: ["email:c@example.com|org:org-c"] });
+			expect(childOptions.oauthAccountPools).toEqual({ "github-copilot": ["account:account-c"] });
 			const { session: child } = await createAgentSession({
 				cwd: tempDir.path(),
 				agentDir: tempDir.path(),
@@ -479,17 +458,17 @@ describe("task subagent OAuth pin inheritance", () => {
 			sessions.push(child);
 			const childGetApiKey = child.agent.getApiKey;
 			if (!childGetApiKey) throw new Error("Expected child credential resolver");
-			expect(metadataUserId(child.agent.metadataForProvider("anthropic")).account_uuid).toBe("account-c");
-			expect(await resolveApiKeyOnce(await childGetApiKey(model))).toBe("access-c");
+			expect(authStorage.oauth.identity("github-copilot", "child-provider-session")?.accountId).toBe("account-c");
+			expect(JSON.parse((await resolveApiKeyOnce(await childGetApiKey(model)))!).token).toBe("access-c");
 
 			// A fresh provider session id starts inside the pool too.
 			expect(child.freshSession()).toBeDefined();
 			expect(child.agent.sessionId).not.toBe("child-provider-session");
-			expect(metadataUserId(child.agent.metadataForProvider("anthropic")).account_uuid).toBe("account-c");
-			expect(await resolveApiKeyOnce(await childGetApiKey(model))).toBe("access-c");
+			expect(authStorage.oauth.identity("github-copilot", child.agent.sessionId)?.accountId).toBe("account-c");
+			expect(JSON.parse((await resolveApiKeyOnce(await childGetApiKey(model)))!).token).toBe("access-c");
 
 			// Without its pooled account the child fails instead of borrowing another.
-			await authStorage.credentials.set("anthropic", [accountA, accountB]);
+			await authStorage.credentials.set("github-copilot", [accountA, accountB]);
 			await expect(resolveApiKeyOnce(await childGetApiKey(model))).rejects.toThrow(
 				"restricted to its OAuth account pool",
 			);
@@ -505,14 +484,14 @@ describe("task subagent OAuth pin inheritance", () => {
 		const authStorage = createInMemoryAuthStorage();
 		const sessions: AgentSession[] = [];
 		try {
-			const model = getBundledModel("anthropic", "claude-sonnet-4-5");
+			const model = getBundledModel("github-copilot", "claude-sonnet-4.5");
 			if (!model) throw new Error("Expected bundled test model");
-			await authStorage.credentials.set("anthropic", [
+			await authStorage.credentials.set("github-copilot", [
 				{ ...oauthCredential("a"), orgId: "org-a" },
 				{ ...oauthCredential("c"), orgId: "org-c" },
 			]);
 			// An unrestricted lookup takes the runtime key first.
-			authStorage.keys.setRuntime("anthropic", "runtime-key");
+			authStorage.keys.setRuntime("github-copilot", "runtime-key");
 			const modelRegistry = new ModelRegistry(authStorage, tempDir.join("models.yml"));
 			const settings = Settings.isolated({
 				"async.enabled": false,
@@ -537,18 +516,20 @@ describe("task subagent OAuth pin inheritance", () => {
 				settings,
 				model,
 				providerSessionId: "pooled-provider-session",
-				oauthAccountPools: { anthropic: ["email:c@example.com|org:org-c"] },
+				oauthAccountPools: { "github-copilot": ["account:account-c"] },
 				toolNames: ["task"],
 				disableExtensionDiscovery: true,
 			});
 			sessions.push(pooled);
 			// Side requests (title generation, skill compression) mint their own
 			// provider session ids or pass none; both stay in the pool.
-			expect(await pooled.modelRegistry.getApiKey(model, "title-provider-session")).toBe("access-c");
-			expect(await pooled.modelRegistry.getApiKey(model)).toBe("access-c");
-			expect(await resolveApiKeyOnce(pooled.modelRegistry.resolver(model, "side-provider-session"))).toBe(
+			expect(JSON.parse((await pooled.modelRegistry.getApiKey(model, "title-provider-session"))!).token).toBe(
 				"access-c",
 			);
+			expect(JSON.parse((await pooled.modelRegistry.getApiKey(model))!).token).toBe("access-c");
+			expect(
+				JSON.parse((await resolveApiKeyOnce(pooled.modelRegistry.resolver(model, "side-provider-session")))!).token,
+			).toBe("access-c");
 			// The shared registry the session was handed stays unrestricted.
 			expect(await modelRegistry.getApiKey(model, "unpooled-provider-session")).toBe("runtime-key");
 
@@ -561,11 +542,11 @@ describe("task subagent OAuth pin inheritance", () => {
 			});
 			const childRegistry = dispatched[0]?.modelRegistry;
 			if (!childRegistry) throw new Error("Expected the dispatched registry");
-			expect(await childRegistry.getApiKey(model, "nested-provider-session")).toBe("access-c");
+			expect(JSON.parse((await childRegistry.getApiKey(model, "nested-provider-session"))!).token).toBe("access-c");
 
 			// A config key (a models.yml apiKey, often for a proxy) fails the pool
 			// closed instead of sending a pooled OAuth token past it.
-			authStorage.keys.setConfig("anthropic", "proxy-key");
+			authStorage.keys.setConfig("github-copilot", "proxy-key");
 			await expect(pooled.modelRegistry.getApiKey(model, "title-provider-session")).rejects.toThrow(
 				"pooled OAuth tokens are never sent past it",
 			);

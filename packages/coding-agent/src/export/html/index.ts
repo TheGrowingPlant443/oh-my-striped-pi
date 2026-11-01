@@ -1,62 +1,37 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { buildSessionTraceFromSnapshots } from "@oh-my-pi/omp-stats/trace";
 import type { SessionTrace } from "@oh-my-pi/omp-stats/types";
 import type { AgentState } from "@oh-my-pi/pi-agent-core";
-import { APP_NAME, isCompiledBinary, isEnoent, VERSION } from "@oh-my-pi/pi-utils";
+import { APP_NAME, isEnoent } from "@oh-my-pi/pi-utils";
 import { getResolvedThemeColors, getThemeExportColors } from "@oh-my-pi/pi-tui/theme";
 import type { SessionEntry, SessionHeader } from "../../session/session-entries";
 import { SessionManager } from "../../session/session-manager";
 import { collectSubSessions, type SubSession } from "../../session/sub-sessions";
 import type { ExportThemeNames } from "./args";
 import templateHtml from "./template.html.txt" with { type: "text" };
-import viewerAsset from "./viewer.generated.json" with { type: "json" };
+import viewerSource from "./viewer.generated.js.txt" with { type: "text" };
 import { exportThemeStyles, webExportThemeVars } from "./web-palette";
 
 export { type ExportThemeNames, parseExportArgs } from "./args";
 
 let cachedTemplate: string | undefined;
 
-/** Create an export document with a checkout viewer or an integrity-pinned release viewer. */
+/** Create a self-contained export document, including the complete offline viewer. */
 export function getTemplate(): string {
 	if (cachedTemplate) return cachedTemplate;
-	const sourceCheckout =
-		!isCompiledBinary() &&
-		!process.env.PI_BUNDLED &&
-		!import.meta.dir.split(/[\\/]/).includes("node_modules") &&
-		fs.existsSync(path.join(import.meta.dir, "shell.html"));
-	let viewerScript: string;
-	if (sourceCheckout) {
-		const viewerPath = path.resolve(import.meta.dir, "../../../export-assets", viewerAsset.file);
-		let viewer: string;
-		try {
-			viewer = fs.readFileSync(viewerPath, "utf8");
-		} catch (err) {
-			if (isEnoent(err)) {
-				throw new Error(`Development export viewer not found: ${viewerPath}. Run bun gen:export-viewer.`);
-			}
-			throw err;
-		}
-		// Inline classic scripts run before deferred external scripts. Wait for
-		// both shared libraries, and prevent embedded text from closing the tag.
-		const escaped = viewer.replace(/<\/script/gi, match => `<\\/${match.slice(2)}`);
-		viewerScript = `<script>window.addEventListener("DOMContentLoaded",function(){\n${escaped}\n});</script>`;
-	} else {
-		const viewerUrl = `https://build.stencil.so/web/omp/${encodeURIComponent(VERSION)}/${viewerAsset.file}`;
-		viewerScript = `<script defer src="${viewerUrl}" integrity="${viewerAsset.integrity}" crossorigin="anonymous" onerror="document.getElementById('viewer-status').textContent='Could not load the session viewer. Connect to the internet and reload this file.'"></script>`;
-	}
-	cachedTemplate = templateHtml
-		.replace("{{MARKED_URL}}", () => "https://stencil.so/assets/omp/marked.333561b9.js")
-		.replace("{{MARKED_INTEGRITY}}", () => "sha256-MzVhuUicTTOmBQF03OgI9HBhlGcICMhDRSPIdD9aYmM=")
-		.replace("{{HIGHLIGHT_URL}}", () => "https://stencil.so/assets/omp/highlight.837a6fa5.js")
-		.replace("{{HIGHLIGHT_INTEGRITY}}", () => "sha256-g3pvpbDHNrUrveKythkPMF2j/J7UFoHbUyFQcFe1yEY=")
-		.replace("<viewer-script/>", () => viewerScript);
+	// Escape HTML parser control sequences without altering the viewer's JavaScript.
+	const source = JSON.stringify(viewerSource).replace(/</g, "\\u003c");
+	cachedTemplate = templateHtml.replace(
+		"<viewer-script/>",
+		() =>
+			`<script>{const viewer=document.createElement("script");viewer.textContent=${source};document.body.append(viewer);}</script>`,
+	);
 	return cachedTemplate;
 }
 
 export interface ExportOptions {
 	outputPath?: string;
-	/** `"web"` uses the hosted web themes; `"theme"` embeds TUI theme overrides. */
+	/** `"web"` uses bundled web palettes; `"theme"` embeds TUI theme overrides. */
 	palette?: "web" | "theme";
 	/** Legacy single TUI theme name. Prefer `themeNames` for dual-theme exports. */
 	themeName?: string;
@@ -173,7 +148,7 @@ export interface SessionData {
 	systemPrompt?: string;
 	tools?: { name: string; description: string }[];
 	subSessions?: Record<string, SubSession>;
-	/** Offline trace for the embedded transcripts; absent in older share snapshots. */
+	/** Offline trace for the embedded transcripts. */
 	trace?: SessionTrace;
 }
 

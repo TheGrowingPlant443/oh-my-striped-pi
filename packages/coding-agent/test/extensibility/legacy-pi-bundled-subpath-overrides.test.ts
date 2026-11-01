@@ -83,44 +83,12 @@ export const finalBeta = Reflect.get(globalThis, "__betaLoads") ?? 0;
 	});
 
 	it("expands wildcard exports for concrete on-disk targets (issue #3442 follow-up)", () => {
-		// `pi-ai/oauth/anthropic` is exposed via the `./oauth/*` wildcard export;
-		// the original fix only bundled non-wildcard subpaths, so peer-only plugins
-		// importing `@(scope)/pi-ai/oauth/anthropic` (remapped via PI_SUBPATH_REMAPS
-		// from `@mariozechner/pi-ai/utils/oauth/anthropic`) still hit the bunfs
-		// fall-through. The generator now globs each wildcard's source pattern
-		// and registers every concrete `.ts` match against the virtual namespace.
+		// OAuth wildcard exports must resolve through the bundled namespace too.
 		const overrides = __buildLegacyPiPackageRootOverrides(true, bundledModuleKeys);
-		expect(overrides["@oh-my-pi/pi-ai/oauth/anthropic"]).toBe(
-			"omp-legacy-pi-bundled:@oh-my-pi/pi-ai/oauth/anthropic",
+		expect(overrides["@oh-my-pi/pi-ai/oauth/github-copilot"]).toBe(
+			"omp-legacy-pi-bundled:@oh-my-pi/pi-ai/oauth/github-copilot",
 		);
-		// Sanity: the wildcard expansion also reaches deeper subroots so plugins
-		// pinned to e.g. `@oh-my-pi/pi-ai/providers/openai` keep resolving.
-		expect(bundledModuleKeys.has("@oh-my-pi/pi-ai/oauth/anthropic")).toBe(true);
-		expect(bundledModuleKeys.has("@oh-my-pi/pi-ai/oauth/openai-codex")).toBe(true);
-	});
-
-	it("actually loads the shim's shared Pi translation through the bundled registry", async () => {
-		// The legacy shim performs the same Pi arg translation as the modern
-		// bridge and imports the shared helpers rather than copying them. Those
-		// use the explicit single-segment `providers/cursor-pi-args` target; wildcard
-		// exports may also match nested paths, whose registry coverage is tested below.
-		//
-		// Executing the generated registry is the contract — a key present in the
-		// override map still proves nothing if the module cannot be imported.
-		const key = "@oh-my-pi/pi-ai/providers/cursor-pi-args";
-		const entry = bundledEntries.find(candidate => candidate.key === key);
-		expect(entry).toBeDefined();
-
-		expect(
-			await runRegistryProbe(
-				[entry!],
-				`const mod = await BUNDLED_PI_MODULE_LOADERS[${JSON.stringify(key)}]();
-export const observed = [mod.piEscapeRegexLiteral("a.b*c"), mod.piJoinPath("src", "*.ts")];`,
-			),
-		).toEqual(["a\\.b\\*c", path.join("src", "*.ts")]);
-
-		const overrides = __buildLegacyPiPackageRootOverrides(true, bundledModuleKeys);
-		expect(overrides[key]).toBe(`omp-legacy-pi-bundled:${key}`);
+		expect(bundledModuleKeys.has("@oh-my-pi/pi-ai/oauth/github-copilot")).toBe(true);
 	});
 
 	it("loads catalog root and provider-model exports from the bundled graph", async () => {
@@ -132,8 +100,8 @@ export const observed = [mod.piEscapeRegexLiteral("a.b*c"), mod.piJoinPath("src"
 			[root, provider],
 			`const catalog = await BUNDLED_PI_MODULE_LOADERS["@oh-my-pi/pi-catalog"]();
 const providers = await BUNDLED_PI_MODULE_LOADERS["@oh-my-pi/pi-catalog/provider-models"]();
-const result = await catalog.createModelManager(providers.anthropicModelManagerOptions()).refresh("offline");
-export const observed = result.models.some(model => model.id === "claude-fable-5");`,
+const result = await catalog.createModelManager(providers.localModelManagerOptions()).refresh("offline");
+export const observed = result.models.length > 0 && result.models.every(model => model.provider === "local");`,
 		);
 		expect(observed).toBe(true);
 	});
@@ -167,10 +135,8 @@ export const observed = buildModel({
 	it("expands web search provider wildcard exports for compiled plugin imports", () => {
 		const overrides = __buildLegacyPiPackageRootOverrides(true, bundledModuleKeys);
 		const providerKeys = [
-			"@oh-my-pi/pi-coding-agent/web/search/providers/xai",
-			"@oh-my-pi/pi-coding-agent/web/search/providers/tinyfish",
+			"@oh-my-pi/pi-coding-agent/web/search/providers/searxng",
 			"@oh-my-pi/pi-coding-agent/web/search/providers/firecrawl",
-			"@oh-my-pi/pi-coding-agent/web/search/providers/duckduckgo",
 		] as const;
 
 		for (const key of providerKeys) {

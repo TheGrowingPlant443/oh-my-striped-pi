@@ -63,25 +63,10 @@ describe("AIError.classify — structural provider errors", () => {
 		expect(AIError.is(id, AIError.Flag.UsageLimit)).toBe(true);
 	});
 
-	it("recognizes Codex transport errors by name without importing the provider", () => {
-		const transport = Object.assign(new Error("websocket closed"), { name: "CodexWebSocketTransportError" });
-		expect(AIError.is(AIError.classify(transport), AIError.Flag.Transient)).toBe(true);
-		const retryableStream = Object.assign(new Error("server error"), {
-			name: "CodexProviderStreamError",
-			retryable: true,
-		});
-		expect(AIError.is(AIError.classify(retryableStream), AIError.Flag.Transient)).toBe(true);
-		const fatalStream = Object.assign(new Error("bad request"), {
-			name: "CodexProviderStreamError",
-			retryable: false,
-		});
-		expect(AIError.is(AIError.classify(fatalStream), AIError.Flag.Transient)).toBe(false);
-	});
-
 	it("classifies an incomplete provider stream as transient + retryable", () => {
 		const err = new AIError.ProviderResponseError(
 			"Google API stream ended without a finish reason (connection dropped or response truncated)",
-			{ provider: "google", kind: "incomplete-stream" },
+			{ provider: "github-copilot", kind: "incomplete-stream" },
 		);
 		const id = AIError.classify(err);
 		expect(AIError.is(id, AIError.Flag.Transient)).toBe(true);
@@ -108,7 +93,7 @@ describe("AIError.classify — structural provider errors", () => {
 
 	it("keeps empty response bodies on the generic transient fallback path", () => {
 		const err = new AIError.ProviderResponseError("Google API returned an empty response body", {
-			provider: "google",
+			provider: "github-copilot",
 			kind: "empty-body",
 		});
 		const id = AIError.classify(err);
@@ -132,7 +117,7 @@ describe("AIError.classify — structural provider errors", () => {
 	});
 
 	it("does not mark a terminal output provider error as transient", () => {
-		const err = new AIError.ProviderResponseError("upstream error", { provider: "google", kind: "output" });
+		const err = new AIError.ProviderResponseError("upstream error", { provider: "github-copilot", kind: "output" });
 		expect(AIError.retriable(AIError.classify(err))).toBe(false);
 	});
 });

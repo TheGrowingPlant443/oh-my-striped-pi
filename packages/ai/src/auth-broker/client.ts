@@ -1,3 +1,4 @@
+import { assertSupportedAuthCredential } from "../auth/provider-policy";
 /**
  * HTTP client for the omp auth-broker server.
  *
@@ -30,7 +31,6 @@ import type {
 	UsageResponse,
 	UsageStaleResponse,
 } from "./types";
-import { AUTH_BROKER_CAPABILITIES_HEADER, AUTH_BROKER_CAPABILITY_CODEX_METER_BLOCK_SCOPES } from "./types";
 import { parseGenerationTag } from "./protocol";
 import {
 	clientUsageReportResponseSchema,
@@ -146,9 +146,7 @@ export class AuthBrokerClient {
 		const query = new URLSearchParams();
 		if (opts.waitMs !== undefined) query.set("wait", String(opts.waitMs));
 		const path = `/v1/snapshot${query.size > 0 ? `?${query.toString()}` : ""}`;
-		const headers: Record<string, string> = {
-			[AUTH_BROKER_CAPABILITIES_HEADER]: AUTH_BROKER_CAPABILITY_CODEX_METER_BLOCK_SCOPES,
-		};
+		const headers: Record<string, string> = {};
 		if (opts.ifGenerationGt !== undefined) headers["If-None-Match"] = `"${opts.ifGenerationGt}"`;
 		const timeoutMs =
 			opts.waitMs !== undefined && opts.waitMs > 0 ? Math.max(this.#timeoutMs, opts.waitMs + 1000) : undefined;
@@ -189,7 +187,6 @@ export class AuthBrokerClient {
 		const headers: Record<string, string> = {
 			Accept: "text/event-stream",
 			Authorization: `Bearer ${this.#token}`,
-			[AUTH_BROKER_CAPABILITIES_HEADER]: AUTH_BROKER_CAPABILITY_CODEX_METER_BLOCK_SCOPES,
 		};
 		if (opts.signal?.aborted) {
 			throw new AuthBrokerError("Auth broker request aborted", { cause: opts.signal.reason });
@@ -369,6 +366,7 @@ export class AuthBrokerClient {
 		credential: AuthCredential,
 		signal?: AbortSignal,
 	): Promise<CredentialUploadResponse> {
+		assertSupportedAuthCredential(provider, credential.type);
 		const body: CredentialUploadRequest = { provider, credential };
 		return this.#request<CredentialUploadResponse>("POST", "/v1/credential", {
 			body,

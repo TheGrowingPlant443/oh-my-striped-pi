@@ -163,7 +163,6 @@ export class SessionHandoff {
 					apiKey: this.#host.modelRegistry.resolver(model, cacheSessionId),
 					sessionId: `${cacheSessionId}:side:${Snowflake.next()}`,
 					promptCacheKey: handoffPromptCacheKey,
-					preferWebsockets: false,
 					serviceTier: this.#host.effectiveServiceTier(model),
 					hideThinkingSummary: this.#host.agent.hideThinkingSummary,
 					initiatorOverride: "agent",

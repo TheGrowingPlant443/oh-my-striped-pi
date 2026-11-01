@@ -16,9 +16,9 @@ import {
 import { removeWithRetries } from "../../utils/src/temp";
 import { withEnv } from "./helpers";
 
-const ANTHROPIC_ENV = ["ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN"] as const;
+const COPILOT_ENV = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN"] as const;
 const AUTH_BROKER_MODULE = path.resolve(import.meta.dir, "../src/auth-broker/index.ts");
-const savedEnv: Partial<Record<(typeof ANTHROPIC_ENV)[number], string | undefined>> = {};
+const savedEnv: Partial<Record<(typeof COPILOT_ENV)[number], string | undefined>> = {};
 
 function mintOAuthCredential(suffix: string, expires: number) {
 	return {
@@ -49,13 +49,13 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	const token = "remote-store-bearer";
 
 	beforeEach(async () => {
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			savedEnv[key] = process.env[key];
 			delete process.env[key];
 		}
 		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auth-broker-remote-store-"));
 		store = new SqliteAuthCredentialStore(new Database(":memory:"));
-		await store.saveOAuth("anthropic", mintOAuthCredential("a", Date.now() + 60_000));
+		await store.saveOAuth("github-copilot", mintOAuthCredential("a", Date.now() + 60_000));
 		storage = new AuthStorage(store);
 		await storage.credentials.reload();
 		handle = startAuthBroker({
@@ -73,7 +73,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		storage?.close();
 		store?.close();
 		await removeWithRetries(tempDir);
-		for (const key of ANTHROPIC_ENV) {
+		for (const key of COPILOT_ENV) {
 			if (savedEnv[key] === undefined) delete process.env[key];
 			else process.env[key] = savedEnv[key];
 		}
@@ -86,7 +86,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		// 1. Initial snapshot frame populates the local store.
 		await waitUntil(() => remote!.snapshot.credentials.length === 1);
 		const initialEntry = remote!.snapshot.credentials[0];
-		expect(initialEntry.provider).toBe("anthropic");
+		expect(initialEntry.provider).toBe("github-copilot");
 		expect(initialEntry.credential.type).toBe("oauth");
 		if (initialEntry.credential.type === "oauth") {
 			expect(initialEntry.credential.access).toBe("access-a");
@@ -95,7 +95,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		const initialGeneration = remote!.snapshot.generation;
 
 		// 2. Server-side upsert is delivered as an `entry` frame.
-		await storage!.credentials.upsert("anthropic", mintOAuthCredential("b", Date.now() + 120_000));
+		await storage!.credentials.upsert("github-copilot", mintOAuthCredential("b", Date.now() + 120_000));
 		await waitUntil(() => remote!.snapshot.credentials.length === 2);
 		expect(remote!.snapshot.generation).toBeGreaterThan(initialGeneration);
 		const accessTokens = remote!.snapshot.credentials
@@ -130,12 +130,12 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			await waitUntil(() => remote!.snapshot.credentials.length === 1);
 			// Boot generation is acknowledged: no spurious reload before any change.
 			expect(await gatewayStorage.credentials.poll()).toBe(false);
-			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["anthropic"]);
+			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["github-copilot"]);
 
 			// Another process logs in a new provider; the change reaches the remote
 			// store over SSE.
-			await storage!.credentials.upsert("deepseek", { type: "api_key", key: "sk-repro" });
-			await waitUntil(() => remote!.snapshot.credentials.some(c => c.provider === "deepseek"));
+			await storage!.credentials.upsert("local", { type: "api_key", key: "sk-repro" });
+			await waitUntil(() => remote!.snapshot.credentials.some(c => c.provider === "local"));
 
 			// The poll now reports the change and the reload widens the gateway view.
 			expect(await gatewayStorage.credentials.poll()).toBe(true);
@@ -144,18 +144,18 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 					.snapshot()
 					.credentials.map(c => c.provider)
 					.sort(),
-			).toEqual(["anthropic", "deepseek"]);
+			).toEqual(["github-copilot", "local"]);
 			// One true per observed change: an unchanged generation reports false.
 			expect(await gatewayStorage.credentials.poll()).toBe(false);
 
 			// A logout in another process removes the credential over SSE, and the
 			// next poll drops it from the gateway view.
-			const deepseekId = remote!.snapshot.credentials.find(c => c.provider === "deepseek")?.id;
-			expect(deepseekId).toBeDefined();
-			expect(await storage!.credentials.disable(deepseekId!, "logged out by test")).toBe(true);
-			await waitUntil(() => !remote!.snapshot.credentials.some(c => c.provider === "deepseek"));
+			const localId = remote!.snapshot.credentials.find(c => c.provider === "local")?.id;
+			expect(localId).toBeDefined();
+			expect(await storage!.credentials.disable(localId!, "logged out by test")).toBe(true);
+			await waitUntil(() => !remote!.snapshot.credentials.some(c => c.provider === "local"));
 			expect(await gatewayStorage.credentials.poll()).toBe(true);
-			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["anthropic"]);
+			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["github-copilot"]);
 		} finally {
 			gatewayStorage.close();
 		}
@@ -172,9 +172,9 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 
 			// Drive the original broker above the generation its replacement will
 			// start at, then acknowledge that complete credential view.
-			await storage!.credentials.upsert("deepseek", { type: "api_key", key: "sk-deepseek" });
-			await storage!.credentials.upsert("openai", { type: "api_key", key: "sk-openai" });
-			await storage!.credentials.upsert("xai", { type: "api_key", key: "sk-xai" });
+			await storage!.credentials.upsert("local", { type: "api_key", key: "local-key" });
+			await storage!.credentials.upsert("kagi", { type: "api_key", key: "kagi-key" });
+			await storage!.credentials.upsert("brave", { type: "api_key", key: "brave-key" });
 			await waitUntil(() => remote!.snapshot.credentials.length === 4);
 			const previousGeneration = remote.snapshot.generation;
 			expect(await gatewayStorage.credentials.poll()).toBe(true);
@@ -189,7 +189,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			storage!.close();
 
 			store = new SqliteAuthCredentialStore(new Database(":memory:"));
-			await store.saveApiKey("google", "sk-restarted");
+			await store.saveApiKey("github-copilot", "sk-restarted");
 			storage = new AuthStorage(store);
 			await storage.credentials.reload();
 			expect(storage.credentials.generation).toBeLessThan(previousGeneration);
@@ -206,16 +206,16 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 				() =>
 					remote!.snapshot.generation < previousGeneration &&
 					remote!.snapshot.credentials.length === 1 &&
-					remote!.snapshot.credentials[0]?.provider === "google",
+					remote!.snapshot.credentials[0]?.provider === "github-copilot",
 				4_000,
 			);
 			expect(await gatewayStorage.credentials.poll()).toBe(true);
-			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["google"]);
+			expect(gatewayStorage.credentials.snapshot().credentials.map(c => c.provider)).toEqual(["github-copilot"]);
 
 			// Incremental events are now ordered against the replacement
 			// baseline, not the previous broker process's higher generation.
-			await storage!.credentials.upsert("deepseek", { type: "api_key", key: "sk-after-restart" });
-			await waitUntil(() => remote!.snapshot.credentials.some(c => c.provider === "deepseek"));
+			await storage!.credentials.upsert("local", { type: "api_key", key: "sk-after-restart" });
+			await waitUntil(() => remote!.snapshot.credentials.some(c => c.provider === "local"));
 			expect(remote.snapshot.generation).toBeLessThan(previousGeneration);
 			expect(await gatewayStorage.credentials.poll()).toBe(true);
 			expect(
@@ -223,7 +223,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 					.snapshot()
 					.credentials.map(c => c.provider)
 					.sort(),
-			).toEqual(["deepseek", "google"]);
+			).toEqual(["github-copilot", "local"]);
 		} finally {
 			gatewayStorage.close();
 		}
@@ -239,8 +239,8 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		remote.recordObservedUsage([
 			{
 				at,
-				provider: "anthropic",
-				model: "claude-x",
+				provider: "github-copilot",
+				model: "copilot-test",
 				requests: 1,
 				inputTokens: 100,
 				outputTokens: 50,
@@ -252,8 +252,8 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		remote.recordObservedUsage([
 			{
 				at: at + 1,
-				provider: "anthropic",
-				model: "claude-x",
+				provider: "github-copilot",
+				model: "copilot-test",
 				requests: 1,
 				inputTokens: 200,
 				outputTokens: 100,
@@ -263,7 +263,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			},
 			{
 				at: at + 2,
-				provider: "openai-codex",
+				provider: "local",
 				model: "gpt-y",
 				requests: 1,
 				inputTokens: 30,
@@ -283,16 +283,16 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		// answer "what did app X use" even for broker-direct installs.
 		expect(reported.providers.every(p => p.app === "omp")).toBe(true);
 
-		const anthropic = reported.providers.find(p => p.provider === "anthropic");
-		expect(anthropic).toMatchObject({
+		const copilot = reported.providers.find(p => p.provider === "github-copilot");
+		expect(copilot).toMatchObject({
 			requests: 2,
 			inputTokens: 300,
 			outputTokens: 150,
 			cacheReadTokens: 30,
 			cacheWriteTokens: 15,
 		});
-		expect(anthropic?.costUsd).toBeCloseTo(1.5, 10);
-		expect(reported.providers.find(p => p.provider === "openai-codex")).toMatchObject({
+		expect(copilot?.costUsd).toBeCloseTo(1.5, 10);
+		expect(reported.providers.find(p => p.provider === "local")).toMatchObject({
 			requests: 1,
 			inputTokens: 30,
 		});
@@ -302,14 +302,14 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		// 5-minute bucket row instead of accreting a new row per flush.
 		const clientStorage = new AuthStorage(remote);
 		clientStorage.usage.observe({
-			provider: "anthropic",
-			model: "claude-x",
+			provider: "github-copilot",
+			model: "copilot-test",
 			at: at + 3,
 			usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
 		});
 		await waitUntil(() => {
 			const current = storage!.usage.clientSummary(0).clients[0];
-			return current?.providers.find(p => p.provider === "anthropic")?.requests === 3;
+			return current?.providers.find(p => p.provider === "github-copilot")?.requests === 3;
 		});
 		// An explicit identity (the auth-gateway attributing a caller) must
 		// produce its own client row instead of folding into this install.
@@ -317,8 +317,8 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			[
 				{
 					at: at + 4,
-					provider: "anthropic",
-					model: "claude-x",
+					provider: "github-copilot",
+					model: "copilot-test",
 					requests: 1,
 					inputTokens: 7,
 					outputTokens: 3,
@@ -335,7 +335,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		expect(attributed?.providers).toEqual([
 			{
 				app: "robomp",
-				provider: "anthropic",
+				provider: "github-copilot",
 				requests: 1,
 				inputTokens: 7,
 				outputTokens: 3,
@@ -354,7 +354,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			`const client = new AuthBrokerClient({ url: ${JSON.stringify(handle!.url)}, token: ${JSON.stringify(token)} });`,
 			"const remote = new RemoteAuthCredentialStore({ client, streamSnapshots: false });",
 			"remote.recordObservedUsage(",
-			'	[{ at: Date.now(), provider: "anthropic", model: "claude-x", requests: 1, inputTokens: 12, outputTokens: 4, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.01 }],',
+			'	[{ at: Date.now(), provider: "github-copilot", model: "copilot-test", requests: 1, inputTokens: 12, outputTokens: 4, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.01 }],',
 			'	{ installId: "print-mode-install", hostname: "print-mode-host", app: "omp" },',
 			");",
 			"await postmortem.quit(0);",
@@ -372,7 +372,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		expect(reported?.providers).toEqual([
 			{
 				app: "omp",
-				provider: "anthropic",
+				provider: "github-copilot",
 				requests: 1,
 				inputTokens: 12,
 				outputTokens: 4,
@@ -432,13 +432,17 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	});
 
 	test("filters configured OAuth identities while preserving API keys and raw snapshot callbacks", async () => {
-		await storage!.credentials.upsert("anthropic", mintOAuthCredential("b", Date.now() + 120_000));
-		await storage!.credentials.upsert("anthropic", { type: "api_key", key: "visible-api-key" });
+		await storage!.credentials.upsert("github-copilot", mintOAuthCredential("b", Date.now() + 120_000));
+		await storage!.credentials.upsert("github-copilot", { type: "api_key", key: "visible-api-key" });
 		const client = new AuthBrokerClient({ url: handle!.url, token });
 		const initialResult = await client.fetchSnapshot();
 		if (initialResult.status !== 200) throw new Error("expected initial snapshot");
-		const allowed = initialResult.snapshot.credentials.find(entry => entry.identityKey?.includes("a@example.com"));
-		const excluded = initialResult.snapshot.credentials.find(entry => entry.identityKey?.includes("b@example.com"));
+		const allowed = initialResult.snapshot.credentials.find(
+			entry => entry.credential.type === "oauth" && entry.credential.accountId === "account-a",
+		);
+		const excluded = initialResult.snapshot.credentials.find(
+			entry => entry.credential.type === "oauth" && entry.credential.accountId === "account-b",
+		);
 		if (!allowed?.identityKey || !excluded?.identityKey) throw new Error("expected OAuth identity keys");
 		const identities = new Set([allowed.identityKey]);
 		const callbacks: SnapshotResponse[] = [];
@@ -446,7 +450,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			client,
 			initialSnapshot: initialResult.snapshot,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", identities]]),
+			accountPool: new Map([["github-copilot", identities]]),
 			onSnapshot: snapshot => {
 				callbacks.push(snapshot);
 			},
@@ -455,7 +459,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		identities.add(excluded.identityKey);
 		expect(
 			remote
-				.listAuthCredentials("anthropic")
+				.listAuthCredentials("github-copilot")
 				.map(entry => entry.credential.type)
 				.sort(),
 		).toEqual(["api_key", "oauth"]);
@@ -473,11 +477,11 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		remote = new RemoteAuthCredentialStore({
 			client,
 			initialSnapshot: initialResult.snapshot,
-			accountPool: new Map([["anthropic", new Set([allowed.identityKey])]]),
+			accountPool: new Map([["github-copilot", new Set([allowed.identityKey])]]),
 		});
 		const initialGeneration = remote.snapshot.generation;
 
-		await storage!.credentials.upsert("anthropic", mintOAuthCredential("b", Date.now() + 120_000));
+		await storage!.credentials.upsert("github-copilot", mintOAuthCredential("b", Date.now() + 120_000));
 		await waitUntil(() => remote!.snapshot.generation > initialGeneration);
 
 		expect(remote.snapshot.credentials).toHaveLength(1);
@@ -485,7 +489,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	});
 
 	test("treats a missing provider as unrestricted and an empty provider pool as OAuth-disabled", async () => {
-		await storage!.credentials.upsert("openai-codex", mintOAuthCredential("codex", Date.now() + 120_000));
+		await storage!.credentials.upsert("local", mintOAuthCredential("local", Date.now() + 120_000));
 		const client = new AuthBrokerClient({ url: handle!.url, token });
 		const initialResult = await client.fetchSnapshot();
 		if (initialResult.status !== 200) throw new Error("expected initial snapshot");
@@ -493,17 +497,16 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			client,
 			initialSnapshot: initialResult.snapshot,
 			streamSnapshots: false,
-			accountPool: new Map([["anthropic", new Set()]]),
+			accountPool: new Map([["github-copilot", new Set()]]),
 		});
 
-		expect(remote.listAuthCredentials("anthropic")).toEqual([]);
-		expect(remote.listAuthCredentials("openai-codex")).toHaveLength(1);
+		expect(remote.listAuthCredentials("github-copilot")).toEqual([]);
+		expect(remote.listAuthCredentials("local")).toHaveLength(1);
 	});
 
 	test("an allow-list pool hides unlisted providers and API keys over snapshots and SSE", async () => {
-		await storage!.credentials.upsert("anthropic", { type: "api_key", key: "hidden-anthropic-key" });
-		await storage!.credentials.upsert("openai-codex", mintOAuthCredential("codex", Date.now() + 120_000));
-		await storage!.credentials.upsert("openrouter", { type: "api_key", key: "visible-openrouter-key" });
+		await storage!.credentials.upsert("github-copilot", { type: "api_key", key: "hidden-copilot-key" });
+		await storage!.credentials.upsert("local", { type: "api_key", key: "visible-local-key" });
 		const client = new AuthBrokerClient({ url: handle!.url, token });
 		const initialResult = await client.fetchSnapshot();
 		if (initialResult.status !== 200) throw new Error("expected initial snapshot");
@@ -512,8 +515,8 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 			initialSnapshot: initialResult.snapshot,
 			accountPool: new Map([
 				["*", { accounts: new Set<string>(), apiKeys: false }],
-				["anthropic", { apiKeys: false }],
-				["openrouter", {}],
+				["github-copilot", { apiKeys: false }],
+				["local", {}],
 			]),
 		});
 		const visible = () =>
@@ -521,24 +524,28 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 				.listAuthCredentials()
 				.map(entry => `${entry.provider}:${entry.credential.type}`)
 				.sort();
-		expect(visible()).toEqual(["anthropic:oauth", "openrouter:api_key"]);
+		expect(visible()).toEqual(["github-copilot:oauth", "local:api_key"]);
 
 		const initialGeneration = remote.snapshot.generation;
-		await storage!.credentials.upsert("moonshot", { type: "api_key", key: "hidden-moonshot-key" });
+		await storage!.credentials.upsert("kagi", { type: "api_key", key: "hidden-search-key" });
 		await waitUntil(() => remote!.snapshot.generation > initialGeneration);
-		expect(visible()).toEqual(["anthropic:oauth", "openrouter:api_key"]);
+		expect(visible()).toEqual(["github-copilot:oauth", "local:api_key"]);
 	});
 
 	test("loads the account pool once for broker-backed discovery", async () => {
-		await storage!.credentials.upsert("anthropic", mintOAuthCredential("b", Date.now() + 120_000));
+		await storage!.credentials.upsert("github-copilot", mintOAuthCredential("b", Date.now() + 120_000));
 		const client = new AuthBrokerClient({ url: handle!.url, token });
 		const initialResult = await client.fetchSnapshot();
 		if (initialResult.status !== 200) throw new Error("expected initial snapshot");
-		const allowed = initialResult.snapshot.credentials.find(entry => entry.identityKey?.includes("a@example.com"));
-		const excluded = initialResult.snapshot.credentials.find(entry => entry.identityKey?.includes("b@example.com"));
+		const allowed = initialResult.snapshot.credentials.find(
+			entry => entry.credential.type === "oauth" && entry.credential.accountId === "account-a",
+		);
+		const excluded = initialResult.snapshot.credentials.find(
+			entry => entry.credential.type === "oauth" && entry.credential.accountId === "account-b",
+		);
 		if (!allowed?.identityKey || !excluded?.identityKey) throw new Error("expected OAuth identity keys");
 		const poolPath = path.join(tempDir, "account-pool.json");
-		await Bun.write(poolPath, JSON.stringify({ anthropic: [allowed.identityKey] }));
+		await Bun.write(poolPath, JSON.stringify({ "github-copilot": [allowed.identityKey] }));
 
 		await withEnv(
 			{
@@ -552,11 +559,18 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 					cachePath: path.join(tempDir, "snapshot-cache.enc"),
 				});
 				try {
-					expect(discovered.oauth.accounts("anthropic").map(account => account.email)).toEqual(["a@example.com"]);
+					expect(discovered.oauth.accounts("github-copilot").map(account => account.email)).toEqual([
+						"a@example.com",
+					]);
 
-					await Bun.write(poolPath, JSON.stringify({ anthropic: [allowed.identityKey, excluded.identityKey] }));
+					await Bun.write(
+						poolPath,
+						JSON.stringify({ "github-copilot": [allowed.identityKey, excluded.identityKey] }),
+					);
 					await discovered.credentials.reload();
-					expect(discovered.oauth.accounts("anthropic").map(account => account.email)).toEqual(["a@example.com"]);
+					expect(discovered.oauth.accounts("github-copilot").map(account => account.email)).toEqual([
+						"a@example.com",
+					]);
 				} finally {
 					discovered.close();
 				}
@@ -565,21 +579,23 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	});
 
 	test("loads allow-list rules from the account pool file", async () => {
-		await storage!.credentials.upsert("anthropic", { type: "api_key", key: "hidden-anthropic-key" });
-		await storage!.credentials.upsert("openrouter", { type: "api_key", key: "visible-openrouter-key" });
-		await storage!.credentials.upsert("moonshot", { type: "api_key", key: "hidden-moonshot-key" });
+		await storage!.credentials.upsert("github-copilot", { type: "api_key", key: "hidden-copilot-key" });
+		await storage!.credentials.upsert("local", { type: "api_key", key: "visible-local-key" });
+		await storage!.credentials.upsert("kagi", { type: "api_key", key: "hidden-search-key" });
 		const client = new AuthBrokerClient({ url: handle!.url, token });
 		const initialResult = await client.fetchSnapshot();
 		if (initialResult.status !== 200) throw new Error("expected initial snapshot");
-		const allowed = initialResult.snapshot.credentials.find(entry => entry.identityKey?.includes("a@example.com"));
+		const allowed = initialResult.snapshot.credentials.find(
+			entry => entry.credential.type === "oauth" && entry.credential.accountId === "account-a",
+		);
 		if (!allowed?.identityKey) throw new Error("expected OAuth identity key");
 		const poolPath = path.join(tempDir, "account-pool.json");
 		await Bun.write(
 			poolPath,
 			JSON.stringify({
 				"*": false,
-				anthropic: { accounts: [allowed.identityKey], apiKeys: false },
-				openrouter: true,
+				"github-copilot": { accounts: [allowed.identityKey], apiKeys: false },
+				local: true,
 			}),
 		);
 
@@ -595,18 +611,20 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 					cachePath: path.join(tempDir, "allow-list-snapshot-cache.enc"),
 				});
 				try {
-					expect(discovered.oauth.accounts("anthropic").map(account => account.email)).toEqual(["a@example.com"]);
+					expect(discovered.oauth.accounts("github-copilot").map(account => account.email)).toEqual([
+						"a@example.com",
+					]);
 					expect(
 						discovered.credentials
 							.snapshot()
 							.credentials.map(entry => `${entry.provider}:${entry.credential.type}`)
 							.sort(),
-					).toEqual(["anthropic:oauth", "openrouter:api_key"]);
+					).toEqual(["github-copilot:oauth", "local:api_key"]);
 				} finally {
 					discovered.close();
 				}
 
-				await Bun.write(poolPath, JSON.stringify({ anthropic: { apiKeys: "no" } }));
+				await Bun.write(poolPath, JSON.stringify({ "github-copilot": { apiKeys: "no" } }));
 				await expect(
 					discoverAuthStorage({ agentDir: tempDir, cachePath: path.join(tempDir, "invalid-cache.enc") }),
 				).rejects.toThrow('"apiKeys" that is not a boolean');
@@ -625,10 +643,10 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 				const discovered = await discoverAuthStorage({
 					agentDir: tempDir,
 					cachePath: path.join(tempDir, "sdk-snapshot-cache.enc"),
-					accountPool: new Map([["anthropic", new Set()]]),
+					accountPool: new Map([["github-copilot", new Set()]]),
 				});
 				try {
-					expect(discovered.oauth.accounts("anthropic")).toEqual([]);
+					expect(discovered.oauth.accounts("github-copilot")).toEqual([]);
 				} finally {
 					discovered.close();
 				}
@@ -705,7 +723,7 @@ class FakeBrokerClient {
 
 describe("RemoteAuthCredentialStore.pollExternalChanges content revision", () => {
 	test("detects a replaced credential even when the broker generation repeats", async () => {
-		const initial = buildApiKeySnapshot(5, [{ id: 1, provider: "deepseek", key: "sk-old" }]);
+		const initial = buildApiKeySnapshot(5, [{ id: 1, provider: "local", key: "sk-old" }]);
 		const client = new FakeBrokerClient(initial);
 		const store = new RemoteAuthCredentialStore({
 			client: client as unknown as AuthBrokerClient,
@@ -718,7 +736,7 @@ describe("RemoteAuthCredentialStore.pollExternalChanges content revision", () =>
 			expect(store.pollExternalChanges()).toBe(false);
 
 			// An identical re-fetch (same generation, same content) stays quiet.
-			client.current = buildApiKeySnapshot(5, [{ id: 1, provider: "deepseek", key: "sk-old" }]);
+			client.current = buildApiKeySnapshot(5, [{ id: 1, provider: "local", key: "sk-old" }]);
 			await store.refreshSnapshot();
 			expect(store.pollExternalChanges()).toBe(false);
 
@@ -726,7 +744,7 @@ describe("RemoteAuthCredentialStore.pollExternalChanges content revision", () =>
 			// in-memory generation counter lands back on the acknowledged value 5.
 			// A generation-equality check would miss this; the content revision
 			// catches it.
-			client.current = buildApiKeySnapshot(5, [{ id: 1, provider: "deepseek", key: "sk-new" }]);
+			client.current = buildApiKeySnapshot(5, [{ id: 1, provider: "local", key: "sk-new" }]);
 			await store.refreshSnapshot();
 			expect(store.snapshot.generation).toBe(5);
 			expect(store.pollExternalChanges()).toBe(true);

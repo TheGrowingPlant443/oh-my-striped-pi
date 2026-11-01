@@ -28,20 +28,7 @@ const REFERENCE_MARKER_SUFFIXES = (() => {
 	return suffixes;
 })();
 
-// xai-oauth subscription entries carry zero public pricing and inflated maxTokens;
-// keep them provider-local so they cannot outrank paid/public Grok references.
-export function isZeroCostXaiOAuthReference(candidate: Model<Api>): boolean {
-	return (
-		candidate.provider === "xai-oauth" &&
-		candidate.cost.input === 0 &&
-		candidate.cost.output === 0 &&
-		candidate.cost.cacheRead === 0 &&
-		candidate.cost.cacheWrite === 0
-	);
-}
-
-// Prefer the reference with the largest limits and complete cache pricing, then
-// first-party OpenAI entries.
+// Prefer the reference with the largest limits and complete cache pricing.
 function shouldReplaceReference(existing: Model<Api> | undefined, candidate: Model<Api>): boolean {
 	if (!existing) return true;
 	if (candidate.contextWindow !== existing.contextWindow) {
@@ -55,7 +42,7 @@ function shouldReplaceReference(existing: Model<Api> | undefined, candidate: Mod
 	if (candidateHasCachePricing !== existingHasCachePricing) {
 		return candidateHasCachePricing;
 	}
-	return existing.provider !== "openai" && candidate.provider === "openai";
+	return false;
 }
 
 function normalizeReferenceKey(value: string): string {
@@ -69,9 +56,6 @@ function normalizeReferenceKey(value: string): string {
 export function buildModelReferenceIndex(models: Iterable<Model<Api>>): ModelReferenceIndex {
 	const exact = new Map<string, Model<Api>>();
 	for (const candidate of models) {
-		if (isZeroCostXaiOAuthReference(candidate)) {
-			continue;
-		}
 		const key = normalizeReferenceKey(candidate.id);
 		if (shouldReplaceReference(exact.get(key), candidate)) {
 			exact.set(key, candidate);

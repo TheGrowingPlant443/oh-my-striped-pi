@@ -261,30 +261,6 @@ export class AuthGatewayError extends ProviderHttpError {
 	}
 }
 
-export class CodexWebSocketTransportError extends Error {
-	constructor(detail: string) {
-		super(`Codex websocket transport failure: ${detail}`);
-		this.name = "CodexWebSocketTransportError";
-	}
-}
-
-export class CodexWhitespaceToolCallLoopError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = "CodexWhitespaceToolCallLoopError";
-	}
-}
-
-export class CodexProviderStreamError extends Error {
-	readonly retryable: boolean;
-
-	constructor(message: string, options?: { retryable?: boolean; cause?: unknown }) {
-		super(message, { cause: options?.cause });
-		this.name = "CodexProviderStreamError";
-		this.retryable = options?.retryable !== false;
-	}
-}
-
 export class AuthBrokerError extends Error {
 	readonly status: number | undefined;
 	readonly body: string | undefined;

@@ -31,10 +31,8 @@ const enum ToolCallStatus {
 /**
  * Maximum tool-call id length the strictest replay provider accepts.
  *
- * Anthropic requires `^[a-zA-Z0-9_-]+$` with a 64-char cap; Google and Codex
- * `normalizeToolCallId` implementations cap individual id segments to the same
- * 64-char ceiling. Replacement ids minted here flow back through
- * `convertAnthropicMessages` (and friends) unchanged, so the `_dupN` suffix
+ * Anthropic requires `^[a-zA-Z0-9_-]+$` with a 64-char cap. Replacement ids
+ * minted here flow back through encoders unchanged, so the `_dupN` suffix
  * MUST not push a normalized id past this bound.
  */
 export const MAX_TOOL_CALL_ID_LENGTH = 64;
@@ -58,7 +56,7 @@ export function isValidToolCallId(id: string): boolean {
  * canonicalized to their `call_` component for pairing.
  */
 export function isResponsesFamilyApi(api: Api | undefined): boolean {
-	return api === "openai-responses" || api === "openai-codex-responses" || api === "azure-openai-responses";
+	return api === "openai-responses";
 }
 
 /**
@@ -122,7 +120,7 @@ function recordToolCallOriginScope(
 /**
  * Canonical key for pairing a tool result with its assistant tool call.
  *
- * The OpenAI Codex/Responses APIs store a tool result's id as a composite
+ * The OpenAI Responses API stores a tool result's id as a composite
  * `<call_id>|<response_item_id>` (e.g. `call_ABC|fc_XYZ`), while the assistant
  * `toolCall` that produced it carries the plain `call_ABC` (or a composite with
  * a DIFFERENT item half). Keying both sides on the FIRST segment pairs them,
@@ -144,7 +142,7 @@ function recordToolCallOriginScope(
  * so the provider encoder still receives the exact wire ids it expects.
  *
  * LOAD-BEARING INVARIANT: pairing correctness depends on the wire `call_id`
- * being unique per distinct tool call. The Codex Responses wire guarantees this
+ * being unique per distinct tool call. The Responses wire guarantees this
  * (distinct parallel calls carry distinct call_ids; only the `fc_` half varies),
  * and genuine cross-turn id reuse is `_dup`-suffixed on the call_ segment by
  * `deduplicateToolCallIds` (which this key preserves).
@@ -578,22 +576,16 @@ export function completionsSendsOwnThinking(
  *   blocks only under these flags; otherwise it drops them.
  * - the Responses wire replays reasoning items unless history is filtered, and
  *   hosts that require reasoning replay already receive id-less plaintext
- *   items from omp (the `requiresReasoningContent*` safety net). OpenRouter's
- *   chat fallback shares the tool-call flag.
- * - Devin sends every turn's thinking in the prompt's `thinking` field.
+ *   items from omp (the `requiresReasoningContent*` safety net).
  * Anthropic-format targets that accept unsigned thinking already read it via
- * `targetReadsForeignThinking`; Bedrock and Google reject or ignore unsigned
- * reasoning, and Codex hosts no portable family.
+ * `targetReadsForeignThinking`.
  */
 function targetReplaysPlaintextReasoning(model: Model, compat: Model["compat"]): boolean {
 	if (!model.reasoning || compat === undefined) return false;
-	if (model.api === "devin-agent") return true;
 	if (!("requiresReasoningContentForToolCalls" in compat)) return false;
 	switch (model.api) {
 		case "openai-completions":
 			return !compat.requiresThinkingAsText && completionsSendsOwnThinking(model, compat);
-		case "openrouter":
-			return !compat.filterReasoningHistory && compat.requiresReasoningContentForToolCalls;
 		case "openai-responses":
 			return (
 				!compat.filterReasoningHistory &&
@@ -943,9 +935,7 @@ export function transformMessages<TApi extends Api>(
 			// session-level model swaps (#2257).
 			const isAnthropicReplay = isAnthropicTarget && assistantMsg.api === "anthropic-messages";
 			const sameAnthropicDeployment =
-				isAnthropicReplay &&
-				assistantMsg.provider === model.provider &&
-				(model.compat.officialEndpoint || model.thinking?.prefixBinding === true);
+				isAnthropicReplay && assistantMsg.provider === model.provider && model.thinking?.prefixBinding === true;
 			const isLatestSurvivingAssistant = index === latestSurvivingAssistantIndex;
 			// Signature policy is a second axis. Anthropic cryptographically
 			// binds reasoning signatures to its deployment and model lineage.
@@ -1225,9 +1215,9 @@ export function transformMessages<TApi extends Api>(
 
 					let normalizedId: string | undefined;
 					if (isAnthropicTarget) {
-						// Custom same-model endpoints own opaque correlation IDs; official
-						// endpoints and cross-model replays require Anthropic-valid IDs.
-						if (!isSameModel || model.compat.officialEndpoint) {
+						// Same-model endpoints own opaque correlation IDs; cross-model
+						// replays require Anthropic-valid IDs.
+						if (!isSameModel) {
 							normalizedId = normalizeAnthropicTargetToolCallId(
 								toolCall.id,
 								model,

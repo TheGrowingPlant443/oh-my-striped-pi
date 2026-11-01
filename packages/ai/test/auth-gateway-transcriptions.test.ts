@@ -42,7 +42,7 @@ function transcriptionModel(
 	provider: string,
 	id: string,
 	api: Api = "openai-transcriptions",
-	baseUrl = provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1",
+	baseUrl = provider === "company-proxy" ? "https://proxy.company.example/v1" : "https://inference.company.example/v1",
 ): Model<Api> {
 	return buildModel({
 		id,
@@ -62,10 +62,10 @@ function transcriptionModel(
 async function boot(): Promise<Harness> {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-transcriptions-"));
 	const storage = await AuthStorage.create(path.join(dir, "auth.db"));
-	storage.keys.setRuntime("openai", "openai-secret");
-	storage.keys.setRuntime("openrouter", "openrouter-secret");
-	const direct = transcriptionModel("openai", "whisper-1");
-	const routed = transcriptionModel("openrouter", "openai/whisper-large-v3");
+	storage.keys.setRuntime("company", "openai-secret");
+	storage.keys.setRuntime("company-proxy", "openrouter-secret");
+	const direct = transcriptionModel("company", "whisper-1");
+	const routed = transcriptionModel("company-proxy", "company/whisper-large-v3");
 	const local = transcriptionModel("local", "whisper-small", "local-inference", "local://inference");
 	const upstream: UpstreamRequest[] = [];
 	const fetchImpl: FetchImpl = async (input, init) => {
@@ -90,8 +90,8 @@ async function boot(): Promise<Harness> {
 		bearerTokens: ["gw-token"],
 		storage,
 		resolveModel: id => {
-			if (id === direct.id || id === `openai/${direct.id}`) return direct;
-			if (id === routed.id || id === `openrouter/${routed.id}`) return routed;
+			if (id === direct.id || id === `company/${direct.id}`) return direct;
+			if (id === routed.id || id === `company-proxy/${routed.id}`) return routed;
 			if (id === local.id || id === `local/${local.id}`) return local;
 			return undefined;
 		},
@@ -127,7 +127,7 @@ describe("auth-gateway POST /v1/audio/transcriptions", () => {
 		const observed: Array<{ provider: string; model: string; costUsd?: number; client?: { app?: string } }> = [];
 		vi.spyOn(harness.storage.usage, "observe").mockImplementation(entry => observed.push(entry));
 		const form = new FormData();
-		form.append("model", "openai/whisper-1");
+		form.append("model", "company/whisper-1");
 		form.append("file", new File([AUDIO], "sample.wav", { type: "audio/wav" }));
 		form.append("language", "en");
 		const response = await fetch(`${harness.url}/v1/audio/transcriptions`, {
@@ -140,7 +140,7 @@ describe("auth-gateway POST /v1/audio/transcriptions", () => {
 		expect(await response.json()).toEqual(UPSTREAM_RESULT);
 		expect(harness.upstream).toHaveLength(1);
 		expect(harness.upstream[0]).toMatchObject({
-			url: "https://api.openai.com/v1/audio/transcriptions",
+			url: "https://inference.company.example/v1/audio/transcriptions",
 			authorization: "Bearer openai-secret",
 			model: "whisper-1",
 			responseFormat: "json",
@@ -151,20 +151,20 @@ describe("auth-gateway POST /v1/audio/transcriptions", () => {
 		expect(harness.upstream[0]?.audio).toEqual(AUDIO);
 		expect(observed).toHaveLength(1);
 		expect(observed[0]).toMatchObject({
-			provider: "openai",
+			provider: "company",
 			model: "whisper-1",
 			costUsd: 0.0025,
 			client: { app: "dictation-client" },
 		});
 	});
 
-	it("translates OpenRouter base64 JSON into the same upstream multipart contract", async () => {
+	it("translates company proxy base64 JSON into the same upstream multipart contract", async () => {
 		harness = await boot();
 		const response = await fetch(`${harness.url}/v1/audio/transcriptions`, {
 			method: "POST",
 			headers: gatewayHeaders("application/json"),
 			body: JSON.stringify({
-				model: "openrouter/openai/whisper-large-v3",
+				model: "company-proxy/company/whisper-large-v3",
 				input_audio: { data: AUDIO.toBase64(), format: "wav" },
 				language: "ja",
 				response_format: "json",
@@ -174,9 +174,9 @@ describe("auth-gateway POST /v1/audio/transcriptions", () => {
 		expect(response.status).toBe(200);
 		expect(harness.upstream).toHaveLength(1);
 		expect(harness.upstream[0]).toMatchObject({
-			url: "https://openrouter.ai/api/v1/audio/transcriptions",
+			url: "https://proxy.company.example/v1/audio/transcriptions",
 			authorization: "Bearer openrouter-secret",
-			model: "openai/whisper-large-v3",
+			model: "company/whisper-large-v3",
 			responseFormat: "json",
 			language: "ja",
 			fileName: "audio.wav",

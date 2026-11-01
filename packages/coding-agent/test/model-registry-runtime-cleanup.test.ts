@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
-import * as fs from "node:fs/promises";
 import { type AssistantMessageEventStream, clearCustomApis, getCustomApi } from "@oh-my-pi/pi-ai";
-import { getOAuthProvider } from "@oh-my-pi/pi-ai/oauth";
+import { getOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
 import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { resolveModelCacheProviderId, resolveOllamaModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
+import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
 import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { TempDir } from "@oh-my-pi/pi-utils";
@@ -33,6 +32,7 @@ describe("ModelRegistry runtime source cleanup", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		clearCustomApis();
+		unregisterOAuthProviders(sourceId);
 		authStorage.close();
 	});
 
@@ -41,66 +41,63 @@ describe("ModelRegistry runtime source cleanup", () => {
 		const config: ProviderConfigInput = {
 			baseUrl: "https://runtime.example.com/v1",
 			apiKey: "RUNTIME_KEY",
-			api: "custom-runtime-cleanup-api",
-			streamSimple,
+			api: "openai-completions",
 			models: [baseModel],
 		};
 
-		registry.registerProvider("runtime-provider", config, sourceId);
+		registry.registerProvider("github-copilot", config, sourceId);
+		registry.registerProvider("local", { api: "local-inference", streamSimple }, sourceId);
 
-		expect(registry.find("runtime-provider", "runtime-model")).toBeDefined();
-		expect(registry.authStorage.keys.source("runtime-provider") !== undefined).toBe(true);
-		expect(getCustomApi("custom-runtime-cleanup-api")).toBeDefined();
+		expect(registry.find("github-copilot", "runtime-model")).toBeDefined();
+		expect(registry.authStorage.keys.source("github-copilot") !== undefined).toBe(true);
+		expect(getCustomApi("local-inference")?.streamSimple).toBe(streamSimple);
 
 		registry.clearSourceRegistrations(sourceId);
 
-		expect(registry.find("runtime-provider", "runtime-model")).toBeUndefined();
-		expect(registry.authStorage.keys.source("runtime-provider") !== undefined).toBe(false);
-		expect(getCustomApi("custom-runtime-cleanup-api")).toBeUndefined();
+		expect(registry.find("github-copilot", "runtime-model")).toBeUndefined();
+		expect(registry.authStorage.keys.source("github-copilot") !== undefined).toBe(false);
+		expect(getCustomApi("local-inference")).toBeUndefined();
 	});
 
-	test("clearing several sources removes each one's providers and rebuilds the catalog once", () => {
+	test("clearing several sources removes only their overlays and rebuilds the catalog once", () => {
 		const registry = new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true });
-		const sources = ["ext://batch-a", "ext://batch-b", "ext://batch-c"];
-		sources.forEach((source, index) => {
-			registry.registerProvider(
-				`batch-provider-${index}`,
-				{
-					baseUrl: "https://batch.example.com/v1",
-					apiKey: "BATCH_KEY",
-					api: "openai-responses",
-					models: [baseModel],
-				},
-				source,
-			);
-		});
 		registry.registerProvider(
-			"kept-provider",
-			{ baseUrl: "https://kept.example.com/v1", apiKey: "KEPT_KEY", api: "openai-responses", models: [baseModel] },
+			"github-copilot",
+			{
+				baseUrl: "https://runtime.example.com/v1",
+				apiKey: "RUNTIME_KEY",
+				api: "openai-completions",
+				models: [baseModel],
+			},
+			sourceId,
+		);
+		registry.registerProvider(
+			"local",
+			{
+				api: "local-inference",
+				models: [{ ...baseModel, id: "kept-model", kind: "tiny" }],
+			},
 			"ext://kept",
 		);
-
 		const clearConfig = vi.spyOn(registry.authStorage.keys, "clearConfig");
-		registry.clearSourceRegistrations(sources);
 
-		// Every catalog rebuild clears the config-sourced keys first.
+		registry.clearSourceRegistrations([sourceId, "ext://empty"]);
+
 		expect(clearConfig).toHaveBeenCalledTimes(1);
-		for (let index = 0; index < sources.length; index++) {
-			expect(registry.find(`batch-provider-${index}`, "runtime-model")).toBeUndefined();
-		}
-		expect(registry.find("kept-provider", "runtime-model")).toBeDefined();
+		expect(registry.find("github-copilot", "runtime-model")).toBeUndefined();
+		expect(registry.find("local", "kept-model")).toBeDefined();
 	});
 
 	test("extension rebinding preserves unrelated credential-scoped cached models", async () => {
 		using tempDir = TempDir.createSync("@omp-model-registry-rebind-");
-		const provider = "opencode-go";
-		const apiKey = "opencode-go-test-key";
+		const provider = "github-copilot";
+		const apiKey = "copilot-test-key";
 		const cachedModel = buildModel({
 			id: "cached-credential-model",
 			name: "Cached Credential Model",
 			api: "openai-responses",
 			provider,
-			baseUrl: "https://opencode.ai/zen/go/v1",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -124,12 +121,10 @@ describe("ModelRegistry runtime source cleanup", () => {
 
 		for (let cycle = 0; cycle < 2; cycle += 1) {
 			registry.registerProvider(
-				"runtime-provider",
+				"local",
 				{
-					baseUrl: "https://runtime.example.com/v1",
-					apiKey: "RUNTIME_KEY",
-					api: "openai-completions",
-					models: [baseModel],
+					api: "local-inference",
+					models: [{ ...baseModel, kind: "tiny" }],
 				},
 				sourceId,
 			);
@@ -143,14 +138,14 @@ describe("ModelRegistry runtime source cleanup", () => {
 
 	test("unloading an override-only extension keeps a built-in provider's hydrated discoveries", async () => {
 		using tempDir = TempDir.createSync("@omp-model-registry-override-only-");
-		const provider = "opencode-go";
-		const apiKey = "opencode-go-test-key";
+		const provider = "github-copilot";
+		const apiKey = "copilot-test-key";
 		const cachedModel = buildModel({
 			id: "cached-credential-model",
 			name: "Cached Credential Model",
 			api: "openai-responses",
 			provider,
-			baseUrl: "https://opencode.ai/zen/go/v1",
+			baseUrl: "https://api.githubcopilot.com",
 			reasoning: false,
 			input: ["text"],
 			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -185,21 +180,9 @@ describe("ModelRegistry runtime source cleanup", () => {
 	test("extension rebinding discards discoveries removed from the model config", async () => {
 		using tempDir = TempDir.createSync("@omp-model-registry-config-rebind-");
 		const modelsPath = tempDir.join("models.json");
-		const cacheDbPath = tempDir.join("models.db");
-		const provider = "configured-ollama";
+		const provider = "github-copilot";
 		const baseUrl = "http://127.0.0.1:11435";
-		const discoveredModel = buildModel({
-			id: "removed-config-model",
-			name: "Removed Config Model",
-			api: "openai-completions",
-			provider,
-			baseUrl,
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 128_000,
-			maxTokens: 16_384,
-		});
+		const discoveredModel = { id: "removed-config-model", context_length: 128_000 };
 		await Bun.write(
 			modelsPath,
 			JSON.stringify({
@@ -208,31 +191,21 @@ describe("ModelRegistry runtime source cleanup", () => {
 						baseUrl,
 						api: "openai-completions",
 						auth: "none",
-						discovery: { type: "ollama" },
+						discovery: { type: "openai-models-list" },
 					},
 				},
 			}),
 		);
-		const oldMtime = new Date("2020-01-01T00:00:00Z");
-		await fs.utimes(modelsPath, oldMtime, oldMtime);
-		writeModelCache(
-			resolveOllamaModelCacheProviderId(provider, baseUrl),
-			Date.now(),
-			[discoveredModel],
-			true,
-			"",
-			cacheDbPath,
-		);
-		const registry = new ModelRegistry(authStorage, modelsPath);
-		await registry.refresh("offline");
+		const registry = new ModelRegistry(authStorage, modelsPath, {
+			fetch: async () => Response.json({ data: [discoveredModel] }),
+		});
+		await registry.refreshProvider(provider, "online");
 		expect(registry.find(provider, discoveredModel.id)).toBeDefined();
 		registry.registerProvider(
-			"runtime-provider",
+			"local",
 			{
-				baseUrl: "https://runtime.example.com/v1",
-				apiKey: "RUNTIME_KEY",
-				api: "openai-completions",
-				models: [baseModel],
+				api: "local-inference",
+				models: [{ ...baseModel, kind: "tiny" }],
 			},
 			sourceId,
 		);
@@ -246,22 +219,10 @@ describe("ModelRegistry runtime source cleanup", () => {
 	test("extension rebinding discards discoveries whose model overrides changed", async () => {
 		using tempDir = TempDir.createSync("@omp-model-registry-override-rebind-");
 		const modelsPath = tempDir.join("models.json");
-		const cacheDbPath = tempDir.join("models.db");
-		const provider = "configured-ollama";
+		const provider = "github-copilot";
 		const baseUrl = "http://127.0.0.1:11436";
 		const modelId = "override-config-model";
-		const discoveredModel = buildModel({
-			id: modelId,
-			name: "Override Config Model",
-			api: "openai-completions",
-			provider,
-			baseUrl,
-			reasoning: false,
-			input: ["text"],
-			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-			contextWindow: 128_000,
-			maxTokens: 16_384,
-		});
+		const discoveredModel = { id: modelId, context_length: 128_000 };
 		const writeConfig = (modelOverrides: Record<string, unknown> | undefined) =>
 			Bun.write(
 				modelsPath,
@@ -271,34 +232,24 @@ describe("ModelRegistry runtime source cleanup", () => {
 							baseUrl,
 							api: "openai-completions",
 							auth: "none",
-							discovery: { type: "ollama" },
+							discovery: { type: "openai-models-list" },
 							...(modelOverrides ? { modelOverrides } : {}),
 						},
 					},
 				}),
 			);
 		await writeConfig({ [modelId]: { headers: { "X-Override": "stale" } } });
-		const oldMtime = new Date("2020-01-01T00:00:00Z");
-		await fs.utimes(modelsPath, oldMtime, oldMtime);
-		writeModelCache(
-			resolveOllamaModelCacheProviderId(provider, baseUrl),
-			Date.now(),
-			[discoveredModel],
-			true,
-			"",
-			cacheDbPath,
-		);
-		const registry = new ModelRegistry(authStorage, modelsPath);
-		await registry.refresh("offline");
+		const registry = new ModelRegistry(authStorage, modelsPath, {
+			fetch: async () => Response.json({ data: [discoveredModel] }),
+		});
+		await registry.refreshProvider(provider, "online");
 		const configured = registry.find(provider, modelId);
 		expect(configured && (await registry.resolveModelHeaders(configured))?.["X-Override"]).toBe("stale");
 		registry.registerProvider(
-			"runtime-provider",
+			"local",
 			{
-				baseUrl: "https://runtime.example.com/v1",
-				apiKey: "RUNTIME_KEY",
-				api: "openai-completions",
-				models: [baseModel],
+				api: "local-inference",
+				models: [{ ...baseModel, kind: "tiny" }],
 			},
 			sourceId,
 		);
@@ -314,24 +265,21 @@ describe("ModelRegistry runtime source cleanup", () => {
 	test("unregisterProvider removes only the named provider and its login entry", () => {
 		const registry = new ModelRegistry(authStorage, undefined, { ignoreLocalModelConfig: true });
 		registry.registerProvider(
-			"runtime-provider",
+			"company-runtime",
 			{
-				baseUrl: "https://runtime.example.com/v1",
+				baseUrl: "https://runtime.company.example/v1",
 				apiKey: "RUNTIME_KEY",
-				api: "custom-runtime-cleanup-api",
+				api: "company-cleanup-api",
 				streamSimple,
 				models: [baseModel],
-				oauth: {
-					name: "Runtime Provider",
-					login: async () => "runtime-token",
-				},
+				oauth: { name: "Company runtime", login: async () => "runtime-token" },
 			},
 			sourceId,
 		);
 		registry.registerProvider(
-			"peer-provider",
+			"company-peer",
 			{
-				baseUrl: "https://peer.example.com/v1",
+				baseUrl: "https://peer.company.example/v1",
 				apiKey: "PEER_KEY",
 				api: "openai-completions",
 				models: [{ ...baseModel, id: "peer-model" }],
@@ -339,12 +287,12 @@ describe("ModelRegistry runtime source cleanup", () => {
 			sourceId,
 		);
 
-		expect(getOAuthProvider("runtime-provider")).toBeDefined();
-		registry.unregisterProvider("runtime-provider");
+		expect(getOAuthProvider("company-runtime")).toBeDefined();
+		registry.unregisterProvider("company-runtime");
 
-		expect(registry.find("runtime-provider", "runtime-model")).toBeUndefined();
-		expect(registry.authStorage.keys.source("runtime-provider") !== undefined).toBe(false);
-		expect(getOAuthProvider("runtime-provider")).toBeUndefined();
-		expect(registry.find("peer-provider", "peer-model")).toBeDefined();
+		expect(registry.find("company-runtime", "runtime-model")).toBeUndefined();
+		expect(registry.authStorage.keys.source("company-runtime")).toBeUndefined();
+		expect(getOAuthProvider("company-runtime")).toBeUndefined();
+		expect(registry.find("company-peer", "peer-model")).toBeDefined();
 	});
 });

@@ -43,8 +43,8 @@ export type LearnParams = typeof learnSchemaWithScope.infer;
  * Orchestrating "learn" tool: persists a lesson to long-term memory and,
  * given a `skill` payload, mints/enhances a managed skill via the shared
  * `writeManagedSkill` primitive. Gated behind `autolearn.enabled` plus a live
- * memory backend — `hindsight`/`mnemopi` (remote/SQLite) or `local` (the
- * file-based rollout backend, where lessons append to `learned.md`).
+ * memory backend — `hindsight` (private server), `mnemopi` (SQLite), or
+ * `local` (files, where lessons append to `learned.md`).
  */
 export class LearnTool implements AgentTool<LearnSchema> {
 	readonly name = "learn";
@@ -71,13 +71,13 @@ export class LearnTool implements AgentTool<LearnSchema> {
 	static createIf(session: ToolSession): LearnTool | null {
 		if (!cfgAutolearnEnabled.get(session.settings)) return null;
 		const backend = cfgMemoryBackend.get(session.settings);
-		if (backend !== "hindsight" && backend !== "mnemopi" && backend !== "local") return null;
+		if (backend !== "mnemopi" && backend !== "local" && backend !== "hindsight") return null;
 		if (backend === "hindsight" && !isHindsightConfigured(loadHindsightConfig(session.settings))) return null;
 		return new LearnTool(session);
 	}
 
 	async execute(_id: string, params: LearnParams): Promise<AgentToolResult> {
-		// 1) Persist or queue the lesson to long-term memory (mirrors MemoryRetainTool).
+		// 1) Persist the lesson to long-term memory before writing a skill.
 		const backend = cfgMemoryBackend.get(this.session.settings);
 		if (params.scope === "global" && backend !== "mnemopi") {
 			throw new Error("Global memory scope is only available with the Mnemopi backend.");
@@ -125,21 +125,21 @@ export class LearnTool implements AgentTool<LearnSchema> {
 			if (!result || result.stored === 0) {
 				throw new Error("Lesson was empty after sanitization; nothing stored.");
 			}
-		} else {
+		} else if (backend === "hindsight") {
 			const state = this.session.getHindsightSessionState?.();
-			if (!state) {
-				throw new Error("Hindsight backend is not initialised for this session.");
-			}
+			if (!state) throw new Error("Hindsight backend is not initialised for this session.");
 			state.enqueueRetain(params.memory, params.context);
 			memoryMessage = "Lesson queued for retention";
+		} else {
+			throw new Error("Memory backend is not active for this session.");
 		}
 
 		// 2) Optionally mint/enhance a managed skill. A failure here is surfaced
-		// as a partial outcome — the lesson is already stored or queued.
+		// as a partial outcome — the lesson is already stored.
 		if (params.skill) {
 			// A managed skill resolves below any authored skill of the same name, so
 			// minting one under a claimed name writes a file that never surfaces. The
-			// lesson is already stored/queued; refuse the skill rather than report a
+			// lesson is already stored; refuse the skill rather than report a
 			// false "Created" (mirrors ManageSkillTool).
 			let safeSkillName: string | undefined;
 			try {

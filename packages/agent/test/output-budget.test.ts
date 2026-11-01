@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AssistantMessage, Context, Message, Model } from "@oh-my-pi/pi-ai";
 import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
 import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
 import {
 	fitOutputTokensToContextWindow,
@@ -27,8 +26,8 @@ function reported(promptTokens: number, timestamp: number): AssistantMessage {
 	return {
 		role: "assistant",
 		content: [{ type: "text", text: "ok" }],
-		api: "mock",
-		provider: "mock",
+		api: "local-inference",
+		provider: "local",
 		model: "mock-model",
 		usage: {
 			input: promptTokens,
@@ -44,7 +43,7 @@ function reported(promptTokens: number, timestamp: number): AssistantMessage {
 }
 
 const deepseek: Model = {
-	...getBundledModel("deepseek", "deepseek-v4-pro"),
+	...getBundledModel("github-copilot", "gpt-4.1"),
 	contextWindow: 1_000_000,
 	maxTokens: 384_000,
 };
@@ -88,20 +87,6 @@ describe("fitOutputTokensToContextWindow", () => {
 		expect(cap).toBeLessThanOrEqual(1_000_000 - 700_000);
 	});
 
-	test("keeps an OpenRouter default cap omitted, but still fits an explicit one", () => {
-		// The transport omits OpenRouter catalog defaults so upstreams self-cap;
-		// a fitted default would become an explicit, upstream-filtering cap.
-		const openrouter = { ...deepseek, compat: { isOpenRouterHost: true, alwaysSendMaxTokens: false } } as never;
-		expect(fitOutputTokensToContextWindow(openrouter, promptOf(800_000), undefined, tokenizer)).toBeUndefined();
-		expect(fitOutputTokensToContextWindow(openrouter, promptOf(800_000), 200_000, tokenizer)).toBe(
-			120_000 - MESSAGE_FRAMING_TOKENS - OUTPUT_FIT_HEADWAY_TOKENS,
-		);
-		const alwaysSends = { ...deepseek, compat: { isOpenRouterHost: true, alwaysSendMaxTokens: true } } as never;
-		expect(fitOutputTokensToContextWindow(alwaysSends, promptOf(800_000), undefined, tokenizer)).toBe(
-			120_000 - MESSAGE_FRAMING_TOKENS - OUTPUT_FIT_HEADWAY_TOKENS,
-		);
-	});
-
 	test("sizes the prompt from the provider's last report plus only the unreported tail", () => {
 		// Local counting of the reported prefix would read 900k and floor the cap
 		// (the Opus 1024-token `length` loop); the provider measured it at 500k.
@@ -130,33 +115,9 @@ describe("fitOutputTokensToContextWindow", () => {
 		);
 	});
 
-	test("leaves the cap alone on hosts that stop generation at the window", () => {
-		// Claude 4.5+ on the Claude API ends at the window with
-		// `model_context_window_exceeded` instead of a 400, so fitting only
-		// takes output room away; older Claude still 400s and is fitted.
-		const opus = getBundledModel("anthropic", "claude-opus-5-5");
-		expect(fitOutputTokensToContextWindow(opus, promptOf(990_000), undefined, tokenizer)).toBeUndefined();
-		// Same model on an unverified host keeps the fit.
-		const bedrockOpus = getBundledModel("amazon-bedrock", "global.anthropic.claude-opus-5-5");
-		expect(fitOutputTokensToContextWindow(bedrockOpus, promptOf(990_000), undefined, tokenizer)).toBe(
-			MIN_FITTED_OUTPUT_TOKENS,
-		);
-		// Anthropic no longer serves Opus 4.1, so the catalog omits it; keep the
-		// pre-4.5 contrast with a first-party spec. 199k of its 200k window leaves
-		// less than its 32k default cap.
-		const opus41 = buildModel({
-			id: "claude-opus-4-1-20250805",
-			name: "Claude Opus 4.1",
-			api: "anthropic-messages",
-			provider: "anthropic",
-			baseUrl: "https://api.anthropic.com",
-			reasoning: true,
-			input: ["text", "image"],
-			cost: { input: 15, output: 75, cacheRead: 1.5, cacheWrite: 18.75 },
-			contextWindow: 200_000,
-			maxTokens: 32_000,
-		});
-		expect(fitOutputTokensToContextWindow(opus41, promptOf(199_000), undefined, tokenizer)).toBe(
+	test("fits output for Copilot Claude when the host does not stop at the context window", () => {
+		const opus = { ...getBundledModel("github-copilot", "claude-opus-5.5"), contextWindow: 200_000 };
+		expect(fitOutputTokensToContextWindow(opus, promptOf(opus.contextWindow), undefined, tokenizer)).toBe(
 			MIN_FITTED_OUTPUT_TOKENS,
 		);
 	});
@@ -173,7 +134,7 @@ describe("fitOutputTokensToContextWindow", () => {
 		// counting the visible text, or the signature's 2,000 byte-tokens, leaves
 		// the 32k cap in place and overflows the window.
 		const model: Model = {
-			...getBundledModel("amazon-bedrock", "global.anthropic.claude-opus-5"),
+			...getBundledModel("github-copilot", "claude-opus-5"),
 			contextWindow: 40_000,
 		};
 		const signature = "s".repeat(8_000);

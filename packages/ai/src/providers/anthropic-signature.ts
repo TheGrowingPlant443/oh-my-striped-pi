@@ -119,15 +119,3 @@ export function isAnthropicNarrationSignature(signature: string): boolean {
 	const kind = lengthDelimitedField(header, HEADER_KIND_FIELD);
 	return kind !== undefined && Buffer.from(kind).equals(NARRATION_KIND);
 }
-
-/**
- * Model id from an OpenRouter reasoning item — a `reasoning_details` entry on
- * chat completions or a Responses `reasoning` output item — which forwards the
- * upstream Anthropic signature as `{ format: "anthropic-claude-v1", signature }`.
- * Undefined for other formats.
- */
-export function servedModelFromOpenRouterReasoning(item: unknown): string | undefined {
-	if (!item || typeof item !== "object" || !("format" in item) || !("signature" in item)) return undefined;
-	if (item.format !== "anthropic-claude-v1" || typeof item.signature !== "string") return undefined;
-	return servedModelFromAnthropicSignature(item.signature);
-}

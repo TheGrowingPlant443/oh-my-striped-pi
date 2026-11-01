@@ -8,7 +8,7 @@ function createPartial(text = ""): AssistantMessage {
 		role: "assistant",
 		content: [{ type: "text", text }],
 		api: "openai-responses",
-		provider: "openai",
+		provider: "github-copilot",
 		model: "test-model",
 		usage: {
 			input: 0,

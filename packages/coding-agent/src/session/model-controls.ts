@@ -11,7 +11,6 @@ import {
 	clearAnthropicFastModeFallback,
 	isAnthropicFastModeFallbackDisabled,
 } from "@oh-my-pi/pi-ai/providers/anthropic-state";
-import { isFireworksFastModelId } from "@oh-my-pi/pi-catalog/fireworks-model-id";
 import { THINKING_EFFORTS } from "@oh-my-pi/pi-catalog/effort";
 import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
 import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
@@ -48,13 +47,7 @@ import { formatRoleModelValue, resolveRoleModelFull } from "./role-models";
 import { EPHEMERAL_MODEL_CHANGE_ROLE, PREWALK_MODEL_CHANGE_ROLE } from "./session-entries";
 import type { SessionManager } from "./session-manager";
 
-import {
-	cfgDefaultThinkingLevel,
-	cfgProvidersFireworksTier,
-	cfgTierAnthropic,
-	cfgTierGoogle,
-	cfgTierOpenai,
-} from "./settings";
+import { cfgDefaultThinkingLevel, cfgTierAnthropic, cfgTierGoogle, cfgTierOpenai } from "./settings";
 import { cfgDisabledProviders, cfgEnabledModels } from "../config/model-settings";
 
 /** Capabilities borrowed from the owning AgentSession. */
@@ -632,9 +625,7 @@ export class ModelControls {
 	async applyAutoThinkingLevel(promptText: string, generation: number, solutionSpace?: string): Promise<void> {
 		const model = this.#model;
 		if (!model?.reasoning || model.thinking?.unverified) return;
-		// Models with reasoning but no controllable effort surface (devin-agent
-		// Cascade routes effort via sibling model ids, not a wire param) have
-		// nothing to pick — skip classification rather than discard its result.
+		// Without a controllable effort surface, there is nothing to classify.
 		if (getSupportedEfforts(model).length === 0) return;
 
 		let resolved: Effort | undefined;
@@ -773,11 +764,6 @@ export class ModelControls {
 	}
 
 	#serviceTierFor(model: Model, tiers: ServiceTierByFamily): ServiceTier | undefined {
-		if (model.provider === "fireworks") {
-			return cfgProvidersFireworksTier.get(this.#host.settings) === "priority" && !isFireworksFastModelId(model.id)
-				? "priority"
-				: undefined;
-		}
 		return resolveModelServiceTier(tiers, model);
 	}
 

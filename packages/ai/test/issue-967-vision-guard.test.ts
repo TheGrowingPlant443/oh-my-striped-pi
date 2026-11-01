@@ -1,7 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { convertMessages as convertGoogleMessages } from "@oh-my-pi/pi-ai/providers/google-shared";
-import { convertCodexResponsesMessages } from "@oh-my-pi/pi-ai/providers/openai-codex-responses";
 import { convertMessages as convertOpenAICompletionsMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
 import {
 	appendResponsesToolResultMessages,
@@ -30,8 +28,6 @@ const compat: ResolvedOpenAICompat = {
 	supportsSamplingParams: true,
 	supportsPenaltyAndStopParams: true,
 	alwaysSendMaxTokens: false,
-	isOpenRouterHost: false,
-	isVercelGatewayHost: false,
 	reasoningEffortMap: {},
 	supportsUsageInStreaming: true,
 	supportsToolChoice: true,
@@ -57,12 +53,9 @@ const compat: ResolvedOpenAICompat = {
 	qwenPreserveThinking: false,
 	qwenTemplateReasoningEffort: false,
 	requiresAssistantContentForToolCalls: false,
-	openRouterRouting: {},
-	vercelGatewayRouting: {},
 	extraBody: {},
 	supportsStrictMode: true,
 	toolStrictMode: "none",
-	wireModelIdMode: "raw",
 	stripDeepseekSpecialTokens: false,
 	reasoningDeltasMayBeCumulative: false,
 	emptyLengthFinishIsContextError: false,
@@ -126,18 +119,6 @@ function countTaggedValues(value: unknown, tag: string): number {
 	const record = value as Record<string, unknown>;
 	const own = record.type === tag ? 1 : 0;
 	return Object.values(record).reduce<number>((sum, item) => sum + countTaggedValues(item, tag), own);
-}
-
-function countObjectKeys(value: unknown, key: string): number {
-	if (Array.isArray(value)) {
-		return value.reduce((sum, item) => sum + countObjectKeys(item, key), 0);
-	}
-	if (!value || typeof value !== "object") {
-		return 0;
-	}
-	const record = value as Record<string, unknown>;
-	const own = Object.hasOwn(record, key) ? 1 : 0;
-	return Object.values(record).reduce<number>((sum, item) => sum + countObjectKeys(item, key), own);
 }
 
 describe("issue #967 vision guard", () => {
@@ -214,38 +195,6 @@ describe("issue #967 vision guard", () => {
 		]);
 	});
 
-	it("strips non-vision images from Codex responses user and tool-result payloads", () => {
-		const model = makeModel("openai-codex-responses", "openai-codex");
-		const context: Context = {
-			messages: [
-				{
-					role: "user",
-					content: [
-						{ type: "text", text: "plot summary" },
-						{ type: "image", mimeType: "image/png", data: "ZmFrZQ==" },
-					],
-					timestamp: 1,
-				},
-				makeAssistant(model.api, model.provider, model.id),
-				makeToolResult([{ type: "image", mimeType: "image/png", data: "ZmFrZQ==" }]),
-			],
-		};
-
-		const messages = convertCodexResponsesMessages(model, context);
-		expect(countTaggedValues(messages, "input_image")).toBe(0);
-		expect(messages.filter(item => (item as { role?: string }).role === "user")).toHaveLength(1);
-		expect(messages[0]).toMatchObject({
-			role: "user",
-			content: [
-				{ type: "input_text", text: "plot summary" },
-				{ type: "input_text", text: NON_VISION_IMAGE_PLACEHOLDER },
-			],
-		});
-		expect(messages.find(item => (item as { type?: string }).type === "function_call_output")).toMatchObject({
-			output: NON_VISION_IMAGE_PLACEHOLDER,
-		});
-	});
-
 	it("strips non-vision images from Anthropic payloads", () => {
 		const model = makeModel("anthropic-messages", "anthropic");
 		const messages = convertAnthropicMessages(
@@ -262,7 +211,6 @@ describe("issue #967 vision guard", () => {
 				makeToolResult([{ type: "image", mimeType: "image/png", data: "ZmFrZQ==" }]),
 			],
 			model,
-			false,
 		);
 		expect(countTaggedValues(messages, "image")).toBe(0);
 		expect(messages[0]).toMatchObject({ role: "user", content: `plot summary\n${NON_VISION_IMAGE_PLACEHOLDER}` });
@@ -271,41 +219,6 @@ describe("issue #967 vision guard", () => {
 		expect(toolResult.content[0]).toMatchObject({
 			type: "tool_result",
 			content: NON_VISION_IMAGE_PLACEHOLDER,
-		});
-	});
-
-	it("strips non-vision images from Google payloads", () => {
-		const model = makeModel("google-generative-ai", "google");
-		const context: Context = {
-			messages: [
-				{
-					role: "user",
-					content: [
-						{ type: "text", text: "plot summary" },
-						{ type: "image", mimeType: "image/png", data: "ZmFrZQ==" },
-					],
-					timestamp: 1,
-				},
-				makeAssistant(model.api, model.provider, model.id),
-				makeToolResult([{ type: "image", mimeType: "image/png", data: "ZmFrZQ==" }]),
-			],
-		};
-
-		const messages = convertGoogleMessages(model, context);
-		expect(countObjectKeys(messages, "inlineData")).toBe(0);
-		expect(messages[0]).toMatchObject({
-			role: "user",
-			parts: [{ text: "plot summary" }, { text: NON_VISION_IMAGE_PLACEHOLDER }],
-		});
-		expect(messages.at(-1)).toMatchObject({
-			role: "user",
-			parts: [
-				{
-					functionResponse: {
-						response: { output: NON_VISION_IMAGE_PLACEHOLDER },
-					},
-				},
-			],
 		});
 	});
 });

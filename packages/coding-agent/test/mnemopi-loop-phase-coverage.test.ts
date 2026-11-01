@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
 import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
 import { extendRecallWithLegacyBanks, type MnemopiBackendConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
-import * as content from "@oh-my-pi/pi-coding-agent/hindsight/content";
+import * as content from "@oh-my-pi/pi-coding-agent/memory-backend/content";
 import {
 	loadMnemopi,
 	loadMnemopiCore,
@@ -101,14 +101,9 @@ function makeMnemopiConfig(): MnemopiBackendConfig {
 		providerOptions: {
 			noEmbeddings: true,
 			embeddingModel: undefined,
-			embeddingApiUrl: undefined,
-			embeddingApiKey: undefined,
 			llm: false,
 		},
 		llmMode: "none",
-		llmBaseUrl: undefined,
-		llmApiKey: undefined,
-		llmModel: undefined,
 	};
 }
 
@@ -135,7 +130,6 @@ function registerMnemopiState(entries: () => unknown[]): MnemopiSessionState {
 			} as never,
 			getXdevToolEntries: () => [],
 			emitNotice: () => {},
-			getHindsightSessionState: () => undefined,
 			subscribe: () => () => {},
 		} as never,
 	});

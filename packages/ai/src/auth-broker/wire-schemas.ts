@@ -234,34 +234,10 @@ const usageLimitSchema = type({
 	"notes?": "string[]",
 });
 
-const usageResetCreditsSchema = type({
-	availableCount: "number",
-	"redeemableCount?": "number",
-	"nextCreditId?": "string",
-	"eligible?": "boolean",
-	"reason?": "string",
-	"cooldownUntil?": "string",
-	"credits?": type({
-		"id?": "string",
-		"title?": "string",
-		"program?": "string",
-		"remainingCount?": "number",
-		"usable?": "boolean",
-		"requiresLimit?": "boolean",
-		"clears?": "string[]",
-		"blocking?": "string[]",
-		"usedFractions?": { "[string]": "number" },
-		"grantedAt?": "string",
-		"expiresAt?": "string",
-		"status?": "string",
-	}).array(),
-});
-
 const arkUsageReportSchema = type({
 	provider: "string",
 	fetchedAt: "number",
 	limits: usageLimitSchema.array(),
-	"resetCredits?": usageResetCreditsSchema,
 	"notes?": "string[]",
 	"metadata?": { "[string]": "unknown" },
 	"raw?": "unknown",

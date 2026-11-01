@@ -265,7 +265,7 @@ export function positionRail(
 
 /**
  * A turn the user can rewind past and re-edit: a user message with prompt
- * text, or a user-initiated custom message (skill / collab prompt).
+ * text, or a user-initiated skill prompt.
  */
 export function isUserTurnEntry(entry: TranscriptEntry): boolean {
 	if (entry.type === "message" && entry.message.role === "user") return userMessageHasText(entry.message);

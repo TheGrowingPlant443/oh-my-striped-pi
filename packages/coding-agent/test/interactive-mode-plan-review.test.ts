@@ -4,6 +4,8 @@ import * as path from "node:path";
 import { Agent, AgentBusyError, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
 import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
 import * as AIError from "@oh-my-pi/pi-ai/error";
+import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
 import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
 import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
 import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
@@ -25,6 +27,7 @@ import { planSaveFileName } from "@oh-my-pi/pi-coding-agent/plan-mode/plan-autos
 import { initTheme } from "@oh-my-pi/pi-tui/theme";
 import type { SubmittedUserInput } from "@oh-my-pi/pi-coding-agent/modes/types";
 import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import { toProviderModelConfig } from "./helpers/model-fixtures";
 import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
 import { SILENT_ABORT_MARKER, USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
 import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
@@ -63,7 +66,7 @@ function assistantWithUsage(overrides: Partial<AssistantMessage> = {}): Assistan
 		role: "assistant",
 		content: [],
 		api: "anthropic-messages",
-		provider: "anthropic",
+		provider: "github-copilot",
 		model: "test",
 		usage: usageWithInput(0),
 		stopReason: "stop",
@@ -164,7 +167,7 @@ describe("InteractiveMode plan review rendering", () => {
 		sharedTempDir = TempDir.createSync("@pi-plan-review-shared-");
 		await Settings.init({ inMemory: true, cwd: sharedTempDir.path() });
 		authStorage = await AuthStorage.create(path.join(sharedTempDir.path(), "testauth.db"));
-		authStorage.keys.setRuntime("anthropic", "test-key");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
 		modelRegistry = new ModelRegistry(authStorage);
 	});
 
@@ -175,9 +178,9 @@ describe("InteractiveMode plan review rendering", () => {
 
 	beforeEach(() => {
 		tempDir = TempDir.createSync("@pi-plan-review-");
-		const model = modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const model = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!model) {
-			throw new Error("Expected claude-sonnet-4-5 to exist in registry");
+			throw new Error("Expected claude-sonnet-4.5 to exist in registry");
 		}
 
 		session = new AgentSession({
@@ -206,6 +209,7 @@ describe("InteractiveMode plan review rendering", () => {
 		tempDir = undefined as unknown as TempDir;
 		currentMode?.stop();
 		await currentSession?.dispose();
+		modelRegistry.unregisterProvider("company-planner");
 		currentTempDir?.removeSync();
 		setKeybindings(KeybindingsManager.inMemory());
 	});
@@ -452,13 +456,13 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("executes a remote approval on the extension's selected tier and reports the tiers", async () => {
-		const slow = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const def = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const slow = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const def = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!slow || !def) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-sonnet-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -490,16 +494,16 @@ describe("InteractiveMode plan review rendering", () => {
 		);
 		expect(answered).toBe(true);
 		expect(requested?.tiers).toEqual([
-			{ role: "default", provider: "anthropic", model: def.id },
-			{ role: "slow", provider: "anthropic", model: slow.id },
+			{ role: "default", provider: "github-copilot", model: def.id },
+			{ role: "slow", provider: "github-copilot", model: slow.id },
 		]);
 		expect(resolved).toMatchObject({ reviewId: requested?.reviewId, choice: "keep", by: "extension" });
 		expect(session.model?.id).toBe(slow.id);
 	});
 
 	it("refuses a remote approval naming no selectable tier and keeps the review open", async () => {
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -1469,8 +1473,26 @@ describe("InteractiveMode plan review rendering", () => {
 		mode.stop();
 		await session.dispose();
 
-		const executionModel = modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const planModel = modelRegistry.find("anthropic", "claude-opus-4-6");
+		const executionModel = modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const planSpec: ModelSpec<"anthropic-messages"> = {
+			id: "company-plan-large",
+			name: "Company large-context planner",
+			api: "anthropic-messages",
+			provider: "company-planner",
+			baseUrl: "https://inference.company.example",
+			reasoning: true,
+			input: ["text"],
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+			contextWindow: 1000000,
+			maxTokens: 8192,
+		};
+		const planModel = buildModel(planSpec);
+		modelRegistry.registerProvider(planModel.provider, {
+			api: planModel.api,
+			baseUrl: planModel.baseUrl,
+			apiKey: "test-key",
+			models: [toProviderModelConfig(planSpec)],
+		});
 		if (!executionModel?.contextWindow || !planModel?.contextWindow) {
 			throw new Error("Expected test models with context windows");
 		}
@@ -1484,7 +1506,7 @@ describe("InteractiveMode plan review rendering", () => {
 				},
 			}),
 			sessionManager: SessionManager.create(tempDir.path(), tempDir.path()),
-			settings: Settings.isolated({ modelRoles: { plan: `anthropic/${planModel.id}` } }),
+			settings: Settings.isolated({ modelRoles: { plan: `${planModel.provider}/${planModel.id}` } }),
 			modelRegistry,
 		});
 		mode = new InteractiveMode(session, "test");
@@ -1888,17 +1910,17 @@ describe("InteractiveMode plan review rendering", () => {
 		// was active before plan mode (#planModePreviousModelState), which silently
 		// reverted the operator's pick — sliding to "slow" still executed on the
 		// default model. The fix defers application until after the plan-mode exit.
-		authStorage.keys.setRuntime("anthropic", "test-key");
-		const slow = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const def = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		authStorage.keys.setRuntime("github-copilot", "test-key");
+		const slow = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const def = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!slow || !def) throw new Error("Expected sonnet + opus to exist in registry");
 
 		// plan === default === the session model: this is what makes plan-mode entry
 		// record a previous-model state for #exitPlanMode to restore. slow differs,
 		// so an early application would be clobbered by that restore.
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-sonnet-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-sonnet-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -1943,13 +1965,13 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("retains the plan model when the slider selection matches the active plan tier", async () => {
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const prePlanModel = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const prePlanModel = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!planModel || !prePlanModel) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -1985,8 +2007,8 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("treats matching-model slider tier as explicit when its thinking differs from the pre-plan thinking", async () => {
-		const sonnet = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const opus = session.modelRegistry.find("anthropic", "claude-opus-4-5");
+		const sonnet = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const opus = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!sonnet || !opus) throw new Error("Expected sonnet + opus to exist in registry");
 
 		// default tier explicitly turns thinking off on sonnet; the session enters
@@ -1995,9 +2017,9 @@ describe("InteractiveMode plan review rendering", () => {
 		// restores thinking=high instead of the configured off override. The fix
 		// must compare thinking levels too and pass the default entry through
 		// applyRoleModel.
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5:off");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5:off");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 		session.setThinkingLevel(ThinkingLevel.High);
 
 		const planFilePath = "local://PLAN.md";
@@ -2035,13 +2057,13 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("preserves DEFAULT(auto) when plan approval restores the default tier", async () => {
-		const sonnet = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const opus = session.modelRegistry.find("anthropic", "claude-opus-4-5");
+		const sonnet = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const opus = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!sonnet || !opus) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 		session.setThinkingLevel(AUTO_THINKING, true);
 
 		const planFilePath = "local://PLAN.md";
@@ -2075,8 +2097,8 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("falls back to the pre-plan model when only plan is configured and the slider is hidden", async () => {
-		const sonnet = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
-		const opus = session.modelRegistry.find("anthropic", "claude-opus-4-5");
+		const sonnet = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
+		const opus = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!sonnet || !opus) throw new Error("Expected sonnet + opus to exist in registry");
 		expect(session.model?.id).toBe(sonnet.id);
 
@@ -2085,7 +2107,7 @@ describe("InteractiveMode plan review rendering", () => {
 		// slider is hidden — the operator made no selection and approval must
 		// fall through to the pre-plan sonnet restore instead of pinning the
 		// lone plan tier.
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -2115,12 +2137,12 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("compaction runs on the plan model and restores the pre-plan model after success", async () => {
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const prePlanModel = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const prePlanModel = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!planModel || !prePlanModel) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -2153,11 +2175,11 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("failed compaction stays on the plan model and still dispatches", async () => {
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
 		if (!planModel) throw new Error("Expected opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -2191,16 +2213,16 @@ describe("InteractiveMode plan review rendering", () => {
 	});
 
 	it("slider tier on the compact path applies after successful compaction", async () => {
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const execModel = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const execModel = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!planModel || !execModel) throw new Error("Expected sonnet + opus to exist in registry");
 
 		// Plan model (opus) differs from the execution tier the operator slides to
 		// (default = sonnet). Successful compaction must keep running on opus, then
 		// end on the slider-selected default tier.
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("slow", "anthropic/claude-opus-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("slow", "github-copilot/claude-opus-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -2250,12 +2272,12 @@ describe("InteractiveMode plan review rendering", () => {
 		// #planModePreviousModelState, so an aborted "Approve and compact context"
 		// left the next turn stranded on the plan model. The transition now runs
 		// for "cancelled" too (the operator aborted only compaction, not approval).
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const prePlanModel = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const prePlanModel = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!planModel || !prePlanModel) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {
@@ -2297,12 +2319,12 @@ describe("InteractiveMode plan review rendering", () => {
 		// so the model transition must run inside the before-flush hook. Otherwise a
 		// turn queued during compaction dispatches on the plan model (the restore,
 		// recorded while streaming, lands one turn later via #pendingModelSwitch).
-		const planModel = session.modelRegistry.find("anthropic", "claude-opus-4-5");
-		const prePlanModel = session.modelRegistry.find("anthropic", "claude-sonnet-4-5");
+		const planModel = session.modelRegistry.find("github-copilot", "claude-opus-4.5");
+		const prePlanModel = session.modelRegistry.find("github-copilot", "claude-sonnet-4.5");
 		if (!planModel || !prePlanModel) throw new Error("Expected sonnet + opus to exist in registry");
 
-		session.settings.setModelRole("default", "anthropic/claude-sonnet-4-5");
-		session.settings.setModelRole("plan", "anthropic/claude-opus-4-5");
+		session.settings.setModelRole("default", "github-copilot/claude-sonnet-4.5");
+		session.settings.setModelRole("plan", "github-copilot/claude-opus-4.5");
 
 		const planFilePath = "local://PLAN.md";
 		const resolvedPlanPath = resolveLocalUrlToPath(planFilePath, {

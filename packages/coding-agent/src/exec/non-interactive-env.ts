@@ -12,7 +12,6 @@ export const NON_INTERACTIVE_ENV: Readonly<Record<string, string>> = {
 	BAT_PAGER: "cat",
 	DELTA_PAGER: "cat",
 	GH_PAGER: "cat",
-	GLAB_PAGER: "cat",
 	PSQL_PAGER: "cat",
 	MYSQL_PAGER: "cat",
 	AWS_PAGER: "",

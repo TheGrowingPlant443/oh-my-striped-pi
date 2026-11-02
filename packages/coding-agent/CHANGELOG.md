@@ -81,6 +81,8 @@
 - Removed hosted Codex Security scans while preserving local workflows and report imports.
 - Removed Codex Live voice and retired provider-specific saved-reset commands.
 - Removed Smithery cloud marketplace/login and Exa-specific MCP filtering/key extraction; ordinary configured MCP remains.
+- Removed all GitLab CLI (`glab`) use: GitLab merge-request review in `/review` and `/annotate code-review`, `mr://` merge-request diff URLs, glab credential-based cache keys and the `GLAB_PAGER` shell default; GitHub pull-request review is unchanged.
+- Removed public installers, npm/Homebrew/GitHub release publishing and the vmon CI template builder; build and deploy this private fork from an authenticated checkout with Nix.
 
 
 ## [18.13.3] - 2026-10-28

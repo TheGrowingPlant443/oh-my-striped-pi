@@ -11,7 +11,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import { getOrFetchIssue, getOrFetchPr } from "@oh-my-striped-pi/pi-coding-agent/tools/gh";
-import { Database } from "bun:sqlite";
 import {
 	getCached,
 	getCachedGeneration,
@@ -21,7 +20,6 @@ import {
 	openDb,
 	putCached,
 	resetForTests as resetCacheForTests,
-	resolveGitlabCacheAuthKey,
 	retainCachedGeneration,
 } from "@oh-my-striped-pi/pi-coding-agent/tools/github-cache";
 import { ToolAbortError, throwIfAborted } from "@oh-my-striped-pi/pi-coding-agent/tools/tool-errors";
@@ -161,34 +159,6 @@ describe("github-cache db layer", () => {
 		expect(stat.mode & 0o777).toBe(0o755);
 	});
 
-	it("migrates a v3 cache whose kind CHECK predates mr-diff rows", () => {
-		const legacy = new Database(process.env.OMSP_GITHUB_CACHE_DB!);
-		legacy.run(`
-			CREATE TABLE github_view_cache (
-				auth_key TEXT NOT NULL, repo TEXT NOT NULL,
-				kind TEXT NOT NULL CHECK (kind IN ('issue','pr','pr-diff')),
-				number INTEGER NOT NULL, include_comments INTEGER NOT NULL, fetched_at INTEGER NOT NULL,
-				payload TEXT NOT NULL, rendered TEXT NOT NULL, source_url TEXT,
-				PRIMARY KEY (auth_key, repo, kind, number, include_comments)
-			);
-			PRAGMA user_version = 3;
-		`);
-		legacy.close();
-		resetCacheForTests();
-
-		putCached({
-			repo: "gitlab.com/g/p",
-			kind: "mr-diff",
-			number: 1,
-			includeComments: false,
-			payload: { unified: "", files: [] },
-			rendered: "mr-diff-body",
-			fetchedAt: 1000,
-		});
-
-		expect(getCached("gitlab.com/g/p", "mr-diff", 1, false)?.rendered).toBe("mr-diff-body");
-	});
-
 	it("preserves rows across openDb() and honors the configured hard TTL via per-lookup sweep", async () => {
 		const DAY_MS = 86_400_000;
 		const fourteenDaysAgo = Date.now() - 14 * DAY_MS;
@@ -263,40 +233,6 @@ describe("github-cache db layer", () => {
 		// remains.
 		expect(after?.rendered).toBe("refreshed-content");
 		expect(after?.fetchedAt).not.toBe(fourteenDaysAgo);
-	});
-});
-
-describe("resolveGitlabCacheAuthKey", () => {
-	const ENV_KEYS = ["GITLAB_TOKEN", "GITLAB_ACCESS_TOKEN", "OAUTH_TOKEN", "GLAB_CONFIG_DIR"] as const;
-	const saved: Partial<Record<(typeof ENV_KEYS)[number], string>> = {};
-
-	beforeEach(() => {
-		for (const key of ENV_KEYS) {
-			saved[key] = process.env[key];
-			delete process.env[key];
-		}
-		// Empty config dir: no glab config.yml credential material.
-		process.env.GLAB_CONFIG_DIR = tempDir;
-	});
-
-	afterEach(() => {
-		for (const key of ENV_KEYS) {
-			if (saved[key] === undefined) delete process.env[key];
-			else process.env[key] = saved[key];
-		}
-	});
-
-	it("separates GitLab tokens and bypasses caching without credentials", () => {
-		expect(resolveGitlabCacheAuthKey("gitlab.com")).toBeUndefined();
-
-		process.env.GITLAB_TOKEN = "token-a";
-		const keyA = resolveGitlabCacheAuthKey("gitlab.com");
-		process.env.GITLAB_TOKEN = "token-b";
-		const keyB = resolveGitlabCacheAuthKey("gitlab.com");
-
-		expect(keyA).toBeDefined();
-		expect(keyB).toBeDefined();
-		expect(keyA).not.toBe(keyB);
 	});
 });
 

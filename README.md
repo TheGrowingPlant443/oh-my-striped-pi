@@ -35,7 +35,7 @@ QA reporting, hosted sharing/publication, public search providers and public rea
 
 Credential administration remains available: token access, auth export/import, and auth broker/gateway can expose or redistribute credentials to their configured destinations. Automatic dependency, model and runtime downloads also remain; this fork is not offline-only.
 
-Smithery cloud marketplace/login and Exa-specific MCP credential overrides are removed. Manual/local MCP configuration and plugins remain; existing remote MCP entries and credential files are not deleted, so review their destinations before use.
+Smithery cloud marketplace/login, Exa-specific MCP credential overrides and all GitLab CLI (`glab`) integration are removed. Manual/local MCP configuration and plugins remain; existing remote MCP entries and credential files are not deleted, so review their destinations before use. The full list of removed features is in the `Removed` section of [packages/coding-agent/CHANGELOG.md](packages/coding-agent/CHANGELOG.md).
 
 `/update` and `omsp update` explain that application updates are company-managed; they do not check upstream releases, obtain GitHub credentials or replace the application. Deploy this fork through Git, Nix or your company's release process. Plugin updates remain available through `omsp update --plugins`, with `--check` for a dry run.
 

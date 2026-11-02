@@ -1,5 +1,5 @@
 /**
- * Helpers shared by the forge protocols (`pr://`, `mr://`): session cwd
+ * Helpers shared by the forge protocols (`issue://`, `pr://`): session cwd
  * resolution, URL-segment splitting, and diff-family rendering (`…/diff`,
  * `…/diff/all`, `…/diff/<i>`).
  */
@@ -17,9 +17,9 @@ import type { InternalResource, InternalUrl, ResolveContext } from "./types";
  * 2. First registered session via `AgentRegistry` (single-session fallback).
  * 3. `process.cwd()` (last resort).
  *
- * The cwd drives `gh repo view` / `glab repo view` and repo listings for
- * short-form URLs, so getting this right is what keeps reads of `issue://N`
- * or `mr://N/diff` from picking the wrong repo across concurrent sessions.
+ * The cwd drives `gh repo view` and repo listings for short-form URLs, so
+ * getting this right is what keeps reads of `issue://N` from picking the
+ * wrong repo across concurrent sessions.
  */
 export function resolveCwd(context: ResolveContext | undefined): string {
 	if (context?.cwd) return context.cwd;

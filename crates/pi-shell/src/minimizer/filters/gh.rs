@@ -182,13 +182,13 @@ fn contains_failure_signal(input: &str) -> bool {
 	})
 }
 
-/// Issue/PR view filter, shared with `glab` issue/MR view.
+/// Issue/PR view filter.
 ///
 /// On failure keep the raw output (dedup + head/tail) so error context
 /// survives; on success strip markdown body noise (HTML comments,
 /// badges/images, horizontal rules, blank-line runs) first.
 #[must_use]
-pub(super) fn markdown_view(input: &str, exit_code: i32) -> String {
+fn markdown_view(input: &str, exit_code: i32) -> String {
 	if exit_code != 0 {
 		return primitives::head_tail_dedup(input);
 	}

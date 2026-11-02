@@ -5,8 +5,8 @@ import { REJECT_PROMPT_COMMAND } from "../exec/non-interactive-env";
 import { ToolAbortError, throwIfAborted } from "../tools/tool-errors";
 
 /**
- * Process-lifetime cache of a forge's default-repo lookup (`gh repo view`,
- * `glab repo view`) keyed by absolute cwd.
+ * Process-lifetime cache of a forge's default-repo lookup (`gh repo view`)
+ * keyed by absolute cwd.
  *
  * The shared lookup is intentionally **not** bound to any caller's
  * AbortSignal. Cancelling one caller would otherwise kill the underlying
@@ -43,7 +43,7 @@ export class CwdLookupMemo {
 	}
 }
 
-/** Captured result of a completed forge CLI (`gh`/`glab`) invocation. */
+/** Captured result of a completed forge CLI (`gh`) invocation. */
 export interface ForgeCliResult {
 	exitCode: number;
 	stdout: string;

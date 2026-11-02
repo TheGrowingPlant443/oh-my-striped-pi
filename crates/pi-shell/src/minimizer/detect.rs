@@ -347,10 +347,6 @@ fn detect_subcommand(program: &str, args: &[String]) -> Option<String> {
 			&["--paginate", "--slurp", "--verbose"],
 			&[],
 		),
-		// glab's clap-level globals are `-R`/`--repo` and `-g`/`--group`
-		// (donor rtk/src/cmds/git/glab_cmd.rs + README); both take a value, so
-		// skip them and their argument to reach the real subcommand.
-		"glab" => first_non_global_arg(args, &["-R", "--repo", "-g", "--group"], &[], &[]),
 		"gt" => first_non_global_arg(
 			args,
 			&["--repo", "--cwd", "--config", "--debug-context"],
@@ -683,13 +679,6 @@ mod tests {
 		let command = detect("deploy.cmd go").expect("deploy.cmd command is detected");
 		assert_eq!(command.program, "deploy.cmd");
 		assert_eq!(command.subcommand.as_deref(), Some("go"));
-	}
-
-	#[test]
-	fn detects_glab_subcommand_past_repo_global() {
-		let command = detect("glab -R owner/repo mr list").expect("glab command is detected");
-		assert_eq!(command.program, "glab");
-		assert_eq!(command.subcommand.as_deref(), Some("mr"));
 	}
 
 	#[test]

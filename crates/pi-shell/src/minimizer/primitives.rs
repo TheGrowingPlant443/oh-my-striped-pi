@@ -495,13 +495,13 @@ mod tests {
 
 	#[test]
 	fn test_command_has_ordered_tokens_basic() {
-		assert!(command_has_ordered_tokens("glab mr diff 42", "mr", "diff"));
+		assert!(command_has_ordered_tokens("gh pr diff 42", "pr", "diff"));
 		assert!(
-			!command_has_ordered_tokens("glab diff mr 42", "mr", "diff"),
+			!command_has_ordered_tokens("gh diff pr 42", "pr", "diff"),
 			"wrong order must be false"
 		);
 		assert!(
-			!command_has_ordered_tokens("glab mr", "mr", "diff"),
+			!command_has_ordered_tokens("gh pr", "pr", "diff"),
 			"missing second token must be false"
 		);
 	}

@@ -35,7 +35,7 @@ import { ToolAbortError } from "./tool-errors";
 // Storage layer
 // ────────────────────────────────────────────────────────────────────────────
 
-export type CacheKind = "issue" | "pr" | "pr-diff" | "mr-diff";
+export type CacheKind = "issue" | "pr" | "pr-diff";
 
 const DEFAULT_CACHE_AUTH_KEY = "default";
 
@@ -127,7 +127,7 @@ export function openDb(): Database | null {
 			CREATE TABLE IF NOT EXISTS github_view_cache (
 				auth_key        TEXT    NOT NULL,
 				repo             TEXT    NOT NULL,
-				kind             TEXT    NOT NULL CHECK (kind IN ('issue','pr','pr-diff','mr-diff')),
+				kind             TEXT    NOT NULL CHECK (kind IN ('issue','pr','pr-diff')),
 				number           INTEGER NOT NULL,
 				include_comments INTEGER NOT NULL,
 				fetched_at       INTEGER NOT NULL,
@@ -207,35 +207,6 @@ function hashCacheIdentity(parts: string[]): string {
 }
 
 /**
- * glab config file, following glab's search order: `GLAB_CONFIG_DIR` wins
- * outright; otherwise the legacy `~/.config/glab-cli` path, then the
- * XDG/platform config dir. Returns the first existing candidate, else the first.
- */
-export function getGlabConfigPath(): string {
-	const override = process.env.GLAB_CONFIG_DIR;
-	if (override) return path.join(override, "config.yml");
-	const home = os.homedir();
-	const candidates = [path.join(home, ".config", "glab-cli", "config.yml")];
-	const xdg = process.env.XDG_CONFIG_HOME;
-	if (xdg) {
-		candidates.push(path.join(xdg, "glab-cli", "config.yml"));
-	} else if (process.platform === "darwin") {
-		candidates.push(path.join(home, "Library", "Application Support", "glab-cli", "config.yml"));
-	} else if (process.platform === "win32") {
-		const localAppData = process.env.LOCALAPPDATA ?? path.join(home, "AppData", "Local");
-		candidates.push(path.join(localAppData, "glab-cli", "config.yml"));
-	}
-	for (const candidate of candidates) {
-		try {
-			if (fs.statSync(candidate, { throwIfNoEntry: false })) return candidate;
-		} catch (err) {
-			logger.debug("github cache: failed to stat glab config candidate", { err: String(err), path: candidate });
-		}
-	}
-	return candidates[0]!;
-}
-
-/**
  * Memo for {@link resolveCliCacheAuthKey}. Recomputed only when the token
  * env vars or the config path/mtime change, so the per-lookup cost on the
  * cache hot path is a few env reads plus one `stat` instead of a full file
@@ -248,8 +219,6 @@ interface AuthKeyMemoEntry {
 	value: string | undefined;
 }
 const AUTH_KEY_TOKEN_ENV_VARS = ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"];
-/** Env vars glab reads tokens from; they apply to every host glab talks to. */
-export const GITLAB_TOKEN_ENV_VARS = ["GITLAB_TOKEN", "GITLAB_ACCESS_TOKEN", "OAUTH_TOKEN"];
 const authKeyMemo = new Map<string, AuthKeyMemoEntry>();
 
 function resolveCliCacheAuthKey(
@@ -315,11 +284,6 @@ export function resolveGithubCacheAuthKey(host: string = defaultGhHost()): strin
 		path.join(getGhConfigDir(), "hosts.yml"),
 		"hosts",
 	);
-}
-
-/** GitLab counterpart of {@link resolveGithubCacheAuthKey}: glab token env vars and/or glab's config.yml. */
-export function resolveGitlabCacheAuthKey(host: string): string | undefined {
-	return resolveCliCacheAuthKey(`gitlab:${host}`, host, GITLAB_TOKEN_ENV_VARS, getGlabConfigPath(), "glab-config");
 }
 
 /**
@@ -882,7 +846,7 @@ export async function getOrFetchView<T>(options: CacheLookupOptions<T>): Promise
 				status: "fresh",
 				fetchedAt: cached.fetchedAt,
 			};
-		} else if (options.kind === "pr-diff" || options.kind === "mr-diff") {
+		} else if (options.kind === "pr-diff") {
 			scheduleBackgroundRefresh(
 				authKey,
 				options.repo,

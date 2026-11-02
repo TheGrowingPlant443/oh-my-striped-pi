@@ -2,17 +2,17 @@
  * Generate commit messages from diffs using a smol, fast model.
  * Follows the same pattern as title-generator.ts.
  */
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
-import { completeSimple, retryTransientCompletion } from "@oh-my-pi/pi-ai";
-import { roleDefaultModels } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+import type { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai";
+import { completeSimple, retryTransientCompletion } from "@oh-my-striped-pi/pi-ai";
+import { roleDefaultModels } from "@oh-my-striped-pi/pi-catalog/compat/behavior";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 
 import type { ModelRegistry } from "../config/model-registry";
 import { getModelMatchPreferences, resolveModelRoleValue } from "../config/model-resolver";
 import type { Settings } from "../config/settings";
 import commitSystemPrompt from "../prompts/system/commit-message-system.md" with { type: "text" };
-import { concreteThinkingLevel, toReasoningEffort } from "@oh-my-pi/pi-tui/thinking";
+import { concreteThinkingLevel, toReasoningEffort } from "@oh-my-striped-pi/pi-tui/thinking";
 
 const COMMIT_SYSTEM_PROMPT = prompt.render(commitSystemPrompt);
 const MAX_DIFF_CHARS = 4000;

@@ -4,7 +4,7 @@
   unzip,
 }:
 stdenvNoCC.mkDerivation {
-  pname = "omp-bun-runtime-template";
+  pname = "omsp-bun-runtime-template";
   inherit (bun) version;
   src = bun.src;
 

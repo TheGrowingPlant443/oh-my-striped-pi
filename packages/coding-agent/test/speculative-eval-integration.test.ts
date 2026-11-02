@@ -9,23 +9,23 @@ import {
 	agentLoop,
 	type SpeculativeOperationSink,
 	type SpeculativePhysicalOutcome,
-} from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Context, Message } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as jsContextManager from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { disposeAllKernelSessions } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
-import { EvalShadowCellSession } from "@oh-my-pi/pi-coding-agent/eval/speculation/cell-session";
-import { CodingAgentSpeculativeExecutionHost } from "@oh-my-pi/pi-coding-agent/speculation/host";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Context, Message } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { setStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as jsContextManager from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { disposeAllKernelSessions } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
+import { EvalShadowCellSession } from "@oh-my-striped-pi/pi-coding-agent/eval/speculation/cell-session";
+import { CodingAgentSpeculativeExecutionHost } from "@oh-my-striped-pi/pi-coding-agent/speculation/host";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EvalTool } from "@oh-my-striped-pi/pi-coding-agent/tools/eval";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const temporaryDirectories: string[] = [];
-const pythonIt = process.env.PI_PYTHON_INTEGRATION === "1" ? it : it.skip;
+const pythonIt = process.env.OMSP_PYTHON_INTEGRATION === "1" ? it : it.skip;
 
 afterEach(async () => {
 	vi.restoreAllMocks();

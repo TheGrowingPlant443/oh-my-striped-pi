@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AnnotationOverlay } from "@oh-my-pi/pi-tui/overlays/annotation-overlay";
-import type { AnnotationOverlayDraft, TextReviewSource } from "@oh-my-pi/pi-tui/overlays/annotation-types";
-import { isEnoent, logger, postmortem, toError } from "@oh-my-pi/pi-utils";
+import type { AnnotationOverlay } from "@oh-my-striped-pi/pi-tui/overlays/annotation-overlay";
+import type { AnnotationOverlayDraft, TextReviewSource } from "@oh-my-striped-pi/pi-tui/overlays/annotation-types";
+import { isEnoent, logger, postmortem, toError } from "@oh-my-striped-pi/pi-utils";
 import type { ReadonlySessionManager } from "../../../../session/session-manager";
 import { writeFileAtomically } from "../../../../utils/atomic-file";
 import { parseReviewDiffSnapshot } from "../review/diff";

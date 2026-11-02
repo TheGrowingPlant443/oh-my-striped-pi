@@ -7,28 +7,28 @@ import {
 	streamSimple,
 	type Usage,
 	type UserMessage,
-} from "@oh-my-pi/pi-ai";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { type DownloadActivity, onDownloadActivity } from "@oh-my-pi/pi-coding-agent/downloads/activity";
-import { WORKER_CONNECTION_CLOSED } from "@oh-my-pi/pi-coding-agent/subprocess/shared-worker";
+} from "@oh-my-striped-pi/pi-ai";
+import { unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { type DownloadActivity, onDownloadActivity } from "@oh-my-striped-pi/pi-coding-agent/downloads/activity";
+import { WORKER_CONNECTION_CLOSED } from "@oh-my-striped-pi/pi-coding-agent/subprocess/shared-worker";
 import {
 	buildLocalInferenceMessages,
 	registerLocalInferenceApi,
-} from "@oh-my-pi/pi-coding-agent/tiny/local-inference-api";
-import { TINY_LOCAL_MODELS } from "@oh-my-pi/pi-coding-agent/tiny/models";
+} from "@oh-my-striped-pi/pi-coding-agent/tiny/local-inference-api";
+import { TINY_LOCAL_MODELS } from "@oh-my-striped-pi/pi-coding-agent/tiny/models";
 import {
 	type TinyModelChatOptions,
 	TinyTitleClient,
 	tinyModelClient,
-} from "@oh-my-pi/pi-coding-agent/tiny/title-client";
+} from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
 import type {
 	TinyChatMessage,
 	TinyWorkerRequest,
 	TinyWorkerResponse,
-} from "@oh-my-pi/pi-coding-agent/tiny/title-protocol";
+} from "@oh-my-striped-pi/pi-coding-agent/tiny/title-protocol";
 
-const SOURCE_ID = "omp/local-inference";
+const SOURCE_ID = "omsp/local-inference";
 const model = getBundledModel("local", "lfm2.5-230m")!;
 
 function zeroUsage(): Usage {

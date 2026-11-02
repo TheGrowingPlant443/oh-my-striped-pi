@@ -1,15 +1,15 @@
 import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, test } from "bun:test";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { getProviderDefinition } from "@oh-my-striped-pi/pi-ai/registry";
 import {
 	getOAuthApiKey,
 	getOAuthProviders,
 	registerOAuthProvider,
 	refreshOAuthToken,
 	unregisterOAuthProviders,
-} from "@oh-my-pi/pi-ai/registry/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
+} from "@oh-my-striped-pi/pi-ai/registry/oauth";
+import type { OAuthCredentials } from "@oh-my-striped-pi/pi-ai/registry/oauth/types";
 import { getEnvApiKey, getEnvApiKeyName, resolveProviderApiKey } from "../src/env-api-key";
 
 const credentials: OAuthCredentials = { refresh: "r", access: "a", expires: Date.now() + 3_600_000 };

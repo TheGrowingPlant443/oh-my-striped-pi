@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { isEnoent } from "@oh-my-pi/pi-utils";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils";
 import { buildDocsIndexPayload } from "./generate-docs-index";
 import { createJsonParsePlugin } from "./json-parse-plugin";
 import { createLegacyPiVirtualModulePlugin } from "./legacy-pi-virtual-module";
@@ -15,17 +15,17 @@ const obsoleteHtmlExportAssetPattern =
 	/^(?:template-[^.]+\.(?:css|html|js)|tool-views\.generated-[^.]+\.js|(?:marked|highlight)\.min-[^.]+\.js)$/;
 
 // Native / optional / platform-specific deps are loaded from installed files.
-const ALWAYS_EXTERNAL = ["@oh-my-pi/pi-natives", "@huggingface/transformers", "fastembed", "onnxruntime-node"];
+const ALWAYS_EXTERNAL = ["@oh-my-striped-pi/pi-natives", "@huggingface/transformers", "fastembed", "onnxruntime-node"];
 
 /**
- * Embeds `@oh-my-pi/pi-natives/THIRD-PARTY-NOTICES.txt` even though the natives package is external. An external
+ * Embeds `@oh-my-striped-pi/pi-natives/THIRD-PARTY-NOTICES.txt` even though the natives package is external. An external
  * text import would be hoisted to a top-level import of `dist/cli.js`, reading the installed addon's notices on every
- * launch instead of only for `omp --license`.
+ * launch instead of only for `omsp --license`.
  */
 const inlineNativeNoticesPlugin: Bun.BunPlugin = {
 	name: "inline-native-notices",
 	setup(build) {
-		build.onResolve({ filter: /^@oh-my-pi\/pi-natives\/THIRD-PARTY-NOTICES\.txt$/ }, () => ({
+		build.onResolve({ filter: /^@oh-my-striped-pi\/pi-natives\/THIRD-PARTY-NOTICES\.txt$/ }, () => ({
 			path: path.join(packageDir, "../natives/THIRD-PARTY-NOTICES.txt"),
 		}));
 	},
@@ -63,7 +63,7 @@ function formatBytes(bytes: number): string {
 }
 
 async function cleanBundleOutputs(outDir: string): Promise<void> {
-	// dist/ is shared with the dev binary (dist/omp); only remove assets
+	// dist/ is shared with the dev binary (dist/omsp); only remove assets
 	// emitted by this script.
 	let entries: string[];
 	try {
@@ -99,8 +99,8 @@ export async function bundleDist(outDir: string = defaultOutDir): Promise<void> 
 	await runCommand(["bun", "--cwd=../stats", "run", "gen:stats"]);
 	// One payload for both consumers: inlined into dist/cli.js via `--define` for
 	// the bundled CLI entrypoint, and written to dist/docs-index.generated.txt so
-	// SDK consumers importing `@oh-my-pi/pi-coding-agent/*` (TypeScript source, no
-	// build-time embed) can still resolve omp:// docs (see src/internal-urls/docs-index.ts).
+	// SDK consumers importing `@oh-my-striped-pi/pi-coding-agent/*` (TypeScript source, no
+	// build-time embed) can still resolve omsp:// docs (see src/internal-urls/docs-index.ts).
 	try {
 		const docsPayload = await buildDocsIndexPayload();
 		// Build in-process: the docs embed payload is far larger than Linux's
@@ -113,8 +113,8 @@ export async function bundleDist(outDir: string = defaultOutDir): Promise<void> 
 			plugins: [createJsonParsePlugin(), await createLegacyPiVirtualModulePlugin(), inlineNativeNoticesPlugin],
 			external: [...ALWAYS_EXTERNAL, ...RUNTIME_EXTERNAL],
 			define: {
-				"process.env.PI_BUNDLED": JSON.stringify("true"),
-				"process.env.PI_DOCS_EMBED": JSON.stringify(docsPayload.payload),
+				"process.env.OMSP_BUNDLED": JSON.stringify("true"),
+				"process.env.OMSP_DOCS_EMBED": JSON.stringify(docsPayload.payload),
 			},
 			minify: {
 				whitespace: true,

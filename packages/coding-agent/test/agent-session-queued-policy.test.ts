@@ -1,34 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { setImmediate } from "node:timers/promises";
-import { Type } from "@oh-my-pi/omptype/typebox";
-import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { Context, ImageContent } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockResponseSource } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { BeforeAgentStartEvent, Extension } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import * as memoryBackend from "@oh-my-pi/pi-coding-agent/memory-backend";
-import type { MemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
-import { loadMnemopiConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
+import { Type } from "@oh-my-striped-pi/omptype/typebox";
+import { Agent, type AgentMessage, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { Context, ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockResponseSource } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ExtensionRuntime } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type {
+	BeforeAgentStartEvent,
+	Extension,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import * as memoryBackend from "@oh-my-striped-pi/pi-coding-agent/memory-backend";
+import type { MemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/types";
+import { loadMnemopiConfig } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/config";
 import {
 	getMnemopiSessionState,
 	loadMnemopi,
 	loadMnemopiCore,
 	MnemopiSessionState,
 	setMnemopiSessionState,
-} from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AgentSessionConfig } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { SessionProviderBoundary } from "@oh-my-pi/pi-coding-agent/session/session-provider-boundary";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AgentSessionConfig } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session-types";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { SessionProviderBoundary } from "@oh-my-striped-pi/pi-coding-agent/session/session-provider-boundary";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
-import { cfgMnemopiInjectionTokenLimit } from "@oh-my-pi/pi-coding-agent/mnemopi/settings";
+import { cfgMnemopiInjectionTokenLimit } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/settings";
 
 const BASE = ["base identity", "base tools"];
 

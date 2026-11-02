@@ -1,18 +1,21 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Agent, AppendOnlyContextManager } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, AppendOnlyContextManager } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { assistantMsg } from "./utilities";
 
 const cleanup: Array<() => Promise<void>> = [];

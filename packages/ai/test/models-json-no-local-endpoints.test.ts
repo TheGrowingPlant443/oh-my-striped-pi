@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getBundledModels, getBundledProviders } from "@oh-my-pi/pi-catalog/models";
+import { getBundledModels, getBundledProviders } from "@oh-my-striped-pi/pi-catalog/models";
 
 // Catalog snapshots contain only the retained backends, never a generator's
 // machine-specific HTTP inference endpoints.

@@ -8,17 +8,17 @@ import {
 	resolveSharedBrowserLaunchSpec,
 	stealthIgnoreDefaultArgs,
 	systemChromiumCandidatesForTest,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { BrowserPlatform, computeExecutablePath, detectBrowserPlatform } from "@oh-my-pi/pi-utils/browsers";
-import { APP_NAME } from "@oh-my-pi/pi-utils/dirs";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { BrowserPlatform, computeExecutablePath, detectBrowserPlatform } from "@oh-my-striped-pi/pi-utils/browsers";
+import { APP_NAME } from "@oh-my-striped-pi/pi-utils/dirs";
 import { PUPPETEER_REVISIONS } from "puppeteer-core/internal/revisions.js";
 
 const EXECUTABLE_PROBE = path.resolve(import.meta.dir, "../fixtures/browser-executable-probe.ts");
 
 /**
- * The parent's environment without the variables that relocate omp's directories or pick a browser.
- * `setAgentDir()` exports `PI_CODING_AGENT_DIR` for the rest of the process, and an agent-dir or
+ * The parent's environment without the variables that relocate omsp's directories or pick a browser.
+ * `setAgentDir()` exports `OMSP_CODING_AGENT_DIR` for the rest of the process, and an agent-dir or
  * profile override disables the XDG roots the tests below pin the child's puppeteer cache with, so
  * an inherited one would point the child at a cache without the seeded Chrome for Testing.
  */
@@ -27,7 +27,7 @@ function probeEnv(): Record<string, string | undefined> {
 	for (const key in env) {
 		if (key.startsWith("XDG_") || key.startsWith("PUPPETEER_")) delete env[key];
 	}
-	for (const key of ["PI_CODING_AGENT_DIR", "PI_CONFIG_DIR", "OMP_PROFILE", "PI_PROFILE"]) delete env[key];
+	for (const key of ["OMSP_CODING_AGENT_DIR", "OMSP_CONFIG_DIR", "OMSP_PROFILE"]) delete env[key];
 	return env;
 }
 
@@ -203,7 +203,7 @@ describe("browser executable selection", () => {
 			const result = Bun.spawnSync([process.execPath, EXECUTABLE_PROBE], {
 				env: {
 					...probeEnv(),
-					OMP_BROWSER_PROBE_PLATFORM: "win32",
+					OMSP_BROWSER_PROBE_PLATFORM: "win32",
 					ProgramFiles: tempDir.path(),
 					"ProgramFiles(x86)": path.join(tempDir.path(), "missing-x86"),
 					LOCALAPPDATA: path.join(tempDir.path(), "missing-local"),
@@ -232,7 +232,7 @@ describe("browser executable selection", () => {
 				const home = path.join(tempDir.path(), "home");
 				const xdgCache = path.join(tempDir.path(), "cache");
 				// resolveIf() (packages/utils/src/dirs.ts) only redirects to an XDG
-				// root when its `<XDG>/omp` dir already exists, so create them to pin
+				// root when its `<XDG>/omsp` dir already exists, so create them to pin
 				// the child's puppeteer cache to this isolated location.
 				for (const xdg of [xdgCache, path.join(tempDir.path(), "data"), path.join(tempDir.path(), "state")]) {
 					fs.mkdirSync(path.join(xdg, APP_NAME), { recursive: true });
@@ -243,7 +243,7 @@ describe("browser executable selection", () => {
 					XDG_CACHE_HOME: xdgCache,
 					XDG_DATA_HOME: path.join(tempDir.path(), "data"),
 					XDG_STATE_HOME: path.join(tempDir.path(), "state"),
-					OMP_BROWSER_PROBE_PLATFORM: "darwin",
+					OMSP_BROWSER_PROBE_PLATFORM: "darwin",
 					PUPPETEER_EXECUTABLE_PATH: "",
 				};
 
@@ -255,7 +255,7 @@ describe("browser executable selection", () => {
 
 				// Seed the isolated Chrome for Testing binary in the child's cache so the
 				// probe resolves it without a network download. getPuppeteerDir() resolves
-				// to `<XDG_CACHE_HOME>/omp/puppeteer` given the dirs created above.
+				// to `<XDG_CACHE_HOME>/omsp/puppeteer` given the dirs created above.
 				const cacheDir = path.join(xdgCache, APP_NAME, "puppeteer");
 				// The child emulates macOS on this host's CPU, so Chrome for Testing resolves to mac/mac_arm.
 				const platform = os.arch() === "arm64" ? BrowserPlatform.MAC_ARM : BrowserPlatform.MAC;
@@ -307,7 +307,7 @@ describe("browser executable selection", () => {
 				};
 				const probe = (purpose: string) => {
 					const result = Bun.spawnSync([process.execPath, EXECUTABLE_PROBE], {
-						env: { ...env, OMP_BROWSER_PROBE_PURPOSE: purpose },
+						env: { ...env, OMSP_BROWSER_PROBE_PURPOSE: purpose },
 						stdout: "pipe",
 						stderr: "pipe",
 					});

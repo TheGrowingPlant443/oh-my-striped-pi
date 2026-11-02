@@ -3,7 +3,12 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as tls from "node:tls";
-import { __resetExtraCaCache, ExtraCaError, type FetchImpl, wrapFetchForExtraCa } from "@oh-my-pi/pi-utils/tls-fetch";
+import {
+	__resetExtraCaCache,
+	ExtraCaError,
+	type FetchImpl,
+	wrapFetchForExtraCa,
+} from "@oh-my-striped-pi/pi-utils/tls-fetch";
 
 const SAMPLE_PEM =
 	"-----BEGIN CERTIFICATE-----\nMIIBkTCCATegAwIBAgIUF/sample/extra/ca/for/tests/1234567=\n-----END CERTIFICATE-----\n";
@@ -28,7 +33,7 @@ describe("wrapFetchForExtraCa", () => {
 	beforeEach(async () => {
 		__resetExtraCaCache();
 		originalEnv = Bun.env.NODE_EXTRA_CA_CERTS;
-		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-extra-ca-"));
+		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-extra-ca-"));
 	});
 
 	afterEach(async () => {

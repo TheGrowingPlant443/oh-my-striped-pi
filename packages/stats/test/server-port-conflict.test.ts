@@ -10,7 +10,7 @@ import {
 import { startServer } from "../src/server";
 import { installStatsTestIsolation } from "./helpers/temp-agent";
 
-installStatsTestIsolation("@pi-stats-port-conflict-");
+const isolation = installStatsTestIsolation("@pi-stats-port-conflict-");
 
 /**
  * Directly probe a TCP endpoint, bypassing any configured HTTP proxy so the
@@ -42,19 +42,15 @@ function getNonLoopbackHostname(): string | undefined {
 
 const holderProcesses: Array<Subprocess<"ignore", "pipe", "pipe">> = [];
 
-async function startBunHolder(responseExpr: string, options?: { hostname?: string; statsOwned?: boolean }) {
+async function startBunHolder(
+	responseExpr: string,
+	options?: { hostname?: string; statsOwned?: boolean; sourcePath?: string },
+) {
 	const hostname = options?.hostname ?? STATS_DASHBOARD_HOSTNAME;
-	const reservation = Bun.serve({
-		port: 0,
-		hostname: STATS_DASHBOARD_HOSTNAME,
-		fetch: () => new Response("reserved"),
-	});
-	const port = reservation.port;
-	reservation.stop(true);
-
-	const source = `Bun.serve({ port: ${port}, hostname: "${hostname}", fetch: () => ${responseExpr} }); process.stdout.write("ready"); await Promise.withResolvers().promise;`;
-	const args = [process.execPath, "-e", source];
-	if (options?.statsOwned) args.push("omp-stats");
+	const source = `const server = Bun.serve({ port: 0, hostname: "${hostname}", fetch: () => ${responseExpr} }); process.stdout.write(String(server.port)); await Promise.withResolvers().promise;`;
+	if (options?.sourcePath) await Bun.write(options.sourcePath, source);
+	const args = options?.sourcePath ? [process.execPath, options.sourcePath] : [process.execPath, "-e", source];
+	if (options?.statsOwned) args.push("omsp-stats");
 	const child = Bun.spawn(args, {
 		stdin: "ignore",
 		stdout: "pipe",
@@ -65,13 +61,12 @@ async function startBunHolder(responseExpr: string, options?: { hostname?: strin
 	const reader = child.stdout.getReader();
 	const ready = await reader.read();
 	reader.releaseLock();
-	if (!ready.done && new TextDecoder().decode(ready.value) === "ready") {
-		return { child, port };
-	}
+	const port = ready.done ? Number.NaN : Number(new TextDecoder().decode(ready.value));
+	if (Number.isInteger(port) && port > 0) return { child, port };
 
 	await child.exited;
 	const stderr = await new Response(child.stderr).text();
-	throw new Error(`Holder failed to listen on port ${port}: ${stderr}`);
+	throw new Error(`Holder failed to listen: ${stderr}`);
 }
 
 /** Assert that a current, same-origin-only dashboard answers on `port`. */
@@ -184,7 +179,7 @@ describe("startServer port conflicts", () => {
 
 	it("reuses a live dashboard that answers slowly while it ingests", async () => {
 		// Regression: a dashboard stalled by ingest missed the probe deadline and
-		// `/stats` failed with "not identifiable as an omp stats dashboard". The
+		// `/stats` failed with "not identifiable as an omsp stats dashboard". The
 		// holder is a separate process probed over real sockets, so its stall has
 		// to be a real delay; fake timers here cannot slow another process down.
 		const headers = `{ "${STATS_DASHBOARD_HEADER}": "${STATS_DASHBOARD_SECURITY_VERSION}", "${STATS_DASHBOARD_HOSTNAME_HEADER}": "${STATS_DASHBOARD_HOSTNAME}" }`;
@@ -193,6 +188,30 @@ describe("startServer port conflicts", () => {
 		const server = await startServer(holder.port);
 		expect(server.port).toBe(holder.port);
 		expect(holder.child.exitCode).toBeNull();
+	});
+
+	it("leaves an upstream dashboard at a generic stats source path alive and falls back", async () => {
+		const temp = isolation.current();
+		if (!temp) throw new Error("Stats test isolation is not initialized");
+		const holder = await startBunHolder(
+			'Response.json([], { headers: { "x-omp-stats-dashboard": "3", "x-omp-stats-hostname": "127.0.0.1" } })',
+			{ sourcePath: temp.join("packages/stats/src/index.ts") },
+		);
+		// The generic source suffix used to authorize terminating this upstream Bun process.
+		const server = await startServer(holder.port);
+
+		try {
+			expect(server.port).not.toBe(holder.port);
+			expect(holder.child.exitCode).toBeNull();
+			const upstream = await fetch(`http://${STATS_DASHBOARD_HOSTNAME}:${holder.port}/api/stats/models`);
+			expect(upstream.status).toBe(200);
+			expect(upstream.headers.get("x-omp-stats-dashboard")).toBe("3");
+			expect(upstream.headers.get(STATS_DASHBOARD_HEADER)).toBeNull();
+			await upstream.body?.cancel();
+			await expectCurrentDashboard(server.port);
+		} finally {
+			server.stop();
+		}
 	});
 
 	for (const fixture of [
@@ -237,7 +256,7 @@ describe("startServer port conflicts", () => {
 			response: 'new Response("foreign", { status: 404 })',
 			statsOwned: false,
 		},
-		// Never answering is what a dashboard stalled mid-ingest looks like; stopping it would kill a live `omp stats`.
+		// Never answering is what a dashboard stalled mid-ingest looks like; stopping it would kill a live `omsp stats`.
 		{ name: "a stats listener that never answers", response: "Promise.withResolvers().promise", statsOwned: true },
 	]) {
 		it(`serves on an ephemeral port beside ${fixture.name}`, async () => {

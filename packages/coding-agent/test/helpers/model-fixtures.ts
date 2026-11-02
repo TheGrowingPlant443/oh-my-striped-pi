@@ -1,6 +1,6 @@
-import { type GeneratedProvider, getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { type Api, type Model, modelKind, type ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import type { ProviderModelConfig } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
+import { type GeneratedProvider, getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
+import { type Api, type Model, modelKind, type ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import type { ProviderModelConfig } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
 
 /** Select a bundled chat model by behavior so tests survive catalog roster changes. */
 export function getTestModel(provider: GeneratedProvider, matches?: (model: Model) => boolean): Model {

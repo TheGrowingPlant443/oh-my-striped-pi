@@ -1,12 +1,12 @@
 import { dlopen, FFIType, ptr } from "bun:ffi";
 import * as fs from "node:fs";
-import { TtyWriter } from "@oh-my-pi/pi-natives";
-import { $env, isBunTestRuntime, isTerminalHeadless, isWsl } from "@oh-my-pi/pi-utils/env";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import { popLoopPhase, pushLoopPhase } from "@oh-my-pi/pi-utils/loop-phase";
-import * as postmortem from "@oh-my-pi/pi-utils/postmortem";
-import { restoreTerminalStderr, suppressTerminalStderr } from "@oh-my-pi/pi-utils/stderr-guard";
-import { TSP_VERSION } from "@oh-my-pi/pi-wire";
+import { TtyWriter } from "@oh-my-striped-pi/pi-natives";
+import { $env, isBunTestRuntime, isTerminalHeadless, isWsl } from "@oh-my-striped-pi/pi-utils/env";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import { popLoopPhase, pushLoopPhase } from "@oh-my-striped-pi/pi-utils/loop-phase";
+import * as postmortem from "@oh-my-striped-pi/pi-utils/postmortem";
+import { restoreTerminalStderr, suppressTerminalStderr } from "@oh-my-striped-pi/pi-utils/stderr-guard";
+import { TSP_VERSION } from "@oh-my-striped-pi/pi-wire";
 import { getActiveTerminal, registerStdoutErrorHandler, setActiveTerminal } from "./active-terminal";
 import {
 	encodeBundledGlyphRegistrations,
@@ -462,7 +462,7 @@ export function emergencyTerminalRestore(): void {
 		const terminal = getActiveTerminal();
 		if (terminal) {
 			// Keyboard enhancement state is screen-local: pop the alt-screen
-			// frame before leaving it, then let stop() pop omp's main-screen frame.
+			// frame before leaving it, then let stop() pop omsp's main-screen frame.
 			if (altScreenActive) {
 				const keyboardExit =
 					terminal.keyboardEnhancementExitSequence ?? (terminal.kittyEnableSequence ? "\x1b[<u" : "");
@@ -545,7 +545,7 @@ export type GlyphProtocolReportHandler = (supported: boolean) => void;
 /**
  * Outcome of the Tern Surface Protocol `hello` probe: the terminal's reply,
  * or null when it answered the DA1 sentinel first (no TSP) or the probe was
- * skipped (`PI_TUI_NATIVE=0`, multiplexers, devenv's reloading shell).
+ * skipped (`OMSP_TUI_NATIVE=0`, multiplexers, devenv's reloading shell).
  */
 export type TspHelloHandler = (hello: TspHello | null) => void;
 
@@ -846,7 +846,7 @@ export class ProcessTerminal implements Terminal {
 	#isLoopStalled?: () => boolean;
 	#stdoutResizeListener?: () => void;
 	#kittyProtocolActive = false;
-	// Kitty flags omp pushed on its own stack frame; meaningful only while kitty is active.
+	// Kitty flags omsp pushed on its own stack frame; meaningful only while kitty is active.
 	#kittyFlags = 0;
 	#modifyOtherKeysActive = false;
 	#modifyOtherKeysTimeout?: Timer;
@@ -891,7 +891,7 @@ export class ProcessTerminal implements Terminal {
 	// value so WSL env does not change behavior. See {@link ProcessTerminalOptions}.
 	readonly #conpty: boolean;
 	readonly #nativeWindowsConsole: boolean;
-	#writeLogPath = $env.PI_TUI_WRITE_LOG || "";
+	#writeLogPath = $env.OMSP_TUI_WRITE_LOG || "";
 	#stdoutErrorCleanup?: () => void;
 	#stdoutErrorHandler = (err: Error) => {
 		this.#markTerminalDisconnected("stdout failed", err);
@@ -995,7 +995,7 @@ export class ProcessTerminal implements Terminal {
 	}
 
 	get keyboardEnhancementRestoreSequence(): string | null {
-		// `CSI = flags ; 1 u` replaces the main-screen stack top, which is omp's own
+		// `CSI = flags ; 1 u` replaces the main-screen stack top, which is omsp's own
 		// frame, so it is a no-op wherever per-screen stacks work. Windows Terminal
 		// 1.25–1.27 restore the pre-push flags on `?1049l` (microsoft/terminal#20763),
 		// dropping to legacy keys: Shift+Enter arrives as `\r`, Ctrl+Enter as `\n`.
@@ -1096,7 +1096,7 @@ export class ProcessTerminal implements Terminal {
 
 	get tspExpected(): boolean {
 		// A multiplexer or relay started from Tern can leave `TERM_PROGRAM=tern`
-		// behind while swallowing APC, even when `PI_TUI_NATIVE=1` forces the probe.
+		// behind while swallowing APC, even when `OMSP_TUI_NATIVE=1` forces the probe.
 		return (
 			isTernPane($env) &&
 			tspPathBlocker($env) === null &&
@@ -1216,7 +1216,7 @@ export class ProcessTerminal implements Terminal {
 			classifyTerminalMultiplexerModule($env)?.gatesBracketedPaste === true;
 
 		// Force normal cursor-key (DECCKM) and numeric-keypad mode (terminfo
-		// `rmkx` = "\x1b[?1l\x1b>"). omp decodes both CSI ("\x1b[A") and SS3
+		// `rmkx` = "\x1b[?1l\x1b>"). omsp decodes both CSI ("\x1b[A") and SS3
 		// ("\x1bOA") arrow encodings, so it never enables application mode
 		// itself — but a prior program that left the TTY in application-cursor-
 		// keys mode makes arrows arrive as SS3. Normalizing on entry keeps input
@@ -1277,7 +1277,7 @@ export class ProcessTerminal implements Terminal {
 		// gates the renderer's begin/end markers; 2048 (in-band resize) is enabled
 		// only after the terminal confirms support; 2031 (appearance change
 		// notifications) drives mid-session theme tracking. Xterm ?1010/?1011
-		// are disabled while OMP owns the TTY so typing in the editor does not
+		// are disabled while OMSP owns the TTY so typing in the editor does not
 		// force a reader scrolled into native history back to the tail. Each probe
 		// rides the shared DA1 sentinel, so terminals that ignore DECRQM resolve as
 		// unsupported when the DA1 reply arrives.
@@ -1844,7 +1844,7 @@ export class ProcessTerminal implements Terminal {
 		// single-line OSC 99 form until confirmation, and delivery still uses the
 		// passthrough/BEL path (#3395).
 		if (isInsideTerminalMultiplexer($env)) return false;
-		return !isBunTestRuntime() || $env.PI_TUI_OSC99_PROBE === "1";
+		return !isBunTestRuntime() || $env.OMSP_TUI_OSC99_PROBE === "1";
 	}
 
 	#queryOsc99Support(): void {
@@ -1854,7 +1854,7 @@ export class ProcessTerminal implements Terminal {
 		this.#osc99ResponseBuffer = "";
 		if (this.#dead || !this.#shouldQueryOsc99Support()) return;
 
-		const id = `omp-probe-${nextOsc99ProbeId++}`;
+		const id = `omsp-probe-${nextOsc99ProbeId++}`;
 		this.#osc99PendingId = id;
 		this.#da1SentinelOwners.push({ kind: "osc99Probe", id });
 		// The probe never runs under a multiplexer (see #shouldQueryOsc99Support),
@@ -1884,13 +1884,13 @@ export class ProcessTerminal implements Terminal {
 	}
 
 	#shouldQueryGlyphProtocolSupport(): boolean {
-		// `PI_NO_GLYPH_PROTOCOL=1` keeps the terminal's own font coverage (tofu
+		// `OMSP_NO_GLYPH_PROTOCOL=1` keeps the terminal's own font coverage (tofu
 		// included) — the registration shadows a system Nerd Font at render time.
-		if ($env.PI_NO_GLYPH_PROTOCOL === "1") return false;
+		if ($env.OMSP_NO_GLYPH_PROTOCOL === "1") return false;
 		// Same multiplexer rule as the OSC 99 probe: tmux/screen cannot route the
 		// APC reply back to the sending pane, so it would leak as literal text.
 		if (isInsideTerminalMultiplexer($env)) return false;
-		return !isBunTestRuntime() || $env.PI_TUI_GLYPH_PROTOCOL_PROBE === "1";
+		return !isBunTestRuntime() || $env.OMSP_TUI_GLYPH_PROTOCOL_PROBE === "1";
 	}
 
 	#queryGlyphProtocolSupport(): void {
@@ -1943,8 +1943,8 @@ export class ProcessTerminal implements Terminal {
 
 	/** Why the `hello` probe does not run, or `null` when it does. */
 	#tspProbeSkipReason(): string | null {
-		const override = $env.PI_TUI_NATIVE;
-		if (override === "0") return "PI_TUI_NATIVE=0";
+		const override = $env.OMSP_TUI_NATIVE;
+		if (override === "0") return "OMSP_TUI_NATIVE=0";
 		// tmux makes APC bodies the pane title unless the hosting terminal asked
 		// for TSP through `@tern-tsp`: no override may force the probe there.
 		if (tmuxMultiplexer.isInside($env)) {
@@ -1954,7 +1954,7 @@ export class ProcessTerminal implements Terminal {
 		// The reply could never arrive.
 		const blocker = tspPathBlocker($env);
 		if (blocker !== null) return blocker;
-		return isBunTestRuntime() && $env.PI_TUI_TSP_PROBE !== "1" ? "bun test runtime" : null;
+		return isBunTestRuntime() && $env.OMSP_TUI_TSP_PROBE !== "1" ? "bun test runtime" : null;
 	}
 
 	/** A Tern pane that ends up on the classic renderer says why in the log, once. */
@@ -2381,7 +2381,7 @@ export class ProcessTerminal implements Terminal {
 		// `rmkx`). Symmetric with the normalize in start(): a TTY-sharing child
 		// can leave the terminal in application-cursor-keys mode, and without
 		// this reset the parent shell inherits SS3 arrows so Up/Down history
-		// navigation stays broken after omp exits (#6374).
+		// navigation stays broken after omsp exits (#6374).
 		this.#safeWrite("\x1b[?1l\x1b>");
 
 		// Disable bracketed paste mode

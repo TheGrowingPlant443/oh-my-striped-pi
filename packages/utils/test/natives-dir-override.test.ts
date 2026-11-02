@@ -2,16 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { __resetDirsFromEnvForTests, getAgentDir, getNativesDir } from "@oh-my-pi/pi-utils/dirs";
+import { __resetDirsFromEnvForTests, getAgentDir, getNativesDir } from "@oh-my-striped-pi/pi-utils/dirs";
 
 const ENV_KEYS = [
 	"HOME",
 	"USERPROFILE",
-	"OMP_PROFILE",
-	"PI_PROFILE",
-	"PI_CONFIG_DIR",
-	"PI_CODING_AGENT_DIR",
-	"PI_NATIVES_DIR",
+	"OMSP_PROFILE",
+	"OMSP_CONFIG_DIR",
+	"OMSP_CODING_AGENT_DIR",
+	"OMSP_NATIVES_DIR",
 	"XDG_DATA_HOME",
 	"XDG_STATE_HOME",
 	"XDG_CACHE_HOME",
@@ -29,7 +28,7 @@ describe("native directory override", () => {
 			originalEnv[key] = process.env[key];
 			delete process.env[key];
 		}
-		tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-utils-natives-dir-"));
+		tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-utils-natives-dir-"));
 		home = path.join(tempRoot, "home");
 		await fs.mkdir(home);
 		process.env.HOME = home;
@@ -53,15 +52,15 @@ describe("native directory override", () => {
 		const cache = path.join(tempRoot, "cache");
 		const data = path.join(tempRoot, "data");
 		const shared = path.join(tempRoot, "shared");
-		await fs.mkdir(path.join(cache, "omp", "profiles", "isolated"), { recursive: true });
-		await fs.mkdir(path.join(data, "omp", "profiles", "isolated"), { recursive: true });
+		await fs.mkdir(path.join(cache, "omsp", "profiles", "isolated"), { recursive: true });
+		await fs.mkdir(path.join(data, "omsp", "profiles", "isolated"), { recursive: true });
 		process.env.XDG_CACHE_HOME = cache;
 		process.env.XDG_DATA_HOME = data;
-		process.env.PI_CONFIG_DIR = ".alternate";
-		process.env.OMP_PROFILE = "isolated";
+		process.env.OMSP_CONFIG_DIR = ".alternate";
+		process.env.OMSP_PROFILE = "isolated";
 		__resetDirsFromEnvForTests();
 		const defaultNatives = path.join(
-			xdgPlatform ? path.join(cache, "omp") : path.join(home, ".alternate"),
+			xdgPlatform ? path.join(cache, "omsp") : path.join(home, ".alternate"),
 			"profiles",
 			"isolated",
 			"natives",
@@ -69,18 +68,18 @@ describe("native directory override", () => {
 		const agent = getAgentDir();
 		expect(getNativesDir()).toBe(defaultNatives);
 
-		process.env.PI_NATIVES_DIR = " " + shared + " ";
+		process.env.OMSP_NATIVES_DIR = " " + shared + " ";
 		expect(getNativesDir()).toBe(shared);
 		expect(getAgentDir()).toBe(agent);
 
-		delete process.env.PI_NATIVES_DIR;
+		delete process.env.OMSP_NATIVES_DIR;
 		expect(getNativesDir()).toBe(defaultNatives);
 	});
 
 	it("expands home-relative overrides instead of treating tilde as a cwd-relative path", () => {
-		process.env.PI_NATIVES_DIR = "~";
+		process.env.OMSP_NATIVES_DIR = "~";
 		expect(getNativesDir()).toBe(home);
-		process.env.PI_NATIVES_DIR = " ~/unused/../shared ";
+		process.env.OMSP_NATIVES_DIR = " ~/unused/../shared ";
 		expect(getNativesDir()).toBe(path.join(home, "shared"));
 	});
 
@@ -89,7 +88,7 @@ describe("native directory override", () => {
 		["whitespace", " \t "],
 		["relative", "relative/natives"],
 	])("keeps the existing cache root when the override is %s", (_label, override) => {
-		process.env.PI_NATIVES_DIR = override;
-		expect(getNativesDir()).toBe(path.join(home, ".omp", "natives"));
+		process.env.OMSP_NATIVES_DIR = override;
+		expect(getNativesDir()).toBe(path.join(home, ".omsp", "natives"));
 	});
 });

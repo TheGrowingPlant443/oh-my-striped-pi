@@ -1,7 +1,7 @@
 /**
  * HTTP + WebSocket server for the browser relay.
  *
- * Impersonates Chrome's CDP discovery endpoint so the omp browser tool (and
+ * Impersonates Chrome's CDP discovery endpoint so the omsp browser tool (and
  * any puppeteer client) can connect with a plain `browserURL`:
  * - `GET /json/version` → 200 with `webSocketDebuggerUrl` once the extension
  *   is connected, 503 with a {@link RelayUnavailableInfo} body before that
@@ -13,7 +13,7 @@
  * Binds loopback only: anything that can reach this port can drive the
  * user's logged-in browser.
  */
-import { VERSION } from "@oh-my-pi/pi-utils/dirs";
+import { VERSION } from "@oh-my-striped-pi/pi-utils/dirs";
 import { RelayBridge, type RelayBridgeExtensionUpdater } from "./bridge";
 import {
 	defaultRelayExtensionDir,
@@ -32,7 +32,7 @@ export interface RelayServerOptions {
 	group?: boolean | { title: string; color: string };
 	/**
 	 * The extension copy this relay keeps current: an older extension Chrome loaded from here is rewritten and
-	 * reloaded (default: `omp browser-relay install`'s directory).
+	 * reloaded (default: `omsp browser-relay install`'s directory).
 	 */
 	extensionDir?: string;
 	log?: (message: string, data?: Record<string, unknown>) => void;
@@ -40,7 +40,7 @@ export interface RelayServerOptions {
 
 /**
  * Updates the extension when Chrome loaded it from `dir`: an extension loaded from elsewhere (`install --dir`, a
- * development build) is not this relay's to rewrite, and files a newer omp wrote are left for that omp's relay.
+ * development build) is not this relay's to rewrite, and files a newer omsp wrote are left for that omsp's relay.
  * Calls run one at a time: Chrome profiles that load the same folder share its files, and a later call finds them
  * already current.
  */
@@ -64,15 +64,15 @@ const EXTENSION_ORIGIN = /^chrome-extension:\/\/([a-p]{32})$/;
 
 /** Body of the 503 `/json/version` answer while no extension is connected. */
 export interface RelayUnavailableInfo {
-	/** Version of the OMP binary serving this relay. */
-	ompRelayVersion: string;
+	/** Version of the OMSP binary serving this relay. */
+	omspRelayVersion: string;
 	error: string;
 	/** An extension completed the hello handshake at least once in this server's lifetime. */
 	extensionSeen: boolean;
 	/** Milliseconds this server has been listening. */
 	uptimeMs: number;
 	/** Downstream CDP clients connected to this relay. */
-	ompRelayCdpClients: number;
+	omspRelayCdpClients: number;
 	/** Milliseconds since the last connected extension went away; absent if none has connected yet. */
 	disconnectedMs?: number;
 }
@@ -96,8 +96,8 @@ type RelayWebSocket = Bun.ServerWebSocket<SocketData>;
 const WS_KEEPALIVE_MS = 30_000;
 /** Screenshots travel base64-encoded through both websocket legs. */
 const MAX_PAYLOAD_BYTES = 256 * 1024 * 1024;
-/** Default appearance of the omp tab group. */
-const DEFAULT_GROUP = { title: "omp", color: "cyan" } as const;
+/** Default appearance of the omsp tab group. */
+const DEFAULT_GROUP = { title: "omsp", color: "cyan" } as const;
 /** True when `raw` can serve as the authority of a `ws://` URL: no whitespace,
  *  slashes, userinfo, fragments, or control characters, and URL-parseable. */
 function isWsAuthority(raw: string): boolean {
@@ -157,11 +157,11 @@ export function startRelayServer(opts: RelayServerOptions): RelayServer {
 				if (!bridge.ready) {
 					const disconnectedMs = bridge.extensionGoneForMs;
 					const info: RelayUnavailableInfo = {
-						ompRelayVersion: VERSION,
+						omspRelayVersion: VERSION,
 						error: "relay extension is not connected",
 						extensionSeen: bridge.extensionSeen,
 						uptimeMs: Date.now() - startedAt,
-						ompRelayCdpClients: bridge.cdpClientCount,
+						omspRelayCdpClients: bridge.cdpClientCount,
 						...(disconnectedMs === null ? {} : { disconnectedMs }),
 					};
 					return Response.json(info, { status: 503 });

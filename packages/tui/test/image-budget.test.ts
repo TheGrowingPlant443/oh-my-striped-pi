@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
-import * as natives from "@oh-my-pi/pi-natives";
-import { Container, TUI } from "@oh-my-pi/pi-tui";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { Image, ImageBudget } from "@oh-my-pi/pi-tui/components/image";
-import { Text } from "@oh-my-pi/pi-tui/components/text";
+import * as natives from "@oh-my-striped-pi/pi-natives";
+import { Container, TUI } from "@oh-my-striped-pi/pi-tui";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { Image, ImageBudget } from "@oh-my-striped-pi/pi-tui/components/image";
+import { Text } from "@oh-my-striped-pi/pi-tui/components/text";
 import {
 	encodeKittyVirtualPlacement,
 	getKittyGraphics,
 	KITTY_PLACEHOLDER,
 	setKittyGraphics,
-} from "@oh-my-pi/pi-tui/kitty-graphics";
+} from "@oh-my-striped-pi/pi-tui/kitty-graphics";
 import {
 	type CellDimensions,
 	encodeKitty,
@@ -22,7 +22,7 @@ import {
 	setCellDimensions,
 	TERMINAL,
 	wrapTmuxPassthrough,
-} from "@oh-my-pi/pi-tui/terminal-capabilities";
+} from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
 import { withoutTerminalMultiplexer } from "./helpers/terminal-multiplexer";
 
 withoutTerminalMultiplexer();
@@ -873,7 +873,7 @@ describe("TUI inline-image budget", () => {
 
 	it("clips a direct Kitty placement during an in-place width repaint", async () => {
 		const originalGraphics = { ...getKittyGraphics() };
-		const originalResizeMode = Bun.env.PI_TUI_RESIZE_IN_PLACE;
+		const originalResizeMode = Bun.env.OMSP_TUI_RESIZE_IN_PLACE;
 		const term = new VirtualTerminal(40, 6);
 		const writes: string[] = [];
 		const realWrite = term.write.bind(term);
@@ -883,7 +883,7 @@ describe("TUI inline-image budget", () => {
 		});
 
 		setKittyGraphics({ unicodePlaceholders: false });
-		Bun.env.PI_TUI_RESIZE_IN_PLACE = "1";
+		Bun.env.OMSP_TUI_RESIZE_IN_PLACE = "1";
 		const tui = createTui(term);
 		tui.addChild(
 			new Image(
@@ -910,8 +910,8 @@ describe("TUI inline-image budget", () => {
 		} finally {
 			tui.stop();
 			setKittyGraphics(originalGraphics);
-			if (originalResizeMode === undefined) delete Bun.env.PI_TUI_RESIZE_IN_PLACE;
-			else Bun.env.PI_TUI_RESIZE_IN_PLACE = originalResizeMode;
+			if (originalResizeMode === undefined) delete Bun.env.OMSP_TUI_RESIZE_IN_PLACE;
+			else Bun.env.OMSP_TUI_RESIZE_IN_PLACE = originalResizeMode;
 		}
 	});
 

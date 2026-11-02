@@ -9,9 +9,9 @@ import {
 	sanitizeSkillName,
 	toSkillFrontmatter,
 	writeManagedSkill,
-} from "@oh-my-pi/pi-coding-agent/autolearn/managed-skills";
-import { parseFrontmatter, removeWithRetries } from "@oh-my-pi/pi-utils";
-import { getAgentDir, setAgentDir } from "@oh-my-pi/pi-utils/dirs";
+} from "@oh-my-striped-pi/pi-coding-agent/autolearn/managed-skills";
+import { parseFrontmatter, removeWithRetries } from "@oh-my-striped-pi/pi-utils";
+import { getAgentDir, setAgentDir } from "@oh-my-striped-pi/pi-utils/dirs";
 
 describe("managed-skills primitives", () => {
 	let tempHome: string;
@@ -19,9 +19,9 @@ describe("managed-skills primitives", () => {
 	let originalAgentDir: string;
 	beforeEach(async () => {
 		originalAgentDir = getAgentDir();
-		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omp-managed-skills-"));
+		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-managed-skills-"));
 		spyOn(os, "homedir").mockReturnValue(tempHome);
-		setAgentDir(path.join(tempHome, ".omp", "agent"));
+		setAgentDir(path.join(tempHome, ".omsp", "agent"));
 	});
 
 	afterEach(async () => {
@@ -124,7 +124,7 @@ describe("managed-skills primitives", () => {
 				writeManagedSkill({ action: "create", name: "../skills/evil", description: "d", body: "b" }),
 			).rejects.toThrow();
 			// Nothing leaked into an authored skills dir.
-			const authoredEvil = path.join(tempHome, ".omp", "agent", "skills", "evil", "SKILL.md");
+			const authoredEvil = path.join(tempHome, ".omsp", "agent", "skills", "evil", "SKILL.md");
 			expect(await Bun.file(authoredEvil).exists()).toBe(false);
 		});
 
@@ -133,7 +133,7 @@ describe("managed-skills primitives", () => {
 			await fs.mkdir(managedRoot, { recursive: true });
 			// Plant a symlink where the skill dir would live, pointing outside the
 			// isolated managed root; Bun.write would otherwise follow it.
-			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omp-escape-"));
+			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-escape-"));
 			try {
 				await fs.symlink(outside, path.join(managedRoot, "evil"));
 				await expect(
@@ -161,7 +161,7 @@ describe("managed-skills primitives", () => {
 		});
 
 		it("writes through a symlinked root into its target directory", async () => {
-			const realRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-realroot-"));
+			const realRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-realroot-"));
 			try {
 				await fs.mkdir(path.dirname(getManagedSkillsDir()), { recursive: true });
 				await fs.symlink(realRoot, getManagedSkillsDir());
@@ -181,14 +181,14 @@ describe("managed-skills primitives", () => {
 
 		it("refuses to write through a broken symlinked root", async () => {
 			await fs.mkdir(path.dirname(getManagedSkillsDir()), { recursive: true });
-			await fs.symlink(path.join(os.tmpdir(), "omp-no-such-root"), getManagedSkillsDir());
+			await fs.symlink(path.join(os.tmpdir(), "omsp-no-such-root"), getManagedSkillsDir());
 			await expect(
 				writeManagedSkill({ action: "create", name: "demo", description: "d", body: "b" }),
 			).rejects.toThrow(/broken symlink/);
 		});
 
 		it("refuses to write through a root that links to a file", async () => {
-			const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "omp-realroot-file-")), "notadir");
+			const file = path.join(await fs.mkdtemp(path.join(os.tmpdir(), "omsp-realroot-file-")), "notadir");
 			await Bun.write(file, "x");
 			try {
 				await fs.mkdir(path.dirname(getManagedSkillsDir()), { recursive: true });
@@ -226,7 +226,7 @@ describe("managed-skills primitives", () => {
 
 		it("refuses to update a SKILL.md that is a symlink", async () => {
 			await writeManagedSkill({ action: "create", name: "linky", description: "d", body: "real" });
-			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omp-link-"));
+			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-link-"));
 			const target = path.join(outside, "target.md");
 			await Bun.write(target, "outside content");
 			try {
@@ -267,7 +267,7 @@ describe("managed-skills primitives", () => {
 		it("refuses to delete through a symlinked skill directory", async () => {
 			const managedRoot = getManagedSkillsDir();
 			await fs.mkdir(managedRoot, { recursive: true });
-			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omp-deltarget-"));
+			const outside = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-deltarget-"));
 			await Bun.write(path.join(outside, "keep.txt"), "keep");
 			try {
 				await fs.symlink(outside, path.join(managedRoot, "linked"));

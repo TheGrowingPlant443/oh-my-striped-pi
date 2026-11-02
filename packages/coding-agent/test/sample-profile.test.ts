@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolContext, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
+import type { AgentToolContext, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EditTool } from "@oh-my-striped-pi/pi-coding-agent/edit";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { wrapToolWithMetaNotice } from "@oh-my-striped-pi/pi-coding-agent/tools/output-meta";
 import {
 	demangleSymbol,
 	parseSampleProfile,
 	renderSampleProfile,
-} from "@oh-my-pi/pi-coding-agent/utils/sample-profile";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/utils/sample-profile";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const BOX_MEASURE = "_RNvNtCsfMEenOU8j5j_11slab_kernel6layout11box_measure";
 

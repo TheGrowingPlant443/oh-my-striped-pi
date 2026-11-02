@@ -19,22 +19,26 @@
  */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { effectiveReserveTokens, prepareCompaction, resolveThresholdTokens } from "@oh-my-pi/pi-agent-core/compaction";
-import { base64ImageSize } from "@oh-my-pi/pi-agent-core/image-tokens";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { toModelSpec } from "@oh-my-pi/pi-catalog/provider-models/bundled-references";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { encodeRpcFrame, MAX_RPC_FRAME_BYTES } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-frame";
-import { computeNonMessageTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { cfgSnapcompactShape } from "@oh-my-pi/pi-coding-agent/session/context-settings";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import {
+	effectiveReserveTokens,
+	prepareCompaction,
+	resolveThresholdTokens,
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { base64ImageSize } from "@oh-my-striped-pi/pi-agent-core/image-tokens";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { toModelSpec } from "@oh-my-striped-pi/pi-catalog/provider-models/bundled-references";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { encodeRpcFrame, MAX_RPC_FRAME_BYTES } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-frame";
+import { computeNonMessageTokens } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { cfgSnapcompactShape } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 
 function companyModel(provider: string, id: string) {
 	const spec: ModelSpec = {

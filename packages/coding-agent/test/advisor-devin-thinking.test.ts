@@ -1,12 +1,12 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { Effort, type Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { Effort, type Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 

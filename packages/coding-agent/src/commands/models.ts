@@ -2,9 +2,9 @@
  * List, search, and refresh available models.
  */
 
-import { MODEL_KINDS, type ModelKind } from "@oh-my-pi/pi-catalog/types";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { MODEL_KINDS, type ModelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { APP_NAME } from "@oh-my-striped-pi/pi-utils";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
 import { modelsHelp as commandHelp } from "../cli/command-help";
 import { resolveModelsArgs, runModelsCommand } from "../cli/models-cli";
 
@@ -49,7 +49,7 @@ export default class Models extends Command {
 		`# List models of every catalog kind\n  ${APP_NAME} models --kind all`,
 		`# List Copilot's models\n  ${APP_NAME} models github-copilot`,
 		`# Find models by substring\n  ${APP_NAME} models find gpt`,
-		`# Force a fresh catalog fetch (replaces rm -rf ~/.omp/models.db)\n  ${APP_NAME} models refresh`,
+		`# Force a fresh catalog fetch (replaces rm -rf ~/.omsp/models.db)\n  ${APP_NAME} models refresh`,
 		`# Machine-readable output\n  ${APP_NAME} models --json`,
 	];
 

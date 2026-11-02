@@ -9,13 +9,13 @@ import type {
 	HindsightApi,
 	MentalModelListResponse,
 	MentalModelSummary,
-} from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import type { HindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { renderMentalModelsBlock } from "@oh-my-pi/pi-coding-agent/hindsight/mental-models";
-import type { AgentSessionEventListener } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import { SessionMemory, type SessionMemoryHost } from "@oh-my-pi/pi-coding-agent/session/session-memory";
+} from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import type { HindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { renderMentalModelsBlock } from "@oh-my-striped-pi/pi-coding-agent/hindsight/mental-models";
+import type { AgentSessionEventListener } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import { SessionMemory, type SessionMemoryHost } from "@oh-my-striped-pi/pi-coding-agent/session/session-memory";
 
 function makeConfig(overrides: Partial<HindsightConfig> = {}): HindsightConfig {
 	return {
@@ -31,7 +31,7 @@ function makeConfig(overrides: Partial<HindsightConfig> = {}): HindsightConfig {
 		retainMode: "full-session",
 		retainEveryNTurns: 3,
 		retainOverlapTurns: 2,
-		retainContext: "omp",
+		retainContext: "omsp",
 		recallBudget: "mid",
 		recallMaxTokens: 1024,
 		recallTypes: [],

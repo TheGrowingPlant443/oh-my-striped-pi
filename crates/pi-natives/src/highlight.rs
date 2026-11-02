@@ -31,7 +31,7 @@ use crate::{
 pub type Color = InlineStr<48>;
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
-	syntect::dumps::from_uncompressed_data(include_bytes!(env!("OMP_SYNTAX_SET")))
+	syntect::dumps::from_uncompressed_data(include_bytes!(env!("OMSP_SYNTAX_SET")))
 		.expect("bundled syntax set should match the syntect build")
 });
 static SCOPE_MATCHERS: LazyLock<ScopeMatchers> = LazyLock::new(ScopeMatchers::new);

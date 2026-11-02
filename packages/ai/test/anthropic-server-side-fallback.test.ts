@@ -1,8 +1,8 @@
 /** Copilot tool replay ordering and recovery of historical fallback boundaries. */
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { convertAnthropicMessages, streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { AnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic-client";
-import type { MessageParam } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
+import { convertAnthropicMessages, streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { AnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
+import type { MessageParam } from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
 import type {
 	AssistantMessage,
 	Context,
@@ -10,8 +10,8 @@ import type {
 	Model,
 	ProviderSessionState,
 	ToolResultMessage,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const fableModel: Model<"anthropic-messages"> = buildModel({
 	id: "claude-fable-5",

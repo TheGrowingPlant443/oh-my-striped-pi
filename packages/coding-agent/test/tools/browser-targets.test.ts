@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { findFreeCdpPort, relayTargets } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { findFreeCdpPort, relayTargets } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
 import {
 	DISCARDED_TABS_PROTOCOL_VERSION,
 	type TabSnapshot,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/relay/protocol";
-import { type RelayServer, startRelayServer } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/server";
-import { releaseTab } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { isRecord } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/protocol";
+import { type RelayServer, startRelayServer } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/server";
+import { releaseTab } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import { type FakeAnswer, type FakeDaemon, startFakeDaemon } from "./tern-fake-daemon";
 
 const PANE = 3;
@@ -20,7 +20,7 @@ const BLOCKS = [
 	{ block: 7, url: "https://docs.example/c", title: "Docs C", owner: null, shown: true, driven: false },
 ];
 
-const ENV_KEYS = ["TERN_PANE_SOCKET", "TERN_PANE", "PI_BROWSER_TERN", "PI_BROWSER_RELAY"] as const;
+const ENV_KEYS = ["TERN_PANE_SOCKET", "TERN_PANE", "OMSP_BROWSER_TERN", "OMSP_BROWSER_RELAY"] as const;
 let savedEnv: Map<string, string | undefined>;
 
 let daemon: FakeDaemon | undefined;
@@ -75,7 +75,7 @@ async function startWindow(blocks: readonly Record<string, unknown>[]): Promise<
 	});
 	process.env.TERN_PANE_SOCKET = daemon.socketPath;
 	process.env.TERN_PANE = String(PANE);
-	delete process.env.PI_BROWSER_TERN;
+	delete process.env.OMSP_BROWSER_TERN;
 	return daemon;
 }
 
@@ -103,7 +103,7 @@ async function invoke(tool: ToolSession, parameters: Record<string, unknown>) {
 }
 
 describe("browser targets in Tern", () => {
-	it("lists the window's browser blocks and names the omp tab holding an adopted one", async () => {
+	it("lists the window's browser blocks and names the omsp tab holding an adopted one", async () => {
 		await startWindow(BLOCKS);
 		const tool = session();
 		opened.push("docs");
@@ -124,7 +124,7 @@ describe("browser targets in Tern", () => {
 		]);
 		expect(text).toStartWith("Tern browser blocks (adopt one with app.target set to its id):\n");
 		expect(text).toContain('- 5 "Docs A" https://docs.example/a (docked, not on screen)');
-		expect(text).toContain('- 7 "Docs C" https://docs.example/c (docked, on screen, driven by omp tab "docs")');
+		expect(text).toContain('- 7 "Docs C" https://docs.example/c (docked, on screen, driven by omsp tab "docs")');
 	});
 
 	it("omits shown and driven an older Tern does not report", async () => {

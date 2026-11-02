@@ -2,8 +2,8 @@
  * Display text for context entries. Each header has an ANSI-string form (`render`)
  * and a span form (`describe`); keep the twins visually identical.
  */
-import { sanitizeText } from "@oh-my-pi/pi-utils";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { CONTEXT_PRESENTATION } from "../chrome/context-presentation";
 import type { ContextCategoryId, ContextThinkingGroup, ContextViewEntry } from "../chrome/context-view-model";
 import { editorKey } from "../chrome/keybinding-hints";

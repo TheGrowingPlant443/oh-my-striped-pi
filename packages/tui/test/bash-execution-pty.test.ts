@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { BashExecutionComponent } from "@oh-my-pi/pi-tui/chat/bash-execution";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { getThemeByName, setThemeInstance } from "@oh-my-pi/pi-tui/theme";
-import type { TUI } from "@oh-my-pi/pi-tui";
+import { BashExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/bash-execution";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { getThemeByName, setThemeInstance } from "@oh-my-striped-pi/pi-tui/theme";
+import type { TUI } from "@oh-my-striped-pi/pi-tui";
 
 const ui = { requestRender: () => {}, requestComponentRender: () => {} } as unknown as TUI;
 

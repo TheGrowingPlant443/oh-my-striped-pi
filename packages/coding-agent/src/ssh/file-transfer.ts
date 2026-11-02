@@ -6,8 +6,8 @@
  * `ssh://` reads/writes round-trip exactly — leading/trailing whitespace, tabs,
  * and final newlines are preserved.
  */
-import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
-import { ConcatSink, ptree } from "@oh-my-pi/pi-utils";
+import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-striped-pi/pi-natives";
+import { ConcatSink, ptree } from "@oh-my-striped-pi/pi-utils";
 import { buildRemoteCommand, ensureConnection, ensureHostInfo, type SSHConnectionTarget } from "./connection-manager";
 import { quotePosixArgument } from "../utils/shell-quote";
 import { wrapInPosixShell } from "./utils";
@@ -152,7 +152,7 @@ export async function writeRemoteFile(
 		throw new Error("ssh://: destination is a directory path (trailing '/'); ssh:// write requires a file path");
 	}
 	const dest = quotePosixArgument(remotePath);
-	const tmp = quotePosixArgument(`${remotePath}.omp-tmp.${crypto.randomUUID()}`);
+	const tmp = quotePosixArgument(`${remotePath}.omsp-tmp.${crypto.randomUUID()}`);
 	// Stage stdin into the temp first (so the remote never blocks on an unread
 	// pipe and a dropped connection lands in the temp, never the destination).
 	// An EXIT trap removes the staged temp on every exit path (staging failure,

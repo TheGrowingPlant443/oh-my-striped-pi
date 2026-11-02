@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 function customModel(compat?: ModelSpec<"openai-completions">["compat"]): Model<"openai-completions"> {
 	return buildModel({

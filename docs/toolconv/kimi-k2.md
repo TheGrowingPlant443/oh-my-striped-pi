@@ -4,10 +4,10 @@ Native tool-calling convention of Moonshot AI's **Kimi K2** family (`moonshotai/
 
 This document was verified against the model card, the official `docs/tool_call_guidance.md` and `docs/deploy_guidance.md` (GitHub `MoonshotAI/Kimi-K2`), the raw `chat_template.jinja` and `tokenizer_config.json` from the HF repo (rendered locally for the byte-exact streams below), and the vLLM `kimi_k2` tool parser source.
 
-The upstream template/tokenizer reference below is distinct from OMP's
-prompt-driven implementation. OMP does not run that template or inject its
+The upstream template/tokenizer reference below is distinct from OMSP's
+prompt-driven implementation. OMSP does not run that template or inject its
 default system prompt; its current behavior is described in
-[omp / pi converter behavior](#omp--pi-converter-behavior).
+[omsp / pi converter behavior](#omsp--pi-converter-behavior).
 
 ## Special tokens
 
@@ -173,7 +173,7 @@ Moonshot's hosted API (`platform.moonshot.ai`) exposes both OpenAI- and Anthropi
 
 - **ID → name parsing differs between references.** The official
   `tool_call_guidance.md` uses `function_id.split('.')[1].split(':')[0]`,
-  while vLLM and omp take the last dot-separated segment before the colon.
+  while vLLM and omsp take the last dot-separated segment before the colon.
   The latter tolerates additional namespace segments, but neither convention
   can preserve a literal dot as part of the function name; tool names SHOULD
   follow the documented `functions.{name}:{idx}` shape without dots in
@@ -184,20 +184,20 @@ Moonshot's hosted API (`platform.moonshot.ai`) exposes both OpenAI- and Anthropi
 - **Index semantics.** `{idx}` is the per-turn call counter starting at `0`; it is not a global counter and resets each assistant turn. Do not assume IDs are unique across turns — disambiguate by turn when persisting history.
 - **Streaming marker splits.** Section and call markers can be split across token boundaries.
   vLLM holds back any trailing suffix that partially matches a marker and streams
-  argument fragments. omp's owned scanner also holds partial markers, but buffers a
+  argument fragments. omsp's owned scanner also holds partial markers, but buffers a
   call's arguments until `<|tool_call_end|>` and emits no `toolArgDelta` events.
 - **`finish_reason` varies by engine.** The official guide explicitly warns the terminal `finish_reason` for tool calls "may vary across different engines"; loop on `finish_reason == "tool_calls"` but be defensive.
 - **Engine fallback.** Kimi K2 reuses the DeepSeek-V3 architecture; `config.json` sets `model_type: "kimi_k2"` so engines apply the right parser. If you force `model_type: "deepseek_v3"` as a compatibility workaround, no native Kimi tool parser is available and you must parse the `<|tool_calls_section_*|>` markers manually.
 - **Parser availability.** vLLM ships both a Python (`KimiK2ToolParser`) and a newer Rust tool parser; SGLang implements its own `kimi_k2` parser. All key off the same five markers and the `functions.{name}:{idx}` ID convention documented here.
 - **Whitespace artifact.** When no `system` message is supplied, the template injects the default system prompt and a small `\n  ` (newline + two spaces) can appear before the first `<|im_user|>` marker. It is harmless (tokenizes around the markers), but supplying an explicit system message yields the clean streams shown above.
 
-## omp / pi converter behavior
+## omsp / pi converter behavior
 
 The repository's `kimi` dialect is an **owned in-band converter**. Select it
-with `tools.format: kimi` in agent configuration or `PI_DIALECT=kimi`.
+with `tools.format: kimi` in agent configuration or `OMSP_DIALECT=kimi`.
 The default `tools.format: auto` retains provider-native tools unless the
 model has `supportsTools: false`; a model id classified as Kimi then resolves
-to `kimi`. Selection is recomputed for each provider request. `PI_DIALECT`
+to `kimi`. Selection is recomputed for each provider request. `OMSP_DIALECT`
 is a fallback when configuration resolves to no owned dialect, so unset it
 when selecting `native` to ensure provider-native calling.
 
@@ -252,7 +252,7 @@ channel are dropped to avoid double dispatch.
 
 - `packages/ai/src/dialect/kimi.ts`, `coercion.ts`, and `kimi.md` — owned scanner, rendering, and injected guide.
 - `packages/ai/src/dialect/catalog.ts`, `history.ts`, and `owned-stream.ts` — prompt/history conversion, projection, and fabricated-result boundary.
-- `packages/agent/src/agent-loop.ts` — per-request selection, `PI_DIALECT`, and native-tool-choice suppression.
+- `packages/agent/src/agent-loop.ts` — per-request selection, `OMSP_DIALECT`, and native-tool-choice suppression.
 - `packages/catalog/src/identity/dialect.ts` and `packages/coding-agent/src/sdk.ts` — family affinity and `tools.format` resolution.
 
 - Model card (Tool Calling section, OpenAI-style example, deployment/API notes): https://huggingface.co/moonshotai/Kimi-K2-Instruct

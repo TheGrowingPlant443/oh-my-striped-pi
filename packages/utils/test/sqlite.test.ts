@@ -28,7 +28,7 @@ async function backupNames(dirPath: string, dbName = "store.db"): Promise<string
 }
 
 test("failed asynchronous initialization releases and rolls back its write transaction", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-init-");
+	await using dir = await TempDir.create("@omsp-sqlite-init-");
 	const dbPath = dir.join("store.db");
 	await expect(
 		openSqliteDatabase(dbPath, async db => {
@@ -52,7 +52,7 @@ test("failed asynchronous initialization releases and rolls back its write trans
 });
 
 test("corruption recovery is opt-in and the default preserves the active evidence", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-default-corrupt-");
+	await using dir = await TempDir.create("@omsp-sqlite-default-corrupt-");
 	const dbPath = dir.join("store.db");
 	const damaged = Buffer.from("not a sqlite database".repeat(64));
 	await fs.promises.writeFile(dbPath, damaged);
@@ -73,7 +73,7 @@ test("corruption recovery is opt-in and the default preserves the active evidenc
 });
 
 test("synchronous recovery preserves malformed schema pages and yields a persistent database", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-sync-corrupt-");
+	await using dir = await TempDir.create("@omsp-sqlite-sync-corrupt-");
 	const dbPath = dir.join("store.db");
 	const damaged = await corruptSchemaPages(dbPath);
 
@@ -106,7 +106,7 @@ test("synchronous recovery preserves malformed schema pages and yields a persist
 });
 
 test("recovery preserves sidecars present at corruption detection under one private backup name", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-sidecars-");
+	await using dir = await TempDir.create("@omsp-sqlite-sidecars-");
 	const dbPath = dir.join("store.db");
 	const contents = new Map<string, Buffer<ArrayBuffer>>([
 		["", Buffer.from("not a database")],
@@ -145,7 +145,7 @@ test("recovery preserves sidecars present at corruption detection under one priv
 });
 
 test("concurrent failed openers adopt one replacement without discarding each other's writes", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-concurrent-");
+	await using dir = await TempDir.create("@omsp-sqlite-concurrent-");
 	const dbPath = dir.join("store.db");
 	const damaged = await corruptSchemaPages(dbPath);
 	const ready = Promise.withResolvers<void>();
@@ -178,7 +178,7 @@ test("concurrent failed openers adopt one replacement without discarding each ot
 });
 
 test("a second corruption failure surfaces without rotating the first backup again", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-repeat-corrupt-");
+	await using dir = await TempDir.create("@omsp-sqlite-repeat-corrupt-");
 	const dbPath = dir.join("store.db");
 	const damaged = await corruptSchemaPages(dbPath);
 	await expect(
@@ -193,7 +193,7 @@ test("a second corruption failure surfaces without rotating the first backup aga
 });
 
 test("opt-in recovery never rotates a non-corruption SQLite failure", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-error-");
+	await using dir = await TempDir.create("@omsp-sqlite-error-");
 	const dbPath = dir.join("store.db");
 
 	let failure: unknown;
@@ -223,7 +223,7 @@ async function corruptFreelist(dbPath: string) {
 }
 
 test("recovery still fires when a multi-statement script hides the corruption behind a later error", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-hidden-corrupt-");
+	await using dir = await TempDir.create("@omsp-sqlite-hidden-corrupt-");
 	const dbPath = dir.join("store.db");
 	const damaged = await corruptFreelist(dbPath);
 
@@ -247,7 +247,7 @@ test("recovery still fires when a multi-statement script hides the corruption be
 });
 
 test("a non-corruption init failure on a store that fails quick_check is preserved as corruption", async () => {
-	await using dir = await TempDir.create("@omp-sqlite-init-fails-on-corrupt-");
+	await using dir = await TempDir.create("@omsp-sqlite-init-fails-on-corrupt-");
 	const dbPath = dir.join("store.db");
 	const damaged = await corruptFreelist(dbPath);
 	const initFailure = new Error("init failed");
@@ -300,7 +300,7 @@ test.each([
 	["middle", 3],
 	["second-to-last", -2],
 ])("salvage keeps every readable row on both sides of a damaged %s leaf", async (_label, position) => {
-	await using dir = await TempDir.create("@omp-sqlite-salvage-");
+	await using dir = await TempDir.create("@omsp-sqlite-salvage-");
 	const dbPath = dir.join("store.db");
 	const { pageSize, leaves } = seedLeaves(dbPath);
 	expect(leaves.length).toBeGreaterThan(5);

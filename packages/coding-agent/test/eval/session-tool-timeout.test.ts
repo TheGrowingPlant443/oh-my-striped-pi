@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { $which, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { $which, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { Settings } from "../../src/config/settings";
 import { disposeAllVmContexts } from "../../src/eval/js/context-manager";
 import { disposeAllKernelSessions } from "../../src/eval/py/executor";
@@ -93,8 +93,8 @@ async function warmEval(evalTool: EvalTool, language: "js" | "py"): Promise<void
 	await evalTool.execute("warmup", { language, code: "print('ready')", timeout: 0 });
 }
 
-// Real Python kernels only under PI_PYTHON_INTEGRATION=1, like the other real-kernel suites.
-const PYTHON_INTEGRATION = Bun.env.PI_PYTHON_INTEGRATION === "1";
+// Real Python kernels only under OMSP_PYTHON_INTEGRATION=1, like the other real-kernel suites.
+const PYTHON_INTEGRATION = Bun.env.OMSP_PYTHON_INTEGRATION === "1";
 
 describe("eval delegated session tools", () => {
 	for (const language of ["js", "py"] as const) {

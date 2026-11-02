@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { syncAllSessions } from "@oh-my-pi/omp-stats/aggregator";
+import { syncAllSessions } from "@oh-my-striped-pi/omsp-stats/aggregator";
 import {
 	closeDb,
 	getFileOffset,
@@ -10,10 +10,10 @@ import {
 	initDb,
 	insertMessageStats,
 	insertToolCalls,
-} from "@oh-my-pi/omp-stats/db";
-import { getOverallStats } from "@oh-my-pi/omp-stats/rollup";
-import { parseSessionFile } from "@oh-my-pi/omp-stats/parser";
-import { getSessionsDir, getStatsDbPath } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/omsp-stats/db";
+import { getOverallStats } from "@oh-my-striped-pi/omsp-stats/rollup";
+import { parseSessionFile } from "@oh-my-striped-pi/omsp-stats/parser";
+import { getSessionsDir, getStatsDbPath } from "@oh-my-striped-pi/pi-utils";
 import { installStatsTestIsolation } from "./helpers/temp-agent";
 
 installStatsTestIsolation("@pi-stats-malformed-");

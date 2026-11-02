@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { JsRuntime, type RuntimeHooks } from "@oh-my-pi/pi-coding-agent/eval/js/shared/runtime";
-import type { EvalDisplayOutput } from "@oh-my-pi/pi-coding-agent/eval/types";
+import { JsRuntime, type RuntimeHooks } from "@oh-my-striped-pi/pi-coding-agent/eval/js/shared/runtime";
+import type { EvalDisplayOutput } from "@oh-my-striped-pi/pi-coding-agent/eval/types";
 
 const PNG_BASE64 = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).toString("base64");
 

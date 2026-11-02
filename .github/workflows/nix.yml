@@ -1,8 +1,6 @@
-name: OMP Nix
+name: OMSP Nix
 
-# Nightly, on-demand, and release runs only. Releases push their `v*` tag
-# atomically with main (scripts/release.ts), so the tag push is the release
-# trigger; branch pushes and pull requests never run this workflow.
+# Nightly, on-demand, and tag builds only; this workflow does not publish.
 on:
   push:
     tags: ["v*"]
@@ -46,12 +44,12 @@ jobs:
         with:
           extra_nix_config: |
             accept-flake-config = true
-      - name: Build omp with thin LTO
+      - name: Build omsp with thin LTO
         run: |
           out=$(nix build --no-link --print-out-paths --print-build-logs --show-trace --impure \
-            --expr "(builtins.getFlake \"git+file://$GITHUB_WORKSPACE\").packages.x86_64-linux.omp.override { withFatLto = false; }")
-          echo "OMP_OUT=$out" >> "$GITHUB_ENV"
-      - name: Smoke-test omp
+            --expr "(builtins.getFlake \"git+file://$GITHUB_WORKSPACE\").packages.x86_64-linux.omsp.override { withFatLto = false; }")
+          echo "OMSP_OUT=$out" >> "$GITHUB_ENV"
+      - name: Smoke-test omsp
         run: |
-          "$OMP_OUT/bin/omp" --version
-          "$OMP_OUT/bin/omp" --smoke-test
+          "$OMSP_OUT/bin/omsp" --version
+          "$OMSP_OUT/bin/omsp" --smoke-test

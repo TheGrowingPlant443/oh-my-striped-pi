@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { buildAnthropicClientOptions } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { AnthropicMessagesClient } from "@oh-my-pi/pi-ai/providers/anthropic-client";
-import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { resolveOpenAIRequestSetup } from "@oh-my-pi/pi-ai/providers/openai-shared";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { buildAnthropicClientOptions } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { AnthropicMessagesClient } from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
+import { streamOpenAICompletions } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { resolveOpenAIRequestSetup } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
 
 const modelSpec = {
 	provider: "company",

@@ -1,10 +1,15 @@
-import type { AstGrepToolDetails } from "@oh-my-pi/pi-tui/tools/ast-grep";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import type { ToolExample } from "@oh-my-pi/pi-ai";
-import { type AstFindMatch, astGrep, type ShellFilesystem } from "@oh-my-pi/pi-natives";
+import type { AstGrepToolDetails } from "@oh-my-striped-pi/pi-tui/tools/ast-grep";
+import { type } from "@oh-my-striped-pi/omptype";
+import type {
+	AgentTool,
+	AgentToolContext,
+	AgentToolResult,
+	AgentToolUpdateCallback,
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { ToolExample } from "@oh-my-striped-pi/pi-ai";
+import { type AstFindMatch, astGrep, type ShellFilesystem } from "@oh-my-striped-pi/pi-natives";
 
-import { prompt, untilAborted } from "@oh-my-pi/pi-utils";
+import { prompt, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { getEditStore } from "../edit/store";
 
 import { sessionResolveContext } from "../internal-urls/context";
@@ -19,8 +24,8 @@ import type { ToolSession } from ".";
 import { resolveToolTier } from "./approval";
 import { materializeReadUrlToFile, parseReadUrlTarget } from "./fetch";
 import { createFileRecorder, formatResultPath, resultSnapshotPath } from "./file-recorder";
-import { type FileMatchSection, formatFileMatches } from "@oh-my-pi/pi-tui/tools/grouped-file-output";
-import { formatMatchLine } from "@oh-my-pi/pi-tui/tools/match-line-format";
+import { type FileMatchSection, formatFileMatches } from "@oh-my-striped-pi/pi-tui/tools/grouped-file-output";
+import { formatMatchLine } from "@oh-my-striped-pi/pi-tui/tools/match-line-format";
 
 import {
 	parseSearchPath,
@@ -30,10 +35,10 @@ import {
 	searchPathTier,
 } from "./path-utils";
 import { searchApprovalCacheTargets } from "./search-approval-targets";
-import { toPathList } from "@oh-my-pi/pi-tui/render/render-utils";
+import { toPathList } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { isRawSelector } from "./read-selector";
-import { capParseErrors, formatCodeFrameLine, formatParseErrors } from "@oh-my-pi/pi-tui/render/render-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { capParseErrors, formatCodeFrameLine, formatParseErrors } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 
 import { cfgTaskDisabledAgents } from "../task/settings";

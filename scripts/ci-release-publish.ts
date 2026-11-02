@@ -2,7 +2,7 @@
 /**
  * Publish workspace packages.
  *
- * The default mode publishes public JS packages and the `@oh-my-pi/pi-natives`
+ * The default mode publishes public JS packages and the `@oh-my-striped-pi/pi-natives`
  * core package. Generated native leaf packages are published separately with
  * `--native-leaf <tag>` from the release_binary matrix after that matrix entry
  * downloads the matching `.node` artifacts.
@@ -45,6 +45,12 @@ import * as path from "node:path";
 import { $ } from "bun";
 import { generateNpmPackages, LEAF_TARGETS } from "../packages/natives/scripts/gen-npm-packages.ts";
 import { fixEmitExtensions } from "./fix-emit-extensions.ts";
+
+if (import.meta.main) {
+	throw new Error(
+		"Public npm publishing is disabled for oh-my-striped-pi. Build from the source checkout or with Nix.",
+	);
+}
 
 export interface PublishPackage {
 	dir: string;
@@ -182,7 +188,7 @@ export const packages: PublishPackage[] = [
 	{
 		dir: "packages/coding-agent",
 		kind: "typescript",
-		publishBin: { omp: "dist/cli.js" },
+		publishBin: { omsp: "dist/cli.js" },
 		packLock: STATS_CLIENT_LOCK,
 	},
 ];
@@ -305,7 +311,7 @@ export async function applyPublishBin(pkgRelDir: string, write: boolean): Promis
 function buildNativeOptionalDependencies(version: string): JsonObject {
 	const optionalDependencies: JsonObject = {};
 	for (const target of LEAF_TARGETS) {
-		optionalDependencies[`@oh-my-pi/pi-natives-${target.tag}`] = version;
+		optionalDependencies[`@oh-my-striped-pi/pi-natives-${target.tag}`] = version;
 	}
 	return optionalDependencies;
 }
@@ -435,7 +441,7 @@ function publishTargetJob(target: PublishTarget, packLocks: KeyedMutex): Publish
 				return;
 			}
 			log(`Packing ${name}…`);
-			packDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-pack-"));
+			packDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-pack-"));
 			const destination = packDir;
 			// The tarball lands in a private temp dir, so the lock only needs to cover packing.
 			const result = await packLocks(target.packLock, () =>

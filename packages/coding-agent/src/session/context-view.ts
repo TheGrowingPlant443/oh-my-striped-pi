@@ -1,6 +1,6 @@
-import type { AgentMessage, Tokenizer } from "@oh-my-pi/pi-agent-core";
-import type { AnthropicServerToolContent, AssistantMessage, ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import { isSurvivingAssistant } from "@oh-my-pi/pi-ai/providers/transform-messages";
+import type { AgentMessage, Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
+import type { AnthropicServerToolContent, AssistantMessage, ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import { isSurvivingAssistant } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
 import {
 	CONTEXT_CATEGORIES,
 	type ContextCategoryId,
@@ -8,9 +8,9 @@ import {
 	type ContextViewCategory,
 	type ContextViewData,
 	type ContextViewEntry,
-} from "@oh-my-pi/pi-tui/chrome/context-view-model";
-import { type ContextBreakdown, toolSchemaFragments } from "@oh-my-pi/pi-tui/status-line/context-usage";
-import { stringifyJson } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui/chrome/context-view-model";
+import { type ContextBreakdown, toolSchemaFragments } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
+import { stringifyJson } from "@oh-my-striped-pi/pi-utils";
 import type { AgentSession } from "./agent-session";
 import { computeSessionContextBreakdown } from "./context-usage-runtime";
 import { type ContextViewMessage, convertMessagesForContextView } from "./messages";

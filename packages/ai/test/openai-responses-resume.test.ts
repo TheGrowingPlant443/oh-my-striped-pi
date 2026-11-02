@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import {
 	pollOpenAIResponsesResultForCompletion,
 	streamOpenAIResponses,
-} from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { configureProviderStoreResponses } from "@oh-my-pi/pi-ai/providers/openai-responses-state";
-import type { AssistantMessageEvent, Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { configureProviderStoreResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses-state";
+import type { AssistantMessageEvent, Context, FetchImpl, Model } from "@oh-my-striped-pi/pi-ai/types";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 const SOCKET_CLOSE =
 	"The socket connection was closed unexpectedly. For more information, pass `verbose: true` in the second argument to fetch()";
@@ -154,16 +154,16 @@ const context: Context = { messages: [{ role: "user", content: "hi", timestamp: 
 // Poll sleeps and transient-retry backoff go through the injectable wait seam.
 const noWait = async (): Promise<void> => {};
 
-/** Run `fn` with PI_MUSE_STORE_RESPONSES set to `value` (unset when undefined), then restore it. */
+/** Run `fn` with OMSP_MUSE_STORE_RESPONSES set to `value` (unset when undefined), then restore it. */
 async function withStoreEnv(value: string | undefined, fn: () => Promise<void>): Promise<void> {
-	const previous = process.env.PI_MUSE_STORE_RESPONSES;
-	if (value === undefined) delete process.env.PI_MUSE_STORE_RESPONSES;
-	else process.env.PI_MUSE_STORE_RESPONSES = value;
+	const previous = process.env.OMSP_MUSE_STORE_RESPONSES;
+	if (value === undefined) delete process.env.OMSP_MUSE_STORE_RESPONSES;
+	else process.env.OMSP_MUSE_STORE_RESPONSES = value;
 	try {
 		await fn();
 	} finally {
-		if (previous === undefined) delete process.env.PI_MUSE_STORE_RESPONSES;
-		else process.env.PI_MUSE_STORE_RESPONSES = previous;
+		if (previous === undefined) delete process.env.OMSP_MUSE_STORE_RESPONSES;
+		else process.env.OMSP_MUSE_STORE_RESPONSES = previous;
 	}
 }
 
@@ -333,9 +333,9 @@ describe("openai-responses socket-drop resume", () => {
 	it.each([
 		["stays off by default", undefined, undefined, undefined, false],
 		["follows the host default when the request leaves it unset", undefined, true, undefined, true],
-		["lets PI_MUSE_STORE_RESPONSES=0 override the host default", "0", true, undefined, false],
-		["follows PI_MUSE_STORE_RESPONSES=1 when the option is unset", "1", undefined, undefined, true],
-		["lets the option override PI_MUSE_STORE_RESPONSES", "1", undefined, false, false],
+		["lets OMSP_MUSE_STORE_RESPONSES=0 override the host default", "0", true, undefined, false],
+		["follows OMSP_MUSE_STORE_RESPONSES=1 when the option is unset", "1", undefined, undefined, true],
+		["lets the option override OMSP_MUSE_STORE_RESPONSES", "1", undefined, false, false],
 	] as const)("storage %s", async (_label, env, hostDefault, storeResponses, stored) => {
 		// Privacy: storage is opt-in. Off sends `store: false` and skips the resume
 		// poll, so the drop fails fast with no GETs; on adopts the stored result.
@@ -367,8 +367,8 @@ describe("openai-responses socket-drop resume", () => {
 		// request, even when the caller explicitly asks for stateful turns. A storing
 		// host with strict tool schemas (custom providers can set `store-responses`)
 		// exercises the fallback; the shipped muse-code row disables strict mode.
-		const previous = process.env.PI_MUSE_STORE_RESPONSES;
-		delete process.env.PI_MUSE_STORE_RESPONSES;
+		const previous = process.env.OMSP_MUSE_STORE_RESPONSES;
+		delete process.env.OMSP_MUSE_STORE_RESPONSES;
 		try {
 			const postBodies: Array<Record<string, unknown>> = [];
 			let rejectStrict = true;
@@ -453,8 +453,8 @@ describe("openai-responses socket-drop resume", () => {
 				expect(body.previous_response_id).toBeUndefined();
 			}
 		} finally {
-			if (previous === undefined) delete process.env.PI_MUSE_STORE_RESPONSES;
-			else process.env.PI_MUSE_STORE_RESPONSES = previous;
+			if (previous === undefined) delete process.env.OMSP_MUSE_STORE_RESPONSES;
+			else process.env.OMSP_MUSE_STORE_RESPONSES = previous;
 		}
 	});
 });

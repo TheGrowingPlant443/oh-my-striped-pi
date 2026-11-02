@@ -7,7 +7,7 @@
 - Moved `PINNED_HUD_TOGGLE_ID` to the coding agent's task output manager so reserving subagent IDs no longer loads the interactive editor.
 - Removed retired provider reset indicators, QA/Codex Live controls and public SaaS sign-in pages; self-hosted provider, private collaboration and local recording interfaces remain.
 - Removed `ToolExecutionHandle.setToolActivityVisible`; tool-activity visibility is now controlled by transcript components, while reply blocks remain visible by default.
-- Removed the `@oh-my-pi/pi-tui/theme/defaults` export. Bundled palettes are now available through `getBuiltinThemes()` from `theme/defaults.json`.
+- Removed the `@oh-my-striped-pi/pi-tui/theme/defaults` export. Bundled palettes are now available through `getBuiltinThemes()` from `theme/defaults.json`.
 
 ### Fixed
 

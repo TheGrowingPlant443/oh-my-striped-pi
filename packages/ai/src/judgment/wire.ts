@@ -4,7 +4,7 @@
  * judgment module; `native.ts` maps every judgment API to its dialect.
  */
 import type { ImageContent, Usage } from "../types";
-import type { JudgmentImageInput } from "@oh-my-pi/pi-catalog/compat/judgment-images";
+import type { JudgmentImageInput } from "@oh-my-striped-pi/pi-catalog/compat/judgment-images";
 import type { JudgmentRequest } from "./types";
 
 /** Where one attempt posts and which bearer token it sends. */

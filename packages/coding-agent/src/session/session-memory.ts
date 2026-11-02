@@ -1,7 +1,7 @@
 /** Session memory backend lifecycle and transcript resets. */
 
-import type { Agent, AgentTool } from "@oh-my-pi/pi-agent-core";
-import { logger } from "@oh-my-pi/pi-utils";
+import type { Agent, AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { all as allSettings, combine, type Derived } from "../config/registry";
 import type { Settings } from "../config/settings";

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { complete } from "@oh-my-pi/pi-ai/stream";
-import type { Api, Context, Model, OptionsForApi, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { type } from "@oh-my-striped-pi/omptype";
+import { complete } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Api, Context, Model, OptionsForApi, ToolResultMessage } from "@oh-my-striped-pi/pi-ai/types";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import { resolveApiKey } from "./oauth";
 
 // Empty object schema for the test tools.

@@ -1,6 +1,6 @@
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import type { Api, FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
-import { type } from "@oh-my-pi/omptype";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
+import type { Api, FetchImpl, Model, Usage } from "@oh-my-striped-pi/pi-catalog/types";
+import { type } from "@oh-my-striped-pi/omptype";
 import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import type { EmbeddingRequest, EmbeddingResult } from "./types";

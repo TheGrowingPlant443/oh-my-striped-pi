@@ -10,8 +10,8 @@ import {
 	setTerminalSessionSource,
 	setTerminalTitleSpinnerStyle,
 	setTerminalTitleState,
-} from "@oh-my-pi/pi-coding-agent/utils/title-generator";
-import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/utils/title-generator";
+import { setTerminalHeadless } from "@oh-my-striped-pi/pi-utils";
 import { mockWindowsConsoleTitle, type WindowsConsoleTitleMock } from "./terminal-title-test-utils";
 
 const LABEL = "my-project";
@@ -361,7 +361,7 @@ describe("disposeTerminalTitleState", () => {
 
 	it("clears the title before popping the saved one on shutdown", () => {
 		// CONTRACT: a terminal without a title stack ignores the pop, so the clear
-		// is all that takes omp's title off the tab. A terminal with a stack must
+		// is all that takes omsp's title off the tab. A terminal with a stack must
 		// see the pop last, or the clear would wipe the title it restored.
 		disposeTerminalTitleState();
 		popTerminalTitle();
@@ -395,7 +395,7 @@ describe("disposeTerminalTitleState", () => {
 	});
 });
 
-// Tern names omp's directory in its composer bar from the OSC 7 omp writes, as
+// Tern names omsp's directory in its composer bar from the OSC 7 omsp writes, as
 // it does for a shell's prompt; other terminals must not hear it.
 describe("reporting the session to Tern", () => {
 	const OSC7 = /\x1b\]7;([^\x07]*)\x07/g;

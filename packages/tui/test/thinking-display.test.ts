@@ -3,7 +3,7 @@ import {
 	canonicalizeMessage,
 	formatThinkingForDisplay,
 	resetThinkingDisplayCacheForTests,
-} from "@oh-my-pi/pi-tui/chat/thinking-display";
+} from "@oh-my-striped-pi/pi-tui/chat/thinking-display";
 
 describe("canonicalizeMessage", () => {
 	it("returns empty string for undefined, empty, or whitespace-only", () => {

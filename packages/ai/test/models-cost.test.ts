@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { Usage } from "@oh-my-pi/pi-ai/types";
-import { calculateCost, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import type { Usage } from "@oh-my-striped-pi/pi-ai/types";
+import { calculateCost, getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 const cacheModel = {
 	...getBundledModel("github-copilot", "claude-opus-5"),

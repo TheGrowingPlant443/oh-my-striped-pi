@@ -1,4 +1,4 @@
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import { getSecurityContractSchemas } from "./schemas";
 import type { SecurityFinding, SecurityScan, SecurityScanBundle, SecurityScanPlan } from "./types";
 

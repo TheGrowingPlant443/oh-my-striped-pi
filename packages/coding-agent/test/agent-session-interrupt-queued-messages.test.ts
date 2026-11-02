@@ -7,22 +7,22 @@
  * to the model.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import {
 	createMockModel,
 	type MockModel,
 	type MockResponse,
 	type MockResponseSource,
-} from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm, USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm, USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 interface ParkedHarness {
 	session: AgentSession;

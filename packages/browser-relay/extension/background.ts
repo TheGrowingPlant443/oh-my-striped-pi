@@ -1,5 +1,5 @@
 /**
- * OMP Browser Relay — MV3 service worker.
+ * OMSP Browser Relay — MV3 service worker.
  *
  * Dumb pipe by design: all CDP orchestration lives in the relay server. This
  * worker (1) keeps a websocket to the relay, (2) executes its RPCs against
@@ -17,7 +17,7 @@ import {
 } from "../../coding-agent/src/tools/browser/relay/protocol";
 import { ownedDebuggerTabs } from "./debugger-ownership";
 
-const DEFAULT_PORT = 9224;
+const DEFAULT_PORT = 9225;
 const PING_INTERVAL_MS = 20_000;
 const RECONNECT_MIN_MS = 1_000;
 const RECONNECT_MAX_MS = 10_000;
@@ -25,11 +25,11 @@ const REMOVE_TAB_ATTEMPTS = 3;
 const REMOVE_TAB_RETRY_MS = 500;
 
 /**
- * The omp version that installed this script, declared by the line the installer puts above it
+ * The omsp version that installed this script, declared by the line the installer puts above it
  * (`stampRelayExtensionScript`); undeclared in an unstamped build. Read from the script, not the manifest:
  * after the files change, a Chrome restart re-reads manifest.json but keeps running the old service worker.
  */
-declare const OMP_INSTALL_VERSION: string | undefined;
+declare const OMSP_INSTALL_VERSION: string | undefined;
 
 let ws: WebSocket | null = null;
 let reconnectDelay = RECONNECT_MIN_MS;
@@ -56,7 +56,7 @@ async function ensureInstanceId(): Promise<string> {
 /**
  * Identity of this browser run, in `chrome.storage.session`. Chrome clears it on restart, when it also reuses tab
  * ids, so the relay retires the previous run's targets instead of resolving an old target id to a new tab. An
- * extension reload clears it too: omp then loses its handles to the tabs it opened, which stay open.
+ * extension reload clears it too: omsp then loses its handles to the tabs it opened, which stay open.
  */
 let browserSession: Promise<string> | null = null;
 function ensureBrowserSession(): Promise<string> {
@@ -100,13 +100,13 @@ function snapshot(tab: ChromeTab): TabSnapshot | null {
 	};
 }
 
-/** Title of the omp tab group; mirrored to session storage so a restarted service worker can still dissolve it. */
+/** Title of the omsp tab group; mirrored to session storage so a restarted service worker can still dissolve it. */
 let ompGroupTitle: string | null = null;
 
 /**
  * Serialize group mutations. Chrome's query→group→set-title sequence is not
  * atomic: two concurrent runs both miss the not-yet-titled group and mint
- * duplicate "omp" groups in the same window.
+ * duplicate "omsp" groups in the same window.
  */
 let groupOps: Promise<unknown> = Promise.resolve();
 function enqueueGroupOp<T>(fn: () => Promise<T>): Promise<T> {
@@ -115,7 +115,7 @@ function enqueueGroupOp<T>(fn: () => Promise<T>): Promise<T> {
 	return result;
 }
 
-/** Move tabs into the per-window omp group, creating or reusing it by title. */
+/** Move tabs into the per-window omsp group, creating or reusing it by title. */
 async function groupTabs(tabIds: number[], title: string, color: string): Promise<{ grouped: Record<string, number> }> {
 	ompGroupTitle = title;
 	void chrome.storage.session.set({ ompGroupTitle: title });
@@ -154,7 +154,7 @@ async function groupTabs(tabIds: number[], title: string, color: string): Promis
 	return { grouped };
 }
 
-/** Dissolve every omp-titled group (relay disconnected or asked us to release tabs). */
+/** Dissolve every omsp-titled group (relay disconnected or asked us to release tabs). */
 async function restoreGroups(): Promise<void> {
 	if (!ompGroupTitle) {
 		// Service worker restarted since the last group op; recover the title.
@@ -219,7 +219,7 @@ async function buildHello(): Promise<ExtToRelayMessage> {
 		userAgent: navigator.userAgent,
 		browserVersion: versionMatch?.[0] ?? "Chrome/unknown",
 		discardedTabsProtocol: 1, // Keep in sync with the relay protocol version.
-		ompVersion: typeof OMP_INSTALL_VERSION === "string" ? OMP_INSTALL_VERSION : undefined,
+		omspVersion: typeof OMSP_INSTALL_VERSION === "string" ? OMSP_INSTALL_VERSION : undefined,
 		reloadProtocol: EXTENSION_RELOAD_PROTOCOL_VERSION,
 		tabs: snapshots,
 		attachedTabIds,
@@ -373,9 +373,9 @@ chrome.tabs.onRemoved.addListener(tabId => {
 
 // ---- lifecycle ----------------------------------------------------------------
 
-chrome.alarms.create("omp-relay-keepalive", { periodInMinutes: 0.5 });
+chrome.alarms.create("omsp-relay-keepalive", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(alarm => {
-	if (alarm.name === "omp-relay-keepalive") void connect();
+	if (alarm.name === "omsp-relay-keepalive") void connect();
 });
 
 chrome.storage.onChanged.addListener((_changes, areaName) => {

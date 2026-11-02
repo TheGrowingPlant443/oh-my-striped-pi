@@ -3,10 +3,10 @@
 DeepSeek-V3, V3-0324, R1, R1-0528, and V3.1 use a distinctive chat envelope built from
 **fullwidth-pipe** tokens such as `<｜begin▁of▁sentence｜>` and `<｜User｜>`. Their tool
 calls use dedicated markers (`<｜tool▁calls▁begin｜>` … `<｜tool▁calls▁end｜>`) around JSON
-arguments. This document centers on the **V3.1** convention emitted by OMP's `deepseek`
+arguments. This document centers on the **V3.1** convention emitted by OMSP's `deepseek`
 dialect, distinguishes the older **V3-0324 / R1-0528** encoding, and covers the newer
 XML-style [DSML envelope](#dsml-envelope-newer-deepseek-models) accepted by the scanner.
-The V3.1 reference chat template is not the same as OMP's history/transcript rendering.
+The V3.1 reference chat template is not the same as OMSP's history/transcript rendering.
 
 An inference server enables it with a chat template plus a tool-call parser:
 
@@ -269,7 +269,7 @@ deepseek_v31`):
   the parser to find. (Conversely, do not assume special-token filtering removes them.)
 - **No code fence / no `type` field in V3.1.** The R1/V3-0324 grammar
   (`function<｜tool▁sep｜>name` + ` ```json ` block) differs from V3.1's
-  `name<｜tool▁sep｜>raw_json`. OMP accepts both, but a parser limited to one grammar does not.
+  `name<｜tool▁sep｜>raw_json`. OMSP accepts both, but a parser limited to one grammar does not.
 - **Chaining has no delimiter in V3.1.** Calls abut directly:
   `…<｜tool▁call▁end｜><｜tool▁call▁begin｜>…`. Do not split on newlines/whitespace; split on
   the `<｜tool▁call▁begin｜>` / `<｜tool▁call▁end｜>` boundaries. (R1/V3-0324 put a `\n` before
@@ -363,13 +363,13 @@ reuse the same fullwidth pipe (`｜`, U+FF5C), but the body is an Anthropic-styl
 - An ASCII-pipe variant (`<|DSML|tool_calls>`, `<|DSML|invoke …>`, `<|DSML|parameter …>`) occurs
   on the wire alongside the fullwidth form.
 - OpenAI-compatible hosts can leak this envelope into visible `content` instead of returning
-  structured `tool_calls`. OMP's native healing is separate from selecting the owned
+  structured `tool_calls`. OMSP's native healing is separate from selecting the owned
   `deepseek` dialect; its compatibility policy determines whether DSML recovery is enabled.
 
-## omp / pi converter behavior
+## omsp / pi converter behavior
 
 The repository's `deepseek` dialect is an **owned in-band converter**, not a
-vLLM parser wrapper. Select it with `PI_DIALECT=deepseek` or the agent's
+vLLM parser wrapper. Select it with `OMSP_DIALECT=deepseek` or the agent's
 `dialect`/`getDialect` configuration. When tools are present, the agent appends
 the dialect guide and compact tool catalog to the system prompt, removes
 native provider tools from the request, re-encodes prior calls/results with

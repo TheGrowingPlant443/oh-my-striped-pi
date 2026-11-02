@@ -2,8 +2,8 @@
  * Explain managed application updates or update installed plugins.
  */
 
-import { Command, Flags } from "@oh-my-pi/pi-utils/cli";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import * as pluginCli from "../cli/plugin-cli";
 import { updateHelp as commandHelp } from "../cli/command-help";
 
@@ -14,7 +14,7 @@ export default class Update extends Command {
 		plugins: Flags.boolean({ char: "l", description: "Update installed plugins", default: false }),
 	};
 
-	static examples = ["omp update", "omp update --plugins", "omp update --plugins --check"];
+	static examples = ["omsp update", "omsp update --plugins", "omsp update --plugins --check"];
 
 	async run(): Promise<void> {
 		const { flags } = await this.parse(Update);
@@ -23,7 +23,7 @@ export default class Update extends Command {
 			await pluginCli.runPluginCommand({ action: "upgrade", args: [], flags: flags.check ? { dryRun: true } : {} });
 		} else {
 			console.log(
-				"Application updates are company-managed. Use your company's Git/Nix/managed release process to update OMP. To update plugins, run `omp update --plugins` (add --check to preview).",
+				"Application updates are company-managed. Use your company's Git/Nix/managed release process to update OMSP. To update plugins, run `omsp update --plugins` (add --check to preview).",
 			);
 		}
 	}

@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { getAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
-import type { Model } from "@oh-my-pi/pi-catalog/types";
-import type { SimpleStreamOptions } from "@oh-my-pi/pi-ai";
+import { ModelRegistry, type ProviderConfigInput } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { getAgentDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
+import type { Model } from "@oh-my-striped-pi/pi-catalog/types";
+import type { SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
 import { CacheWarmer, getPromptCacheTtlMs } from "../src/session/cache-warmer";
 
 const originalAgentDir = getAgentDir();
-const originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
 
 let tempDir: TempDir;
 let authStorage: AuthStorage;
@@ -26,8 +26,8 @@ describe("ModelRegistry default custom models config", () => {
 	afterEach(async () => {
 		authStorage.close();
 		setAgentDir(originalAgentDir);
-		if (originalAgentDirEnv === undefined) delete process.env.PI_CODING_AGENT_DIR;
-		else process.env.PI_CODING_AGENT_DIR = originalAgentDirEnv;
+		if (originalAgentDirEnv === undefined) delete process.env.OMSP_CODING_AGENT_DIR;
+		else process.env.OMSP_CODING_AGENT_DIR = originalAgentDirEnv;
 		await tempDir.remove().catch(() => {});
 	});
 

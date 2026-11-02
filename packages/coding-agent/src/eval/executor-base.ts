@@ -1,7 +1,7 @@
-import { logger } from "@oh-my-pi/pi-utils";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import { Settings } from "../config/settings";
-import { type OutputArtifactError, OutputSink } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import { statusEventKey } from "@oh-my-pi/pi-tui/tools/eval";
+import { type OutputArtifactError, OutputSink } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import { statusEventKey } from "@oh-my-striped-pi/pi-tui/tools/eval";
 import type { ToolSession } from "../tools";
 import {
 	resolveOutputMaxColumns,
@@ -310,12 +310,12 @@ export function createCancelledKernelResult(output: string): KernelExecutionResu
 // ---------------------------------------------------------------------------
 
 export const MANAGED_KERNEL_ENV_KEYS = [
-	"PI_SESSION_FILE",
-	"PI_ARTIFACTS_DIR",
-	"PI_TOOL_BRIDGE_URL",
-	"PI_TOOL_BRIDGE_TOKEN",
-	"PI_TOOL_BRIDGE_SESSION",
-	"PI_EVAL_LOCAL_ROOTS",
+	"OMSP_SESSION_FILE",
+	"OMSP_ARTIFACTS_DIR",
+	"OMSP_TOOL_BRIDGE_URL",
+	"OMSP_TOOL_BRIDGE_TOKEN",
+	"OMSP_TOOL_BRIDGE_SESSION",
+	"OMSP_EVAL_LOCAL_ROOTS",
 ] as const;
 
 interface ManagedKernelEnvOptions {
@@ -341,23 +341,23 @@ export function buildManagedKernelEnvPatch(
 	const localRoots = options.localRoots;
 	if (policy?.sparse) {
 		const patch: Record<string, string | undefined> = {};
-		if (options.sessionFile) patch.PI_SESSION_FILE = options.sessionFile;
-		if (options.artifactsDir) patch.PI_ARTIFACTS_DIR = options.artifactsDir;
+		if (options.sessionFile) patch.OMSP_SESSION_FILE = options.sessionFile;
+		if (options.artifactsDir) patch.OMSP_ARTIFACTS_DIR = options.artifactsDir;
 		if (options.bridge) {
-			patch.PI_TOOL_BRIDGE_URL = options.bridge.url;
-			patch.PI_TOOL_BRIDGE_TOKEN = options.bridge.token;
-			patch.PI_TOOL_BRIDGE_SESSION = options.bridgeSessionId ?? "";
+			patch.OMSP_TOOL_BRIDGE_URL = options.bridge.url;
+			patch.OMSP_TOOL_BRIDGE_TOKEN = options.bridge.token;
+			patch.OMSP_TOOL_BRIDGE_SESSION = options.bridgeSessionId ?? "";
 		}
-		if (localRoots) patch.PI_EVAL_LOCAL_ROOTS = JSON.stringify(localRoots);
+		if (localRoots) patch.OMSP_EVAL_LOCAL_ROOTS = JSON.stringify(localRoots);
 		return patch;
 	}
 	return {
-		PI_SESSION_FILE: options.sessionFile ?? null,
-		PI_ARTIFACTS_DIR: options.artifactsDir ?? null,
-		PI_TOOL_BRIDGE_URL: options.bridge?.url ?? null,
-		PI_TOOL_BRIDGE_TOKEN: options.bridge?.token ?? null,
-		PI_TOOL_BRIDGE_SESSION: options.bridge && options.bridgeSessionId ? options.bridgeSessionId : null,
-		PI_EVAL_LOCAL_ROOTS: localRoots && Object.keys(localRoots).length > 0 ? JSON.stringify(localRoots) : null,
+		OMSP_SESSION_FILE: options.sessionFile ?? null,
+		OMSP_ARTIFACTS_DIR: options.artifactsDir ?? null,
+		OMSP_TOOL_BRIDGE_URL: options.bridge?.url ?? null,
+		OMSP_TOOL_BRIDGE_TOKEN: options.bridge?.token ?? null,
+		OMSP_TOOL_BRIDGE_SESSION: options.bridge && options.bridgeSessionId ? options.bridgeSessionId : null,
+		OMSP_EVAL_LOCAL_ROOTS: localRoots && Object.keys(localRoots).length > 0 ? JSON.stringify(localRoots) : null,
 	};
 }
 

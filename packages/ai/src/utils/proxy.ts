@@ -1,6 +1,6 @@
 import * as net from "node:net";
 import * as tls from "node:tls";
-import * as logger from "@oh-my-pi/pi-utils/logger";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
 import { AbortError } from "../error/abort";
 import { StreamTimeoutError, ValidationError } from "../error/validation";
 import type { FetchImpl } from "../types";
@@ -127,8 +127,8 @@ export function __resetProxyCache(): void {
 }
 
 /**
- * Normalizes provider id (e.g. github-copilot -> PI_PROXY_GITHUB_COPILOT) and looks it up.
- * If not found, falls back to PI_PROXY. Results are memoized because env values are static
+ * Normalizes provider id (e.g. github-copilot -> OMSP_PROXY_GITHUB_COPILOT) and looks it up.
+ * If not found, falls back to OMSP_PROXY. Results are memoized because env values are static
  * for the lifetime of the process and this function is called for every outgoing request.
  */
 export function getProxyForProvider(provider: string): string | undefined {
@@ -137,15 +137,15 @@ export function getProxyForProvider(provider: string): string | undefined {
 	}
 
 	const normalized = provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
-	const envKey = `PI_PROXY_${normalized}`;
-	const value = Bun.env[envKey] || Bun.env.PI_PROXY;
+	const envKey = `OMSP_PROXY_${normalized}`;
+	const value = Bun.env[envKey] || Bun.env.OMSP_PROXY;
 	proxyCache.set(provider, value);
 	// Once per provider per process: a silently unproxied provider request is
 	// otherwise indistinguishable from a proxied one until the region block
 	// answers 403.
 	logger.debug("provider proxy resolved", {
 		provider,
-		source: Bun.env[envKey] ? envKey : value ? "PI_PROXY" : "none",
+		source: Bun.env[envKey] ? envKey : value ? "OMSP_PROXY" : "none",
 		proxy: value ? proxyLogTarget(value) : undefined,
 	});
 	return value;
@@ -227,30 +227,30 @@ export function __resetGlobalProxyFetch(): void {
 }
 
 /**
- * Routes the process-wide `globalThis.fetch` through `PI_PROXY`.
+ * Routes the process-wide `globalThis.fetch` through `OMSP_PROXY`.
  *
  * Bun's native fetch resolves `HTTPS_PROXY` / `HTTP_PROXY` / `ALL_PROXY` by
- * itself but knows nothing about `PI_PROXY`. Provider *streams* get their proxy
+ * itself but knows nothing about `OMSP_PROXY`. Provider *streams* get their proxy
  * from {@link wrapFetchForProxy}; every other provider-bound request — OAuth
  * token refresh and login, usage probes, model discovery — goes out through the
- * bare global `fetch` and would silently ignore `PI_PROXY`. That asymmetry is
+ * bare global `fetch` and would silently ignore `OMSP_PROXY`. That asymmetry is
  * fatal wherever a provider geo-blocks its token endpoint: the stream is
  * proxied, the refresh is not, and the credential dies with a 403.
  *
- * A per-request `proxy` (including `PI_PROXY_<PROVIDER>` injected by
+ * A per-request `proxy` (including `OMSP_PROXY_<PROVIDER>` injected by
  * {@link wrapFetchForProxy}) still wins, and loopback / private-range /
  * `NO_PROXY` targets bypass, so local model servers and MCP hosts are
- * untouched. Idempotent; a no-op when `PI_PROXY` is unset.
+ * untouched. Idempotent; a no-op when `OMSP_PROXY` is unset.
  */
 export function installGlobalProxyFetch(): void {
 	if (globalProxyFetchInstalled) return;
-	const proxyUrl = Bun.env.PI_PROXY?.trim();
+	const proxyUrl = Bun.env.OMSP_PROXY?.trim();
 	// One line naming every proxy-relevant variable this process can see: a
-	// missing PI_PROXY and a NO_PROXY rule that silences it are otherwise
+	// missing OMSP_PROXY and a NO_PROXY rule that silences it are otherwise
 	// indistinguishable from a working proxy that the peer rejected.
 	const env = {
-		PI_PROXY: proxyUrl ? proxyLogTarget(proxyUrl) : undefined,
-		PI_PROXY_ANTHROPIC: Bun.env.PI_PROXY_ANTHROPIC ? proxyLogTarget(Bun.env.PI_PROXY_ANTHROPIC) : undefined,
+		OMSP_PROXY: proxyUrl ? proxyLogTarget(proxyUrl) : undefined,
+		OMSP_PROXY_ANTHROPIC: Bun.env.OMSP_PROXY_ANTHROPIC ? proxyLogTarget(Bun.env.OMSP_PROXY_ANTHROPIC) : undefined,
 		HTTPS_PROXY: Bun.env.HTTPS_PROXY || Bun.env.https_proxy ? "set" : undefined,
 		ALL_PROXY: Bun.env.ALL_PROXY || Bun.env.all_proxy ? "set" : undefined,
 		NO_PROXY: Bun.env.NO_PROXY || Bun.env.no_proxy,
@@ -260,7 +260,7 @@ export function installGlobalProxyFetch(): void {
 		// per-process line. When some are set, record why none was installed.
 		if (Object.values(env).some(value => value !== undefined && value !== "")) {
 			logger.debug("global proxy fetch not installed", {
-				reason: "PI_PROXY unset",
+				reason: "OMSP_PROXY unset",
 				env,
 			});
 		}

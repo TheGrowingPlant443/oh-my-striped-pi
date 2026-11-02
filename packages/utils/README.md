@@ -1,14 +1,14 @@
-# @oh-my-pi/pi-utils
+# @oh-my-striped-pi/pi-utils
 
-Shared utilities for [omp](https://github.com/can1357/oh-my-pi) packages. Zero ceremony, Bun-first.
+Shared utilities for [omsp](https://github.com/TheGrowingPlant443/oh-my-striped-pi) packages. Zero ceremony, Bun-first.
 
 ## Notable modules
 
 | Module                                                                                                             | Purpose                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `logger`                                                                                                           | Centralized logger writing to `~/.omp/logs/` (`bun test`: temp dir), rotating, never stdout  |
+| `logger`                                                                                                           | Centralized logger writing to `~/.omsp/logs/` (`bun test`: temp dir), rotating, never stdout  |
 | `prompt`                                                                                                           | Handlebars-based prompt templating and formatting helpers                                    |
-| `dirs`                                                                                                             | Path helpers for omp config directories (`~/.omp`, XDG-aware on Linux)                       |
+| `dirs`                                                                                                             | Path helpers for omsp config directories (`~/.omsp`, XDG-aware on Linux)                       |
 | `stream`                                                                                                           | `readStream` / `readLines` helpers over `ReadableStream`                                     |
 | `ptree` / `procmgr`                                                                                                | Process trees, `ChildProcess` wrapper, process lifecycle management                          |
 | `postmortem`                                                                                                       | Cleanup callbacks on exit, signals, and fatal exceptions                                     |
@@ -21,17 +21,15 @@ Shared utilities for [omp](https://github.com/can1357/oh-my-pi) packages. Zero c
 | `peek-file`                                                                                                        | Read the first N bytes of a file with pooled buffers                                         |
 | `frontmatter`, `glob`, `mime`, `temp`, `format`, `color`, `snowflake`, `tab-spacing`, `path-tree`, `sanitize-text` | Smaller single-purpose helpers                                                               |
 
-Import from the root barrel or per-module subpaths (`@oh-my-pi/pi-utils/<module>`).
+Import from the root barrel or per-module subpaths (`@oh-my-striped-pi/pi-utils/<module>`).
 
-## Install
+## Workspace setup
 
-```sh
-bun add @oh-my-pi/pi-utils
-```
-
-Ships TypeScript source directly (no build step); requires Bun ≥ 1.4.4.
+This is a private source workspace, not a public npm package. Use it from an
+authenticated monorepo or company workspace with managed dependencies prepared.
+It runs TypeScript source directly (no build step); requires Bun ≥ 1.4.4.
 
 ## References
 
-- [Monorepo README](https://github.com/can1357/oh-my-pi#readme)
+- [Monorepo README](https://github.com/TheGrowingPlant443/oh-my-striped-pi#readme)
 - [CHANGELOG](./CHANGELOG.md)

@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Api, AuthStorage, Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resolveModelScope } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import type { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, AuthStorage, Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resolveModelScope } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	buildSessionOptions,
 	rebuildScopedModels,
@@ -13,11 +13,11 @@ import {
 	resolveScopedModels,
 	type ScopedModelSink,
 	toSessionScopedModels,
-} from "@oh-my-pi/pi-coding-agent/main";
-import { createSetupHost } from "@oh-my-pi/pi-coding-agent/modes/setup";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/main";
+import { createSetupHost } from "@oh-my-striped-pi/pi-coding-agent/modes/setup";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 function model(id: string): Model<Api> {

@@ -8,10 +8,10 @@ import packageJson from "../package.json" with { type: "json" };
 const ENV_KEYS = [
 	"HOME",
 	"USERPROFILE",
-	"PI_NATIVES_DIR",
+	"OMSP_NATIVES_DIR",
 	"XDG_DATA_HOME",
-	"PI_NATIVE_VARIANT",
-	"__PI_NATIVE_VARIANT_CACHE",
+	"OMSP_NATIVE_VARIANT",
+	"__OMSP_NATIVE_VARIANT_CACHE",
 ] as const;
 
 describe("native addon directory override", () => {
@@ -25,12 +25,12 @@ describe("native addon directory override", () => {
 			originalEnv[key] = process.env[key];
 			delete process.env[key];
 		}
-		tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-natives-dir-"));
+		tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-natives-dir-"));
 		home = path.join(tempRoot, "home");
 		await fs.mkdir(home);
 		process.env.HOME = home;
 		process.env.USERPROFILE = home;
-		process.env.PI_NATIVE_VARIANT = "baseline";
+		process.env.OMSP_NATIVE_VARIANT = "baseline";
 		vi.spyOn(os, "homedir").mockReturnValue(home);
 	});
 
@@ -47,8 +47,8 @@ describe("native addon directory override", () => {
 	it("places the versioned cache outside a fresh HOME and takes precedence over initialized XDG", async () => {
 		const shared = path.join(tempRoot, "shared");
 		const xdgData = path.join(tempRoot, "data");
-		await fs.mkdir(path.join(xdgData, "omp"), { recursive: true });
-		process.env.PI_NATIVES_DIR = ` ${shared} `;
+		await fs.mkdir(path.join(xdgData, "omsp"), { recursive: true });
+		process.env.OMSP_NATIVES_DIR = ` ${shared} `;
 
 		const ctx = initLoaderContext({ isCompiledBinary: true });
 		prepareNativeVersionDir(ctx.versionedDir);
@@ -58,14 +58,14 @@ describe("native addon directory override", () => {
 		expect(initLoaderContext({ isCompiledBinary: true }).versionedDir).toBe(ctx.versionedDir);
 		expect(await fs.readdir(shared)).toEqual([packageJson.version]);
 		expect(await fs.readdir(home)).toEqual([]);
-		expect(await fs.readdir(path.join(xdgData, "omp"))).toEqual([]);
+		expect(await fs.readdir(path.join(xdgData, "omsp"))).toEqual([]);
 	});
 
 	it("expands home-relative overrides before appending the package version", () => {
-		process.env.PI_NATIVES_DIR = "~";
+		process.env.OMSP_NATIVES_DIR = "~";
 		expect(initLoaderContext({ isCompiledBinary: true }).versionedDir).toBe(path.join(home, packageJson.version));
 
-		process.env.PI_NATIVES_DIR = " ~/unused/../shared ";
+		process.env.OMSP_NATIVES_DIR = " ~/unused/../shared ";
 		expect(initLoaderContext({ isCompiledBinary: true }).versionedDir).toBe(
 			path.join(home, "shared", packageJson.version),
 		);
@@ -77,12 +77,12 @@ describe("native addon directory override", () => {
 		["relative", "relative/natives"],
 	])("falls back to XDG when the override is %s", async (_label, override) => {
 		const xdgData = path.join(tempRoot, "data");
-		await fs.mkdir(path.join(xdgData, "omp"), { recursive: true });
+		await fs.mkdir(path.join(xdgData, "omsp"), { recursive: true });
 		process.env.XDG_DATA_HOME = xdgData;
-		process.env.PI_NATIVES_DIR = override;
+		process.env.OMSP_NATIVES_DIR = override;
 
 		expect(initLoaderContext({ isCompiledBinary: true }).versionedDir).toBe(
-			path.join(xdgData, "omp", "natives", packageJson.version),
+			path.join(xdgData, "omsp", "natives", packageJson.version),
 		);
 	});
 });

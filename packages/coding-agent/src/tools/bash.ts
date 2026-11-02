@@ -4,9 +4,9 @@ import {
 	formatWallTimeNotice,
 	formatExitCodeNotice,
 	WALL_TIME_NOTICE_MIN_MS,
-} from "@oh-my-pi/pi-tui/tools/bash";
+} from "@oh-my-striped-pi/pi-tui/tools/bash";
 import * as fs from "node:fs";
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import type {
 	AgentTool,
 	AgentToolContext,
@@ -14,11 +14,11 @@ import type {
 	AgentToolUpdateCallback,
 	ToolApprovalDecision,
 	ToolTier,
-} from "@oh-my-pi/pi-agent-core";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { PipeStreams } from "@oh-my-pi/pi-natives";
-import { isEnoent, logger, prompt } from "@oh-my-pi/pi-utils";
-import { isPosixShell } from "@oh-my-pi/pi-utils/procmgr";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { PipeStreams } from "@oh-my-striped-pi/pi-natives";
+import { isEnoent, logger, prompt } from "@oh-my-striped-pi/pi-utils";
+import { isPosixShell } from "@oh-my-striped-pi/pi-utils/procmgr";
 import { raceJobSettlement, resolveAutoBackgroundWaitMs } from "../async";
 import type { Settings } from "../config/settings";
 import { applyDirenvPreflight, type BashResult, executeBash } from "../exec/bash-executor";
@@ -32,7 +32,7 @@ import type {
 	ClientBridgeTerminalHandle,
 	ClientBridgeTerminalOutput,
 } from "../session/client-bridge";
-import { DEFAULT_MAX_BYTES, enforceInlineByteCap } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { DEFAULT_MAX_BYTES, enforceInlineByteCap } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import { resolveCliEntryCmd } from "../subprocess/worker-client";
 import { TerminalGraphicsDecoder } from "../utils/terminal-graphics";
 import type { ToolSession } from ".";
@@ -45,13 +45,13 @@ import { resolveEvalBackends } from "./eval-backends";
 import { invalidateGithubCacheForBashCommand, invalidateGithubCacheForBashResult } from "./gh-cache-invalidation";
 import { serviceLogs, startService, type ServiceReady } from "../launch/services";
 import { isFindEnabled } from "./jfind";
-import { formatArtifactErrorNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { formatOutputNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
+import { formatArtifactErrorNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { formatOutputNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
 import { resolveInlineByteCapBudget } from "./output-meta";
 import { resolveToCwd } from "./path-utils";
 import { extractLeadingCdTarget, extractLiteralAndChainSegments, tokenizeShellSegments } from "./shell-tokenize";
 import { ToolAbortError } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 import { clampTimeout, TOOL_TIMEOUTS } from "./tool-timeouts";
 
@@ -157,7 +157,7 @@ const BASH_PATTERN_APPROVAL_VALUES = new Set(["allow", "deny", "prompt"]);
  * preserves `bash` tool semantics (`$VAR`, `$(...)`, `source`, POSIX quoting,
  * `-l`) wherever a POSIX shell is available. The agent host's shell path is
  * used as a proxy for the client's, matching the near-universal ACP
- * deployment shape of an editor spawning omp as a co-hosted subprocess.
+ * deployment shape of an editor spawning omsp as a co-hosted subprocess.
  */
 export function wrapShellLineForClientTerminal(
 	line: string,
@@ -168,12 +168,12 @@ export function wrapShellLineForClientTerminal(
 }
 
 /**
- * Mirrors pi-shell's `env_flag` gate for `PI_DISABLE_UUTILS_BUILTINS`:
+ * Mirrors pi-shell's `env_flag` gate for `OMSP_DISABLE_UUTILS_BUILTINS`:
  * session shell env first, then process env; truthy = present and not "", "0",
  * or "false". Controls whether the prompt advertises the in-process builtins.
  */
 function shellBuiltinsDisabled(settings: Settings): boolean {
-	const raw = settings.getShellConfig().env?.PI_DISABLE_UUTILS_BUILTINS ?? Bun.env.PI_DISABLE_UUTILS_BUILTINS;
+	const raw = settings.getShellConfig().env?.OMSP_DISABLE_UUTILS_BUILTINS ?? Bun.env.OMSP_DISABLE_UUTILS_BUILTINS;
 	return !!raw && raw !== "0" && raw.toLowerCase() !== "false";
 }
 
@@ -664,13 +664,13 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 	 * Session identity for a command, read when its tool call starts, so
 	 * `/fork`, `/new`, and `/resume` take effect on the next call while a call
 	 * already under way keeps the session it began in. Always set both keys: an
-	 * empty value replaces a stale one inherited from a parent omp process,
+	 * empty value replaces a stale one inherited from a parent omsp process,
 	 * since an env overlay cannot unset.
 	 */
 	#sessionEnv(): Record<string, string> {
 		return {
-			PI_SESSION_ID: this.session.sessionManager?.getSessionId?.() ?? this.session.getSessionId?.() ?? "",
-			PI_SESSION_FILE: this.session.getSessionFile() ?? "",
+			OMSP_SESSION_ID: this.session.sessionManager?.getSessionId?.() ?? this.session.getSessionId?.() ?? "",
+			OMSP_SESSION_FILE: this.session.getSessionFile() ?? "",
 		};
 	}
 
@@ -1216,7 +1216,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 		}
 
 		// A timeout of 0 is an explicit long-running-command contract: the user
-		// must still cancel the call or job, but OMP does not impose a deadline.
+		// must still cancel the call or job, but OMSP does not impose a deadline.
 		const requestedTimeoutSec = rawTimeout ?? 300;
 		const timeoutDisabled = requestedTimeoutSec === 0;
 		const maxTimeout = cfgToolsMaxTimeout.get(this.session.settings);

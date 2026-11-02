@@ -1,11 +1,11 @@
 // A live tool card renders the model's intent, as a card rebuilt from the transcript does.
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Settings, resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/event-controller";
-import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import type { DescribeContext, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { TUI } from "@oh-my-pi/pi-tui/tui";
+import { Settings, resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EventController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/event-controller";
+import { ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import type { DescribeContext, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { TUI } from "@oh-my-striped-pi/pi-tui/tui";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 
 /** The native node a TSP terminal draws for the card. */

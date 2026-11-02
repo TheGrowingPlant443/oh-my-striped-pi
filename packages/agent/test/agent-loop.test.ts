@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent } from "@oh-my-pi/pi-agent-core";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	agentLoop,
 	agentLoopContinue,
 	agentLoopDetailed,
 	TERMINAL_TOOL_RESULT_ABORT_REASON,
 	TOOL_INTERRUPT_ABORT_REASON,
-} from "@oh-my-pi/pi-agent-core/agent-loop";
-import { SpeculativeOperationCoordinator } from "@oh-my-pi/pi-agent-core/speculative-execution";
+} from "@oh-my-striped-pi/pi-agent-core/agent-loop";
+import { SpeculativeOperationCoordinator } from "@oh-my-striped-pi/pi-agent-core/speculative-execution";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -18,19 +18,29 @@ import type {
 	AgentToolContext,
 	SpeculativePhysicalOutcome,
 	ToolCallContext,
-} from "@oh-my-pi/pi-agent-core/types";
-import { ASIDE_MESSAGE_COMMIT, ASIDE_MESSAGE_DISCARD, SPECULATIVE_STREAM_SESSION } from "@oh-my-pi/pi-agent-core/types";
-import type { AssistantMessage, AssistantMessageEvent, Context, Message, ToolResultMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { setStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import type { HarmonyDetection } from "@oh-my-pi/pi-ai/utils/harmony-leak";
-import * as harmonyLeak from "@oh-my-pi/pi-ai/utils/harmony-leak";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-agent-core/types";
+import {
+	ASIDE_MESSAGE_COMMIT,
+	ASIDE_MESSAGE_DISCARD,
+	SPECULATIVE_STREAM_SESSION,
+} from "@oh-my-striped-pi/pi-agent-core/types";
+import type {
+	AssistantMessage,
+	AssistantMessageEvent,
+	Context,
+	Message,
+	ToolResultMessage,
+} from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { transformMessages } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { setStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import type { HarmonyDetection } from "@oh-my-striped-pi/pi-ai/utils/harmony-leak";
+import * as harmonyLeak from "@oh-my-striped-pi/pi-ai/utils/harmony-leak";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import { createAssistantMessage, createHarmonyMitigationModel, createUserMessage } from "./helpers";
 
-declare module "@oh-my-pi/pi-agent-core/types" {
+declare module "@oh-my-striped-pi/pi-agent-core/types" {
 	interface CustomAgentMessages {
 		advisor: {
 			role: "custom";

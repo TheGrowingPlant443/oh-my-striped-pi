@@ -39,7 +39,7 @@ The session-scoped wire schema advertises only enabled runtimes ("py" and "js").
 
 ## Kernel lifecycle
 
-Each Python kernel is a single subprocess: `<resolved-python> -u <runner.py>`. The runner is bundled with the host binary (Bun text import), written to a per-user `omp-python-runner-<uid>` cache under the OS temp directory once per script hash, and reused by subsequent spawns.
+Each Python kernel is a single subprocess: `<resolved-python> -u <runner.py>`. The runner is bundled with the host binary (Bun text import), written to a per-user `omsp-python-runner-<uid>` cache under the OS temp directory once per script hash, and reused by subsequent spawns.
 
 Kernel startup sequence:
 
@@ -140,32 +140,32 @@ Cells support top-level `await`, `async for`, and `async with` on a persistent a
 Environment is filtered before launching the runner:
 
 - Allowlist includes core vars like `PATH`, `HOME`, locale vars, `VIRTUAL_ENV`, `PYTHONPATH`, etc.
-- Allow-prefixes: `LC_`, `XDG_`, `PI_`
+- Allow-prefixes: `LC_`, `XDG_`, `OMSP_`
 - Denylist strips common API keys (OpenAI/Anthropic/Gemini/etc.)
 
 Runtime selection order (skipped entirely when the `python.interpreter` setting names an explicit executable):
 
 1. Active/located venv (`VIRTUAL_ENV`, then `CONDA_PREFIX`, then `<cwd>/.venv`, `<cwd>/venv`)
-2. Managed venv at `~/.omp/python-env`
+2. Managed venv at `~/.omsp/python-env`
 3. `python` or `python3` on PATH
 
 Candidates are probed in order until one runs; a broken venv does not automatically shadow a working later candidate. The selected working runtime is cached for that cwd/interpreter key. An explicit interpreter is a path (with `~` expansion and relative paths resolved against session cwd), not a PATH-search command name.
 
-When a venv is selected, its bin/Scripts path is prepended to `PATH`. The managed venv path follows the configured OMP data root; `~/.omp/python-env` is the default.
+When a venv is selected, its bin/Scripts path is prepended to `PATH`. The managed venv path follows the configured OMSP data root; `~/.omsp/python-env` is the default.
 
 The runner additionally receives `PYTHONUNBUFFERED=1` and `PYTHONIOENCODING=utf-8` so streamed output reaches the host promptly.
 
-Session/bridge context is patched before each cell through `PI_SESSION_FILE`, `PI_ARTIFACTS_DIR`, `PI_TOOL_BRIDGE_URL`, `PI_TOOL_BRIDGE_TOKEN`, `PI_TOOL_BRIDGE_SESSION`, and `PI_EVAL_LOCAL_ROOTS`. Missing managed entries are removed from `os.environ`; unrelated environment mutations remain.
+Session/bridge context is patched before each cell through `OMSP_SESSION_FILE`, `OMSP_ARTIFACTS_DIR`, `OMSP_TOOL_BRIDGE_URL`, `OMSP_TOOL_BRIDGE_TOKEN`, `OMSP_TOOL_BRIDGE_SESSION`, and `OMSP_EVAL_LOCAL_ROOTS`. Missing managed entries are removed from `os.environ`; unrelated environment mutations remain.
 
 ## Tool availability and mode selection
 
-The backend settings `eval.py` / `eval.js` default to `true`. Optional boolean environment flags `PI_PY` and `PI_JS` override their corresponding setting independently. `eval.tools.enabled` also defaults to `true`; turning it off removes the `tools` spawn fields and kernel-defined-tool guidance.
+The backend settings `eval.py` / `eval.js` default to `true`. Optional boolean environment flags `OMSP_PY` and `OMSP_JS` override their corresponding setting independently. `eval.tools.enabled` also defaults to `true`; turning it off removes the `tools` spawn fields and kernel-defined-tool guidance.
 
 The tool's session-scoped schema lists only enabled runtimes. If Python preflight fails while another runtime is enabled, `eval` remains available for that runtime and a `py` call reports a Python-backend availability error with enabled alternatives.
 
 Python prelude helpers include `agent(prompt, *, agent=None, label=None, schema=None, schema_mode=None, isolated=None, apply=None, merge=None, tools=None)`, which registers a background subagent job and returns an `AgentHandle` (`.id`, `.handle` = `agent://<id>`, `.status`, `.done()`, `.wait(timeout=None)`, `.send()`, `.cancel()`, `.output()`, awaitable). `completion(...)` likewise returns a `CompletionHandle`. `wait(handles, timeout=None, raise_errors=True)` barriers over handles in input order. `workpool(...)` returns a `WorkPool` (`push`, `status`, `peek`, `close`); its name is the aggregate async-job id; results auto-deliver, and the zero-argument `wait` tool blocks only when nothing else remains to do. `tool.<name>(args)` is a coroutine (`await tool.read({...})`); `@tool` registers a kernel-local function as a tool for subagents (schema inferred from type hints) when `eval.tools.enabled` is on.
 
-The runner accepts a `{"type": "tool", "id", "op": "describe"|"call", ...}` request alongside cell requests. It is served on a dedicated daemon thread (POSIX; between cells on Windows) against the kernel's `__omp_tools__` registry, replies with a `reply` frame (`{ok, tools, missing}` or `{ok, value}`), and reports a raising tool as an `error` frame without touching the running cell. See [Eval tool](./tools/eval.md) for the caller-facing contract.
+The runner accepts a `{"type": "tool", "id", "op": "describe"|"call", ...}` request alongside cell requests. It is served on a dedicated daemon thread (POSIX; between cells on Windows) against the kernel's `__omsp_tools__` registry, replies with a `reply` frame (`{ok, tools, missing}` or `{ok, value}`), and reports a raising tool as an `error` frame without touching the running cell. See [Eval tool](./tools/eval.md) for the caller-facing contract.
 
 ## Execution flow and cancellation/timeout
 
@@ -244,15 +244,15 @@ Output is streamed through `OutputSink` in `packages/tui/src/tools/streaming-out
 
 ## Operational troubleshooting
 
-- **Python backend not available** — Check `eval.py`, `PI_PY`, and that `python`/`python3` is on PATH. If another backend is enabled, use its advertised language token.
-- **No working Python** — Install a modern Python 3 interpreter, configure `python.interpreter`, or place a compatible venv at the managed Python path (default `~/.omp/python-env`). `omp setup python --check` reports the resolved interpreter.
+- **Python backend not available** — Check `eval.py`, `OMSP_PY`, and that `python`/`python3` is on PATH. If another backend is enabled, use its advertised language token.
+- **No working Python** — Install a modern Python 3 interpreter, configure `python.interpreter`, or place a compatible venv at the managed Python path (default `~/.omsp/python-env`). `omsp setup python --check` reports the resolved interpreter.
 - **Execution hangs then times out** — Increase `timeout` for legitimate work or set it to `0` to disable the watchdog. For stuck native code, cancellation sends `SIGINT` first and then escalates; session mode recreates the kernel on the next request if it had to be killed.
 - **stdin/input prompts in Python code** — `input()` is not supported; pass data programmatically.
 - **Working directory errors** — Python starts each cell in the session cwd. Use `%cd` or `os.chdir()` within the cell when needed; the next call starts back in the host session cwd.
 
 ## Relevant environment variables
 
-- `PI_PY` / `PI_JS` — per-backend exposure overrides
-- `PI_PYTHON_SKIP_CHECK=1` — bypass Python preflight/warm checks
-- `PI_PYTHON_INTEGRATION=1` — enable gated integration tests that spawn a real Python
-- `PI_PYTHON_IPC_TRACE=1` — log NDJSON frames exchanged with the runner subprocess
+- `OMSP_PY` / `OMSP_JS` — per-backend exposure overrides
+- `OMSP_PYTHON_SKIP_CHECK=1` — bypass Python preflight/warm checks
+- `OMSP_PYTHON_INTEGRATION=1` — enable gated integration tests that spawn a real Python
+- `OMSP_PYTHON_IPC_TRACE=1` — log NDJSON frames exchanged with the runner subprocess

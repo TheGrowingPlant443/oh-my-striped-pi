@@ -370,7 +370,7 @@ export function createHarmonyAuditEvent(params: {
 		removedLen: params.removed.length,
 		removedSha8: sha8(params.removed),
 		removedPreview: redactedJunkPreview(params.removed),
-		removedBlob: Bun.env.OMP_HARMONY_DEBUG === "1" ? params.removed : undefined,
+		removedBlob: Bun.env.OMSP_HARMONY_DEBUG === "1" ? params.removed : undefined,
 	};
 }
 

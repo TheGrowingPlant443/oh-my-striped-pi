@@ -463,7 +463,7 @@ pub(super) fn after_cleanup<T>(result: CoreResult<T>, cleanup: CoreResult<()>) -
 /// How many presses of `event_type` the HID system has counted. Hardware
 /// mouse presses ([`control::POINTER_PRESS_TYPES`]) are how a user picks a
 /// window, while typing in their own window is not. Presses posted to the HID
-/// event tap advance these counters, omp's own included; events posted to a
+/// event tap advance these counters, omsp's own included; events posted to a
 /// pid do not.
 fn hid_counter(event_type: u32) -> u32 {
 	// SAFETY: HIDSystemState (1) and these public CGEventType values are
@@ -481,7 +481,7 @@ fn activation_activity() -> [u32; 5] {
 }
 
 /// `WindowServer`'s HID counters for the types the takeover monitor watches,
-/// next to how many of each the monitor has seen. Both count omp's own HID
+/// next to how many of each the monitor has seen. Both count omsp's own HID
 /// posts too.
 #[derive(Clone, Copy, Debug)]
 struct MonitorProgress {
@@ -530,10 +530,10 @@ fn monitor_settled(baseline: MonitorProgress) -> bool {
 /// Whether the user picked something since takeover began: a click or a
 /// shortcut the monitor classified as a choice. With Input Monitoring the
 /// monitor sees every key and press, and its count is complete once it has
-/// caught up with all `WindowServer` counted (`settled`), whichever of omp's
+/// caught up with all `WindowServer` counted (`settled`), whichever of omsp's
 /// own presses are still on their way; until then the user may have chosen.
 /// Without it the tap sees nothing, which leaves the HID press counters net
-/// of omp's own presses (`counters_show_press`); keys are then known only to
+/// of omsp's own presses (`counters_show_press`); keys are then known only to
 /// `WindowServer`, which refuses the hand-back for those after its timestamp.
 fn takeover_user_chose(
 	monitor_sees_input: bool,
@@ -548,10 +548,10 @@ fn takeover_user_chose(
 	}
 }
 
-/// Pointer presses omp posted to the HID event tap ([`note_hid_post`]).
+/// Pointer presses omsp posted to the HID event tap ([`note_hid_post`]).
 static OWN_POINTER_PRESSES: AtomicU32 = AtomicU32::new(0);
 
-/// Counts `event_type` as omp's own pointer press when it is one; called just
+/// Counts `event_type` as omsp's own pointer press when it is one; called just
 /// before the event is posted to the HID event tap, so a reader never sees
 /// the HID counter move ahead of this count.
 pub(super) fn note_hid_post(event_type: CGEventType) {
@@ -560,8 +560,8 @@ pub(super) fn note_hid_post(event_type: CGEventType) {
 	}
 }
 
-/// The HID pointer-press counters next to omp's own presses posted to the HID
-/// event tap, so a baseline taken before omp's own clicks still tells the
+/// The HID pointer-press counters next to omsp's own presses posted to the HID
+/// event tap, so a baseline taken before omsp's own clicks still tells the
 /// user's presses apart from them.
 #[derive(Clone, Copy, Debug)]
 struct PointerPresses {
@@ -571,13 +571,13 @@ struct PointerPresses {
 
 impl PointerPresses {
 	fn now() -> Self {
-		// Own first: a press of omp's posted between the two reads then looks
+		// Own first: a press of omsp's posted between the two reads then looks
 		// like the user's, which only stands the hand-back down.
 		let own = OWN_POINTER_PRESSES.load(Ordering::Acquire);
 		Self { hid: control::POINTER_PRESS_TYPES.map(hid_counter), own }
 	}
 
-	/// Whether the HID counters show more presses since `baseline` than omp
+	/// Whether the HID counters show more presses since `baseline` than omsp
 	/// posted: one of them, at least, is the user's.
 	fn user_pressed_since(self, baseline: Self) -> bool {
 		let hid =
@@ -3402,7 +3402,7 @@ mod tests {
 		let behind = MonitorProgress { counted: [5, 0, 0, 93, 31], seen: [3, 0, 0, 1, 8] };
 		assert!(!behind.caught_up_since(baseline));
 		// Takeover's own press and the user's click: the HID counters show one
-		// more press, the user's, counted ahead of omp's still pending press,
+		// more press, the user's, counted ahead of omsp's still pending press,
 		// and the monitor has not classified it yet.
 		let click = MonitorProgress { counted: [5, 0, 0, 92, 31], seen: [2, 0, 0, 1, 8] };
 		assert!(!click.caught_up_since(baseline));
@@ -3419,7 +3419,7 @@ mod tests {
 		assert!(takeover_user_chose(true, || false, || panic!(), || panic!()));
 		assert!(takeover_user_chose(true, || true, || true, || panic!()));
 		assert!(!takeover_user_chose(true, || true, || false, || panic!()));
-		// Without it the tap sees nothing; the HID counters net of omp's own
+		// Without it the tap sees nothing; the HID counters net of omsp's own
 		// presses are all there is.
 		assert!(!takeover_user_chose(false, || panic!(), || panic!(), || false));
 		assert!(takeover_user_chose(false, || panic!(), || panic!(), || true));

@@ -23,17 +23,17 @@ section() {
 }
 
 smoke_cli() {
-   local omp_bin="$1"
+   local omsp_bin="$1"
    local runtime_dir
    runtime_dir="$(mktemp -d "$WORK_DIR/compiled-runtime.XXXXXX")"
-   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omp_bin" --version
-   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omp_bin" --help >/dev/null
-   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omp_bin" stats --summary >/dev/null
+   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omsp_bin" --version
+   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omsp_bin" --help >/dev/null
+   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omsp_bin" stats --summary >/dev/null
    # Spawns bundled workers and serves the stats dashboard once. Regression
    # probe for #1011/#1027 worker loading and for npm/compiled distributions
    # missing the dashboard assets that `stats --summary` never touches.
-   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omp_bin" --smoke-test
-   bun "$ROOT_DIR/scripts/install-tests/settings-session.ts" "$omp_bin"
+   XDG_DATA_HOME="$runtime_dir/xdg" HOME="$runtime_dir/home" "$omsp_bin" --smoke-test
+   bun "$ROOT_DIR/scripts/install-tests/settings-session.ts" "$omsp_bin"
 }
 
 find_tarball() {
@@ -83,7 +83,7 @@ align_native_manifest() {
    mv "$WORK_DIR/natives-package.aligned.json" "$NATIVES_PACKAGE"
 }
 section "Binary install smoke"
-if [ "${OMP_INSTALL_TEST_SKIP_NATIVE_BUILD:-0}" != "1" ]; then
+if [ "${OMSP_INSTALL_TEST_SKIP_NATIVE_BUILD:-0}" != "1" ]; then
    bun --cwd=packages/natives run build
 fi
 align_native_manifest
@@ -91,8 +91,8 @@ bun --cwd=packages/coding-agent run build
 
 BINARY_DIR="$WORK_DIR/binary-bin"
 mkdir -p "$BINARY_DIR"
-cp packages/coding-agent/dist/omp "$BINARY_DIR/omp"
-smoke_cli "$BINARY_DIR/omp"
+cp packages/coding-agent/dist/omsp "$BINARY_DIR/omsp"
+smoke_cli "$BINARY_DIR/omsp"
 
 section "Source install smoke"
 SOURCE_BUN_HOME="$WORK_DIR/bun-source"
@@ -100,7 +100,7 @@ SOURCE_BUN_HOME="$WORK_DIR/bun-source"
    export BUN_INSTALL="$SOURCE_BUN_HOME"
    export PATH="$BUN_INSTALL/bin:$PATH"
    bun --cwd="$ROOT_DIR/packages/coding-agent" link
-   smoke_cli "$BUN_INSTALL/bin/omp"
+   smoke_cli "$BUN_INSTALL/bin/omsp"
 )
 
 section "Tarball install smoke"
@@ -144,7 +144,7 @@ for pkg in utils wire omptype catalog ai mnemopi snapcompact agent tui stats col
 done
 
 # 4. Pack the coding agent with its *published* manifest: release swaps
-#    `bin.omp` from `src/cli.ts` to the prepack bundle `dist/cli.js`. The repo
+#    `bin.omsp` from `src/cli.ts` to the prepack bundle `dist/cli.js`. The repo
 #    manifest keeps pointing at source so `bun link`/`install.sh --source`
 #    work without a build, so the swap must be reproduced here for the smoke
 #    to exercise the bundled worker-host entry the published package ships.
@@ -159,20 +159,20 @@ agent_rc=0
 cp "$agent_pkg_backup" "$ROOT_DIR/packages/coding-agent/package.json"
 [ "$agent_rc" -eq 0 ] || exit "$agent_rc"
 
-utils_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-utils-*.tgz)"
-wire_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-wire-*.tgz)"
-omptype_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-omptype-*.tgz)"
-natives_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-natives-[0-9]*.tgz)"
-natives_leaf_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-natives-"$host_tag"-*.tgz)"
-catalog_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-catalog-*.tgz)"
-ai_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-ai-*.tgz)"
-mnemopi_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-mnemopi-*.tgz)"
-snapcompact_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-snapcompact-*.tgz)"
-agent_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-agent-core-*.tgz)"
-tui_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-tui-*.tgz)"
-stats_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-omp-stats-*.tgz)"
-coding_agent_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-pi-coding-agent-*.tgz)"
-collab_web_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-pi-collab-web-*.tgz)"
+utils_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-utils-*.tgz)"
+wire_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-wire-*.tgz)"
+omptype_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-omptype-*.tgz)"
+natives_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-natives-[0-9]*.tgz)"
+natives_leaf_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-natives-"$host_tag"-*.tgz)"
+catalog_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-catalog-*.tgz)"
+ai_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-ai-*.tgz)"
+mnemopi_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-mnemopi-*.tgz)"
+snapcompact_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-snapcompact-*.tgz)"
+agent_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-agent-core-*.tgz)"
+tui_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-tui-*.tgz)"
+stats_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-omsp-stats-*.tgz)"
+coding_agent_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-pi-coding-agent-*.tgz)"
+collab_web_tgz="$(find_tarball "$TARBALL_DIR"/oh-my-striped-pi-collab-web-*.tgz)"
 
 TARBALL_APP_DIR="$WORK_DIR/tarball-install"
 mkdir -p "$TARBALL_APP_DIR"
@@ -185,20 +185,20 @@ mkdir -p "$TARBALL_APP_DIR"
    node -e "
 		const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
 		pkg.overrides = {
-			'@oh-my-pi/pi-utils': '$utils_tgz',
-			'@oh-my-pi/pi-wire': '$wire_tgz',
-			'@oh-my-pi/omptype': '$omptype_tgz',
-			'@oh-my-pi/pi-natives': '$natives_tgz',
-			'@oh-my-pi/pi-natives-$host_tag': '$natives_leaf_tgz',
-			'@oh-my-pi/pi-ai': '$ai_tgz',
-			'@oh-my-pi/pi-catalog': '$catalog_tgz',
-			'@oh-my-pi/pi-mnemopi': '$mnemopi_tgz',
-			'@oh-my-pi/snapcompact': '$snapcompact_tgz',
-			'@oh-my-pi/pi-agent-core': '$agent_tgz',
-			'@oh-my-pi/pi-tui': '$tui_tgz',
-			'@oh-my-pi/omp-stats': '$stats_tgz',
-			'@oh-my-pi/pi-coding-agent': '$coding_agent_tgz',
-			'@oh-my-pi/collab-web': '$collab_web_tgz'
+			'@oh-my-striped-pi/pi-utils': '$utils_tgz',
+			'@oh-my-striped-pi/pi-wire': '$wire_tgz',
+			'@oh-my-striped-pi/omptype': '$omptype_tgz',
+			'@oh-my-striped-pi/pi-natives': '$natives_tgz',
+			'@oh-my-striped-pi/pi-natives-$host_tag': '$natives_leaf_tgz',
+			'@oh-my-striped-pi/pi-ai': '$ai_tgz',
+			'@oh-my-striped-pi/pi-catalog': '$catalog_tgz',
+			'@oh-my-striped-pi/pi-mnemopi': '$mnemopi_tgz',
+			'@oh-my-striped-pi/snapcompact': '$snapcompact_tgz',
+			'@oh-my-striped-pi/pi-agent-core': '$agent_tgz',
+			'@oh-my-striped-pi/pi-tui': '$tui_tgz',
+			'@oh-my-striped-pi/omsp-stats': '$stats_tgz',
+			'@oh-my-striped-pi/pi-coding-agent': '$coding_agent_tgz',
+			'@oh-my-striped-pi/collab-web': '$collab_web_tgz'
 		};
 		require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
 	"
@@ -207,36 +207,36 @@ mkdir -p "$TARBALL_APP_DIR"
    # The platform leaf must arrive through the core's optionalDependencies +
    # override, not as a direct dependency — assert it landed before smoking so a
    # resolution regression is distinguishable from a runtime loader bug.
-   leaf_dir="node_modules/@oh-my-pi/pi-natives-$host_tag"
+   leaf_dir="node_modules/@oh-my-striped-pi/pi-natives-$host_tag"
    [ -d "$leaf_dir" ] || {
       echo "Platform leaf package not installed: $leaf_dir"
       exit 1
    }
-   wire_intent="$(bun -e 'import { INTENT_FIELD } from "@oh-my-pi/pi-wire"; process.stdout.write(INTENT_FIELD);')"
+   wire_intent="$(bun -e 'import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire"; process.stdout.write(INTENT_FIELD);')"
    [ "$wire_intent" = "i" ] || {
-      echo "Unexpected @oh-my-pi/pi-wire INTENT_FIELD: $wire_intent"
+      echo "Unexpected @oh-my-striped-pi/pi-wire INTENT_FIELD: $wire_intent"
       exit 1
    }
    omptype_probe="$(bun -e '
-      import { type } from "@oh-my-pi/omptype";
-      import { Type } from "@oh-my-pi/omptype/typebox";
-      const root = type({ name: "string", enabled: "boolean = false" }).assert({ name: "omp" });
+      import { type } from "@oh-my-striped-pi/omptype";
+      import { Type } from "@oh-my-striped-pi/omptype/typebox";
+      const root = type({ name: "string", enabled: "boolean = false" }).assert({ name: "omsp" });
       const typebox = Type.Object({ name: Type.String() }).assert({ name: "tb" });
       process.stdout.write(`${root.name}:${root.enabled}:${typebox.name}`);
    ')"
-   [ "$omptype_probe" = "omp:false:tb" ] || {
-      echo "Unexpected @oh-my-pi/omptype probe result: $omptype_probe"
+   [ "$omptype_probe" = "omsp:false:tb" ] || {
+      echo "Unexpected @oh-my-striped-pi/omptype probe result: $omptype_probe"
       exit 1
    }
-   [ -f "node_modules/@oh-my-pi/collab-web/src/export-standalone.ts" ] || {
+   [ -f "node_modules/@oh-my-striped-pi/collab-web/src/export-standalone.ts" ] || {
       echo "Export viewer package did not install src/export-standalone.ts"
       exit 1
    }
-   [ -s "node_modules/@oh-my-pi/pi-coding-agent/src/export/html/viewer.generated.js.txt" ] || {
+   [ -s "node_modules/@oh-my-striped-pi/pi-coding-agent/src/export/html/viewer.generated.js.txt" ] || {
       echo "Coding agent tarball did not install the embedded export viewer"
       exit 1
    }
-   smoke_cli ./node_modules/.bin/omp
+   smoke_cli ./node_modules/.bin/omsp
 )
 
 echo ""

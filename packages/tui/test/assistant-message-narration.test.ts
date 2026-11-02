@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 const REASONING = "Weighing whether the gradle run already finished.";
 const NARRATION = "The build is running; it should finish in about fifteen minutes.";

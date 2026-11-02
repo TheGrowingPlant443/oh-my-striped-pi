@@ -2,22 +2,22 @@ import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Tokenizer } from "@oh-my-pi/pi-agent-core";
-import type { UsageReport } from "@oh-my-pi/pi-ai";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins";
-import { MarketplaceManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
-import type { AgentSession, AsyncJobTree } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { SessionDumpArchive } from "@oh-my-pi/pi-coding-agent/session/session-dump-format";
-import type { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
-import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
+import type { UsageReport } from "@oh-my-striped-pi/pi-ai";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { PluginManager } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins";
+import { MarketplaceManager } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/marketplace";
+import type { AgentSession, AsyncJobTree } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { SessionDumpArchive } from "@oh-my-striped-pi/pi-coding-agent/session/session-dump-format";
+import type { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { executeAcpBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/acp-builtins";
+import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-striped-pi/pi-utils";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
-import { cfgBrowserEnabled, cfgBrowserHeadless } from "@oh-my-pi/pi-coding-agent/tools/browser/settings";
-import { cfgExtendedContext } from "@oh-my-pi/pi-coding-agent/session/context-settings";
-import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
-import { cfgWorktreeCleanSource } from "@oh-my-pi/pi-coding-agent/task/settings";
+import { cfgBrowserEnabled, cfgBrowserHeadless } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/settings";
+import { cfgExtendedContext } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
+import { cfgMemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/settings";
+import { cfgWorktreeCleanSource } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
 
 interface FakeAcpBuiltinSession {
 	fastMode: boolean;
@@ -588,13 +588,13 @@ describe("ACP builtin slash commands", () => {
 	it("dump: outputs transcript with LLM request JSON path when sidecar succeeds", async () => {
 		const { output, runtime } = createRuntime();
 		runtime.session.formatSessionAsText = () => "Session content here";
-		runtime.session.dumpLlmRequestToTmpDir = async () => "/tmp/omp-llm-request-test.json";
+		runtime.session.dumpLlmRequestToTmpDir = async () => "/tmp/omsp-llm-request-test.json";
 
 		const result = await executeAcpBuiltinSlashCommand("/dump", runtime);
 
 		expect(result).toEqual({ consumed: true });
 		expect(output[0]).toContain("Session content here");
-		expect(output[0]).toContain("LLM request JSON: /tmp/omp-llm-request-test.json");
+		expect(output[0]).toContain("LLM request JSON: /tmp/omsp-llm-request-test.json");
 		expect(output[0]).toContain("persists on disk");
 	});
 
@@ -624,7 +624,7 @@ describe("ACP builtin slash commands", () => {
 		const { output, runtime } = createRuntime();
 		runtime.session.formatSessionAsText = () => "Session content here";
 		runtime.session.dumpSessionArchiveToTmpDir = async () => ({
-			path: "/tmp/omp-dump-test.zip",
+			path: "/tmp/omsp-dump-test.zip",
 			files: ["session.md", "llm-request.json", "subagents/Scout.md"],
 			subagentCount: 1,
 			subagentError: "EACCES: permission denied",
@@ -634,7 +634,7 @@ describe("ACP builtin slash commands", () => {
 		await executeAcpBuiltinSlashCommand("/dump", runtime);
 		await executeAcpBuiltinSlashCommand("/dump everything", runtime);
 
-		expect(output[0]).toContain("Session dump archive: /tmp/omp-dump-test.zip");
+		expect(output[0]).toContain("Session dump archive: /tmp/omsp-dump-test.zip");
 		expect(output[0]).toContain("  subagents/Scout.md");
 		expect(output[0]).toContain("Subagent transcripts unavailable: EACCES: permission denied");
 		expect(output[1]).toBe("Session content here");
@@ -696,7 +696,7 @@ describe("ACP builtin slash commands", () => {
 		expect(configNotified).toBe(0);
 	});
 
-	// /switch resolves like `omp bench`: fuzzy ids, @role aliases, :level suffixes
+	// /switch resolves like `omsp bench`: fuzzy ids, @role aliases, :level suffixes
 	it("switch opus:low: fuzzy-resolves a session-only model with the thinking suffix", async () => {
 		const { output, runtime, session } = createRuntime();
 		const available = [
@@ -1017,7 +1017,7 @@ describe("wave 3 commands", () => {
 
 	it("/move: relocates the current session instead of switching to an empty target session", async () => {
 		const { output, runtime, session, fakeSessionManager } = createRuntime();
-		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-move-target-"));
+		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-move-target-"));
 		const originalProjectDir = process.cwd();
 		const reloadForCwd = spyOn(runtime.settings, "reloadForCwd");
 		let configNotified = 0;
@@ -1045,7 +1045,7 @@ describe("wave 3 commands", () => {
 	// /wt
 	it("/wt: refuses outside a git checkout", async () => {
 		const { output, runtime, fakeSessionManager } = createRuntime();
-		const plainDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-wt-plain-"));
+		const plainDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-wt-plain-"));
 		fakeSessionManager._cwd = plainDir;
 		try {
 			const result = await executeAcpBuiltinSlashCommand("/wt feature", runtime);
@@ -1059,12 +1059,12 @@ describe("wave 3 commands", () => {
 
 	it("/wt: creates a worktree carrying uncommitted changes and relocates the session into it", async () => {
 		const { output, runtime, fakeSessionManager } = createRuntime();
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-wt-"));
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-wt-"));
 		const repoDir = path.join(root, "repo");
 		const worktreeBase = path.join(root, "wt");
 		const originalProjectDir = process.cwd();
-		const originalWorktreeDir = process.env.OMP_WORKTREE_DIR;
-		process.env.OMP_WORKTREE_DIR = worktreeBase;
+		const originalWorktreeDir = process.env.OMSP_WORKTREE_DIR;
+		process.env.OMSP_WORKTREE_DIR = worktreeBase;
 		const git = async (...args: string[]) => {
 			const proc = Bun.spawn(["git", ...args], { cwd: repoDir, stdout: "pipe", stderr: "pipe" });
 			const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -1103,8 +1103,8 @@ describe("wave 3 commands", () => {
 			expect(await git("symbolic-ref", "HEAD")).toBe("refs/heads/main");
 		} finally {
 			setProjectDir(originalProjectDir);
-			if (originalWorktreeDir === undefined) delete process.env.OMP_WORKTREE_DIR;
-			else process.env.OMP_WORKTREE_DIR = originalWorktreeDir;
+			if (originalWorktreeDir === undefined) delete process.env.OMSP_WORKTREE_DIR;
+			else process.env.OMSP_WORKTREE_DIR = originalWorktreeDir;
 			await fs.rm(root, { recursive: true, force: true });
 		}
 	});
@@ -1112,12 +1112,12 @@ describe("wave 3 commands", () => {
 	it("/wt: with worktree.cleanSource=true, cleans the source checkout while preserving the worktree", async () => {
 		const { output, runtime, fakeSessionManager } = createRuntime();
 		cfgWorktreeCleanSource.override(runtime.settings, true);
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-wt-clean-"));
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-wt-clean-"));
 		const repoDir = path.join(root, "repo");
 		const worktreeBase = path.join(root, "wt");
 		const originalProjectDir = process.cwd();
-		const originalWorktreeDir = process.env.OMP_WORKTREE_DIR;
-		process.env.OMP_WORKTREE_DIR = worktreeBase;
+		const originalWorktreeDir = process.env.OMSP_WORKTREE_DIR;
+		process.env.OMSP_WORKTREE_DIR = worktreeBase;
 		const git = async (...args: string[]) => {
 			const proc = Bun.spawn(["git", ...args], { cwd: repoDir, stdout: "pipe", stderr: "pipe" });
 			const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -1161,8 +1161,8 @@ describe("wave 3 commands", () => {
 			expect(await git("status", "--porcelain")).toBe("");
 		} finally {
 			setProjectDir(originalProjectDir);
-			if (originalWorktreeDir === undefined) delete process.env.OMP_WORKTREE_DIR;
-			else process.env.OMP_WORKTREE_DIR = originalWorktreeDir;
+			if (originalWorktreeDir === undefined) delete process.env.OMSP_WORKTREE_DIR;
+			else process.env.OMSP_WORKTREE_DIR = originalWorktreeDir;
 			await fs.rm(root, { recursive: true, force: true });
 		}
 	});
@@ -1170,12 +1170,12 @@ describe("wave 3 commands", () => {
 	it("/wt: aborts and leaves source checkout untouched when settings flush fails", async () => {
 		const { output, runtime, fakeSessionManager } = createRuntime();
 		spyOn(runtime.settings, "flush").mockRejectedValue(new Error("disk full"));
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-wt-flush-fail-"));
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-wt-flush-fail-"));
 		const repoDir = path.join(root, "repo");
 		const worktreeBase = path.join(root, "wt");
 		const originalProjectDir = process.cwd();
-		const originalWorktreeDir = process.env.OMP_WORKTREE_DIR;
-		process.env.OMP_WORKTREE_DIR = worktreeBase;
+		const originalWorktreeDir = process.env.OMSP_WORKTREE_DIR;
+		process.env.OMSP_WORKTREE_DIR = worktreeBase;
 		const git = async (...args: string[]) => {
 			const proc = Bun.spawn(["git", ...args], { cwd: repoDir, stdout: "pipe", stderr: "pipe" });
 			const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
@@ -1208,8 +1208,8 @@ describe("wave 3 commands", () => {
 			expect(wtDirs).toEqual([]);
 		} finally {
 			setProjectDir(originalProjectDir);
-			if (originalWorktreeDir === undefined) delete process.env.OMP_WORKTREE_DIR;
-			else process.env.OMP_WORKTREE_DIR = originalWorktreeDir;
+			if (originalWorktreeDir === undefined) delete process.env.OMSP_WORKTREE_DIR;
+			else process.env.OMSP_WORKTREE_DIR = originalWorktreeDir;
 			await fs.rm(root, { recursive: true, force: true });
 		}
 	});
@@ -1455,9 +1455,9 @@ describe("wave 4 commands", () => {
 describe("wave 5 — adapters and polish", () => {
 	// /mcp add — verify parsing and output message
 	it("/mcp add foo --url https://example.com --token X --scope project: outputs success or propagates write error", async () => {
-		// Uses project scope so it writes to /tmp/project/.omp/mcp.json which test infra controls.
+		// Uses project scope so it writes to /tmp/project/.omsp/mcp.json which test infra controls.
 		// We verify the command either reports success or a meaningful error (not a parse error).
-		const mcpModule = await import("@oh-my-pi/pi-coding-agent/mcp/config-writer");
+		const mcpModule = await import("@oh-my-striped-pi/pi-coding-agent/mcp/config-writer");
 		const spy = spyOn(mcpModule, "addMCPServer").mockResolvedValue(undefined);
 		try {
 			const { output, runtime } = createRuntime();
@@ -1495,7 +1495,7 @@ describe("wave 5 — adapters and polish", () => {
 
 	// /ssh add — spy on addSSHHost
 	it("/ssh add foo --host x --user y --scope user: calls addSSHHost", async () => {
-		const sshModule = await import("@oh-my-pi/pi-coding-agent/ssh/config-writer");
+		const sshModule = await import("@oh-my-striped-pi/pi-coding-agent/ssh/config-writer");
 		const spy = spyOn(sshModule, "addSSHHost").mockResolvedValue(undefined);
 		try {
 			const { output, runtime } = createRuntime();
@@ -1585,7 +1585,8 @@ describe("wave 5 — adapters and polish", () => {
 
 	// /marketplace discover bulleted list
 	it("/marketplace discover: output is bulleted with '  - ' token", async () => {
-		const { MarketplaceManager } = await import("@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace");
+		const { MarketplaceManager } =
+			await import("@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/marketplace");
 		const discoverSpy = spyOn(MarketplaceManager.prototype, "listAvailablePlugins").mockResolvedValue([
 			{ name: "hello", version: "1.0.0", description: "A greeting plugin" } as never,
 			{ name: "world", version: "2.0.0", description: undefined } as never,
@@ -1604,7 +1605,7 @@ describe("wave 5 — adapters and polish", () => {
 
 describe("/move preflight flush", () => {
 	it("disposes the session when headless workspace rollback cannot recover", async () => {
-		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-acp-move-fatal-"));
+		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-acp-move-fatal-"));
 		const originalProjectDir = getProjectDir();
 		const { output, runtime, session } = createRuntime();
 		const dispose = spyOn(session, "dispose");
@@ -1625,7 +1626,7 @@ describe("/move preflight flush", () => {
 		}
 	});
 	it("aborts text-mode /move when pending settings flush fails", async () => {
-		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-acp-move-"));
+		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-acp-move-"));
 		try {
 			const { output, fakeSessionManager, runtime } = createRuntime();
 			spyOn(runtime.settings, "flush").mockRejectedValue(new Error("disk full"));
@@ -1641,7 +1642,7 @@ describe("/move preflight flush", () => {
 	});
 
 	it("completes text-mode /move when flush succeeds", async () => {
-		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-acp-move-ok-"));
+		const targetDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-acp-move-ok-"));
 		const originalProjectDir = process.cwd();
 		try {
 			const { output, fakeSessionManager, runtime } = createRuntime();

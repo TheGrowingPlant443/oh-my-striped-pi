@@ -5,24 +5,24 @@
  * breaking the prompt-cache prefix the clone shares with its parent.
  */
 import { afterEach, expect, it, vi } from "bun:test";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { hindsightBackend } from "@oh-my-pi/pi-coding-agent/hindsight/backend";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import type { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import type { MemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import { getMnemopiSessionState } from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { TanCommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/tan-command-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import * as sdk from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as settingsStream from "@oh-my-pi/pi-coding-agent/session/settings-stream-fn";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { hindsightBackend } from "@oh-my-striped-pi/pi-coding-agent/hindsight/backend";
+import { HindsightApi } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import type { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import type { MemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/types";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import { getMnemopiSessionState } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import { TanCommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/tan-command-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import * as sdk from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as settingsStream from "@oh-my-striped-pi/pi-coding-agent/session/settings-stream-fn";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const model = createMockModel().model;
 const MEMORY = "The deploy host is alpha-7.";
@@ -36,7 +36,7 @@ afterEach(() => {
 it.each(["mnemopi", "hindsight"] as const)(
 	"sends the parent's recalled system prompt unchanged from a /tan clone using %s",
 	async backend => {
-		using dir = TempDir.createSync("@omp-tan-memory-recall-");
+		using dir = TempDir.createSync("@omsp-tan-memory-recall-");
 		const auth = await AuthStorage.create(dir.join("auth.db"));
 		auth.keys.setRuntime("local", "test-key");
 		const sessions: AgentSession[] = [];

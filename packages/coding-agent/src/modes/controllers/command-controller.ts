@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { CompactionCancelledError, type CompactionOutcome } from "@oh-my-pi/pi-agent-core/compaction";
+import { CompactionCancelledError, type CompactionOutcome } from "@oh-my-striped-pi/pi-agent-core/compaction";
 import {
 	getEnvApiKey,
 	getProviderDetails,
@@ -9,7 +9,7 @@ import {
 	resolveUsedFraction,
 	type UsageLimit,
 	type UsageReport,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	type Component,
 	Loader,
@@ -20,10 +20,10 @@ import {
 	Text,
 	visibleWidth,
 	wrapTextWithAnsi,
-} from "@oh-my-pi/pi-tui";
-import { formatDuration, logger, Snowflake, sanitizeText } from "@oh-my-pi/pi-utils";
-import { getActiveProfile, getConfigDirName } from "@oh-my-pi/pi-utils/dirs";
-import { classifyTerminalMultiplexer } from "@oh-my-pi/pi-tui/terminal-multiplexer";
+} from "@oh-my-striped-pi/pi-tui";
+import { formatDuration, logger, Snowflake, sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import { getActiveProfile, getConfigDirName } from "@oh-my-striped-pi/pi-utils/dirs";
+import { classifyTerminalMultiplexer } from "@oh-my-striped-pi/pi-tui/terminal-multiplexer";
 import { shouldEnableAppendOnlyContext } from "../../config/append-only-context-mode";
 import { type BashResult, isPersistentShellCdCommand } from "../../exec/bash-executor";
 import { parseExportArgs } from "../../export/html/args";
@@ -39,24 +39,24 @@ import {
 	summarizeMentalModel,
 } from "../../hindsight";
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../../memory-backend";
-import { BashExecutionComponent, bashPtyViewport } from "@oh-my-pi/pi-tui/chat/bash-execution";
-import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
-import { EvalExecutionComponent } from "@oh-my-pi/pi-tui/chat/eval-execution";
-import { MoveOverlay, type MoveOverlayResult } from "@oh-my-pi/pi-tui/overlays/move-overlay";
+import { BashExecutionComponent, bashPtyViewport } from "@oh-my-striped-pi/pi-tui/chat/bash-execution";
+import { appKey } from "@oh-my-striped-pi/pi-tui/chrome/keybinding-hints";
+import { EvalExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/eval-execution";
+import { MoveOverlay, type MoveOverlayResult } from "@oh-my-striped-pi/pi-tui/overlays/move-overlay";
 import { moveDirectorySource } from "../move-directory-source";
-import { getMarkdownTheme, getSymbolTheme, theme, type Theme } from "@oh-my-pi/pi-tui/theme";
+import { getMarkdownTheme, getSymbolTheme, theme, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
 import type { InteractiveModeContext } from "../../modes/types";
-import { ContextViewer } from "@oh-my-pi/pi-tui/overlays/context-viewer";
-import type { OverlayHandle } from "@oh-my-pi/pi-tui";
-import { ReportPanel } from "@oh-my-pi/pi-tui/overlays/report-panel";
-import type { TspText } from "@oh-my-pi/pi-wire";
+import { ContextViewer } from "@oh-my-striped-pi/pi-tui/overlays/context-viewer";
+import type { OverlayHandle } from "@oh-my-striped-pi/pi-tui";
+import { ReportPanel } from "@oh-my-striped-pi/pi-tui/overlays/report-panel";
+import type { TspText } from "@oh-my-striped-pi/pi-wire";
 import { computeSessionContextBreakdown } from "../../session/context-usage-runtime";
 import { buildSessionContextView } from "../../session/context-view";
-import { buildHotkeysMarkdown, HotkeysSheetComponent } from "@oh-my-pi/pi-tui/hotkeys-markdown";
-import { isNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { buildToolsMarkdown } from "@oh-my-pi/pi-tui/prompt/tools-markdown";
+import { buildHotkeysMarkdown, HotkeysSheetComponent } from "@oh-my-striped-pi/pi-tui/hotkeys-markdown";
+import { isNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { buildToolsMarkdown } from "@oh-my-striped-pi/pi-tui/prompt/tools-markdown";
 import type { AsyncJobSnapshotItem } from "../../session/agent-session";
-import { buildJobTree, jobTreeGuide, jobTreeIndent } from "@oh-my-pi/pi-tui/overlays/job-tree";
+import { buildJobTree, jobTreeGuide, jobTreeIndent } from "@oh-my-striped-pi/pi-tui/overlays/job-tree";
 import type { AuthStorage, OAuthAccountIdentity } from "../../session/auth-storage";
 import type { CompactMode } from "../../session/compact-modes";
 import {
@@ -75,13 +75,13 @@ import {
 } from "../../session/session-worktree";
 import { formatShakeSummary, type ShakeMode, type ShakeResult } from "../../session/shake-types";
 import { formatActiveAccountLabel, limitMatchesActiveAccount } from "../../slash-commands/helpers/active-oauth-account";
-import { formatProviderName } from "@oh-my-pi/pi-tui/chrome/format";
-import { formatCompactQuota } from "@oh-my-pi/pi-tui/overlays/advisor-config";
+import { formatProviderName } from "@oh-my-striped-pi/pi-tui/chrome/format";
+import { formatCompactQuota } from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 import { resolveTernPane } from "../../tools/browser/tern/kind";
 import { TernError, type TernErrorKind, TernSocketClient } from "../../tools/browser/tern/wire";
 import { outputMeta } from "../../tools/output-meta";
 import { resolveToCwd, stripOuterDoubleQuotes } from "../../tools/path-utils";
-import { replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui/render/render-utils";
+import { replaceTabs, truncateToWidth } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import {
 	getChangelogPath,
 	parseChangelog,
@@ -94,9 +94,9 @@ import { formatDumpArchiveReport, type SessionDumpArchive } from "../../session/
 import { openPath } from "../../utils/open";
 import { resumeCommand } from "../../utils/resume-command";
 import { setSessionTerminalTitle } from "../../utils/title-generator";
-import { collapseSharedUsageReports, formatLimitTitle } from "@oh-my-pi/pi-tui/overlays/usage-display";
-import { formatRemainingOnlyTotal, isUsedOnlyAbsoluteAmount } from "@oh-my-pi/pi-tui/prompt/usage-amounts";
-import type { UnavailableUsageAccount } from "@oh-my-pi/pi-tui/overlays/usage-dashboard";
+import { collapseSharedUsageReports, formatLimitTitle } from "@oh-my-striped-pi/pi-tui/overlays/usage-display";
+import { formatRemainingOnlyTotal, isUsedOnlyAbsoluteAmount } from "@oh-my-striped-pi/pi-tui/prompt/usage-amounts";
+import type { UnavailableUsageAccount } from "@oh-my-striped-pi/pi-tui/overlays/usage-dashboard";
 
 import { cfgTerminalShowImages } from "../settings";
 import { cfgProviderAppendOnlyContext } from "../../session/settings";
@@ -137,7 +137,7 @@ interface ForkTerminalDependencies {
  * Startup flags the fork child re-supplies from the parent's live state
  * (`--profile`, `--model`, `--thinking`, `--prompt-cache-key`) or that would
  * re-point it at a stale scope (`--config`/`--cwd`/`--provider`; the child
- * gets the effective overlays via `PI_CONFIG_FILES` and the session cwd).
+ * gets the effective overlays via `OMSP_CONFIG_FILES` and the session cwd).
  */
 const FORK_LAUNCH_OVERRIDES: Readonly<Record<string, true>> = {
 	"--config": true,
@@ -367,7 +367,7 @@ export class CommandController {
 		try {
 			// Lazy: the stats dashboard (server + sqlite) loads on demand only,
 			// matching src/cli/stats-cli.ts, to keep CLI startup fast.
-			const { formatStatsDashboardUrl, startServer } = await import("@oh-my-pi/omp-stats");
+			const { formatStatsDashboardUrl, startServer } = await import("@oh-my-striped-pi/omsp-stats");
 			const { hostname, port } = await startServer();
 			const url = `${formatStatsDashboardUrl(hostname, port)}/#/traces?s=${encodeURIComponent(sessionFile)}`;
 			this.openInBrowser(url);
@@ -1432,12 +1432,11 @@ export class CommandController {
 			// Pin only non-secret scope variables.
 			const command = [
 				...forkScopeEnvCommand({
-					PI_CODING_AGENT_DIR: this.ctx.settings.getAgentDir(),
-					PI_CONFIG_DIR: getConfigDirName(),
-					OMP_PROFILE: activeProfile,
-					PI_PROFILE: activeProfile,
-					PI_CONFIG_FILES: this.ctx.settings.getConfigFiles().join(path.delimiter),
-					PI_CODING_AGENT_SESSION_DIR: environment.PI_CODING_AGENT_SESSION_DIR,
+					OMSP_CODING_AGENT_DIR: this.ctx.settings.getAgentDir(),
+					OMSP_CONFIG_DIR: getConfigDirName(),
+					OMSP_PROFILE: activeProfile,
+					OMSP_CONFIG_FILES: this.ctx.settings.getConfigFiles().join(path.delimiter),
+					OMSP_CODING_AGENT_SESSION_DIR: environment.OMSP_CODING_AGENT_SESSION_DIR,
 					XDG_DATA_HOME: environment.XDG_DATA_HOME,
 					XDG_STATE_HOME: environment.XDG_STATE_HOME,
 					XDG_CACHE_HOME: environment.XDG_CACHE_HOME,
@@ -1478,7 +1477,7 @@ export class CommandController {
 	}
 
 	/**
-	 * `/fork` inside a Tern pane: ask Tern to run `omp --fork` of this session in a new pane beside
+	 * `/fork` inside a Tern pane: ask Tern to run `omsp --fork` of this session in a new pane beside
 	 * this one, which keeps the original session. False means fork in place instead: outside Tern,
 	 * an unsaved session, a Tern without `fork`, or Tern refusing it. Once the request is out, an
 	 * unconfirmed one is reported rather than retried in place, since Tern may still open the pane.
@@ -1497,7 +1496,7 @@ export class CommandController {
 				return false;
 			}
 			if (!client.supports("fork")) return false;
-			// The new pane's omp reads the session file as it starts.
+			// The new pane's omsp reads the session file as it starts.
 			await this.ctx.session.flushToDisk();
 			try {
 				await client.fork({ block: tern.pane }, { timeoutMs: TERN_FORK_TIMEOUT_MS });
@@ -1818,7 +1817,7 @@ export class CommandController {
 				if (shouldPersistCwd) return await this.#applyBashResultCwd(result);
 			} catch (error) {
 				this.ctx.showError(
-					`Bash command completed, but OMP failed to update its working directory: ${
+					`Bash command completed, but OMSP failed to update its working directory: ${
 						error instanceof Error ? error.message : "Unknown error"
 					}`,
 				);
@@ -2553,7 +2552,7 @@ export function renderUsageReports(
 			lines.push(`  ${uiTheme.fg("dim", truncateToWidth(`${boundedLabel}${status}`, availableWidth - 2))}`);
 		}
 
-		// Provider-wide disclaimers (e.g. "OMP-observed spend only") render once
+		// Provider-wide disclaimers (e.g. "OMSP-observed spend only") render once
 		// above the per-account sections instead of duplicating onto every limit.
 		const providerNotes = [...new Set(providerReports.flatMap(report => report.notes ?? []))];
 		if (providerNotes.length > 0) {

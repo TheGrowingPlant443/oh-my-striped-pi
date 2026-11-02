@@ -1,17 +1,17 @@
 import { afterEach, expect, it } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { Message } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { Message } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const temp = TempDir.createSync("@pi-eval-resume-");
 const sessions: AgentSession[] = [];
@@ -73,7 +73,7 @@ it("keeps the previous process's request as the resumed request prefix", async (
 	if (!file) throw new Error("Expected a persisted session");
 
 	/**
-	 * One `omp -p --continue` process: reopen the file, prompt once, optionally
+	 * One `omsp -p --continue` process: reopen the file, prompt once, optionally
 	 * record an eval call, and return the last provider request.
 	 */
 	const runProcess = async (text: string, evalCallId?: string): Promise<Message[]> => {

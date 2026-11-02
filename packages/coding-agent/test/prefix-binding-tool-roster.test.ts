@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, type Mock, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { Message, Model } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionMaintenance } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { Message, Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionMaintenance } from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 
 function createPrefixBindingModel(): Model<"anthropic-messages"> {
 	return buildModel({

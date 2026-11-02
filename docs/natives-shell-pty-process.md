@@ -1,6 +1,6 @@
 # Natives Shell, PTY, Process, and Key Internals
 
-This document covers execution/process/terminal primitives in `@oh-my-pi/pi-natives`: `shell`, `pty`, `ps`, and `keys`, using the architecture terms from `docs/natives-architecture.md`.
+This document covers execution/process/terminal primitives in `@oh-my-striped-pi/pi-natives`: `shell`, `pty`, `ps`, and `keys`, using the architecture terms from `docs/natives-architecture.md`.
 
 ## Implementation files
 
@@ -47,11 +47,11 @@ Rust creates `brush_core::Shell` with:
 - inherited environment disabled (`do_not_inherit_env: true`), followed by explicit environment reconstruction from host env,
 - profile and rc loading skipped,
 - bash-mode builtins, with `exec` and `suspend` disabled,
-- process builtins registered unconditionally from `pi_builtins::process_builtins()` — `nohup`, `pgrep`, `pkill`, `pidwait`, `ps`, `sleep`, `timeout`, and `top` (`nohup` is withheld when `PI_DISABLE_NOHUP_BUILTIN` is set; `kill` comes from the default bash-mode set, where `pi-builtins`' richer implementation replaces brush's original),
+- process builtins registered unconditionally from `pi_builtins::process_builtins()` — `nohup`, `pgrep`, `pkill`, `pidwait`, `ps`, `sleep`, `timeout`, and `top` (`nohup` is withheld when `OMSP_DISABLE_NOHUP_BUILTIN` is set; `kill` comes from the default bash-mode set, where `pi-builtins`' richer implementation replaces brush's original),
 - in-process utility builtins registered from `pi_builtins::utility_builtins()` (see the next section),
 - an opt-in `git` builtin (`crates/pi-shell/src/git.rs`), registered when either layer below is on; anything a layer does not take runs the git binary with the original arguments:
-   - `PI_SMART_GIT` serves supported `git worktree add` invocations through `pi-vcs`: copy-on-write clone, worktree registration, and reconciliation to the target commit, with an in-process checkout fallback when cloning is unavailable;
-   - `PI_GIT_GUARD` (set by the coding agent from `bash.gitGuard`; `crates/pi-shell/src/git/guard.rs`) judges git commands that discard or move work by the checkout they run in. In a repository's main checkout, which other sessions may share, it refuses with exit status 1: `stash` other than `list`/`show`/`create`, `reset --hard`, `reset` to a commit other than HEAD's, `switch` and `checkout` of a branch or commit, and `checkout` of paths and working-tree `restore` unless the repository is mid-merge/rebase/cherry-pick/revert (unmerged index entries or the operation's state files; a finished rebase's leftover `REBASE_HEAD` does not count), and even then not forced or whole-tree forms. A linked worktree of a non-bare repository, and a submodule inside one, run everything: a command that discards uncommitted tracked changes first records them as a `git stash create` commit on the `refs/omp/discarded` reflog and says so on stderr (refused instead when it recurses into submodules, through `--recurse-submodules` or `submodule.recurse`, since that record does not hold their changes), and `stash pop`/`apply`/`drop`/`branch`/`clear` refuse a stash-list entry whose `WIP on <branch>:`/`On <branch>:` subject names another branch, a detached HEAD, or no branch. It judges the expanded argv in the directory git actually runs in (`cd` and `-C` applied); `--git-dir`/`--work-tree`/`GIT_DIR`-style redirection is refused, since the repository it changes is not the one found from the directory,
+   - `OMSP_SMART_GIT` serves supported `git worktree add` invocations through `pi-vcs`: copy-on-write clone, worktree registration, and reconciliation to the target commit, with an in-process checkout fallback when cloning is unavailable;
+   - `OMSP_GIT_GUARD` (set by the coding agent from `bash.gitGuard`; `crates/pi-shell/src/git/guard.rs`) judges git commands that discard or move work by the checkout they run in. In a repository's main checkout, which other sessions may share, it refuses with exit status 1: `stash` other than `list`/`show`/`create`, `reset --hard`, `reset` to a commit other than HEAD's, `switch` and `checkout` of a branch or commit, and `checkout` of paths and working-tree `restore` unless the repository is mid-merge/rebase/cherry-pick/revert (unmerged index entries or the operation's state files; a finished rebase's leftover `REBASE_HEAD` does not count), and even then not forced or whole-tree forms. A linked worktree of a non-bare repository, and a submodule inside one, run everything: a command that discards uncommitted tracked changes first records them as a `git stash create` commit on the `refs/omsp/discarded` reflog and says so on stderr (refused instead when it recurses into submodules, through `--recurse-submodules` or `submodule.recurse`, since that record does not hold their changes), and `stash pop`/`apply`/`drop`/`branch`/`clear` refuse a stash-list entry whose `WIP on <branch>:`/`On <branch>:` subject names another branch, a detached HEAD, or no branch. It judges the expanded argv in the directory git actually runs in (`cd` and `-C` applied); `--git-dir`/`--work-tree`/`GIT_DIR`-style redirection is refused, since the repository it changes is not the one found from the directory,
 - skip-list for shell-sensitive vars (`PS1`, `PWD`, `SHLVL`, bash function exports, etc.),
 - a non-exported `env="$env"` fallback so PowerShell-style `$env:NAME` survives brush parameter expansion unless the user shadows `env`.
 
@@ -85,9 +85,9 @@ Three search-related builtins are worth calling out:
 
 Each builtin runs inside the shell process (no `fork`/`exec`) against the `pi-builtins` `Host` view of the shell (`src/host.rs`): stdio routes through the command's (possibly piped/redirected) file descriptors, path operands resolve against the shell working directory, the shell's exported environment is visible, and abort/timeout cancellation is honored. Because these builtins shadow system binaries, registration is gated in `crates/pi-shell/src/shell.rs`:
 
-- `PI_DISABLE_UUTILS_BUILTINS` disables the whole utility set (bare names resolve to system binaries again),
-- `PI_DISABLE_UUTILS_DESTRUCTIVE` disables the destructive shadows (`rm`, `mv`, `cp`, which overwrites existing files, and `ln`, which can clobber via `-f`) together,
-- `PI_DISABLE_RM_BUILTIN` / `PI_DISABLE_MV_BUILTIN` disable `rm`/`mv` individually.
+- `OMSP_DISABLE_UUTILS_BUILTINS` disables the whole utility set (bare names resolve to system binaries again),
+- `OMSP_DISABLE_UUTILS_DESTRUCTIVE` disables the destructive shadows (`rm`, `mv`, `cp`, which overwrites existing files, and `ln`, which can clobber via `-f`) together,
+- `OMSP_DISABLE_RM_BUILTIN` / `OMSP_DISABLE_MV_BUILTIN` disable `rm`/`mv` individually.
 
 Builtin switches are read from `sessionEnv` first, then the process environment, during session creation. Values are truthy when present and not empty, `"0"`, or case-insensitive `"false"`; command-scoped `env` does not change registration.
 

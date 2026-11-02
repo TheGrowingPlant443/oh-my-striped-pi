@@ -1,16 +1,16 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Message, Model, Usage, UserMessage } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { estimateToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Message, Model, Usage, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { estimateToolSchemaTokens } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 describe("AgentSession session stats", () => {
@@ -131,7 +131,7 @@ describe("AgentSession session stats", () => {
 			apiKey: "test-key",
 			models: [toProviderModelConfig(spec)],
 		});
-		using tempDir = TempDir.createSync("@omp-session-mixed-cost-");
+		using tempDir = TempDir.createSync("@omsp-session-mixed-cost-");
 		const manager = SessionManager.create(tempDir.path(), tempDir.path());
 		manager.appendMessage({ role: "user", content: "First request", timestamp: 1 });
 		for (const [timestamp, inputCost, outputCost] of [
@@ -280,7 +280,7 @@ describe("AgentSession session stats", () => {
 			throw new Error("Expected bundled model with a context window");
 		}
 
-		using tempDir = TempDir.createSync("@omp-session-stats-");
+		using tempDir = TempDir.createSync("@omsp-session-stats-");
 		const sessionFile = `${tempDir.path()}/repro.jsonl`;
 		await Bun.write(
 			sessionFile,

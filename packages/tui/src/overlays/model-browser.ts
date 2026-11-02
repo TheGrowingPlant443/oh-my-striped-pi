@@ -7,11 +7,11 @@
  * state, while the advisor config overlay embeds it as a plain "pick one
  * model" list.
  */
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getEffectiveTokenCost, getModelPricingStatus, modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { modelKind, type ModelKind, type ModelPricingStatus } from "@oh-my-pi/pi-catalog/types";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getEffectiveTokenCost, getModelPricingStatus, modelsAreEqual } from "@oh-my-striped-pi/pi-catalog/models";
+import { modelKind, type ModelKind, type ModelPricingStatus } from "@oh-my-striped-pi/pi-catalog/types";
 import type { Component } from "../tui";
 import { FuzzyCorpus, fuzzyRank } from "../fuzzy";
 import { Input } from "../components/input";
@@ -19,7 +19,7 @@ import { ScrollView } from "../components/scroll-view";
 import { matchesKey } from "../keys";
 import type { SgrMouseEvent } from "../mouse";
 import { replaceTabs, truncateToWidth, visibleWidth } from "../utils";
-import { formatNumber, sanitizeText } from "@oh-my-pi/pi-utils";
+import { formatNumber, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
@@ -45,7 +45,7 @@ import type {
 	TspPickerProps,
 	TspSpan,
 	TspText,
-} from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-wire";
 import { col, md, node, row, span, text } from "../native/describe";
 import { pickerFuzzyHits } from "../native/picker";
 import type { NativeChild, NativeNode, NativeUiEvent } from "../native/node";
@@ -842,7 +842,7 @@ export function providerMark(providerId: string): TspPickerMark {
 	return { text, seed: providerId, icon: `provider:${providerId}` };
 }
 
-/** The omp theme token of a thinking level's dot (`thinkingHigh`); none for inherit and auto. */
+/** The omsp theme token of a thinking level's dot (`thinkingHigh`); none for inherit and auto. */
 export function thinkingDotToken(level: ConfiguredThinkingLevel): string | undefined {
 	if (level === ThinkingLevel.Inherit || level === AUTO_THINKING) return undefined;
 	return `thinking${level.charAt(0).toUpperCase()}${level.slice(1)}`;
@@ -1824,7 +1824,7 @@ export class ModelBrowser implements Component {
 		const listNode = node(
 			"list",
 			{
-				role: "omp.model-browser.list",
+				role: "omsp.model-browser.list",
 				selected,
 				filter: filter || undefined,
 				empty: empty ? [span(empty, "muted")] : undefined,
@@ -1935,7 +1935,7 @@ export class ModelBrowser implements Component {
 				if (chips.length > 0) children.push(text(chips, { wrap: "word" }));
 			}
 		}
-		const detailNode = node("col", { role: "omp.model-browser.detail", gap: "none" }, children, "detail");
+		const detailNode = node("col", { role: "omsp.model-browser.detail", gap: "none" }, children, "detail");
 		this.#nativeDetail = { item: selected, epoch: this.#nativeEpoch, roles: this.#roles, node: detailNode };
 		return detailNode;
 	}
@@ -2248,7 +2248,7 @@ export class ModelBrowser implements Component {
 		}
 
 		const children: NativeChild[] = [
-			text(model.name, { role: "omp.picker.title" }),
+			text(model.name, { role: "omsp.picker.title" }),
 			text([span(selector, "mono")], { actions: { click: "copy" }, title: "Copy model id", truncate: "middle" }),
 		];
 		const badges: NativeChild[] = [];

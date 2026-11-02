@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { renderDemotedThinking } from "@oh-my-pi/pi-ai/dialect";
-import { convertMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import type { AssistantMessage, Message } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { renderDemotedThinking } from "@oh-my-striped-pi/pi-ai/dialect";
+import { convertMessages } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import type { AssistantMessage, Message } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const target = buildModel({
 	id: "gpt-4o",

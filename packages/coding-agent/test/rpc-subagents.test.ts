@@ -2,17 +2,20 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
 import {
 	handleRpcSessionChange,
 	type RpcSessionChangeCommand,
 	type RpcSessionChangeResult,
 	type RpcSessionChangeSession,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import { RpcSubagentRegistry, readRpcSubagentTranscript } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-subagents";
-import type { RpcSubagentFrame } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { type AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import {
+	RpcSubagentRegistry,
+	readRpcSubagentTranscript,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-subagents";
+import type { RpcSubagentFrame } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { type AgentProgress } from "@oh-my-striped-pi/pi-tui/tools/task";
 import {
 	type SubagentEventPayload,
 	type SubagentLifecyclePayload,
@@ -20,9 +23,9 @@ import {
 	TASK_SUBAGENT_EVENT_CHANNEL,
 	TASK_SUBAGENT_LIFECYCLE_CHANNEL,
 	TASK_SUBAGENT_PROGRESS_CHANNEL,
-} from "@oh-my-pi/pi-coding-agent/task";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/task";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const tempPaths: string[] = [];
 
@@ -324,7 +327,7 @@ describe("RPC subagent registry", () => {
 
 describe("readRpcSubagentTranscript", () => {
 	test("returns complete JSONL entries and byte cursor", async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-rpc-subagent-transcript-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-rpc-subagent-transcript-"));
 		tempPaths.push(dir);
 		const sessionFile = path.join(dir, "session.jsonl");
 		const headerLine = `${JSON.stringify({ type: "session", id: "s1", timestamp: "2026-06-09T00:00:00.000Z", cwd: dir })}\n`;
@@ -346,7 +349,7 @@ describe("readRpcSubagentTranscript", () => {
 	});
 
 	test("returns empty cursor result for missing transcript files", async () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-rpc-subagent-transcript-missing-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-rpc-subagent-transcript-missing-"));
 		tempPaths.push(dir);
 		const sessionFile = path.join(dir, "missing.jsonl");
 
@@ -365,7 +368,7 @@ describe("readRpcSubagentTranscript", () => {
 
 describe("RpcClient subagent frames", () => {
 	test("dispatches subagent frames and session-specific events", async () => {
-		const scriptPath = path.join(os.tmpdir(), `omp-rpc-subagent-client-${Date.now()}.js`);
+		const scriptPath = path.join(os.tmpdir(), `omsp-rpc-subagent-client-${Date.now()}.js`);
 		tempPaths.push(scriptPath);
 		await Bun.write(
 			scriptPath,

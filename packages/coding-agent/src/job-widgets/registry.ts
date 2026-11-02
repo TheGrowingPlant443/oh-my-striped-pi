@@ -3,8 +3,8 @@
  * its live output, asks the cheap model for a spec once the job has output
  * worth describing, and pushes refreshed views to subscribers while jobs run.
  */
-import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
-import { logger } from "@oh-my-pi/pi-utils";
+import type { JobWidgetView } from "@oh-my-striped-pi/pi-tui/tools/job-widget";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { AsyncJob } from "../async/job-manager";
 import type { JobWidgetAuthor, JobWidgetAuthorRequest } from "./author";
 import { JobWidgetRuntime, sampleLines } from "./runtime";

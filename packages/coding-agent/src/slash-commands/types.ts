@@ -1,5 +1,5 @@
 import type { Settings } from "../config/settings";
-import type { SlashCommandIconName } from "@oh-my-pi/pi-tui/theme/symbols";
+import type { SlashCommandIconName } from "@oh-my-striped-pi/pi-tui/theme/symbols";
 import type { InteractiveModeContext, SubmittedUserInput } from "../modes/types";
 import type { MCPManager } from "../mcp/manager";
 import type { MCPServerConfig } from "../mcp/types";

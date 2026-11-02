@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getAgentDir, isEnoent, withLoopPhase } from "@oh-my-pi/pi-utils";
+import { getAgentDir, isEnoent, withLoopPhase } from "@oh-my-striped-pi/pi-utils";
 import { getMemoryRoot } from "../memories";
 import { getMnemopiSessionState, type MnemopiScopedMemoryHit, type MnemopiSessionState } from "../mnemopi/state";
 import memoryDoc from "../prompts/internal-urls/memory.md" with { type: "text" };

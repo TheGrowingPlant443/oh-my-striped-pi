@@ -1,4 +1,4 @@
-import type { TextContent } from "@oh-my-pi/pi-ai";
+import type { TextContent } from "@oh-my-striped-pi/pi-ai";
 import { type Component } from "../tui";
 import { Box } from "../components/box";
 import { Disclosure } from "../components/disclosure";
@@ -12,7 +12,7 @@ import { fileHyperlink } from "../render";
 import { tryFileUri } from "../render/hyperlink";
 import { collapseSkillTokens, skillChipLabel, skillChipStyle, skillToken } from "../prompt/composer-attachments";
 import { type UserBubbleOptions, UserMessageComponent, userBubbleColor } from "./user-message";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { card, md, node, span } from "../native/describe";
 import { type NativeChild, type NativeNode, type NativeUiEvent } from "../native/node";
 import { Memo } from "../native/memo";
@@ -67,7 +67,7 @@ export class SkillMessageComponent extends Container {
 	}
 
 	/**
-	 * A user-toned card (role `omp.skill`): the skill chip and prompt size in
+	 * A user-toned card (role `omsp.skill`): the skill chip and prompt size in
 	 * the head, the user's draft always visible, and only the loaded skill
 	 * prompt behind a disclosure.
 	 */
@@ -99,7 +99,7 @@ export class SkillMessageComponent extends Container {
 					"section",
 					{
 						head: [span("prompt", "muted")],
-						role: "omp.skill.prompt",
+						role: "omsp.skill.prompt",
 						collapsible: true,
 						collapsed: !this.#expanded,
 					},
@@ -107,7 +107,7 @@ export class SkillMessageComponent extends Container {
 					"prompt",
 				),
 			);
-			return card({ role: "omp.skill", tone: "user", head }, children);
+			return card({ role: "omsp.skill", tone: "user", head }, children);
 		});
 	}
 

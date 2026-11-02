@@ -4,9 +4,9 @@ import {
 	type CleanseParserKind,
 	CleanseStreamParser,
 	parseCleanseDiagnostics,
-} from "@oh-my-pi/pi-coding-agent/cleanse/parsers";
-import { diagnosticKey } from "@oh-my-pi/pi-coding-agent/cleanse/checkers";
-import type { CleanseDiagnostic } from "@oh-my-pi/pi-coding-agent/cleanse/types";
+} from "@oh-my-striped-pi/pi-coding-agent/cleanse/parsers";
+import { diagnosticKey } from "@oh-my-striped-pi/pi-coding-agent/cleanse/checkers";
+import type { CleanseDiagnostic } from "@oh-my-striped-pi/pi-coding-agent/cleanse/types";
 
 interface ParserFixture {
 	kind: CleanseParserKind;

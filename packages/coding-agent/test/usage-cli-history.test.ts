@@ -1,12 +1,12 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, expect, test, vi } from "bun:test";
-import { AuthStorage, SqliteAuthCredentialStore, type UsageHistoryEntry } from "@oh-my-pi/pi-ai";
-import { type AuthBrokerServerHandle, startAuthBroker } from "@oh-my-pi/pi-ai/auth-broker";
-import { runUsageCommand } from "@oh-my-pi/pi-coding-agent/cli/usage-cli";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
+import { AuthStorage, SqliteAuthCredentialStore, type UsageHistoryEntry } from "@oh-my-striped-pi/pi-ai";
+import { type AuthBrokerServerHandle, startAuthBroker } from "@oh-my-striped-pi/pi-ai/auth-broker";
+import { runUsageCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/usage-cli";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
 
-const BROKER_ENV = ["OMP_AUTH_BROKER_URL", "OMP_AUTH_BROKER_TOKEN"] as const;
+const BROKER_ENV = ["OMSP_AUTH_BROKER_URL", "OMSP_AUTH_BROKER_TOKEN"] as const;
 const HOUR_MS = 60 * 60 * 1000;
 
 function snapshot(provider: string, recordedAt: number, usedFraction: number): UsageHistoryEntry {
@@ -37,8 +37,8 @@ beforeEach(() => {
 		bearerTokens: ["history-bearer"],
 		disableRefresher: true,
 	});
-	process.env.OMP_AUTH_BROKER_URL = handle.url;
-	process.env.OMP_AUTH_BROKER_TOKEN = "history-bearer";
+	process.env.OMSP_AUTH_BROKER_URL = handle.url;
+	process.env.OMSP_AUTH_BROKER_TOKEN = "history-bearer";
 	vi.spyOn(Settings, "loadReadOnly").mockResolvedValue(Settings.isolated());
 	vi.spyOn(sdkModule, "discoverAuthStorage").mockResolvedValue(new AuthStorage(localStore));
 });
@@ -53,7 +53,7 @@ afterEach(async () => {
 	}
 });
 
-test("omp usage --history reads the broker host's record, not the client's own store", async () => {
+test("omsp usage --history reads the broker host's record, not the client's own store", async () => {
 	const now = Date.now();
 	brokerStore.recordUsageSnapshots([
 		snapshot("anthropic", now - 3 * HOUR_MS, 0.25),

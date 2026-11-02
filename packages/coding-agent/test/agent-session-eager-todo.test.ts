@@ -1,20 +1,20 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, TextContent, ToolCall } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession, type AgentSessionConfig } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { TodoTool } from "@oh-my-pi/pi-coding-agent/tools";
-import { setInteractiveHost, TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentMessage, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, TextContent, ToolCall } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession, type AgentSessionConfig } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { TodoTool } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { setInteractiveHost, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
 type ObservedPromptCall = {
@@ -226,8 +226,8 @@ describe("AgentSession eager todo enforcement", () => {
 	});
 
 	beforeEach(async () => {
-		previousNoTitle = Bun.env.PI_NO_TITLE;
-		delete Bun.env.PI_NO_TITLE;
+		previousNoTitle = Bun.env.OMSP_NO_TITLE;
+		delete Bun.env.OMSP_NO_TITLE;
 		tempDir = TempDir.createSync("@pi-agent-session-eager-todo-");
 		streamCallCount = 0;
 		scriptedResponses = [];
@@ -240,8 +240,8 @@ describe("AgentSession eager todo enforcement", () => {
 			await session.dispose();
 		}
 		vi.restoreAllMocks();
-		if (previousNoTitle === undefined) delete Bun.env.PI_NO_TITLE;
-		else Bun.env.PI_NO_TITLE = previousNoTitle;
+		if (previousNoTitle === undefined) delete Bun.env.OMSP_NO_TITLE;
+		else Bun.env.OMSP_NO_TITLE = previousNoTitle;
 		tempDir.removeSync();
 	});
 
@@ -510,7 +510,7 @@ describe("AgentSession eager todo enforcement", () => {
 	});
 
 	it("does not refresh todo-init titles when automatic titles are disabled", async () => {
-		Bun.env.PI_NO_TITLE = "1";
+		Bun.env.OMSP_NO_TITLE = "1";
 		await recreateSession({ "title.refreshOnReplan": true });
 		await session.setSessionName("Old auto title", "auto");
 		const completeSimpleMock = vi.spyOn(ai, "completeSimple");

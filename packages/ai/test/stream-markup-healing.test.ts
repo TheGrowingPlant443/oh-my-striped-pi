@@ -4,15 +4,18 @@ import {
 	getDialectDefinition,
 	type InbandScanEvent,
 	ThinkingInbandScanner,
-} from "@oh-my-pi/pi-ai/dialect";
-import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, ThinkingContent, Tool, ToolCall } from "@oh-my-pi/pi-ai/types";
-import { getStreamMarkupHealingPattern, StreamMarkupHealing } from "@oh-my-pi/pi-ai/utils/stream-markup-healing";
-import { stripDsmlToolMarkup } from "@oh-my-pi/pi-ai/utils/dsml-leak";
-import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-ai/dialect";
+import { streamOpenAICompletions } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { stream } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Context, FetchImpl, Model, ThinkingContent, Tool, ToolCall } from "@oh-my-striped-pi/pi-ai/types";
+import {
+	getStreamMarkupHealingPattern,
+	StreamMarkupHealing,
+} from "@oh-my-striped-pi/pi-ai/utils/stream-markup-healing";
+import { stripDsmlToolMarkup } from "@oh-my-striped-pi/pi-ai/utils/dsml-leak";
+import { validateToolArguments } from "@oh-my-striped-pi/pi-ai/utils/validation";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 
 interface SseToolCallDelta {
 	index: number;
@@ -508,7 +511,7 @@ describe("StreamMarkupHealing DeepSeek template-token spellings", () => {
 		const cases = [
 			[
 				"bash",
-				{ command: 'grep -c "<｜tool▁calls▁end｜>\\|<｜tool_call_begin｜>\\|<tool_call_end｜>" omp.log' },
+				{ command: 'grep -c "<｜tool▁calls▁end｜>\\|<｜tool_call_begin｜>\\|<tool_call_end｜>" omsp.log' },
 				"<｜tool_calls_end｜>",
 			],
 			[

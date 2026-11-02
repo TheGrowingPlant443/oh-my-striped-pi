@@ -6,7 +6,7 @@ import {
 	detectRectangularSgrSupport,
 	encodeDeccara,
 	planDeccaraFills,
-} from "@oh-my-pi/pi-tui";
+} from "@oh-my-striped-pi/pi-tui";
 
 // Truecolor background open token used throughout the integration tests.
 const BG_OPEN = "\x1b[48;2;10;20;30m";
@@ -35,12 +35,12 @@ describe("detectRectangularSgrSupport", () => {
 		expect(detectRectangularSgrSupport("trueColor", {})).toBe(false);
 	});
 
-	it("honors the PI_NO_DECCARA kill switch (truthy values only)", () => {
-		expect(detectRectangularSgrSupport("kitty", { PI_NO_DECCARA: "1" })).toBe(false);
-		expect(detectRectangularSgrSupport("kitty", { PI_NO_DECCARA: "true" })).toBe(false);
+	it("honors the OMSP_NO_DECCARA kill switch (truthy values only)", () => {
+		expect(detectRectangularSgrSupport("kitty", { OMSP_NO_DECCARA: "1" })).toBe(false);
+		expect(detectRectangularSgrSupport("kitty", { OMSP_NO_DECCARA: "true" })).toBe(false);
 		// A falsey assignment is not a kill: support stays on.
-		expect(detectRectangularSgrSupport("kitty", { PI_NO_DECCARA: "0" })).toBe(true);
-		expect(detectRectangularSgrSupport("kitty", { PI_NO_DECCARA: "false" })).toBe(true);
+		expect(detectRectangularSgrSupport("kitty", { OMSP_NO_DECCARA: "0" })).toBe(true);
+		expect(detectRectangularSgrSupport("kitty", { OMSP_NO_DECCARA: "false" })).toBe(true);
 	});
 
 	it("disables under tmux/screen/zellij/cmux multiplexers", () => {

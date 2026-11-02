@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 
 beforeAll(async () => {
 	await initTheme(false);

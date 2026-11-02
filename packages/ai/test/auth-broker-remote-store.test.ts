@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, REMOTE_REFRESH_SENTINEL, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
+import { AuthStorage, REMOTE_REFRESH_SENTINEL, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
 import {
 	AuthBrokerClient,
 	type AuthBrokerServerHandle,
@@ -12,7 +12,7 @@ import {
 	RemoteAuthCredentialStore,
 	type SnapshotResponse,
 	startAuthBroker,
-} from "@oh-my-pi/pi-ai/auth-broker";
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
 import { removeWithRetries } from "../../utils/src/temp";
 import { withEnv } from "./helpers";
 
@@ -281,7 +281,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		expect(reported.hostname).toBe(os.hostname());
 		// Default identity carries the app label so broker-side attribution can
 		// answer "what did app X use" even for broker-direct installs.
-		expect(reported.providers.every(p => p.app === "omp")).toBe(true);
+		expect(reported.providers.every(p => p.app === "omsp")).toBe(true);
 
 		const copilot = reported.providers.find(p => p.provider === "github-copilot");
 		expect(copilot).toMatchObject({
@@ -347,15 +347,15 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	});
 
 	test("a process that quits before the flush interval still reports its observed usage", async () => {
-		// Mirrors `omp -p`: one turn, then postmortem.quit() well inside the default 10s flush interval.
+		// Mirrors `omsp -p`: one turn, then postmortem.quit() well inside the default 10s flush interval.
 		const script = [
-			'import { postmortem } from "@oh-my-pi/pi-utils";',
+			'import { postmortem } from "@oh-my-striped-pi/pi-utils";',
 			`import { AuthBrokerClient, RemoteAuthCredentialStore } from ${JSON.stringify(AUTH_BROKER_MODULE)};`,
 			`const client = new AuthBrokerClient({ url: ${JSON.stringify(handle!.url)}, token: ${JSON.stringify(token)} });`,
 			"const remote = new RemoteAuthCredentialStore({ client, streamSnapshots: false });",
 			"remote.recordObservedUsage(",
 			'	[{ at: Date.now(), provider: "github-copilot", model: "copilot-test", requests: 1, inputTokens: 12, outputTokens: 4, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.01 }],',
-			'	{ installId: "print-mode-install", hostname: "print-mode-host", app: "omp" },',
+			'	{ installId: "print-mode-install", hostname: "print-mode-host", app: "omsp" },',
 			");",
 			"await postmortem.quit(0);",
 		].join("\n");
@@ -371,7 +371,7 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 		const reported = storage!.usage.clientSummary(0).clients.find(c => c.installId === "print-mode-install");
 		expect(reported?.providers).toEqual([
 			{
-				app: "omp",
+				app: "omsp",
 				provider: "github-copilot",
 				requests: 1,
 				inputTokens: 12,
@@ -549,9 +549,9 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 
 		await withEnv(
 			{
-				OMP_AUTH_BROKER_URL: handle!.url,
-				OMP_AUTH_BROKER_TOKEN: token,
-				OMP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
+				OMSP_AUTH_BROKER_URL: handle!.url,
+				OMSP_AUTH_BROKER_TOKEN: token,
+				OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
 			},
 			async () => {
 				const discovered = await discoverAuthStorage({
@@ -601,9 +601,9 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 
 		await withEnv(
 			{
-				OMP_AUTH_BROKER_URL: handle!.url,
-				OMP_AUTH_BROKER_TOKEN: token,
-				OMP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
+				OMSP_AUTH_BROKER_URL: handle!.url,
+				OMSP_AUTH_BROKER_TOKEN: token,
+				OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
 			},
 			async () => {
 				const discovered = await discoverAuthStorage({
@@ -635,9 +635,9 @@ describe("RemoteAuthCredentialStore SSE integration", () => {
 	test("prefers a programmatic SDK account pool over the environment file", async () => {
 		await withEnv(
 			{
-				OMP_AUTH_BROKER_URL: handle!.url,
-				OMP_AUTH_BROKER_TOKEN: token,
-				OMP_AUTH_BROKER_ACCOUNT_POOL_FILE: path.join(tempDir, "missing-account-pool.json"),
+				OMSP_AUTH_BROKER_URL: handle!.url,
+				OMSP_AUTH_BROKER_TOKEN: token,
+				OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE: path.join(tempDir, "missing-account-pool.json"),
 			},
 			async () => {
 				const discovered = await discoverAuthStorage({

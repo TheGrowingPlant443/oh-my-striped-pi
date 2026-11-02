@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
-import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
+import { type Api, Effort, type Model } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { tinyTitleClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
 import {
 	disposeTerminalTitleState,
 	generateSessionTitle,
@@ -15,9 +15,9 @@ import {
 	setTerminalTitlePullRequest,
 	setTerminalTitleSpinnerStyle,
 	setTerminalTitleState,
-} from "@oh-my-pi/pi-coding-agent/utils/title-generator";
-import { setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { isWsl, logger, setTerminalHeadless } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/utils/title-generator";
+import { setNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { isWsl, logger, setTerminalHeadless } from "@oh-my-striped-pi/pi-utils";
 import { mockWindowsConsoleTitle, type WindowsConsoleTitleMock } from "./terminal-title-test-utils";
 
 function getModelOrThrow(id: string): Model<Api> {
@@ -1014,8 +1014,8 @@ describe("terminal title runtime", () => {
 	});
 
 	it("reclaims the Windows console title after another process replaces it", () => {
-		// Issue #16842: a child omp (worker, `browser-relay`) attached to the
-		// pane's console retitled it to `omp`; under a TSP terminal every later
+		// Issue #16842: a child omsp (worker, `browser-relay`) attached to the
+		// pane's console retitled it to `omsp`; under a TSP terminal every later
 		// emit composes the same title, so the dedupe cache must not swallow it.
 		const originalPlatform = process.platform;
 		const native = windowsTitleMock;
@@ -1030,7 +1030,7 @@ describe("terminal title runtime", () => {
 			setTerminalTitleState("working");
 			expect(native.titles).toEqual([]);
 
-			native.current = "omp";
+			native.current = "omsp";
 			setTerminalTitleState("idle");
 			expect(native.titles).toEqual(["HOST: Summarize self-host blog post"]);
 			expect(writes).toEqual([]);
@@ -1160,7 +1160,7 @@ describe("terminal title runtime", () => {
 			expect(emittedTitles().at(-1)).toBe("Renamed · #412");
 			setSessionTerminalTitle(undefined);
 			setTerminalTitlePullRequest(undefined);
-			expect(emittedTitles().at(-1)).toBe("omp");
+			expect(emittedTitles().at(-1)).toBe("omsp");
 			setSessionTerminalTitle("Renamed");
 		} finally {
 			setNativeRendering(false);

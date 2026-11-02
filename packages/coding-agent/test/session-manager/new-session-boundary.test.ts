@@ -3,22 +3,22 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getConfigRootDir, setAgentDir } from "@oh-my-pi/pi-utils";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getConfigRootDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 import { makeAssistantMessage } from "./helpers";
 
 describe("SessionManager.continueRecent /new boundary", () => {
 	let testAgentDir: string;
 	let cwd: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 	const originalTmuxPane = process.env.TMUX_PANE;
 	const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 	beforeEach(async () => {
 		// Deterministic, non-TTY terminal id so breadcrumb read/write is stable.
 		process.env.TMUX_PANE = "%new-boundary-test";
-		testAgentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-new-boundary-"));
+		testAgentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-new-boundary-"));
 		setAgentDir(testAgentDir);
 		cwd = path.join(testAgentDir, "project");
 		fs.mkdirSync(cwd, { recursive: true });
@@ -31,7 +31,7 @@ describe("SessionManager.continueRecent /new boundary", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await fsp.rm(testAgentDir, { recursive: true, force: true });
 	});

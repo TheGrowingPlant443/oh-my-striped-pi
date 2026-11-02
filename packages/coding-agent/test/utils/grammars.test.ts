@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { WasmGrammarInfo } from "@oh-my-pi/pi-natives";
-import { installGrammar } from "@oh-my-pi/pi-coding-agent/utils/grammars";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { WasmGrammarInfo } from "@oh-my-striped-pi/pi-natives";
+import { installGrammar } from "@oh-my-striped-pi/pi-coding-agent/utils/grammars";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const RELEASE = "grammars-test";
 const WASM = new Uint8Array([
@@ -37,19 +37,19 @@ describe("wasm grammar install", () => {
 				return new Response("not found", { status: 404 });
 			},
 		});
-		previousUrl = process.env.PI_GRAMMARS_URL;
+		previousUrl = process.env.OMSP_GRAMMARS_URL;
 		// `server.url` ends in `/`: the installer must trim it.
-		process.env.PI_GRAMMARS_URL = server.url.href;
+		process.env.OMSP_GRAMMARS_URL = server.url.href;
 	});
 
 	afterAll(() => {
-		if (previousUrl === undefined) delete process.env.PI_GRAMMARS_URL;
-		else process.env.PI_GRAMMARS_URL = previousUrl;
+		if (previousUrl === undefined) delete process.env.OMSP_GRAMMARS_URL;
+		else process.env.OMSP_GRAMMARS_URL = previousUrl;
 		server.stop(true);
 	});
 
 	it("installs the verified grammar at <dir>/<file>", async () => {
-		using tempDir = TempDir.createSync("@omp-grammar-install-");
+		using tempDir = TempDir.createSync("@omsp-grammar-install-");
 		const info = grammarInfo("testlang-ok.wasm", WASM_SHA256);
 		const dest = path.join(tempDir.path(), info.file);
 
@@ -61,7 +61,7 @@ describe("wasm grammar install", () => {
 	});
 
 	it("rejects a digest mismatch without leaving files behind", async () => {
-		using tempDir = TempDir.createSync("@omp-grammar-mismatch-");
+		using tempDir = TempDir.createSync("@omsp-grammar-mismatch-");
 		const info = grammarInfo("testlang-bad.wasm", "0".repeat(64));
 		const dest = path.join(tempDir.path(), info.file);
 

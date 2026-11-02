@@ -1,8 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { AgentBusyError, type AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import { getBlobsDir, isEnoent, logger, type postmortem, VERSION } from "@oh-my-pi/pi-utils";
+import { AgentBusyError, type AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import { getBlobsDir, isEnoent, logger, type postmortem, VERSION } from "@oh-my-striped-pi/pi-utils";
 import {
 	type Agent,
 	type AgentSideConnection,
@@ -43,7 +43,7 @@ import {
 	type SetSessionModeRequest,
 	type SetSessionModeResponse,
 	type Usage,
-} from "@oh-my-pi/pi-utils/acp";
+} from "@oh-my-striped-pi/pi-utils/acp";
 import { disableProvider, enableProvider } from "../../capability";
 import { Settings } from "../../config/settings";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
@@ -61,7 +61,7 @@ import { MCPManager } from "../../mcp/manager";
 import { reconnectMcpManagerServer } from "../../mcp/oauth-reauth";
 import type { MCPServerConfig } from "../../mcp/types";
 import { loadAllExtensions } from "../../modes/components/extensions/state-manager";
-import { theme } from "@oh-my-pi/pi-tui/theme";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
 import { normalizePlanTitle, type PlanApprovalDetails, resolveApprovedPlan } from "../../plan-mode/approved-plan";
 import { autosaveApprovedPlan } from "../../plan-mode/plan-autosave";
 import type { AgentSession, AgentSessionEvent } from "../../session/agent-session";
@@ -74,10 +74,10 @@ import { executeAcpBuiltinSlashCommand } from "../../slash-commands/acp-builtins
 import { buildAvailableSlashCommands, toAcpAvailableCommands } from "../../slash-commands/available-commands";
 import { DEFAULT_STT_MODEL_KEY, STT_MODELS } from "../../stt/models";
 import { refreshAgentDiscovery } from "../../task";
-import { AUTO_THINKING, parseConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+import { AUTO_THINKING, parseConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
 import { OTHER_OPTION } from "../../tools/ask";
 import { resolvePlanFilePath } from "../../plan-mode/plan-files";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import {
 	DEFAULT_TTS_SPEED,
 	DEFAULT_TTS_VOICE,
@@ -87,7 +87,7 @@ import {
 	TTS_SPEED_MIN,
 	TTS_SPEED_OPTIONS,
 } from "../../tts/models";
-import { canonicalizeMessage } from "@oh-my-pi/pi-tui/chat/thinking-display";
+import { canonicalizeMessage } from "@oh-my-striped-pi/pi-tui/chat/thinking-display";
 import { createAcpClientBridge } from "./acp-client-bridge";
 import {
 	extractAssistantMessageText,
@@ -115,7 +115,7 @@ const SPEECH_MODELS_LIST_METHOD = "speech.models.list";
  * codex-acp (spec proposal: ACP `session/inject`,
  * agentclientprotocol/agent-client-protocol#1261, still open). Advertised via
  * top-level `_meta.steering.supported` in the `initialize` response; params
- * carry `{ sessionId, prompt: ContentBlock[] }`. The omp extension
+ * carry `{ sessionId, prompt: ContentBlock[] }`. The omsp extension
  * `_meta.steering.queue: "followUp"` routes to the native follow-up queue
  * instead of the steering queue. Idle sessions are never consumed or started:
  * the response is always `promptRequired`, so the host submits the prompt
@@ -318,7 +318,7 @@ const STEERING_BLOCK_STRING_FIELDS: Record<string, string[]> = {
 };
 
 /**
- * `_meta.steering.queue` of a `_session/steering` request — the omp-specific
+ * `_meta.steering.queue` of a `_session/steering` request — the omsp-specific
  * opt-in routing the message to the native follow-up queue instead of the
  * steering queue. Everything else (including `idleBehavior`) is unused: idle
  * sessions always answer `promptRequired`, so the host keeps owning the turn.
@@ -816,23 +816,23 @@ export class AcpAgent implements Agent {
 			{
 				id: "agent",
 				name: "Use existing local credentials",
-				description: "Authenticate via the provider keys/OAuth state already configured under ~/.omp.",
+				description: "Authenticate via the provider keys/OAuth state already configured under ~/.omsp.",
 			},
 		];
 		if (params.clientCapabilities?.auth?.terminal === true) {
 			authMethods.push({
 				type: "terminal",
 				id: "terminal",
-				name: "Set up omp in terminal",
-				description: "Launch the omp TUI to add provider keys and select models.",
+				name: "Set up omsp in terminal",
+				description: "Launch the omsp TUI to add provider keys and select models.",
 				args: [ACP_TERMINAL_AUTH_FLAG],
 			});
 		}
 		return {
 			protocolVersion: PROTOCOL_VERSION,
 			agentInfo: {
-				name: "omp",
-				title: "omp",
+				name: "omsp",
+				title: "omsp",
 				version: VERSION,
 			},
 			authMethods,
@@ -1423,7 +1423,7 @@ export class AcpAgent implements Agent {
 		switch (method) {
 			case SPEECH_MODELS_LIST_METHOD:
 				return buildAcpSpeechModelsCatalog();
-			case "_omp/sessions/listAll": {
+			case "_omsp/sessions/listAll": {
 				const limit = typeof params.limit === "number" ? Math.max(1, Math.min(5000, params.limit as number)) : 1000;
 				const sessions = await SessionManager.listAll();
 				const sorted = sessions.sort((l, r) => r.modified.getTime() - l.modified.getTime()).slice(0, limit);
@@ -1432,7 +1432,7 @@ export class AcpAgent implements Agent {
 					total: sessions.length,
 				};
 			}
-			case "_omp/projects/list": {
+			case "_omsp/projects/list": {
 				const sessions = await SessionManager.listAll();
 				const buckets = new Map<
 					string,
@@ -1460,7 +1460,7 @@ export class AcpAgent implements Agent {
 				const projects = Array.from(buckets.values()).sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 				return { projects, totalSessions: sessions.length };
 			}
-			case "_omp/chats/byCwd": {
+			case "_omsp/chats/byCwd": {
 				const cwd = typeof params.cwd === "string" ? (params.cwd as string) : undefined;
 				if (!cwd) throw new Error("cwd required");
 				const limit = typeof params.limit === "number" ? Math.max(1, Math.min(500, params.limit as number)) : 100;
@@ -1468,7 +1468,7 @@ export class AcpAgent implements Agent {
 				const sorted = sessions.sort((l, r) => r.modified.getTime() - l.modified.getTime()).slice(0, limit);
 				return { sessions: sorted.map(s => this.#toSessionInfo(s)) };
 			}
-			case "_omp/usage": {
+			case "_omsp/usage": {
 				const [firstRecord] = this.#sessions.values();
 				const target = firstRecord?.session ?? this.#initialSession;
 				if (!target) {
@@ -1477,14 +1477,14 @@ export class AcpAgent implements Agent {
 				const reports = await target.fetchUsageReports();
 				return { reports: reports ?? [] };
 			}
-			case "_omp/extensions": {
+			case "_omsp/extensions": {
 				const cwd = typeof params.cwd === "string" ? (params.cwd as string) : undefined;
 				const sm = await Settings.init();
 				const disabledIds = cfgDisabledExtensions.get(sm);
 				const extensions = await loadAllExtensions(cwd, disabledIds);
 				return { extensions: extensions as unknown as Array<{ [key: string]: unknown }> };
 			}
-			case "_omp/extensions/toggle": {
+			case "_omsp/extensions/toggle": {
 				const providerId = params.providerId;
 				if (typeof providerId !== "string") throw new Error("providerId required");
 				if (params.enabled === false) {
@@ -1520,11 +1520,11 @@ export class AcpAgent implements Agent {
 	 *   always `promptRequired`, so the host submits the content through
 	 *   `session/prompt` and keeps owning the turn.
 	 *
-	 * omp deliberately never returns `startedNewTurn` (claude-agent-acp's
+	 * omsp deliberately never returns `startedNewTurn` (claude-agent-acp's
 	 * behavior without the `idleBehavior` opt-in) because a detached turn has
 	 * no `session/prompt` response to carry a failed start, so a rejection
 	 * would be invisible to the client (claude-agent-acp#903). `queue` is
-	 * `followUp` when the request opts into the omp-specific
+	 * `followUp` when the request opts into the omsp-specific
 	 * `_meta.steering.queue: "followUp"` routing.
 	 */
 	async #handleSessionSteering(params: { [key: string]: unknown }): Promise<{ [key: string]: unknown }> {

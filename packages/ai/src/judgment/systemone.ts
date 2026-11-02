@@ -1,5 +1,5 @@
 /** System One protocol, supported by OpenJEV, Kev and self-hosted Clef. */
-import { isRecord } from "@oh-my-pi/pi-utils";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import type { ImageContent } from "../types";
 import {
 	type BoxQuestion,
@@ -24,12 +24,12 @@ function decodeSystemOne(payload: unknown): DecodedJudgment | undefined {
 
 /**
  * `state` with `items` added and every original value kept: arrays gain them at the end, objects
- * under the first free `__omp_judgment_images[_N]` key, and a string root becomes `[state, ...items]`.
+ * under the first free `__omsp_judgment_images[_N]` key, and a string root becomes `[state, ...items]`.
  */
 function stateWithImages(state: JudgmentRequest["state"], items: readonly JsonValue[]): JudgmentRequest["state"] {
 	if (Array.isArray(state)) return [...state, ...items];
 	if (!isRecord(state)) return [state, ...items];
-	const baseKey = "__omp_judgment_images";
+	const baseKey = "__omsp_judgment_images";
 	let key = baseKey;
 	for (let suffix = 1; Object.hasOwn(state, key); suffix++) key = `${baseKey}_${suffix}`;
 	return { ...state, [key]: items };

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { Model } from "@oh-my-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { Model } from "@oh-my-striped-pi/pi-catalog/types";
 import { handleImageEdits, handleImageGenerations } from "../src/auth-gateway/routes/images";
 import { handleSpeech } from "../src/auth-gateway/routes/speech";
 import { handleSystemOne } from "../src/auth-gateway/routes/systemone";

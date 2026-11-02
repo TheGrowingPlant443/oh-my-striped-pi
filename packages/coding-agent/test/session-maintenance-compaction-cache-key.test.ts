@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { normalizeOpenAIPromptCacheKey } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { Model, ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { normalizeOpenAIPromptCacheKey } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { Model, ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { asGlobalFetch } from "./helpers/fetch-mock";
 import { assistantMsg, userMsg } from "./utilities";
 

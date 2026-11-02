@@ -1,19 +1,19 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import type { AssistantMessage, ImageContent, Usage } from "@oh-my-pi/pi-ai";
+import type { AssistantMessage, ImageContent, Usage } from "@oh-my-striped-pi/pi-ai";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { BtwHistoryPanel } from "@oh-my-pi/pi-tui/overlays/btw-history-panel";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { BtwHistoryStore } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { BtwPanelComponent } from "@oh-my-pi/pi-tui/overlays/btw-panel";
-import { BtwController } from "@oh-my-pi/pi-coding-agent/modes/controllers/btw-controller";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import * as clipboard from "@oh-my-pi/pi-coding-agent/utils/clipboard";
-import { Container, replaceTabs, type TUI } from "@oh-my-pi/pi-tui";
-import type { NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
+import { BtwHistoryPanel } from "@oh-my-striped-pi/pi-tui/overlays/btw-history-panel";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { BtwHistoryStore } from "@oh-my-striped-pi/pi-coding-agent/session/btw-history";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { BtwPanelComponent } from "@oh-my-striped-pi/pi-tui/overlays/btw-panel";
+import { BtwController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/btw-controller";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import * as clipboard from "@oh-my-striped-pi/pi-coding-agent/utils/clipboard";
+import { Container, replaceTabs, type TUI } from "@oh-my-striped-pi/pi-tui";
+import type { NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
 
 const usage: Usage = {
 	input: 0,
@@ -317,7 +317,7 @@ describe("BtwController", () => {
 	});
 
 	it("keeps focused-agent side conversations apart from main history in the shared artifacts directory", async () => {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-focused-scope-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-focused-scope-"));
 		const mainTurn = vi.fn(async () => ({
 			replyText: "Main answer",
 			assistantMessage: createAssistantMessage("Main"),
@@ -369,7 +369,7 @@ describe("BtwController", () => {
 	});
 
 	it("heads a titled side question with its title while the model answers the full text", async () => {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-title-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-title-"));
 		const runEphemeralTurn = vi.fn(async (_args: RunEphemeralTurnArgs) => ({
 			replyText: "Status answer",
 			assistantMessage: createAssistantMessage("Status answer"),
@@ -764,7 +764,7 @@ describe("BtwController", () => {
 	});
 
 	it("keeps closed answers across resume without changing the main journal or model context", async () => {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-history-controller-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-history-controller-"));
 		const manager = SessionManager.create(directory, directory);
 		const session = makeFakeSession(async () => ({
 			replyText: "Saved side answer",
@@ -807,7 +807,7 @@ describe("BtwController", () => {
 	});
 
 	it("persists cancellation and ignores late output after switching sessions", async () => {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-cancel-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-cancel-"));
 		const pending = Promise.withResolvers<RunEphemeralTurnResult>();
 		const run = vi.fn((_args: RunEphemeralTurnArgs) => pending.promise);
 		const ctx = makeCtx(makeFakeSession(run));

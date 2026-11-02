@@ -17,12 +17,12 @@ A successful call is not memoized by JS. Repeated calls rely on the runtime's `r
 - `platformTag`: `${platform}-${process.arch}`;
 - package version (the expected addon release, subject to the pre-sentinel compatibility exception below);
 - package-local `nativeDir` and the directory of `process.execPath`;
-- `nativesDir`: `PI_NATIVES_DIR` first (trimmed, `~`-expanded, and normalized; empty or relative values are ignored), then `$XDG_DATA_HOME/omp/natives` only when `$XDG_DATA_HOME/omp` exists, otherwise `~/.omp/natives`;
+- `nativesDir`: `OMSP_NATIVES_DIR` first (trimmed, `~`-expanded, and normalized; empty or relative values are ignored), then `$XDG_DATA_HOME/omsp/natives` only when `$XDG_DATA_HOME/omsp` exists, otherwise `~/.omsp/natives`;
 - `versionedDir`: `<nativesDir>/<packageVersion>`;
-- legacy compiled-binary directory: `%LOCALAPPDATA%/omp` (or `~/AppData/Local/omp`) on Windows, `~/.local/bin` elsewhere;
+- legacy compiled-binary directory: `%LOCALAPPDATA%/omsp` (or `~/AppData/Local/omsp`) on Windows, `~/.local/bin` elsewhere;
 - workspace/install/compiled mode, optional leaf directory, Windows staging policy, CPU variant, filenames, and ordered candidates.
 
-Compiled mode is true when a populated embedded manifest exists, `PI_COMPILED` is set, or `import.meta.url` contains a Bun embedded marker (`$bunfs`, `~BUN`, or `%7EBUN`). A non-compiled `nativeDir` outside a `node_modules` path is a workspace load. Windows path classification is case-insensitive; other platforms use case-sensitive path matching.
+Compiled mode is true when a populated embedded manifest exists, `OMSP_COMPILED` is set, or `import.meta.url` contains a Bun embedded marker (`$bunfs`, `~BUN`, or `%7EBUN`). A non-compiled `nativeDir` outside a `node_modules` path is a workspace load. Windows path classification is case-insensitive; other platforms use case-sensitive path matching.
 
 ## Platforms and variants
 
@@ -37,7 +37,7 @@ Supported publish tags are:
 
 An unsupported tag is reported only after probing candidates.
 
-For x64, `PI_NATIVE_VARIANT=modern|baseline` wins. Invalid values are ignored. Otherwise the private inherited `__PI_NATIVE_VARIANT_CACHE` result is used when valid; only then does the loader detect AVX2:
+For x64, `OMSP_NATIVE_VARIANT=modern|baseline` wins. Invalid values are ignored. Otherwise the private inherited `__OMSP_NATIVE_VARIANT_CACHE` result is used when valid; only then does the loader detect AVX2:
 
 - Linux reads `/proc/cpuinfo`.
 - macOS tries `/usr/sbin/sysctl` and then `sysctl`, querying `machdep.cpu.leaf7_features` and `machdep.cpu.features`.
@@ -59,7 +59,7 @@ Detection uses `Bun.spawnSync` when available, then falls back to `node:child_pr
 
 ### Installed, non-compiled package
 
-1. Every selected filename in `@oh-my-pi/pi-natives-<tag>`.
+1. Every selected filename in `@oh-my-striped-pi/pi-natives-<tag>`.
 2. For each filename, package-local `nativeDir`, then the executable directory.
 
 The platform leaf wins over a stale core artifact. Workspace loads deliberately skip leaf resolution.
@@ -113,7 +113,7 @@ The version error distinguishes a previous addon still resident in the current p
 
 Workspace development skips the version check entirely, so a checkout that pulled a newer release boots before its rebuild. That tolerance is not silent: `native/index.js` uses `missingNativeExport(symbol)` for missing ordinary function exports (release-identity functions remain raw passthroughs), which is `undefined` on a current addon and a throwing stub on a stale one naming the symbol, the addon path, the loaded and expected releases, and `bun run build:native`. `nativeAddonStatus()` reports the same identity (`path`, `version`, `packageVersion`, `stale`) for callers that surface it themselves.
 
-Rust module initialization installs crash diagnostics but does not spawn runtime threads under the dynamic-loader lock. The optional post-load hook installs bounded Windows Tokio and Rayon pools. It is best-effort; older addons or hook failures fall back to napi-rs behavior. Set `PI_DEBUG_STARTUP` to emit synchronous `[startup]` markers to stderr, including hook success/failure.
+Rust module initialization installs crash diagnostics but does not spawn runtime threads under the dynamic-loader lock. The optional post-load hook installs bounded Windows Tokio and Rayon pools. It is best-effort; older addons or hook failures fall back to napi-rs behavior. Set `OMSP_DEBUG_STARTUP` to emit synchronous `[startup]` markers to stderr, including hook success/failure.
 
 Cache cleanup ignores read/delete failures and removes only directories named with an older `major.minor.patch` release and an mtime at least ten minutes old. `prepareNativeVersionDir()` refreshes the directory mtime before extraction or staging to protect concurrent starts. Cleanup preserves current/future versions, prerelease/non-version names, ordinary files, and recently active directories.
 

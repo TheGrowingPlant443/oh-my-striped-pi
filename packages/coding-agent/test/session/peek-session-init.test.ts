@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { FileSessionStorage, MemorySessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { FileSessionStorage, MemorySessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "../helpers/model-fixtures";
 
 const tempDirs: TempDir[] = [];

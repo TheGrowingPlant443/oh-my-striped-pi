@@ -1,5 +1,5 @@
-import { type CredentialDisabledEvent, getOAuthProviders } from "@oh-my-pi/pi-ai";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import { type CredentialDisabledEvent, getOAuthProviders } from "@oh-my-striped-pi/pi-ai";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 
 /** `notice` source of an automatic credential disable; print mode writes these to stderr. */
 export const CREDENTIAL_DISABLED_NOTICE_SOURCE = "auth";

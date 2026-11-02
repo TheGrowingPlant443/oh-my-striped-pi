@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
+import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
 import { removeWithRetries } from "../../utils/src/temp";
 
 const LEGACY_TIMESTAMP = 1_700_000_000;
@@ -475,7 +475,7 @@ describe("AuthStorage persistent session stickiness", () => {
 	let dbPath = "";
 
 	beforeEach(async () => {
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-auth-test-"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-auth-test-"));
 		dbPath = path.join(tempDir, "auth.db");
 	});
 

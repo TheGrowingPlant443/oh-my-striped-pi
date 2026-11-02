@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { agentLoop } from "@oh-my-pi/pi-agent-core/agent-loop";
-import { SpeculativeOperationCoordinator } from "@oh-my-pi/pi-agent-core/speculative-execution";
-import type { AgentTool, AgentMessage, AgentContext, AgentLoopConfig } from "@oh-my-pi/pi-agent-core/types";
-import type { Message } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
+import { type } from "@oh-my-striped-pi/omptype";
+import { agentLoop } from "@oh-my-striped-pi/pi-agent-core/agent-loop";
+import { SpeculativeOperationCoordinator } from "@oh-my-striped-pi/pi-agent-core/speculative-execution";
+import type { AgentTool, AgentMessage, AgentContext, AgentLoopConfig } from "@oh-my-striped-pi/pi-agent-core/types";
+import type { Message } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
 import { createUserMessage } from "./helpers";
 
 // Identity converter for tests - just passes through standard messages

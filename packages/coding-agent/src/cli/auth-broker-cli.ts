@@ -1,5 +1,5 @@
 /**
- * `omp auth-broker` command handlers.
+ * `omsp auth-broker` command handlers.
  *
  * Sub-verbs:
  *   - `serve [--bind=…] [--trust-proxy-headers]` — boots the broker against the local SQLite store.
@@ -26,13 +26,13 @@ import {
 	type OAuthProvider,
 	PROVIDER_REGISTRY,
 	SqliteAuthCredentialStore,
-} from "@oh-my-pi/pi-ai";
-import { AuthBrokerClient, DEFAULT_AUTH_BROKER_BIND, startAuthBroker } from "@oh-my-pi/pi-ai/auth-broker";
-import { refreshOAuthToken } from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/oauth/types";
-import { $which, APP_NAME, getAgentDbPath, getConfigRootDir, logger, VERSION } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
-import { setTransports as setLoggerTransports } from "@oh-my-pi/pi-utils/logger";
+} from "@oh-my-striped-pi/pi-ai";
+import { AuthBrokerClient, DEFAULT_AUTH_BROKER_BIND, startAuthBroker } from "@oh-my-striped-pi/pi-ai/auth-broker";
+import { refreshOAuthToken } from "@oh-my-striped-pi/pi-ai/oauth";
+import type { OAuthCredentials } from "@oh-my-striped-pi/pi-ai/oauth/types";
+import { $which, APP_NAME, getAgentDbPath, getConfigRootDir, logger, VERSION } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
+import { setTransports as setLoggerTransports } from "@oh-my-striped-pi/pi-utils/logger";
 import { refreshManagedMcpOAuthCredential } from "../mcp/oauth-credentials";
 import { isManagedMCPOAuthCredentialId, mcpOAuthServerUrlFromCredentialId } from "../mcp/oauth-flow";
 import { resolveAuthBrokerConfig } from "../session/auth-broker-config";
@@ -84,9 +84,9 @@ async function ensureToken(): Promise<string> {
 }
 
 /**
- * OAuth refresh handler for `omp auth-broker serve`'s {@link AuthStorage}.
+ * OAuth refresh handler for `omsp auth-broker serve`'s {@link AuthStorage}.
  *
- * The vault holds provider OAuth rows AND OMP-managed `mcp_oauth:*` rows.
+ * The vault holds provider OAuth rows AND OMSP-managed `mcp_oauth:*` rows.
  * Provider rows refresh through the per-provider registry. MCP rows are
  * self-describing — the embedded token endpoint and client credentials are the
  * only refresh material — so they refresh with a generic `refresh_token` grant.
@@ -111,7 +111,7 @@ export function refreshBrokerOAuthCredential(
 	return refreshOAuthToken(provider as OAuthProvider, credential, signal);
 }
 
-/** The `omp auth-broker serve` vault: tokens refresh in this process through {@link refreshBrokerOAuthCredential}. */
+/** The `omsp auth-broker serve` vault: tokens refresh in this process through {@link refreshBrokerOAuthCredential}. */
 export function createBrokerAuthStorage(store: SqliteAuthCredentialStore): AuthStorage {
 	return new AuthStorage(store, {
 		refreshOAuthCredential: (provider, _credentialId, credential, signal) =>
@@ -123,7 +123,7 @@ export function createBrokerAuthStorage(store: SqliteAuthCredentialStore): AuthS
 async function runServe(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
 	// The broker is a long-running headless service: route structured logs to
 	// stdout so a process supervisor (pm2, journald, k8s) captures them, and
-	// skip the rotating ~/.omp/logs/ file the TUI default would have used.
+	// skip the rotating ~/.omsp/logs/ file the TUI default would have used.
 	setLoggerTransports({ console: true, file: false });
 
 	const bind = flags.bind ?? DEFAULT_AUTH_BROKER_BIND;
@@ -176,7 +176,7 @@ async function runToken(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
 
 async function runLogin(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
 	if (flags.via && !flags.provider) {
-		throw new Error("Usage: omp auth-broker login <provider> --via=user@host (provider required for remote login)");
+		throw new Error("Usage: omsp auth-broker login <provider> --via=user@host (provider required for remote login)");
 	}
 	const providers = getOAuthProviders();
 	// One interface for picker + login prompts; closed before `--via` hands
@@ -337,12 +337,12 @@ async function runMigrate(flags: AuthBrokerCommandArgs["flags"]): Promise<void> 
 	const brokerConfig = await resolveAuthBrokerConfig();
 	if (!brokerConfig) {
 		throw new Error(
-			"OMP_AUTH_BROKER_URL must be set (or `auth.broker.url` in config.yml). `migrate` uploads local credentials to a configured broker.",
+			"OMSP_AUTH_BROKER_URL must be set (or `auth.broker.url` in config.yml). `migrate` uploads local credentials to a configured broker.",
 		);
 	}
 	if (flags.fromLocal !== true) {
 		throw new Error(
-			"`omp auth-broker migrate` requires an explicit source. Pass `--from-local` to migrate from the local SQLite store and env vars.",
+			"`omsp auth-broker migrate` requires an explicit source. Pass `--from-local` to migrate from the local SQLite store and env vars.",
 		);
 	}
 
@@ -490,7 +490,7 @@ async function runMigrate(flags: AuthBrokerCommandArgs["flags"]): Promise<void> 
 async function runStatus(flags: AuthBrokerCommandArgs["flags"]): Promise<void> {
 	const cfg = await resolveAuthBrokerConfig();
 	if (!cfg) {
-		const message = "No auth-broker configured (set OMP_AUTH_BROKER_URL to enable).";
+		const message = "No auth-broker configured (set OMSP_AUTH_BROKER_URL to enable).";
 		if (flags.json) process.stdout.write(`${JSON.stringify({ ok: false, reason: "not_configured" })}\n`);
 		else process.stdout.write(`${chalk.yellow(message)}\n`);
 		return;

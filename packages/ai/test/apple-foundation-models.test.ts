@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 import { completeSimple } from "../src/stream";
 
 const model = buildModel({

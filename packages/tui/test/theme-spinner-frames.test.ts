@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { sharedSpinnerFrame } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { SPINNER_ADVANCE_MS } from "@oh-my-pi/pi-tui/components/loader";
-import { getThemeByName } from "@oh-my-pi/pi-tui/theme";
-import { getConfigRootDir, getCustomThemesDir, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { sharedSpinnerFrame } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { SPINNER_ADVANCE_MS } from "@oh-my-striped-pi/pi-tui/components/loader";
+import { getThemeByName } from "@oh-my-striped-pi/pi-tui/theme";
+import { getConfigRootDir, getCustomThemesDir, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 // Path of the built-in dark theme JSON, used as a known-valid base we can
 // extend with custom `symbols.spinnerFrames` shapes.
 const DARK_THEME_PATH = path.join(import.meta.dir, "..", "src", "theme", "dark.json");
 
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 let tmpAgentDir: string;
@@ -31,7 +31,7 @@ async function writeCustomTheme(name: string, extraSymbols: Record<string, unkno
 
 describe("theme symbols.spinnerFrames", () => {
 	beforeEach(async () => {
-		tmpAgentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-spinner-frames-"));
+		tmpAgentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-spinner-frames-"));
 		setAgentDir(tmpAgentDir);
 	});
 
@@ -40,7 +40,7 @@ describe("theme symbols.spinnerFrames", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await removeWithRetries(tmpAgentDir);
 	});

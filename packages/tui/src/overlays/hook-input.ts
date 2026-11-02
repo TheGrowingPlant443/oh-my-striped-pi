@@ -14,8 +14,8 @@ import type { DescribeContext, NativeChild, NativeNode, NativeUiEvent } from "..
 import { actionBar, actionButton } from "../native/overlay";
 import { plainText } from "../native/spans";
 
-/** Role prefix of the sheet's parts (`omp.hook-input.head`, `.title`, `.timer`, `.detail`, `.field`). */
-const PART = "omp.hook-input";
+/** Role prefix of the sheet's parts (`omsp.hook-input.head`, `.title`, `.timer`, `.detail`, `.field`). */
+const PART = "omsp.hook-input";
 
 export interface HookInputOptions {
 	tui?: TUI;
@@ -65,7 +65,7 @@ export class HookInputComponent extends OverlayPanel {
 		onCancel: () => void,
 		opts?: HookInputOptions,
 	) {
-		super(title, "omp.overlay.hook-input");
+		super(title, "omsp.overlay.hook-input");
 
 		this.#onSubmitCallback = onSubmit;
 		this.#onCancelCallback = onCancel;

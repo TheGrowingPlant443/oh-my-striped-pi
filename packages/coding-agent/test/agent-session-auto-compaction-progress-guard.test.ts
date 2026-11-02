@@ -1,20 +1,24 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { scheduler } from "node:timers/promises";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import { type CompactionPreparation, resolveThresholdTokens, shouldCompact } from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { runPrintMode } from "@oh-my-pi/pi-coding-agent/modes/print-mode";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import type { CompactionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { INCOMPLETE_RECOVERY_MAX_RETRIES } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import * as compactionModule from "@oh-my-striped-pi/pi-agent-core/compaction";
+import {
+	type CompactionPreparation,
+	resolveThresholdTokens,
+	shouldCompact,
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { runPrintMode } from "@oh-my-striped-pi/pi-coding-agent/modes/print-mode";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import type { CompactionEntry } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { INCOMPLETE_RECOVERY_MAX_RETRIES } from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
 
 import {
 	cfgCompactionAsyncEnabled,
@@ -29,7 +33,7 @@ import {
 	cfgCompactionThresholdPercent,
 	cfgCompactionThresholdTokens,
 	cfgContextPromotionEnabled,
-} from "@oh-my-pi/pi-coding-agent/session/context-settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 it("clamps a reserve exceeding the window for small-window threshold recovery bands", () => {
 	const settings = {

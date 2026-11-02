@@ -3,15 +3,19 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { scheduler } from "node:timers/promises";
-import { type BtwHistoryRecord, BtwHistoryStore, getBtwCopyText } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import { acquireFileLock, withFileLock } from "@oh-my-pi/pi-utils";
+import {
+	type BtwHistoryRecord,
+	BtwHistoryStore,
+	getBtwCopyText,
+} from "@oh-my-striped-pi/pi-coding-agent/session/btw-history";
+import { acquireFileLock, withFileLock } from "@oh-my-striped-pi/pi-utils";
 
 describe("BtwHistoryStore", () => {
 	let directory: string;
 	let artifactsDir: string;
 
 	beforeEach(async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-history-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-history-"));
 		artifactsDir = path.join(directory, "session");
 	});
 

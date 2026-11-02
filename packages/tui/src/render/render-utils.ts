@@ -7,10 +7,10 @@
 
 import * as os from "node:os";
 import * as path from "node:path";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { Ellipsis } from "@oh-my-pi/pi-natives";
-import { expandWindowsLongPath, getWindowsShortPath } from "@oh-my-pi/pi-natives/path";
-import { pluralize, sanitizeText } from "@oh-my-pi/pi-utils";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { Ellipsis } from "@oh-my-striped-pi/pi-natives";
+import { expandWindowsLongPath, getWindowsShortPath } from "@oh-my-striped-pi/pi-natives/path";
+import { pluralize, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import { formatKeyHint, type KeyId } from "../app-keybindings";
 import { getKeybindings } from "../keybindings";
 import type { Theme } from "../theme/theme";
@@ -18,7 +18,7 @@ import type { Component } from "../tui";
 import { replaceTabs, sliceByColumn, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
 import { Hasher } from "./utils";
 
-export { Ellipsis } from "@oh-my-pi/pi-natives";
+export { Ellipsis } from "@oh-my-striped-pi/pi-natives";
 export { replaceTabs, truncateToWidth, wrapTextWithAnsi } from "../utils";
 
 /** A thinking selector configured as a concrete level or automatic selection. */
@@ -278,7 +278,14 @@ export function getDomain(url: string): string {
 // Formatting Utilities
 // =============================================================================
 
-export { formatAge, formatBytes, formatCount, formatDuration, formatNumber, pluralize } from "@oh-my-pi/pi-utils";
+export {
+	formatAge,
+	formatBytes,
+	formatCount,
+	formatDuration,
+	formatNumber,
+	pluralize,
+} from "@oh-my-striped-pi/pi-utils";
 
 // =============================================================================
 // Theme Helper Utilities

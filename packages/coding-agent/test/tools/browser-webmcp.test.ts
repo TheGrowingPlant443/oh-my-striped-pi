@@ -1,21 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
 import {
 	acquireBrowser,
 	holdBrowser,
 	type PuppeteerBrowserHandle,
 	releaseBrowser,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import { releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import { releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
 import {
 	WebMcpController,
 	type WebMcpEventsResult,
 	type WebMcpInvokeResult,
 	type WebMcpListResult,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/webmcp";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/webmcp";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { rejectionOf } from "../helpers/rejection";
 import { chromiumAvailable } from "./chromium-probe";
 
@@ -184,7 +184,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser WebMCP helpers", () => {
 		async () => {
 			const invoke = createBrowserHost();
 			using server = servePage(`<title>untouched</title>`);
-			// What the page itself can see of omp: an omp global, a wrapped platform method, a polyfilled context.
+			// What the page itself can see of omsp: an omsp global, a wrapped platform method, a polyfilled context.
 			const pageView = `JSON.stringify({
   ompGlobals: Object.getOwnPropertyNames(globalThis).filter(name => name.startsWith("__ompWebMcp")),
   nativeRegisterTool: typeof ModelContext === "undefined"
@@ -203,7 +203,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser WebMCP helpers", () => {
 				secure,
 			);
 
-			// No secure context, so no platform API, and omp adds none.
+			// No secure context, so no platform API, and omsp adds none.
 			await invoke(call("webmcp-untouched", "goto", ["data:text/html,<title>insecure</title>"]));
 			expect(JSON.parse(valueFrom<string>(await invoke(call("webmcp-untouched", "evaluate", [pageView]))))).toEqual({
 				ompGlobals: [],

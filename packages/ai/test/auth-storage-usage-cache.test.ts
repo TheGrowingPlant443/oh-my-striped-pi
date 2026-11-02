@@ -20,9 +20,9 @@ import {
 	type AuthCredentialStore,
 	AuthStorage,
 	type StoredAuthCredential,
-} from "@oh-my-pi/pi-ai/auth-storage";
-import { usageCacheIdentity } from "@oh-my-pi/pi-ai/auth/usage-cache";
-import type { UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
+} from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { usageCacheIdentity } from "@oh-my-striped-pi/pi-ai/auth/usage-cache";
+import type { UsageProvider, UsageReport } from "@oh-my-striped-pi/pi-ai/usage";
 import { fixtureUsageProvider } from "./usage-test-utils";
 
 function copilotReports(reports: UsageReport[] | null): UsageReport[] {

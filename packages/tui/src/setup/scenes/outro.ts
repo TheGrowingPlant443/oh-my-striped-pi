@@ -1,7 +1,7 @@
 import { centerLine } from "../../utils";
 import { padToWidth } from "../../render/utils";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
-import { gradientLogo, PI_LOGO } from "../../prompt/welcome";
+import { APP_NAME } from "@oh-my-striped-pi/pi-utils";
+import { gradientLogo, OMSP_LOGO } from "../../prompt/welcome";
 import { theme } from "../../theme/theme";
 import { col, compact, keyed, node, span, text } from "../../native/describe";
 import type { NativeNode } from "../../native/node";
@@ -13,7 +13,7 @@ export const SETUP_OUTRO_MS = 1200;
 const outroMemo = new Memo();
 
 /**
- * Native outro, centered: the builtin `omp` mark, "You're all set", the
+ * Native outro, centered: the builtin `omsp` mark, "You're all set", the
  * default model now in effect (`model`, its display name, when there is
  * one), and an indeterminate progress bar standing in for the timed sweep.
  * A click sends the `continue` action.
@@ -23,25 +23,25 @@ export function describeSetupOutro(model: string | undefined): NativeNode {
 		col(
 			compact([
 				node("spacer", { grow: 1 }, undefined, "top"),
-				node("image", { builtin: "omp", alt: APP_NAME, w: 72, role: "omp.setup.outro.mark" }, undefined, "logo"),
-				keyed(text([span("You're all set", "strong")], { wrap: "none", role: "omp.setup.outro.title" }), "title"),
+				node("image", { builtin: "omsp", alt: APP_NAME, w: 72, role: "omsp.setup.outro.mark" }, undefined, "logo"),
+				keyed(text([span("You're all set", "strong")], { wrap: "none", role: "omsp.setup.outro.title" }), "title"),
 				model !== undefined &&
 					keyed(
 						text([span("Default model", "muted"), span(" · ", "dim"), span(model, "muted")], {
 							wrap: "none",
 							truncate: "end",
-							role: "omp.setup.outro.model",
+							role: "omsp.setup.outro.model",
 						}),
 						"model",
 					),
 				keyed(
-					text([span(`Starting ${APP_NAME}…`, "muted")], { wrap: "none", role: "omp.setup.outro.status" }),
+					text([span(`Starting ${APP_NAME}…`, "muted")], { wrap: "none", role: "omsp.setup.outro.status" }),
 					"status",
 				),
-				node("progress", { value: null, role: "omp.setup.outro.progress" }, undefined, "progress"),
+				node("progress", { value: null, role: "omsp.setup.outro.progress" }, undefined, "progress"),
 				node("spacer", { grow: 1 }, undefined, "bottom"),
 			]),
-			{ align: "center", grow: 1, role: "omp.setup.outro", actions: { click: "continue" } },
+			{ align: "center", grow: 1, role: "omsp.setup.outro", actions: { click: "continue" } },
 		),
 	);
 }
@@ -50,7 +50,7 @@ export function renderSetupOutro(width: number, height: number, elapsedMs: numbe
 	const frame = Math.floor(elapsedMs / SETUP_TICK_MS);
 	const lines = renderStarfield(width, height, frame + 1000);
 	const progress = Math.max(0, Math.min(1, elapsedMs / SETUP_OUTRO_MS));
-	const logo = gradientLogo(PI_LOGO, progress * 1.2, { pos: (progress * 2) % 1, strength: 1 - progress });
+	const logo = gradientLogo(OMSP_LOGO, progress * 1.2, { pos: (progress * 2) % 1, strength: 1 - progress });
 	const title = theme.bold(theme.fg("success", `${theme.status.success} Setup saved`));
 	const subtitle = theme.fg("muted", "Handing off to the normal CLI…");
 	const sweepWidth = Math.max(1, Math.min(width - 8, Math.floor((width - 8) * progress)));

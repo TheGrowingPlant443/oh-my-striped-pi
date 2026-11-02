@@ -1,10 +1,10 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import * as path from "node:path";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
-import { refreshStoredManagedMcpOAuthCredential } from "@oh-my-pi/pi-coding-agent/mcp/oauth-credentials";
-import type { MCPStoredOAuthCredential } from "@oh-my-pi/pi-coding-agent/mcp/oauth-flow";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
+import { refreshStoredManagedMcpOAuthCredential } from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-credentials";
+import type { MCPStoredOAuthCredential } from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-flow";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 /** Capture the `resource` form field of the single refresh_token grant a helper call makes. */
 async function captureRefreshResource(
@@ -60,7 +60,7 @@ test("refresh without server-url recovery advertises no resource", async () => {
 const cliEntry = path.join(import.meta.dir, "..", "src", "cli.ts");
 
 test("token refreshes and persists a rotating local MCP OAuth grant", async () => {
-	using tempDir = TempDir.createSync("@omp-token-mcp-oauth-");
+	using tempDir = TempDir.createSync("@omsp-token-mcp-oauth-");
 	const provider = "mcp_oauth:profile:default:https://mcp.example.test/MCP";
 	const dbPath = tempDir.join("agent.db");
 	const refreshTokens: string[] = [];
@@ -97,9 +97,9 @@ test("token refreshes and persists a rotating local MCP OAuth grant", async () =
 			env: {
 				...process.env,
 				NO_COLOR: "1",
-				OMP_AUTH_BROKER_TOKEN: undefined,
-				OMP_AUTH_BROKER_URL: undefined,
-				PI_CODING_AGENT_DIR: tempDir.path(),
+				OMSP_AUTH_BROKER_TOKEN: undefined,
+				OMSP_AUTH_BROKER_URL: undefined,
+				OMSP_CODING_AGENT_DIR: tempDir.path(),
 			},
 			stdout: "pipe",
 			stderr: "pipe",
@@ -135,7 +135,7 @@ test("token refreshes and persists a rotating local MCP OAuth grant", async () =
 }, 30_000);
 
 test("token refuses a managed MCP id scoped to another profile", async () => {
-	using tempDir = TempDir.createSync("@omp-token-mcp-oauth-xprofile-");
+	using tempDir = TempDir.createSync("@omsp-token-mcp-oauth-xprofile-");
 	// A non-expired row that the fall-through resolver WOULD hand back verbatim.
 	const foreignProvider = "mcp_oauth:profile:work:https://mcp.example.test/mcp";
 	const dbPath = tempDir.join("agent.db");
@@ -155,11 +155,10 @@ test("token refuses a managed MCP id scoped to another profile", async () => {
 		env: {
 			...process.env,
 			NO_COLOR: "1",
-			OMP_AUTH_BROKER_TOKEN: undefined,
-			OMP_AUTH_BROKER_URL: undefined,
-			OMP_PROFILE: undefined,
-			PI_PROFILE: undefined,
-			PI_CODING_AGENT_DIR: tempDir.path(),
+			OMSP_AUTH_BROKER_TOKEN: undefined,
+			OMSP_AUTH_BROKER_URL: undefined,
+			OMSP_PROFILE: undefined,
+			OMSP_CODING_AGENT_DIR: tempDir.path(),
 		},
 		stdout: "pipe",
 		stderr: "pipe",
@@ -176,7 +175,7 @@ test("token refuses a managed MCP id scoped to another profile", async () => {
 }, 30_000);
 
 test("token retains the independent Perplexity credential helper", async () => {
-	using tempDir = TempDir.createSync("@omp-token-perplexity-");
+	using tempDir = TempDir.createSync("@omsp-token-perplexity-");
 	const storage = new AuthStorage(await SqliteAuthCredentialStore.open(tempDir.join("agent.db")));
 	await storage.credentials.reload();
 	await storage.credentials.set("perplexity", { type: "api_key", key: "independent-search-key" });
@@ -189,7 +188,7 @@ test("token retains the independent Perplexity credential helper", async () => {
 			HOME: tempDir.path(),
 			USERPROFILE: tempDir.path(),
 			NO_COLOR: "1",
-			PI_CODING_AGENT_DIR: tempDir.path(),
+			OMSP_CODING_AGENT_DIR: tempDir.path(),
 		},
 		stdout: "pipe",
 		stderr: "pipe",

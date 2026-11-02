@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { type AgentMessage, type AgentTelemetryConfig, Tokenizer } from "@oh-my-pi/pi-agent-core";
+import { type } from "@oh-my-striped-pi/omptype";
+import { type AgentMessage, type AgentTelemetryConfig, Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	buildOpenAiNativeHistory,
 	createCompactionSummaryMessage,
 	defaultConvertToLlm,
-} from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage, ToolResultMessage } from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage, ToolResultMessage } from "@oh-my-striped-pi/pi-ai";
 import type {
 	ResponseFileSearchToolCall,
 	ResponseFunctionWebSearch,
 	ResponseInput,
 	ResponseToolSearchOutputItemParam,
-} from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
-import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-responses-wire";
+import { buildResponsesInput } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 import {
 	AdviseTool,
 	type AdvisorAgent,
@@ -37,9 +37,9 @@ import {
 	quarantineAdvisorUnsafeOutput,
 	resolveAdvisorDeliveryChannel,
 } from "../../src/advisor";
-import { createAdvisorMessageCard } from "@oh-my-pi/pi-tui/chat/advisor-message";
-import { setChatTranscriptDisplayPreferences } from "@oh-my-pi/pi-tui/chat/display-preferences";
-import { getThemeByName } from "@oh-my-pi/pi-tui/theme";
+import { createAdvisorMessageCard } from "@oh-my-striped-pi/pi-tui/chat/advisor-message";
+import { setChatTranscriptDisplayPreferences } from "@oh-my-striped-pi/pi-tui/chat/display-preferences";
+import { getThemeByName } from "@oh-my-striped-pi/pi-tui/theme";
 import { obfuscateMessages } from "../../src/secrets/message-transform";
 import { SecretObfuscator } from "../../src/secrets/obfuscator";
 import { getOpenAiRemoteCompactionPayload } from "../../src/session/session-context";

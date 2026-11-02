@@ -1,4 +1,4 @@
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import { TOOL_TIMEOUTS } from "../tools/tool-timeouts";
 
 // =============================================================================
@@ -406,9 +406,9 @@ export interface OpenFile {
 	 * reconcile treats the document as dirty and resyncs from disk.
 	 */
 	syncedHash?: number | bigint;
-	/** When an OMP operation last used this document; long-unused documents close before the next open. */
+	/** When an OMSP operation last used this document; long-unused documents close before the next open. */
 	lastUsedAt: number;
-	/** When OMP last reopened this document (an idle close, or a diagnostics reopen); absent for a first open. */
+	/** When OMSP last reopened this document (an idle close, or a diagnostics reopen); absent for a first open. */
 	reopenedAt?: number;
 }
 
@@ -458,7 +458,7 @@ export interface LspClient {
 	dynamicCapabilityRegistrations?: Map<string, string>;
 	openFiles: Map<string, OpenFile>;
 	/**
-	 * Documents OMP closed and will reopen (for idleness, or mid diagnostics reopen),
+	 * Documents OMSP closed and will reopen (for idleness, or mid diagnostics reopen),
 	 * with the last version the server saw. A reopen resumes past that version; absent
 	 * until the client closes one.
 	 */

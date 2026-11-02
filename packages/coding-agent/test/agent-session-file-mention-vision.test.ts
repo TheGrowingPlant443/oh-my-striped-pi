@@ -7,17 +7,17 @@ import { afterEach, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as imageVisionFallback from "@oh-my-pi/pi-coding-agent/utils/image-vision-fallback";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as imageVisionFallback from "@oh-my-striped-pi/pi-coding-agent/utils/image-vision-fallback";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 const PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 
 it("describes an @-mentioned image for a text-only model", async () => {
-	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-file-mention-vision-"));
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-file-mention-vision-"));
 	cleanups.push(() => removeWithRetries(dir));
 	const imagePath = path.join(dir, "shot.png");
 	await Bun.write(imagePath, Buffer.from(PNG_BASE64, "base64"));

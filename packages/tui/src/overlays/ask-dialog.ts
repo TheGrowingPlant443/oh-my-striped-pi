@@ -1,4 +1,4 @@
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import {
 	type Component,
 	Ellipsis,
@@ -785,8 +785,8 @@ export class AskDialogComponent implements Component {
 
 	/**
 	 * In the dock, in the composer's place and framed as the composer is: a
-	 * `col` with an `omp.editor.*` root role (`omp.editor.ask`, collapsed
-	 * `omp.editor.ask.hidden`), so the terminal draws the composer's shell
+	 * `col` with an `omsp.editor.*` root role (`omsp.editor.ask`, collapsed
+	 * `omsp.editor.ask.hidden`), so the terminal draws the composer's shell
 	 * around it. Not a modal `overlay` sheet: one anchored at the bottom
 	 * covered the transcript rows that explain the question and blocked
 	 * scrolling until the question was answered.
@@ -813,7 +813,7 @@ export class AskDialogComponent implements Component {
 		if (this.#isSubmitTab()) this.#describeSubmitBody(children);
 		else this.#describeQuestionBody(children);
 		children.push(this.#describeActions(blocked, ring));
-		this.#native = col(children, { role: "omp.editor.ask", gap: "md" });
+		this.#native = col(children, { role: "omsp.editor.ask", gap: "md" });
 		this.#nativeBlocked = blocked;
 		return this.#native;
 	}
@@ -833,14 +833,14 @@ export class AskDialogComponent implements Component {
 		const active = this.#isSubmitTab() ? "submit" : String(this.#activeTabIndex);
 		return node(
 			"row",
-			{ role: "omp.ask.head", align: "center" },
+			{ role: "omsp.ask.head", align: "center" },
 			[
 				node(
 					"tabs",
 					{
 						items,
 						active,
-						role: "omp.ask.questions",
+						role: "omsp.ask.questions",
 						title: "Next question  tab · Previous  shift+tab",
 						actions: { click: "select" },
 					},
@@ -881,7 +881,7 @@ export class AskDialogComponent implements Component {
 				span(normalizedInlineInput(sanitizeCarriageReturns(question?.question ?? ""))),
 				...(more ? [span(more, "muted")] : []),
 			],
-			{ truncate: "end", role: "omp.ask.summary" },
+			{ truncate: "end", role: "omsp.ask.summary" },
 		);
 		const hideKey = getKeybindings().getKeys("app.ask.hide")[0];
 		const show = actionButton("Show", "show", {
@@ -893,9 +893,9 @@ export class AskDialogComponent implements Component {
 		const skip = actionButton("Skip", "cancel", cancelKey ? { keys: cancelKey } : {});
 		const items: (NativeNode | null)[] = [];
 		if (this.#countdown) items.push(this.#describeTimer(this.#countdown, ring));
-		// The summary grows (`omp.ask.summary`), end-aligning Skip and Show.
+		// The summary grows (`omsp.ask.summary`), end-aligning Skip and Show.
 		items.push(summary, skip, show);
-		return col([actionBar(items)], { role: "omp.editor.ask.hidden", gap: "md" });
+		return col([actionBar(items)], { role: "omsp.editor.ask.hidden", gap: "md" });
 	}
 
 	/** Question tab: the question as markdown and its answers as radio/check rows (label, description, badge). */
@@ -908,12 +908,12 @@ export class AskDialogComponent implements Component {
 		children.push(
 			node(
 				"md",
-				{ text: replaceTabs(sanitizeCarriageReturns(question.question)), role: "omp.ask.question" },
+				{ text: replaceTabs(sanitizeCarriageReturns(question.question)), role: "omsp.ask.question" },
 				undefined,
 				"question",
 			),
 		);
-		// Radios (`omp.ask.option`, `omp.ask.other`) or checks (`omp.ask.check`, `omp.ask.other.check`); a chosen
+		// Radios (`omsp.ask.option`, `omsp.ask.other`) or checks (`omsp.ask.check`, `omsp.ask.other.check`); a chosen
 		// row is `accent`-toned (a check also carries the check glyph), apart from the highlighted row (`selected`).
 		const items = rows.map(rowItem => {
 			const option = rowItem.kind === "option" ? question.options[rowItem.optionIndex ?? -1] : undefined;
@@ -928,11 +928,11 @@ export class AskDialogComponent implements Component {
 			const role =
 				rowItem.kind === "other"
 					? question.multi
-						? "omp.ask.other.check"
-						: "omp.ask.other"
+						? "omsp.ask.other.check"
+						: "omsp.ask.other"
 					: question.multi
-						? "omp.ask.check"
-						: "omp.ask.option";
+						? "omsp.ask.check"
+						: "omsp.ask.option";
 			return node(
 				"item",
 				{
@@ -954,7 +954,7 @@ export class AskDialogComponent implements Component {
 		children.push(
 			node(
 				"list",
-				{ selected: rows[state.cursorIndex]?.key ?? null, role: "omp.ask.options" },
+				{ selected: rows[state.cursorIndex]?.key ?? null, role: "omsp.ask.options" },
 				items,
 				`q${this.#currentQuestionIndex()}`,
 			),
@@ -963,7 +963,7 @@ export class AskDialogComponent implements Component {
 		const option = highlighted?.kind === "option" ? question.options[highlighted.optionIndex ?? -1] : undefined;
 		if (option?.preview?.trim()) {
 			children.push(
-				node("md", { text: replaceTabs(option.preview), role: "omp.ask.preview" }, undefined, "preview"),
+				node("md", { text: replaceTabs(option.preview), role: "omsp.ask.preview" }, undefined, "preview"),
 			);
 		}
 	}
@@ -978,7 +978,7 @@ export class AskDialogComponent implements Component {
 						span(` · Submit still sends ${unanswered === this.#questions.length ? "the questions" : "the rest"}`),
 					]
 				: [span("All answered · Submit sends them")];
-		children.push(node("text", { spans: notice, role: "omp.ask.notice" }, undefined, "notice"));
+		children.push(node("text", { spans: notice, role: "omsp.ask.notice" }, undefined, "notice"));
 		const answers: { k: string; v: readonly TspSpan[] }[] = [];
 		for (let index = 0; index < this.#questions.length; index++) {
 			const question = this.#questions[index];
@@ -986,7 +986,7 @@ export class AskDialogComponent implements Component {
 			if (!question || !state) continue;
 			answers.push({ k: questionTabName(question, index), v: describeAnswer(question, state) });
 		}
-		children.push(node("kv", { items: answers, role: "omp.ask.answers" }, undefined, "answers"));
+		children.push(node("kv", { items: answers, role: "omsp.ask.answers" }, undefined, "answers"));
 	}
 
 	/**
@@ -1012,7 +1012,10 @@ export class AskDialogComponent implements Component {
 		if (blocked && inputGuard) {
 			return actionBar([
 				...lead,
-				text([span(plainText(this.#guardHint(inputGuard)), "muted")], { truncate: "end", role: "omp.ask.summary" }),
+				text([span(plainText(this.#guardHint(inputGuard)), "muted")], {
+					truncate: "end",
+					role: "omsp.ask.summary",
+				}),
 				skip,
 			]);
 		}

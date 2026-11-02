@@ -1,11 +1,10 @@
 name: "Compose bazel cache config"
 description: >
-   Emits a bazelrc fragment wiring the vmon node's Bazel HTTP cache. Every
-   Bazel job runs on a vmon `omp-ci` sandbox (VMON_CI=1), whose template bakes
-   the repository/xwin caches at /opt/bazel-repo-cache, and whose node serves
-   a per-repository Bazel cache at $VMON_CACHE_URL/bazel: written by branch
-   and tag jobs, read-only for pull requests. Elsewhere the fragment carries
-   only --config=ci and the build runs uncached.
+   Emits a bazelrc fragment with --config=ci for hosted CI. Optional
+   externally provisioned vmon runners (VMON_CI=1) use repository/xwin
+   caches at /opt/bazel-repo-cache and, when VMON_CACHE_URL is set, its
+   Bazel HTTP cache. Pull requests disable uploads; other events enable
+   them. This repository does not provision the runner or cache service.
 
 outputs:
    rc:
@@ -28,12 +27,12 @@ runs:
              exit 0
            fi
 
-           # Template-baked (infra/vmon/omp_ci_template.py warms both with
-           # these exact values, so repo-contents-cache keys match).
+           # External runners must provision these paths themselves.
+           # The retired template builder no longer warms them.
            {
              echo "common --config=ci"
              echo "common --repository_cache=/opt/bazel-repo-cache"
-             echo "common --repo_env=OMP_XWIN_CACHE_DIR=/opt/bazel-repo-cache/xwin"
+             echo "common --repo_env=OMSP_XWIN_CACHE_DIR=/opt/bazel-repo-cache/xwin"
            } > "$rc"
 
            if [ -z "${VMON_CACHE_URL:-}" ]; then

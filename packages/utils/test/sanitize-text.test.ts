@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { sanitizeText, sanitizeTextDeep } from "@oh-my-pi/pi-utils/sanitize-text";
-import { isRecord } from "@oh-my-pi/pi-utils/type-guards";
+import { sanitizeText, sanitizeTextDeep } from "@oh-my-striped-pi/pi-utils/sanitize-text";
+import { isRecord } from "@oh-my-striped-pi/pi-utils/type-guards";
 
 describe("sanitizeText", () => {
 	it("strips ANSI CSI and removes C0/C1 control chars while keeping tab + LF", () => {

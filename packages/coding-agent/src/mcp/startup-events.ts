@@ -1,11 +1,11 @@
-import { isRecord, sanitizeText } from "@oh-my-pi/pi-utils";
+import { isRecord, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import {
 	replaceTabs,
 	shortenEmbeddedPaths,
 	shortenPath,
 	TRUNCATE_LENGTHS,
 	truncateToWidth,
-} from "@oh-my-pi/pi-tui/render/render-utils";
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
 
 export const MCP_CONNECTION_STATUS_EVENT_CHANNEL = "mcp:connection-status";
 

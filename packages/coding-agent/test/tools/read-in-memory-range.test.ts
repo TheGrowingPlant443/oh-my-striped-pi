@@ -2,14 +2,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
-import type { ProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/types";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/router";
+import type { ProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/types";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { wrapToolWithMetaNotice } from "@oh-my-striped-pi/pi-coding-agent/tools/output-meta";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const files: Record<string, string> = {};
 
@@ -33,7 +33,7 @@ function textOutput(result: AgentToolResult<unknown>): string {
 		.join("\n");
 }
 
-// Rows are `N:` in hashline mode and `N|` with plain line numbers (`PI_EDIT_VARIANT` picks the mode).
+// Rows are `N:` in hashline mode and `N|` with plain line numbers (`OMSP_EDIT_VARIANT` picks the mode).
 function shownLines(output: string): number[] {
 	return [...output.matchAll(/^(\d+)[:|]/gm)].map(match => Number(match[1]));
 }

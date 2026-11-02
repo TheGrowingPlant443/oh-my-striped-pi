@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createTurndown } from "@oh-my-pi/pi-coding-agent/utils/turndown";
+import { createTurndown } from "@oh-my-striped-pi/pi-coding-agent/utils/turndown";
 
 describe("createTurndown", () => {
 	it("keeps underscores inside identifiers literal", () => {

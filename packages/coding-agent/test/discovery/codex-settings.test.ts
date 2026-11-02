@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
+import { clearCache as clearFsCache } from "@oh-my-striped-pi/pi-coding-agent/capability/fs";
 import {
 	type Settings as SettingsCapabilityItem,
 	settingsCapability,
-} from "@oh-my-pi/pi-coding-agent/capability/settings";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { loadCapability } from "@oh-my-pi/pi-coding-agent/discovery";
-import { cfgPersonality } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/capability/settings";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { loadCapability } from "@oh-my-striped-pi/pi-coding-agent/discovery";
+import { cfgPersonality } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 describe("Codex config.toml settings", () => {
 	let root = "";
@@ -23,7 +23,7 @@ describe("Codex config.toml settings", () => {
 		clearFsCache();
 		resetSettingsForTest();
 		originalHome = process.env.HOME;
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-codex-settings-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-codex-settings-"));
 		home = path.join(root, "home");
 		project = path.join(root, "project");
 		process.env.HOME = home;
@@ -62,7 +62,7 @@ describe("Codex config.toml settings", () => {
 		]);
 	});
 
-	test("applies matching omp settings from project config.toml", async () => {
+	test("applies matching omsp settings from project config.toml", async () => {
 		const agentDir = path.join(root, "agent");
 		const projectConfig = path.join(project, ".codex", "config.toml");
 		await fs.mkdir(agentDir, { recursive: true });

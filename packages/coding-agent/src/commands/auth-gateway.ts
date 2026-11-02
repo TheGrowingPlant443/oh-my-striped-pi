@@ -1,8 +1,8 @@
 /**
- * `omp auth-gateway` — run a forward proxy that injects auth from the broker.
+ * `omsp auth-gateway` — run a forward proxy that injects auth from the broker.
  */
 
-import { Args, Command, Flags, renderCommandHelp } from "@oh-my-pi/pi-utils/cli";
+import { Args, Command, Flags, renderCommandHelp } from "@oh-my-striped-pi/pi-utils/cli";
 import {
 	AUTH_GATEWAY_ACTIONS,
 	type AuthGatewayAction,
@@ -10,7 +10,7 @@ import {
 	runAuthGatewayCommand,
 } from "../cli/auth-gateway-cli";
 import { authGatewayHelp as commandHelp } from "../cli/command-help";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 export default class AuthGateway extends Command {
 	static description = commandHelp.description;
@@ -44,24 +44,24 @@ export default class AuthGateway extends Command {
 	};
 
 	static examples = [
-		"# Boot the gateway against the configured broker\n  omp auth-gateway serve",
-		'# Serve the same routes as JSON lines on stdin/stdout with your own credentials\n  echo \'{"id":1,"path":"/v1/chat/completions","body":{"model":"@smol","messages":[{"role":"user","content":"hi"}]}}\' | omp auth-gateway stdio',
-		"# Boot on a non-default port\n  omp auth-gateway serve --bind=127.0.0.1:4000",
-		"# Trust client IP headers from a trusted reverse proxy\n  omp auth-gateway serve --trust-proxy-headers",
-		"# Print the gateway bearer token (creates one on first run)\n  omp auth-gateway token",
-		"# Rotate the gateway bearer token\n  omp auth-gateway token --regenerate",
-		"# Run on loopback without any bearer (anyone on this host can call)\n  omp auth-gateway serve --no-auth",
-		"# Also admit scoped client tokens listed in a file\n  omp auth-gateway serve --clients=/etc/omp/gateway-clients.json",
-		"# Show local gateway + broker config status\n  omp auth-gateway status",
-		"# Probe each broker credential to see which one is producing 401s\n  omp auth-gateway check",
-		"# Same, machine-readable for scripts\n  omp auth-gateway check --json",
-		"# Strict check — also exercises each credential with a real chat-completion ping\n  omp auth-gateway check --strict",
+		"# Boot the gateway against the configured broker\n  omsp auth-gateway serve",
+		'# Serve the same routes as JSON lines on stdin/stdout with your own credentials\n  echo \'{"id":1,"path":"/v1/chat/completions","body":{"model":"@smol","messages":[{"role":"user","content":"hi"}]}}\' | omsp auth-gateway stdio',
+		"# Boot on a non-default port\n  omsp auth-gateway serve --bind=127.0.0.1:4101",
+		"# Trust client IP headers from a trusted reverse proxy\n  omsp auth-gateway serve --trust-proxy-headers",
+		"# Print the gateway bearer token (creates one on first run)\n  omsp auth-gateway token",
+		"# Rotate the gateway bearer token\n  omsp auth-gateway token --regenerate",
+		"# Run on loopback without any bearer (anyone on this host can call)\n  omsp auth-gateway serve --no-auth",
+		"# Also admit scoped client tokens listed in a file\n  omsp auth-gateway serve --clients=/etc/omsp/gateway-clients.json",
+		"# Show local gateway + broker config status\n  omsp auth-gateway status",
+		"# Probe each broker credential to see which one is producing 401s\n  omsp auth-gateway check",
+		"# Same, machine-readable for scripts\n  omsp auth-gateway check --json",
+		"# Strict check — also exercises each credential with a real chat-completion ping\n  omsp auth-gateway check --strict",
 	];
 
 	async run(): Promise<void> {
 		const { args, flags } = await this.parse(AuthGateway);
 		if (!args.action) {
-			renderCommandHelp("omp", "auth-gateway", AuthGateway);
+			renderCommandHelp("omsp", "auth-gateway", AuthGateway);
 			return;
 		}
 		const cmd: AuthGatewayCommandArgs = {

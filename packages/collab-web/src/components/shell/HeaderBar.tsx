@@ -1,4 +1,4 @@
-import type { SessionHeader, SessionState } from "@oh-my-pi/pi-wire";
+import type { SessionHeader, SessionState } from "@oh-my-striped-pi/pi-wire";
 import { LogOut, PanelRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
@@ -51,7 +51,7 @@ export const HeaderBar = memo(function HeaderBar({
 	return (
 		<header className="sh-header">
 			<div className="sh-header-left">
-				<span className="sh-brand" aria-label="omp collab">
+				<span className="sh-brand" aria-label="omsp collab">
 					<OmpMark />
 					<span className="sh-brand-slash">/</span>
 				</span>

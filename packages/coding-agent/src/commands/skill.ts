@@ -1,8 +1,8 @@
 /**
  * Install and discover skills on a Skillshare registry (skills.omp.sh).
  */
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
-import type { SkillSearchSort } from "@oh-my-pi/pi-wire/skillshare";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
+import type { SkillSearchSort } from "@oh-my-striped-pi/pi-wire/skillshare";
 import { skillHelp as commandHelp } from "../cli/command-help";
 import { runSkillCommand, SKILL_ACTIONS, SKILL_USAGE, type SkillAction } from "../cli/skill-cli";
 
@@ -27,9 +27,9 @@ export default class Skill extends Command {
 	};
 
 	static examples = [
-		"omp skill install @alice/pdf-tools",
-		"omp skill install -g @alice/pdf-tools@^1.2",
-		'omp skill search "pdf" --sort downloads',
+		"omsp skill install @alice/pdf-tools",
+		"omsp skill install -g @alice/pdf-tools@^1.2",
+		'omsp skill search "pdf" --sort downloads',
 	];
 
 	async run(): Promise<void> {

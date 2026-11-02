@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolCall, SpeculativeOperationSink } from "@oh-my-pi/pi-agent-core";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { TaskTool } from "@oh-my-pi/pi-coding-agent/task";
-import * as discoveryModule from "@oh-my-pi/pi-coding-agent/task/discovery";
-import * as executorModule from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { ExecutorOptions } from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { TaskLaunchSession } from "@oh-my-pi/pi-coding-agent/task/speculative-launch";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { recordApprovalGrant, resolveApproval } from "@oh-my-pi/pi-coding-agent/tools/approval";
-import { getApprovalGrants } from "@oh-my-pi/pi-coding-agent/tools/approval-cache";
-import type { AgentProgress, TaskToolDetails } from "@oh-my-pi/pi-tui/tools/task";
+import type { AgentToolCall, SpeculativeOperationSink } from "@oh-my-striped-pi/pi-agent-core";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async/job-manager";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { TaskTool } from "@oh-my-striped-pi/pi-coding-agent/task";
+import * as discoveryModule from "@oh-my-striped-pi/pi-coding-agent/task/discovery";
+import * as executorModule from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { ExecutorOptions } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { TaskLaunchSession } from "@oh-my-striped-pi/pi-coding-agent/task/speculative-launch";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { recordApprovalGrant, resolveApproval } from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
+import { getApprovalGrants } from "@oh-my-striped-pi/pi-coding-agent/tools/approval-cache";
+import type { AgentProgress, TaskToolDetails } from "@oh-my-striped-pi/pi-tui/tools/task";
 
 function textOf(result: { content: Array<{ type: string; text?: string }> }): string {
 	return result.content.find(part => part.type === "text")?.text ?? "";
@@ -33,7 +33,7 @@ describe("taskFile dispatch", () => {
 	const started = new Map<string, PromiseWithResolvers<void>>();
 
 	beforeEach(async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-task-file-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-task-file-"));
 		executions.length = 0;
 		AgentRegistry.resetGlobalForTests();
 		AgentLifecycleManager.resetGlobalForTests();

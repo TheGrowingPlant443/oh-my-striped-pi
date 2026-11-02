@@ -470,7 +470,7 @@ export function renderIdUnion(name: string, ids: readonly string[]): string {
 /**
  * Source of the committed `src/compat/provider-ids.ts`: the `KnownProvider`
  * union derived from the compiled catalog entries, so the descriptor table and
- * `@oh-my-pi/pi-ai`'s registry keep typed provider ids without importing the
+ * `@oh-my-striped-pi/pi-ai`'s registry keep typed provider ids without importing the
  * JSON as a const.
  */
 export function renderProviderIds(providers: Readonly<Record<string, CompiledProvider>>): string {

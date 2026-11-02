@@ -1,32 +1,32 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { Api, Context, Model, ModelSpec, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { clearCustomApis, registerCustomApi } from "@oh-my-pi/pi-ai";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Api, Context, Model, ModelSpec, SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
+import { clearCustomApis, registerCustomApi } from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
-import { cfgThinkingBudgetsLow } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { cfgToolsFormat } from "@oh-my-pi/pi-coding-agent/session/context-settings";
+import { cfgThinkingBudgetsLow } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { cfgToolsFormat } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 describe("primary-agent provider settings changed mid-session", () => {
 	const sessions: Array<{ dispose(): Promise<void> }> = [];
-	const previousDialectEnv = Bun.env.PI_DIALECT;
+	const previousDialectEnv = Bun.env.OMSP_DIALECT;
 
 	afterEach(async () => {
 		clearCustomApis();
 		for (const session of sessions.splice(0)) await session.dispose();
-		if (previousDialectEnv === undefined) delete Bun.env.PI_DIALECT;
-		else Bun.env.PI_DIALECT = previousDialectEnv;
+		if (previousDialectEnv === undefined) delete Bun.env.OMSP_DIALECT;
+		else Bun.env.OMSP_DIALECT = previousDialectEnv;
 	});
 
 	it("applies thinking budgets and tool format on the next request", async () => {
-		delete Bun.env.PI_DIALECT;
+		delete Bun.env.OMSP_DIALECT;
 		using tempDir = TempDir.createSync("@pi-live-provider-settings-");
 		const api = "openai-responses";
 		const requests: Array<{ context: Context; options: SimpleStreamOptions | undefined }> = [];

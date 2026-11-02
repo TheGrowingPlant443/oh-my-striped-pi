@@ -65,22 +65,22 @@ export interface KittyGraphicsFeatures {
  *
  * Kitty, Ghostty and Otty advertise placeholder support directly. A multiplexer
  * cannot use cursor-positioned placements because the outer terminal does not
- * know pane scroll/reflow state. An explicit `PI_FORCE_IMAGE_PROTOCOL=kitty`
+ * know pane scroll/reflow state. An explicit `OMSP_FORCE_IMAGE_PROTOCOL=kitty`
  * opts into placeholders under any multiplexer — matching `timg -pk`.
  * Automatic fallback stays off inside multiplexers whose pane marker does not
  * prove that a Kitty renderer is enabled (Herdr's is experimental).
  *
- * `PI_NO_KITTY_PLACEHOLDERS=1` and `PI_KITTY_PLACEHOLDERS=0` remain hard
- * opt-outs; `PI_KITTY_PLACEHOLDERS=1` explicitly opts in anywhere else.
+ * `OMSP_NO_KITTY_PLACEHOLDERS=1` and `OMSP_KITTY_PLACEHOLDERS=0` remain hard
+ * opt-outs; `OMSP_KITTY_PLACEHOLDERS=1` explicitly opts in anywhere else.
  */
 export function detectKittyUnicodePlaceholdersSupport(terminalId: string, env: NodeJS.ProcessEnv = Bun.env): boolean {
-	const offRaw = env.PI_NO_KITTY_PLACEHOLDERS?.trim().toLowerCase();
+	const offRaw = env.OMSP_NO_KITTY_PLACEHOLDERS?.trim().toLowerCase();
 	if (offRaw === "1" || offRaw === "true" || offRaw === "on" || offRaw === "yes" || offRaw === "y") return false;
-	const force = env.PI_KITTY_PLACEHOLDERS?.trim().toLowerCase();
+	const force = env.OMSP_KITTY_PLACEHOLDERS?.trim().toLowerCase();
 	if (force === "1" || force === "true" || force === "on" || force === "yes" || force === "y") return true;
 	if (force === "0" || force === "false" || force === "off" || force === "no" || force === "n") return false;
 	const insideMultiplexer = isInsideTerminalMultiplexer(env);
-	if (insideMultiplexer && env.PI_FORCE_IMAGE_PROTOCOL?.trim().toLowerCase() === "kitty") return true;
+	if (insideMultiplexer && env.OMSP_FORCE_IMAGE_PROTOCOL?.trim().toLowerCase() === "kitty") return true;
 	if (terminalMultiplexerSessions(env).some(multiplexer => multiplexer.imagesRequireOverride)) return false;
 	return (
 		terminalId === "kitty" ||

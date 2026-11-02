@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { streamOllama } from "@oh-my-pi/pi-ai/providers/ollama";
-import type { AssistantMessageEvent, Context } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamOllama } from "@oh-my-striped-pi/pi-ai/providers/ollama";
+import type { AssistantMessageEvent, Context } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const model = buildModel({
 	id: "qwen3:8b",

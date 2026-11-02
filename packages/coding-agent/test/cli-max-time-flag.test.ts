@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
 import { runCli } from "../src/cli";
 
 // `runRootCommand` registers the CLI's extension roots (`--no-extensions` → explicit-only) process-wide.
@@ -72,7 +72,7 @@ describe("parseArgs — --max-time flag", () => {
 		const stderr = captured.join("");
 		expect(observedExitCode).toBe(2);
 		expect(stderr).toContain("Error: Invalid --max-time value");
-		expect(stderr).toContain("Run `omp --help` for available flags.");
+		expect(stderr).toContain("Run `omsp --help` for available flags.");
 		expect(stderr).not.toContain("parseMaxTimeSeconds");
 		expect(stderr).not.toContain("CliUsageError");
 	});

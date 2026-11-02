@@ -1,7 +1,7 @@
-import { type FileDiagnosticsResult } from "@oh-my-pi/pi-tui/tools/lsp";
+import { type FileDiagnosticsResult } from "@oh-my-striped-pi/pi-tui/tools/lsp";
 import * as fs from "node:fs";
 import path from "node:path";
-import { isRecord, logger, untilAborted } from "@oh-my-pi/pi-utils";
+import { isRecord, logger, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { formatPathRelativeToCwd } from "../tools/path-utils";
 import { throwIfAborted } from "../tools/tool-errors";
 import {
@@ -301,7 +301,7 @@ function isProvisionalColdPublish(
 	now: number,
 ): boolean {
 	if (expectedDocumentVersion === undefined) return false;
-	// A document OMP closed and reopened can still receive publishes from before the
+	// A document OMSP closed and reopened can still receive publishes from before the
 	// close: the empty one that cleared it, or one versioned for its earlier life.
 	const reopenedAt = client.openFiles.get(uri)?.reopenedAt;
 	if (reopenedAt !== undefined && now - reopenedAt < DEFERRED_DIAGNOSTICS_WAIT_TIMEOUT_MS) {

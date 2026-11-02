@@ -6,8 +6,8 @@
  */
 import * as path from "node:path";
 import * as url from "node:url";
-import type { TSchema } from "@oh-my-pi/pi-ai";
-import { logger, untilAborted } from "@oh-my-pi/pi-utils";
+import type { TSchema } from "@oh-my-striped-pi/pi-ai";
+import { logger, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import type { EffectiveExtensionRoots, SourceMeta } from "../capability/types";
 import { resolveConfigValue } from "../config/resolve-config-value";
 import type { CustomTool } from "../extensibility/custom-tools/types";
@@ -43,7 +43,7 @@ import type { MCPStoredOAuthCredential } from "./oauth-flow";
 import type { McpConnectionStatusEvent } from "./startup-events";
 import { resolveMCPStartupTimeoutMs } from "./timeout";
 
-import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
+import type { MCPToolDetails } from "@oh-my-striped-pi/pi-tui/tools/mcp";
 import { DeferredMCPTool, MCPTool } from "./tool-bridge";
 import type { MCPToolCache } from "./tool-cache";
 import { setGeneratedHeader } from "./transports/header-policy";
@@ -256,7 +256,7 @@ export class MCPManager {
 
 	/**
 	 * Install or clear a loader that creates the process-global instance on first {@link load}, so a
-	 * one-shot host (`omp read`) starts MCP servers only when a request actually reaches them.
+	 * one-shot host (`omsp read`) starts MCP servers only when a request actually reaches them.
 	 */
 	static setDeferredInstance(load: (() => Promise<MCPManager>) | undefined): void {
 		MCPManager.#deferred = load;
@@ -999,7 +999,7 @@ export class MCPManager {
 			// Pending tasks without cached tools used to be awaited synchronously here,
 			// which gated the entire UI on the slowest server's per-request timeout
 			// (issue #2100: a single unresponsive MCP server blocked startup for the
-			// full 30 s `OMP_MCP_TIMEOUT_MS`). Leave them in flight — the background
+			// full 30 s `OMSP_MCP_TIMEOUT_MS`). Leave them in flight — the background
 			// `void toolsPromise.then(...)` chain above registers their tools and
 			// fires `#onToolsChanged` once the connect finishes, or logs the failure
 			// after `allowBackgroundLogging` flips below.
@@ -1295,7 +1295,7 @@ export class MCPManager {
 	/**
 	 * Wait for every in-flight connect, tool load, and reconnect to settle.
 	 *
-	 * One-shot callers (e.g. `omp read <mcp-resource>`) discover servers and read
+	 * One-shot callers (e.g. `omsp read <mcp-resource>`) discover servers and read
 	 * immediately; a server whose handshake outlasts the {@link connectServers}
 	 * startup race is still tracked in {@link #pendingConnections} /
 	 * {@link #pendingToolLoads} and therefore invisible to

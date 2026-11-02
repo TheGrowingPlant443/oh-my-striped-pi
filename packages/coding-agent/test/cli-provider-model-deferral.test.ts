@@ -2,13 +2,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "bun:
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { buildSessionOptions } from "@oh-my-pi/pi-coding-agent/main";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { buildSessionOptions } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 
 // An id the startup catalog lacks may still come from an extension or account
 // discovery, so `--provider p --model id` defers like `--model p/id` instead of
@@ -120,7 +120,7 @@ describe("print-mode suggestions for a provider-qualified miss", () => {
 describe("print mode with a stale configured default", () => {
 	test("warns on stderr naming the stale default and the model that runs instead", async () => {
 		const home = path.join(os.tmpdir(), `pi-cli-stale-default-${Snowflake.next()}`);
-		const agentDir = path.join(home, ".omp", "agent");
+		const agentDir = path.join(home, ".omsp", "agent");
 		fs.mkdirSync(agentDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(agentDir, "config.yml"),

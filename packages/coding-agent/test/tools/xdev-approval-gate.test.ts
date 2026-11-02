@@ -4,20 +4,20 @@
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolContext } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { ExtensionToolWrapper } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/wrapper";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { Tool } from "@oh-my-pi/pi-coding-agent/tools";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import { resolveXdevTool, type XdevState } from "@oh-my-pi/pi-coding-agent/tools/xdev";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool, AgentToolContext } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ExtensionRuntime } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { ExtensionUIContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { ExtensionToolWrapper } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/wrapper";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { Tool } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { WriteTool } from "@oh-my-striped-pi/pi-coding-agent/tools/write";
+import { resolveXdevTool, type XdevState } from "@oh-my-striped-pi/pi-coding-agent/tools/xdev";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const DEVICE = "mcp__jira_addcomment";
 

@@ -1,4 +1,4 @@
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import {
 	type Component,
 	type Focusable,
@@ -39,7 +39,7 @@ import { bottomBorder, row, topBorder } from "../chrome/overlay-box";
 import { padToWidth } from "../render/utils";
 import { SplitPane } from "../components/layout/split-pane";
 import { clampSelection, contentRowWidth, padLinesToHeight, renderScrollableList } from "../chrome/selector-helpers";
-import type { TspScrollBy, TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspScrollBy, TspSpan } from "@oh-my-striped-pi/pi-wire";
 import type { NativeChild, NativeNode, NativeScroll, NativeUiEvent } from "../native/node";
 import { col, md, node, span, text } from "../native/describe";
 import { actionBar, actionButton } from "../native/overlay";
@@ -122,8 +122,8 @@ const STATUS: Record<BtwHistoryRecord["status"], { label: string; color: ThemeCo
 	interrupted: { label: "Interrupted", color: "warning" },
 };
 
-const SHEET = { role: "omp.overlay.btwHistory", anchor: "center", size: "lg", head: "BTW history" } as const;
-const EMPTY_SHEET = { role: "omp.overlay.btwHistory", anchor: "center", size: "md", head: "BTW history" } as const;
+const SHEET = { role: "omsp.overlay.btwHistory", anchor: "center", size: "lg", head: "BTW history" } as const;
+const EMPTY_SHEET = { role: "omsp.overlay.btwHistory", anchor: "center", size: "md", head: "BTW history" } as const;
 
 /** A status worth naming next to an answer natively; an answered question needs none. */
 function describeStatus(status: BtwHistoryTurn["status"]): TspSpan[] | undefined {
@@ -592,7 +592,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 			const reader: NativeNode = {
 				...node(
 					"col",
-					{ role: "omp.btw.reader", grow: 1, basis: 0, min: { w: 0 } },
+					{ role: "omsp.btw.reader", grow: 1, basis: 0, min: { w: 0 } },
 					[this.#describeThread(record)],
 					"details",
 				),
@@ -600,7 +600,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 				scroll: this.#scroll,
 			};
 			const panes = this.#records.length > 1 ? [this.#describeList(), reader] : [reader];
-			children.push(node("row", { role: "omp.btw.body" }, panes, "body"));
+			children.push(node("row", { role: "omsp.btw.body" }, panes, "body"));
 		} else {
 			children.push(this.#describeEmpty());
 		}
@@ -664,7 +664,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 	/**
 	 * The questions, newest first, as two-line palette rows: the question, then
 	 * its time, follow-up count and any status other than answered. While the
-	 * reader has the keys the selection rests (`omp.btw.list.idle`).
+	 * reader has the keys the selection rests (`omsp.btw.list.idle`).
 	 */
 	#describeList(): NativeNode {
 		const items = this.#records.map(record => {
@@ -678,10 +678,10 @@ export class BtwHistoryPanel implements Component, Focusable {
 				.flatMap((part, index) => (part ? [span(part, index % 2 === 1 ? "mono" : undefined)] : []));
 			return node("item", { label, detail, ...(status ? { value: status } : {}) }, undefined, record.id);
 		});
-		const role = this.#focus === "list" ? "omp.btw.list" : "omp.btw.list.idle";
+		const role = this.#focus === "list" ? "omsp.btw.list" : "omsp.btw.list.idle";
 		return node(
 			"col",
-			{ role: "omp.btw.history", shrink: 0 },
+			{ role: "omsp.btw.history", shrink: 0 },
 			[node("list", { role, selected: this.#selectedId ?? null }, items, "records")],
 			"history",
 		);
@@ -692,7 +692,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 		const turns = getDisplayTurns(record);
 		const children: NativeChild[] = turns.map((turn, index) => this.#describeTurn(turn, index, `turn-${index}`));
 		if (this.#composer) children.push(this.#describeComposer(this.#composer));
-		return node("col", { role: "omp.btw.thread" }, children, "thread");
+		return node("col", { role: "omsp.btw.thread" }, children, "thread");
 	}
 
 	#describeTurn(turn: BtwHistoryTurn, index: number, key: string): NativeNode {
@@ -704,25 +704,25 @@ export class BtwHistoryPanel implements Component, Focusable {
 		if (status) meta.push(span("  ·  "), ...status);
 		// The question stays markdown so its inline code and links render.
 		const children: NativeChild[] = [
-			md(sanitizeDisplayText(turn.question), { role: index === 0 ? "omp.btw.question" : "omp.btw.followup" }),
-			text(meta, { role: "omp.btw.meta", truncate: "end", lines: 1 }),
+			md(sanitizeDisplayText(turn.question), { role: index === 0 ? "omsp.btw.question" : "omsp.btw.followup" }),
+			text(meta, { role: "omsp.btw.meta", truncate: "end", lines: 1 }),
 		];
 		// A failed turn with no text says only why it failed.
 		if (turn.answer.trim() || !turn.error) {
 			const answer = turn.answer.trim()
 				? md(sanitizeDisplayText(turn.answer), { stream: turn.status === "running" })
 				: text([span(turn.status === "running" ? "Thinking…" : "No answer text.", "dim")], {
-						role: "omp.btw.pending",
+						role: "omsp.btw.pending",
 					});
-			children.push(node("col", { role: "omp.btw.answer" }, [answer], "answer"));
+			children.push(node("col", { role: "omsp.btw.answer" }, [answer], "answer"));
 		}
 		if (turn.error) {
-			children.push(text([span(sanitizeErrorLine(turn.error), "error")], { role: "omp.btw.error", wrap: "word" }));
+			children.push(text([span(sanitizeErrorLine(turn.error), "error")], { role: "omsp.btw.error", wrap: "word" }));
 		}
 		if (turn.status === "interrupted") {
-			children.push(text([span("Not resumed in this view.", "muted")], { role: "omp.btw.note" }));
+			children.push(text([span("Not resumed in this view.", "muted")], { role: "omsp.btw.note" }));
 		}
-		return node("col", { role: "omp.btw.turn" }, children, key);
+		return node("col", { role: "omsp.btw.turn" }, children, key);
 	}
 
 	/** The follow-up field under the newest answer, where the conversation continues. */
@@ -732,27 +732,27 @@ export class BtwHistoryPanel implements Component, Focusable {
 		if (composer.notice) {
 			children.push(
 				text([span(composer.notice, this.#followUpPending ? "dim" : "warning")], {
-					role: "omp.btw.notice",
+					role: "omsp.btw.notice",
 					wrap: "word",
 				}),
 			);
 		}
-		return node("col", { role: "omp.btw.composer", gap: "sm" }, children, "composer");
+		return node("col", { role: "omsp.btw.composer", gap: "sm" }, children, "composer");
 	}
 
 	#describeEmpty(): NativeNode {
 		return node(
 			"col",
-			{ role: "omp.btw.empty", align: "center", gap: "sm" },
+			{ role: "omsp.btw.empty", align: "center", gap: "sm" },
 			[
-				text("No side questions yet", { role: "omp.btw.empty.title" }),
+				text("No side questions yet", { role: "omsp.btw.empty.title" }),
 				text(
 					[
 						span("Ask one with "),
 						span("/btw <question>", "code"),
 						span(". The answer stays out of the main conversation."),
 					],
-					{ role: "omp.btw.empty.hint", wrap: "word" },
+					{ role: "omsp.btw.empty.hint", wrap: "word" },
 				),
 			],
 			"empty",
@@ -778,7 +778,7 @@ export class BtwHistoryPanel implements Component, Focusable {
 		if (running) buttons.push(actionButton("Stop answer", "stop", { keys: hides ? "x" : "escape" }));
 		if (record && getBtwCopyText(record) !== undefined) {
 			buttons.push(actionButton(copied ? "Copy again" : "Copy answer", "copy-answer", { keys: "c" }));
-			if (copied) buttons.push(text([span("✓ Copied", "success")], { role: "omp.btw.copied" }));
+			if (copied) buttons.push(text([span("✓ Copied", "success")], { role: "omsp.btw.copied" }));
 		}
 		buttons.push(null);
 		// Clicking Close always dismisses the sheet; its tooltip names Esc only where Esc does too.

@@ -2,32 +2,32 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as discoveryHelpers from "@oh-my-pi/pi-coding-agent/discovery/helpers";
-import { parseInternalUrl } from "@oh-my-pi/pi-coding-agent/internal-urls/parse";
-import { SkillProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/skill-protocol";
-import { dispatchRpcSkillPrompt } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import { clearCache as clearFsCache } from "@oh-my-striped-pi/pi-coding-agent/capability/fs";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as discoveryHelpers from "@oh-my-striped-pi/pi-coding-agent/discovery/helpers";
+import { parseInternalUrl } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/parse";
+import { SkillProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/skill-protocol";
+import { dispatchRpcSkillPrompt } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import {
 	RpcExtensionUserMessageTracker,
 	RpcPromptResults,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-prompt-results";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession, AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SKILL_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-prompt-results";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession, AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SKILL_PROMPT_MESSAGE_TYPE } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { cleanupTempHome } from "./helpers/temp-home-cleanup";
 
 const SKILL = "upgrade-skill";
 
 /**
- * `omp plugin upgrade` installs a marketplace plugin's new version in a new
+ * `omsp plugin upgrade` installs a marketplace plugin's new version in a new
  * cache directory (`<marketplace>___<plugin>___<version>`), points the
  * registry at it and deletes the old version's directory. A session that
  * discovered its skills before the upgrade must keep reading them.
@@ -59,12 +59,12 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 		clearFsCache();
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-skill-upgrade-project-"));
 		originalHome = process.env.HOME;
-		originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
+		originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
 		tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-skill-upgrade-home-"));
 		process.env.HOME = tempHomeDir;
 		// Discovery reads `os.homedir()` and the agent dir; left alone they scan the real user's plugins and skills.
 		vi.spyOn(os, "homedir").mockReturnValue(tempHomeDir);
-		setAgentDir(path.join(tempHomeDir, ".omp", "agent"));
+		setAgentDir(path.join(tempHomeDir, ".omsp", "agent"));
 		installPluginVersion("1.0.0");
 	});
 
@@ -73,24 +73,24 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 		discoveryHelpers.clearClaudePluginRootsCache();
 		clearFsCache();
 		vi.restoreAllMocks();
-		if (originalAgentDirEnv === undefined) delete process.env.PI_CODING_AGENT_DIR;
-		else process.env.PI_CODING_AGENT_DIR = originalAgentDirEnv;
+		if (originalAgentDirEnv === undefined) delete process.env.OMSP_CODING_AGENT_DIR;
+		else process.env.OMSP_CODING_AGENT_DIR = originalAgentDirEnv;
 		cleanupTempHome(() => ({ tempDir, tempHomeDir, originalHome }))();
 		for (const dir of extraDirs.splice(0)) removeSyncWithRetries(dir);
 		__resetDirsFromEnvForTests();
 	});
 
 	function pluginDir(version: string): string {
-		return path.join(tempHomeDir, ".omp", "plugins", "cache", "plugins", `market___upgrade-plugin___${version}`);
+		return path.join(tempHomeDir, ".omsp", "plugins", "cache", "plugins", `market___upgrade-plugin___${version}`);
 	}
 
 	function userRegistryPath(): string {
-		return path.join(tempHomeDir, ".omp", "plugins", "installed_plugins.json");
+		return path.join(tempHomeDir, ".omsp", "plugins", "installed_plugins.json");
 	}
 
 	/** The project-scope registry of a session whose cwd is `tempDir`. */
 	function projectRegistryPath(): string {
-		return path.join(tempDir, ".omp", "plugins", "installed_plugins.json");
+		return path.join(tempDir, ".omsp", "plugins", "installed_plugins.json");
 	}
 
 	function writePluginVersion(version: string): void {
@@ -115,7 +115,7 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 	}
 
 	/**
-	 * What `omp plugin upgrade` leaves on disk: the new version installed and registered, and the old
+	 * What `omsp plugin upgrade` leaves on disk: the new version installed and registered, and the old
 	 * one deleted when `previous` is given. Without it the old directory stays, as when another scope
 	 * still uses it or the installer keeps superseded versions for running sessions.
 	 */
@@ -136,13 +136,13 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 	}
 
 	function otherPluginDir(): string {
-		return path.join(tempHomeDir, ".omp", "plugins", "cache", "plugins", "market___other-plugin___1.0.0");
+		return path.join(tempHomeDir, ".omsp", "plugins", "cache", "plugins", "market___other-plugin___1.0.0");
 	}
 
 	/**
 	 * Registers the plugin at `version` and another plugin with a different skill also named
 	 * {@link SKILL}. The plugin registered first keeps the bare name and the other one's skill is
-	 * namespaced. `upgradedLast` is the order `omp plugin upgrade` leaves: it rewrites the upgraded
+	 * namespaced. `upgradedLast` is the order `omsp plugin upgrade` leaves: it rewrites the upgraded
 	 * plugin's entry, which moves it after the other plugin.
 	 */
 	function writeRegistryWithCollidingPlugin(version: string, upgradedLast = false): void {
@@ -164,9 +164,9 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 		fs.writeFileSync(userRegistryPath(), JSON.stringify({ version: 2, plugins }));
 	}
 
-	/** A project skill at `<cwd>/.omp/skills/<name>/SKILL.md`. */
+	/** A project skill at `<cwd>/.omsp/skills/<name>/SKILL.md`. */
 	function writeProjectSkill(cwd: string, name: string, body: string): void {
-		const skillDir = path.join(cwd, ".omp", "skills", name);
+		const skillDir = path.join(cwd, ".omsp", "skills", name);
 		fs.mkdirSync(skillDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(skillDir, "SKILL.md"),
@@ -181,7 +181,7 @@ describe("a plugin upgrade that replaces the plugin's version directory under a 
 		return dir;
 	}
 
-	/** What `omp plugin uninstall` leaves on disk: the plugin unregistered and its directory deleted. */
+	/** What `omsp plugin uninstall` leaves on disk: the plugin unregistered and its directory deleted. */
 	function uninstallPlugin(version: string): void {
 		fs.writeFileSync(userRegistryPath(), JSON.stringify({ version: 2, plugins: {} }));
 		removeSyncWithRetries(pluginDir(version));

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { Tokenizer } from "@oh-my-pi/pi-agent-core";
+import { Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	AssistantMessage,
 	Context,
@@ -8,18 +8,18 @@ import type {
 	Model,
 	TextContent,
 	ToolResultMessage,
-} from "@oh-my-pi/pi-ai";
-import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai";
+import { transformMessages } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import toolResultNote from "../src/prompts/system/snapcompact-toolresult-note.md" with { type: "text" };
 import {
 	estimateInlineSavings,
 	planInlineSwaps,
 	type SnapcompactInlineOptions,
 	SnapcompactInlineTransformer,
-} from "@oh-my-pi/pi-coding-agent/session/snapcompact-inline";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-coding-agent/session/snapcompact-inline";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
 afterEach(() => mock.restore());

@@ -7,24 +7,24 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 
 const AGENT_ID = "HandedOff";
 const MOCK_API_SOURCE = "test/parked-subagent-prewalk-revive";
 const PLANNER = "mock-model";
 const TARGET = "mock-handoff";
-const ENV_KEYS = ["HOME", "PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"] as const;
+const ENV_KEYS = ["HOME", "OMSP_CODING_AGENT_DIR", "OMSP_PROFILE"] as const;
 
 /** The mock carries no effort ladder; without one every configured effort clamps away. */
 const thinking = { mode: "effort", efforts: [Effort.Medium, Effort.High] } as const;
@@ -44,12 +44,12 @@ function restoreEnvValue(key: string, value: string | undefined): void {
 
 beforeEach(async () => {
 	savedEnv = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
-	root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-prewalk-revive-"));
+	root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-prewalk-revive-"));
 	const home = path.join(root, "home");
 	await fs.mkdir(home, { recursive: true });
 	restoreEnvValue("HOME", home);
 	vi.spyOn(os, "homedir").mockReturnValue(home);
-	setAgentDir(path.join(home, ".omp", "agent"));
+	setAgentDir(path.join(home, ".omsp", "agent"));
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
 });

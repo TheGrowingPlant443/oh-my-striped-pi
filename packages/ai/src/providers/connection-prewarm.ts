@@ -1,5 +1,5 @@
-import { isCatalogEndpointUrl } from "@oh-my-pi/pi-catalog/compat/catalog-endpoint";
-import { logger } from "@oh-my-pi/pi-utils";
+import { isCatalogEndpointUrl } from "@oh-my-striped-pi/pi-catalog/compat/catalog-endpoint";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { Api, FetchImpl, Model } from "../types";
 import { lastDispatchOrigin, transportFetch } from "../utils/transport-fetch";
 

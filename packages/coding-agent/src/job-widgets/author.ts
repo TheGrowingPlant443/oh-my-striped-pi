@@ -3,11 +3,15 @@
  * role (aliasing `smol`) with a forced `respond` call carrying the spec
  * schema, fed the job's brief and redacted output samples.
  */
-import { type AgentTelemetryConfig, instrumentedCompleteSimple, resolveTelemetry } from "@oh-my-pi/pi-agent-core";
-import type { Api, AssistantMessage, Model, UserMessage } from "@oh-my-pi/pi-ai";
-import { markPerCallContextMessage } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { roleDefaultModels } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { formatBytes, prompt, truncate } from "@oh-my-pi/pi-utils";
+import {
+	type AgentTelemetryConfig,
+	instrumentedCompleteSimple,
+	resolveTelemetry,
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, AssistantMessage, Model, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import { markPerCallContextMessage } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import { roleDefaultModels } from "@oh-my-striped-pi/pi-catalog/compat/behavior";
+import { formatBytes, prompt, truncate } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { getModelMatchPreferences, parseModelPattern, resolveModelRoleValue } from "../config/model-resolver";
 import { formatModelRoleAlias } from "../config/model-roles";

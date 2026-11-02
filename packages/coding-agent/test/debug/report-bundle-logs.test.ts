@@ -2,10 +2,17 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createReportBundle } from "@oh-my-pi/pi-coding-agent/debug/report-bundle";
-import { getConfigRootDir, getLogsDir, localDay, logger, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { createReportBundle } from "@oh-my-striped-pi/pi-coding-agent/debug/report-bundle";
+import {
+	getConfigRootDir,
+	getLogsDir,
+	localDay,
+	logger,
+	removeWithRetries,
+	setAgentDir,
+} from "@oh-my-striped-pi/pi-utils";
 
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const originalXdgStateHome = process.env.XDG_STATE_HOME;
 const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
@@ -21,12 +28,12 @@ function restoreEnv(name: string, value: string | undefined): void {
 
 // Points the report dir at `root`. XDG_STATE_HOME is only honored on Linux/macOS;
 // elsewhere the config root follows the home dir, so redirect that instead —
-// otherwise the bundle lands in the user's real ~/.omp/reports. A test process's
+// otherwise the bundle lands in the user's real ~/.omsp/reports. A test process's
 // logs dir lives under the temp dir, so point that at `root` too.
 async function isolateLogsRoot(root: string): Promise<void> {
 	if (process.platform === "linux" || process.platform === "darwin") {
 		const xdgStateHome = path.join(root, "state");
-		await fs.mkdir(path.join(xdgStateHome, "omp"), { recursive: true });
+		await fs.mkdir(path.join(xdgStateHome, "omsp"), { recursive: true });
 		process.env.XDG_STATE_HOME = xdgStateHome;
 	} else {
 		process.env.HOME = root;
@@ -45,7 +52,7 @@ afterEach(async () => {
 		setAgentDir(originalAgentDir);
 	} else {
 		setAgentDir(fallbackAgentDir);
-		delete process.env.PI_CODING_AGENT_DIR;
+		delete process.env.OMSP_CODING_AGENT_DIR;
 	}
 	if (cleanupRoot) {
 		await removeWithRetries(cleanupRoot);
@@ -55,7 +62,7 @@ afterEach(async () => {
 
 describe("report bundle logs", () => {
 	it("collects every same-day PID log, not only the current process", async () => {
-		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-report-logs-"));
+		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-report-logs-"));
 		await isolateLogsRoot(cleanupRoot);
 
 		const logsDir = getLogsDir();
@@ -63,9 +70,9 @@ describe("report bundle logs", () => {
 		// Log files are named with the local day (RotatingFileSink naming); same-day
 		// collection must match them with the local day too, not the UTC key.
 		const today = localDay(new Date());
-		const crashedName = `omp.${today}.4242.log`;
+		const crashedName = `omsp.${today}.4242.log`;
 		const rotatedName = `${crashedName}.1`;
-		const currentName = `omp.${today}.${process.pid}.log`;
+		const currentName = `omsp.${today}.${process.pid}.log`;
 		await Bun.write(path.join(logsDir, crashedName), '{"pid":4242,"message":"fatal in crashed pid"}\n');
 		await fs.utimes(path.join(logsDir, crashedName), 1, 1);
 		await Bun.write(path.join(logsDir, rotatedName), '{"pid":4242,"message":"earlier rotated crash output"}\n');
@@ -77,7 +84,7 @@ describe("report bundle logs", () => {
 		const utcToday = new Date().toISOString().slice(0, 10);
 		let staleUtcName: string | undefined;
 		if (utcToday !== today) {
-			staleUtcName = `omp.${utcToday}.4243.log`;
+			staleUtcName = `omsp.${utcToday}.4243.log`;
 			await Bun.write(path.join(logsDir, staleUtcName), '{"pid":4243,"message":"stale utc-keyed"}\n');
 			await fs.utimes(path.join(logsDir, staleUtcName), 3, 3);
 		}
@@ -99,7 +106,7 @@ describe("report bundle logs", () => {
 	});
 
 	it("includes this process's records still buffered by the batching file transport", async () => {
-		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-report-buffered-"));
+		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-report-buffered-"));
 		await isolateLogsRoot(cleanupRoot);
 		const logsDir = getLogsDir();
 		logger.setTransports({ console: false, file: logsDir });
@@ -113,12 +120,12 @@ describe("report bundle logs", () => {
 		const archive = new Bun.Archive(await Bun.file(result.path).bytes());
 		const logsText = (await (await archive.files()).get("logs.txt")?.text()) ?? "";
 		await fs.rm(result.path, { force: true });
-		expect(logsText).toContain(`omp.${localDay(new Date())}.${process.pid}.log`);
+		expect(logsText).toContain(`omsp.${localDay(new Date())}.${process.pid}.log`);
 		expect(logsText).toContain(marker);
 	});
 
 	it("bundles every same-day record of the session and its subagents, past the per-file tail", async () => {
-		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-report-session-logs-"));
+		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-report-session-logs-"));
 		await isolateLogsRoot(cleanupRoot);
 		const logsDir = getLogsDir();
 		await fs.mkdir(logsDir, { recursive: true });
@@ -149,7 +156,7 @@ describe("report bundle logs", () => {
 			...Array.from({ length: 1500 }, (_, i) => record(`filler ${i}`)),
 			record("main late", "main-session"),
 		];
-		await Bun.write(path.join(logsDir, `omp.${localDay(new Date())}.4242.log`), `${lines.join("\n")}\n`);
+		await Bun.write(path.join(logsDir, `omsp.${localDay(new Date())}.4242.log`), `${lines.join("\n")}\n`);
 
 		const result = await createReportBundle({ sessionFile });
 
@@ -166,7 +173,7 @@ describe("report bundle logs", () => {
 	});
 
 	it("keeps the 2 MB tail cap on logs.txt when it also collects session records", async () => {
-		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-report-tail-cap-"));
+		cleanupRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-report-tail-cap-"));
 		await isolateLogsRoot(cleanupRoot);
 		const logsDir = getLogsDir();
 		await fs.mkdir(logsDir, { recursive: true });
@@ -174,7 +181,7 @@ describe("report bundle logs", () => {
 		await Bun.write(sessionFile, '{"type":"session","version":3,"id":"main-session","cwd":"/"}\n');
 		const big = JSON.stringify({ level: "warn", message: "big", pad: "x".repeat(3 * 1024 * 1024) });
 		const last = JSON.stringify({ level: "warn", message: "last", sessionId: "main-session" });
-		await Bun.write(path.join(logsDir, `omp.${localDay(new Date())}.4242.log`), `${big}\n${last}\n`);
+		await Bun.write(path.join(logsDir, `omsp.${localDay(new Date())}.4242.log`), `${big}\n${last}\n`);
 
 		const result = await createReportBundle({ sessionFile });
 

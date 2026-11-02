@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { carriesReasoning } from "@oh-my-pi/pi-catalog/compat/reasoning-carry";
-import type { ResolvedOpenAICompat } from "@oh-my-pi/pi-catalog/types";
+import { resolveCatalogPolicy } from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { carriesReasoning } from "@oh-my-striped-pi/pi-catalog/compat/reasoning-carry";
+import type { ResolvedOpenAICompat } from "@oh-my-striped-pi/pi-catalog/types";
 import { renderDemotedThinking } from "../dialect/demotion";
 import type {
 	Api,
@@ -576,7 +576,7 @@ export function completionsSendsOwnThinking(
  *   blocks only under these flags; otherwise it drops them.
  * - the Responses wire replays reasoning items unless history is filtered, and
  *   hosts that require reasoning replay already receive id-less plaintext
- *   items from omp (the `requiresReasoningContent*` safety net).
+ *   items from omsp (the `requiresReasoningContent*` safety net).
  * Anthropic-format targets that accept unsigned thinking already read it via
  * `targetReadsForeignThinking`.
  */

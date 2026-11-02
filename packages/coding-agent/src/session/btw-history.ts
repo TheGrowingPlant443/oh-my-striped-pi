@@ -1,8 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { type BtwHistoryRecord, type BtwHistoryTurn, getBtwLatestTurn } from "@oh-my-pi/pi-tui/overlays/btw-history";
-import { acquireFileLock, type FileLockHandle, isEnoent, logger, toError } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import {
+	type BtwHistoryRecord,
+	type BtwHistoryTurn,
+	getBtwLatestTurn,
+} from "@oh-my-striped-pi/pi-tui/overlays/btw-history";
+import { acquireFileLock, type FileLockHandle, isEnoent, logger, toError } from "@oh-my-striped-pi/pi-utils";
 import { writeFileAtomically } from "../utils/atomic-file";
 
 export {
@@ -11,7 +15,7 @@ export {
 	getBtwCopyText,
 	getBtwLatestTurn,
 	getBtwTurns,
-} from "@oh-my-pi/pi-tui/overlays/btw-history";
+} from "@oh-my-striped-pi/pi-tui/overlays/btw-history";
 
 const imageSchema = type({ type: "'image'", data: "string", mimeType: "string" });
 const turnFields = {

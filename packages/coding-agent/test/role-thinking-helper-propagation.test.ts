@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import * as ai from "@oh-my-pi/pi-ai";
-import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { generateCommitMessage } from "@oh-my-pi/pi-coding-agent/utils/commit-message-generator";
-import { generateSessionTitle } from "@oh-my-pi/pi-coding-agent/utils/title-generator";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { type Api, Effort, type Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { generateCommitMessage } from "@oh-my-striped-pi/pi-coding-agent/utils/commit-message-generator";
+import { generateSessionTitle } from "@oh-my-striped-pi/pi-coding-agent/utils/title-generator";
 
 function getModelOrThrow(id: string) {
 	return buildModel({

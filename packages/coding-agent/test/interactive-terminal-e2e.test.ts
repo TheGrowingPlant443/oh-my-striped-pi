@@ -1,16 +1,16 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, ToolResultMessage, Usage } from "@oh-my-pi/pi-ai";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { Composer } from "@oh-my-pi/pi-tui/prompt/composer";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, ToolResultMessage, Usage } from "@oh-my-striped-pi/pi-ai";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { Composer } from "@oh-my-striped-pi/pi-tui/prompt/composer";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { VirtualTerminal } from "../../tui/test/virtual-terminal";
 
 function plainRows(rows: readonly string[]): string[] {
@@ -65,17 +65,17 @@ describe("libkitty end-to-end", () => {
 		const pending = mode.getUserInput();
 		await term.waitForRender();
 
-		term.sendInput("hi there omp");
+		term.sendInput("hi there omsp");
 		await term.waitForRender();
 		term.sendInput("\r");
 		const input = await pending;
-		expect(input.text).toBe("hi there omp");
+		expect(input.text).toBe("hi there omsp");
 
 		// The optimistic user-message block must be on the physical screen now,
 		// before any assistant output exists.
-		await term.waitForRender(() => plainRows(term.getViewport()).some(row => row.includes("hi there omp")));
+		await term.waitForRender(() => plainRows(term.getViewport()).some(row => row.includes("hi there omsp")));
 		const viewport = plainRows(term.getViewport());
-		const hits = viewport.filter(row => row.includes("hi there omp"));
+		const hits = viewport.filter(row => row.includes("hi there omsp"));
 		if (hits.length !== 1) dump("viewport after submit", viewport);
 		expect(hits.length).toBe(1);
 	});
@@ -384,7 +384,12 @@ describe("libkitty end-to-end", () => {
 		const buffer = () => plainRows(term.getScrollBuffer());
 		expect(buffer().some(row => row.includes("SHAKE_RETIRED_REASONING"))).toBe(true);
 		await mode.handleShakeCommand("thinking");
-		await term.waitForRender();
+		await term.waitForRender(
+			() =>
+				!buffer().some(row => row.includes("SHAKE_RETIRED_REASONING")) &&
+				buffer().some(row => row.trim() === "Answer marker 1") &&
+				buffer().some(row => row.trim() === "Answer marker 35"),
+		);
 
 		const rows = buffer();
 		expect(rows.some(row => row.includes("SHAKE_RETIRED_REASONING"))).toBe(false);
@@ -402,7 +407,7 @@ describe("libkitty end-to-end", () => {
 				skipped: false,
 				...(errorMessage ? { errorMessage } : {}),
 			});
-			await term.waitForRender();
+			await term.waitForRender(() => buffer().some(row => row.trim() === "Answer marker 1"));
 			expect(buffer().filter(row => row.trim() === "Answer marker 1")).toHaveLength(1);
 			expect(plainRows(term.getViewport()).some(row => row.includes("Review answer"))).toBe(true);
 		}

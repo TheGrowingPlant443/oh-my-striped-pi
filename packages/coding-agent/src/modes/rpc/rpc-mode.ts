@@ -13,13 +13,13 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
-import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { $env, isRecord, logger, Snowflake, toError } from "@oh-my-pi/pi-utils";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { getOAuthProviders } from "@oh-my-striped-pi/pi-ai/oauth";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { toolWireSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
+import { modelsAreEqual } from "@oh-my-striped-pi/pi-catalog/models";
+import { $env, isRecord, logger, Snowflake, toError } from "@oh-my-striped-pi/pi-utils";
 import { clearPluginRootsAndCaches, resolveActiveProjectRegistryPath } from "../../discovery/helpers";
 import {
 	type ExtensionAskDialogQuestion,
@@ -40,14 +40,14 @@ import {
 	type SkillPromptInput,
 	type SkillRediscoverySource,
 } from "../../extensibility/skills";
-import { type Theme, theme } from "@oh-my-pi/pi-tui/theme";
+import { type Theme, theme } from "@oh-my-striped-pi/pi-tui/theme";
 import { AgentLifecycleManager } from "../../registry/agent-lifecycle";
 import {
 	type WordCompletionEngine,
 	type WordCompletionMethod,
 	type WordCompletionQuery,
 	wordCompletionQuery,
-} from "@oh-my-pi/pi-tui/prompt/word-completion";
+} from "@oh-my-striped-pi/pi-tui/prompt/word-completion";
 import { requestTextPrediction, textPredictionBackend } from "../../predict/client";
 import { type AgentSession, type NavigateTreeResult, SessionBusyError } from "../../session/agent-session";
 import type { MCPManager } from "../../mcp/manager";
@@ -1028,7 +1028,7 @@ function parseValueDialogResponse(
 }
 
 function shouldEmitRpcTitles(): boolean {
-	const raw = $env.PI_RPC_EMIT_TITLE;
+	const raw = $env.OMSP_RPC_EMIT_TITLE;
 	if (!raw) return false;
 	const normalized = raw.trim().toLowerCase();
 	return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
@@ -1271,7 +1271,7 @@ export function requestRpcDialog<T>(
 		opts?.signal?.removeEventListener("abort", onAbort);
 		pendingRequests.delete(id);
 	};
-	// Tells the host to close a dialog omp has already settled, so a late answer
+	// Tells the host to close a dialog omsp has already settled, so a late answer
 	// cannot look actionable after abort or timeout.
 	const cancelHostDialog = () =>
 		output({
@@ -1393,7 +1393,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	// process.stdout with no newline, which the reader merges with the next JSON line and
 	// breaks JSON.parse. In RPC mode stdout is the JSON protocol channel — nothing else
 	// may write there.
-	process.env.PI_NOTIFICATIONS = "off";
+	process.env.OMSP_NOTIFICATIONS = "off";
 
 	const frameEncoder = new RpcFrameEncoder();
 	// Bun on Windows writes a piped process.stdout with a blocking WriteFile on the
@@ -1617,7 +1617,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 		}
 
 		setTitle(title: string): void {
-			// Title updates are low-value noise for most RPC hosts; opt in via PI_RPC_EMIT_TITLE=1.
+			// Title updates are low-value noise for most RPC hosts; opt in via OMSP_RPC_EMIT_TITLE=1.
 			if (!emitRpcTitles) return;
 			this.output({
 				type: "extension_ui_request",
@@ -2513,8 +2513,8 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 			case "get_available_thinking_levels": {
 				// Pi-compatible discovery: the selectable levels for the live model,
 				// including `off` (which `set_thinking_level` accepts but the
-				// effort-only helper excludes). OMP-only `auto`/`inherit` are
-				// intentionally omitted — that selector stays an OMP dialect.
+				// effort-only helper excludes). OMSP-only `auto`/`inherit` are
+				// intentionally omitted — that selector stays an OMSP dialect.
 				return success(id, "get_available_thinking_levels", {
 					levels: [ThinkingLevel.Off, ...session.getAvailableThinkingLevels()],
 				});
@@ -2857,7 +2857,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 			// reaper (releaseTabsForOwner) and other bounded teardown run before
 			// the process exits. dispose() also emits `session_shutdown`, so we
 			// must NOT emit it separately here or the event fires twice. Skipping
-			// dispose left OMP-owned Chromium alive after RPC shutdown (#5643).
+			// dispose left OMSP-owned Chromium alive after RPC shutdown (#5643).
 			await disposeAndExit();
 		},
 	});

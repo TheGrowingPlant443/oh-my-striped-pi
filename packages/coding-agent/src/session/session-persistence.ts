@@ -1,6 +1,6 @@
-import { isAnthropicServerToolHistoryBlock } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import { countNewlines, isRecord } from "@oh-my-pi/pi-utils";
-import { PRESERVE_KEY as SNAPCOMPACT_PRESERVE_KEY } from "@oh-my-pi/snapcompact";
+import { isAnthropicServerToolHistoryBlock } from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
+import { countNewlines, isRecord } from "@oh-my-striped-pi/pi-utils";
+import { PRESERVE_KEY as SNAPCOMPACT_PRESERVE_KEY } from "@oh-my-striped-pi/snapcompact";
 import {
 	type BlobStore,
 	externalizeImageDataSync,
@@ -131,7 +131,7 @@ function externalizeImagePayloadSync(
 /**
  * Drop every image ref remembered for `blobStore`, so the next persist checks
  * each blob on disk again. Call when a session write failed: a ref whose line
- * never reached a session file is unreferenced, so `omp gc` may collect its blob.
+ * never reached a session file is unreferenced, so `omsp gc` may collect its blob.
  */
 export function forgetExternalizedImages(blobStore: BlobStore): void {
 	externalizedImageRefs.delete(blobStore);

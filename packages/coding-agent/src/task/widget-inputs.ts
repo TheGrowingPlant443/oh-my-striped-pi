@@ -4,7 +4,7 @@
  * source, every source of the jobs the subagent itself started re-exposed as
  * `<jobId>:<sourceId>`, and a brief read live from the job's progress.
  */
-import type { AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
+import type { AgentProgress } from "@oh-my-striped-pi/pi-tui/tools/task";
 import type { AsyncJobManager } from "../async/job-manager";
 import type { TextTap } from "../job-widgets/text-tap";
 import {
@@ -17,7 +17,7 @@ import {
 import type { SubagentToolResult } from "./executor";
 
 /** Label of the `tools` source (`TOOLS_SOURCE_ID` in `job-widgets/types`), for the widget author. */
-export const TOOLS_SOURCE_LABEL = `subagent tool calls: \`${TOOL_CALL_MARK}<tool> <intent>\` (omp's marker) then the result text`;
+export const TOOLS_SOURCE_LABEL = `subagent tool calls: \`${TOOL_CALL_MARK}<tool> <intent>\` (omsp's marker) then the result text`;
 /** Most of one tool result kept in the tap: its last 64 Ki characters. */
 const MAX_TOOL_RESULT_CHARS = 64 * 1024;
 

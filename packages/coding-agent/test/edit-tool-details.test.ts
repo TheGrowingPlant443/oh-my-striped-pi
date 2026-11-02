@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EditTool, getEditStore } from "@oh-my-pi/pi-coding-agent/edit";
-import { type EditToolDetails } from "@oh-my-pi/pi-tui/tools/edit";
-import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EditTool, getEditStore } from "@oh-my-striped-pi/pi-coding-agent/edit";
+import { type EditToolDetails } from "@oh-my-striped-pi/pi-tui/tools/edit";
+import type { EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { $ } from "bun";
 
 function makeSession(cwd: string, settings: Record<string, unknown> = {}): ToolSession {
@@ -29,7 +29,7 @@ let tempDir: string;
 
 beforeEach(async () => {
 	resetSettingsForTest();
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-edit-tool-details-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-edit-tool-details-"));
 });
 
 afterEach(async () => {

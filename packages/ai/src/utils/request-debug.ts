@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import { redactHeaders } from "./http-inspector";
 import { decodeRequestBodyBytes } from "./request-body";
 
-const REQUEST_DEBUG_ENV = "PI_REQ_DEBUG";
+const REQUEST_DEBUG_ENV = "OMSP_REQ_DEBUG";
 const textEncoder = new TextEncoder();
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -82,7 +82,7 @@ export async function createRequestDebugSession(payload: RequestDebugPayload): P
 /**
  * Dump a fetch-shaped request to `rr-session-N.json`; the returned session's
  * `wrapResponse` streams the raw response into `rr-session-N.res.log`. Called
- * per request by `transportFetch` while `PI_REQ_DEBUG=1`.
+ * per request by `transportFetch` while `OMSP_REQ_DEBUG=1`.
  */
 export async function createFetchRequestDebugSession(
 	input: string | URL | Request,

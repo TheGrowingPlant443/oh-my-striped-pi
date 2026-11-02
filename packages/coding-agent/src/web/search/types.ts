@@ -1,6 +1,6 @@
-import type { SearchProviderId, SearchResponse } from "@oh-my-pi/pi-tui/tools/web-search-types";
+import type { SearchProviderId, SearchResponse } from "@oh-my-striped-pi/pi-tui/tools/web-search-types";
 
-export * from "@oh-my-pi/pi-tui/tools/web-search-types";
+export * from "@oh-my-striped-pi/pi-tui/tools/web-search-types";
 
 export interface SearchResultDetails {
 	response: SearchResponse;

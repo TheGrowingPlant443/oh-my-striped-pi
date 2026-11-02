@@ -1,25 +1,25 @@
 # syntax=docker/dockerfile:1.7-labs
 ###############################################################################
-# oh-my-pi — pi image
+# oh-my-striped-pi — pi image
 #
 # Stages:
 #   natives-builder — Rust + Bun → pi_natives.linux-<arch>.node
-#   wheel-builder   — omp_rpc Python wheel
-#   pi-base         — python + bun + rustup launcher + natives + omp_rpc
-#                     + /usr/local/bin/omp shim
+#   wheel-builder   — omsp_rpc Python wheel
+#   pi-base         — python + bun + rustup launcher + natives + omsp_rpc
+#                     + /usr/local/bin/omsp shim
 #   pi-runtime      — pi-base + pi source + bun install      (DEFAULT, runnable)
 #
 # Build:
-#     docker build -t oh-my-pi/pi:dev .                          # default = pi-runtime
-#     docker build --target pi-base -t oh-my-pi/pi-base:dev .    # base for derived images
+#     docker build -t oh-my-striped-pi/pi:dev .                          # default = pi-runtime
+#     docker build --target pi-base -t oh-my-striped-pi/pi-base:dev .    # base for derived images
 #
 # Run:
-#     docker run --rm oh-my-pi/pi:dev --help
-#     docker run --rm -it -v "$PWD":/work oh-my-pi/pi:dev cli    # interactive omp
+#     docker run --rm oh-my-striped-pi/pi:dev --help
+#     docker run --rm -it -v "$PWD":/work oh-my-striped-pi/pi:dev cli    # interactive omsp
 #
 # Consume as a base in another Dockerfile (see Dockerfile.robomp):
-#     ARG PI_BASE=oh-my-pi/pi:dev
-#     FROM ${PI_BASE} AS pi-base
+#     ARG OMSP_BASE=oh-my-striped-pi/pi:dev
+#     FROM ${OMSP_BASE} AS pi-base
 ###############################################################################
 
 ARG BUN_VERSION=1.4.4
@@ -39,7 +39,7 @@ ARG BUN_VERSION
 ENV BUN_INSTALL=/opt/bun \
     PATH=/opt/bun/bin:/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin \
     CARGO_TERM_COLOR=never \
-    OMP_NATIVE_CARGO_PROFILE=ci
+    OMSP_NATIVE_CARGO_PROFILE=ci
 
 # clang/libclang-dev: bindgen for pipewire-sys/libspa-sys (Linux desktop capture);
 # cmake/make/ninja-build: opusic-sys builds bundled libopus via CMake.
@@ -110,7 +110,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
        packages/natives/native/embedded-addon.js /out/natives-seed/
 
 ############################
-# 2) wheel-builder — omp-rpc wheel
+# 2) wheel-builder — omsp-rpc wheel
 ############################
 FROM python:3.12-slim-bookworm AS wheel-builder
 
@@ -121,14 +121,14 @@ RUN apt-get update \
 RUN pip install --upgrade pip build
 
 WORKDIR /src
-COPY sdk/python/omp-rpc /src
+COPY sdk/python/omsp-rpc /src
 RUN python -m build --wheel --outdir /out
 
 ############################
-# 3) pi-base — python + bun + rustup + natives + omp_rpc + omp shim
+# 3) pi-base — python + bun + rustup + natives + omsp_rpc + omsp shim
 #
 # Sharable runtime base. Derived images (pi-runtime below, Dockerfile.robomp)
-# extend this and overlay their own source tree. Default PI_ROOT=/work/pi is
+# extend this and overlay their own source tree. Default OMSP_ROOT=/work/pi is
 # friendly to derived images that mount a host pi checkout there; pi-runtime
 # overrides it to /pi because its source is baked in.
 ############################
@@ -140,7 +140,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     BUN_INSTALL=/opt/bun \
-    PI_ROOT=/work/pi \
+    OMSP_ROOT=/work/pi \
     CARGO_HOME=/data/cache/cargo \
     CARGO_TARGET_DIR=/data/cache/cargo-target \
     RUSTUP_HOME=/data/cache/rustup \
@@ -177,36 +177,36 @@ RUN curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh \
 COPY --from=natives-builder /out/pi_natives.linux-*.node /opt/bun/bin/
 COPY --from=natives-builder /out/natives-seed/ /opt/pi-natives-seed/
 
-# omp-rpc Python wheel.
+# omsp-rpc Python wheel.
 COPY --from=wheel-builder /out/*.whl /tmp/wheels/
-RUN pip install /tmp/wheels/omp_rpc-*.whl && rm -rf /tmp/wheels
+RUN pip install /tmp/wheels/omsp_rpc-*.whl && rm -rf /tmp/wheels
 
-# Legal payload for the OMP license and the native addon installed above.
-COPY LICENSE packages/natives/THIRD-PARTY-NOTICES.txt /usr/share/doc/omp/
+# Legal payload for the OMSP license and the native addon installed above.
+COPY LICENSE packages/natives/THIRD-PARTY-NOTICES.txt /usr/share/doc/omsp/
 
-# `omp` shim — runs the coding-agent CLI against $PI_ROOT via Bun. Derived
-# images override PI_ROOT to point at wherever their pi source lives.
+# `omsp` shim — runs the coding-agent CLI against $OMSP_ROOT via Bun. Derived
+# images override OMSP_ROOT to point at wherever their pi source lives.
 RUN printf '%s\n' \
     '#!/usr/bin/env bash' \
     'set -euo pipefail' \
-    ': "${PI_ROOT:=/work/pi}"' \
-    'if [ ! -d "$PI_ROOT/packages/coding-agent" ]; then' \
-    '  echo "pi: PI_ROOT=$PI_ROOT does not look like a pi checkout" >&2' \
+    ': "${OMSP_ROOT:=/work/pi}"' \
+    'if [ ! -d "$OMSP_ROOT/packages/coding-agent" ]; then' \
+    '  echo "pi: OMSP_ROOT=$OMSP_ROOT does not look like a pi checkout" >&2' \
     '  exit 127' \
     'fi' \
-    'exec bun "$PI_ROOT/packages/coding-agent/src/cli.ts" "$@"' \
-    > /usr/local/bin/omp \
-    && chmod +x /usr/local/bin/omp
+    'exec bun "$OMSP_ROOT/packages/coding-agent/src/cli.ts" "$@"' \
+    > /usr/local/bin/omsp \
+    && chmod +x /usr/local/bin/omsp
 
 ############################
 # 4) pi-runtime — pi-base + pi source + bun install (DEFAULT)
 #
-# A self-contained, runnable omp image. `docker run oh-my-pi/pi:dev --help`
+# A self-contained, runnable omsp image. `docker run oh-my-striped-pi/pi:dev --help`
 # Just Works without a host checkout.
 ############################
 FROM pi-base AS pi-runtime
 
-ENV PI_ROOT=/pi
+ENV OMSP_ROOT=/pi
 WORKDIR /pi
 
 # Same manifests-only layered install pattern as natives-builder — `bun install`
@@ -231,5 +231,5 @@ COPY . /pi/
 # The root prepare script normally handles it on a vanilla install.
 RUN bun --cwd=packages/coding-agent run gen:export-viewer
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/omp"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/omsp"]
 CMD ["--help"]

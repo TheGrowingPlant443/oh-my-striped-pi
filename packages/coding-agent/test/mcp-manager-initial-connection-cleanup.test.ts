@@ -2,11 +2,15 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as configValue from "@oh-my-pi/pi-coding-agent/config/resolve-config-value";
-import * as mcpClient from "@oh-my-pi/pi-coding-agent/mcp/client";
-import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import type { MCPServerConnection, MCPStdioServerConfig, MCPTransport } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { removeWithRetries, withTimeout } from "@oh-my-pi/pi-utils";
+import * as configValue from "@oh-my-striped-pi/pi-coding-agent/config/resolve-config-value";
+import * as mcpClient from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import { MCPManager } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import type {
+	MCPServerConnection,
+	MCPStdioServerConfig,
+	MCPTransport,
+} from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { removeWithRetries, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { TOOL_NAME as DELAYED_TOOL_NAME } from "./fixtures/delayed-tool-mcp";
 
 const CONFIG: MCPStdioServerConfig = {
@@ -100,7 +104,7 @@ describe("MCPManager initial connection ownership", () => {
 	});
 
 	it("recovers tools after an initial handshake timeout", async () => {
-		const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-initial-recovery-"));
+		const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-initial-recovery-"));
 		const manager = new MCPManager(workDir);
 		const rebound = Promise.withResolvers<void>();
 		const statusTypes: string[] = [];

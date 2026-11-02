@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, type Mock, mock, spyOn } from "bun:test";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { streamPiNative } from "@oh-my-pi/pi-ai/providers/pi-native-client";
-import { encodeStream } from "@oh-my-pi/pi-ai/providers/pi-native-server";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { streamPiNative } from "@oh-my-striped-pi/pi-ai/providers/pi-native-client";
+import { encodeStream } from "@oh-my-striped-pi/pi-ai/providers/pi-native-server";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
 import type {
 	AssistantMessage,
 	AssistantMessageEvent,
@@ -12,8 +12,8 @@ import type {
 	Model,
 	ModelSpec,
 	ProviderResponseMetadata,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 function sseBytes(events: AssistantMessageEvent[]): Uint8Array {
 	const encoder = new TextEncoder();
@@ -125,7 +125,7 @@ function fakeModel(overrides: Partial<Model<"anthropic-messages">> = {}): Model<
 		name: "Claude Sonnet 4.5",
 		api: "anthropic-messages",
 		provider: "github-copilot",
-		baseUrl: "http://llm-gateway.internal:4000",
+		baseUrl: "http://llm-gateway.internal:4001",
 		reasoning: true,
 		input: ["text"],
 		cost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
@@ -168,7 +168,7 @@ describe("streamPiNative request shape", () => {
 		});
 		await stream.result();
 
-		expect(captured.url).toBe("http://llm-gateway.internal:4000/v1/pi/stream");
+		expect(captured.url).toBe("http://llm-gateway.internal:4001/v1/pi/stream");
 		expect(captured.init?.method).toBe("POST");
 		const headers = captured.init?.headers as Record<string, string>;
 		expect(headers["Content-Type"]).toBe("application/json");
@@ -248,11 +248,11 @@ describe("streamPiNative request shape", () => {
 			return fakeResponse([{ type: "done", reason: "stop", message: baseAssistant() }]);
 		}) as FetchImpl;
 
-		await streamPiNative(fakeModel({ baseUrl: "http://llm-gateway.internal:4000///" }), baseContext, {
+		await streamPiNative(fakeModel({ baseUrl: "http://llm-gateway.internal:4001///" }), baseContext, {
 			apiKey: "k",
 			fetch: fetchImpl,
 		}).result();
-		expect(captured.url).toBe("http://llm-gateway.internal:4000/v1/pi/stream");
+		expect(captured.url).toBe("http://llm-gateway.internal:4001/v1/pi/stream");
 	});
 
 	it("forwards `model.headers` and lets a caller-supplied Authorization win", async () => {
@@ -263,13 +263,13 @@ describe("streamPiNative request shape", () => {
 		}) as FetchImpl;
 
 		await streamPiNative(
-			fakeModel({ headers: { "x-omp-slot": "robomp-1", Authorization: "Bearer model-wins" } }),
+			fakeModel({ headers: { "x-omsp-slot": "robomp-1", Authorization: "Bearer model-wins" } }),
 			baseContext,
 			{ apiKey: "options-loses", fetch: fetchImpl },
 		).result();
 
 		const headers = captured.init?.headers as Record<string, string>;
-		expect(headers["x-omp-slot"]).toBe("robomp-1");
+		expect(headers["x-omsp-slot"]).toBe("robomp-1");
 		expect(headers.Authorization).toBe("Bearer model-wins");
 	});
 
@@ -341,9 +341,9 @@ describe("streamPiNative event flow", () => {
 		await expect(stream.result()).rejects.toThrow(/first event/);
 	});
 
-	it("uses PI_STREAM_FIRST_EVENT_TIMEOUT_MS for silent pi-native streams", async () => {
-		const previous = Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS;
-		Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS = "20";
+	it("uses OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS for silent pi-native streams", async () => {
+		const previous = Bun.env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS;
+		Bun.env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS = "20";
 		try {
 			const fetchImpl: FetchImpl = (async () =>
 				new Response(stalledBody(), {
@@ -356,9 +356,9 @@ describe("streamPiNative event flow", () => {
 			await expect(stream.result()).rejects.toThrow(/first event/);
 		} finally {
 			if (previous === undefined) {
-				delete Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS;
+				delete Bun.env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS;
 			} else {
-				Bun.env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS = previous;
+				Bun.env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS = previous;
 			}
 		}
 	});

@@ -2,16 +2,16 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, spyOn, test, vi } from "bun:test";
-import type { FetchImpl, Model } from "@oh-my-pi/pi-ai";
-import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { resolveSpeechCandidates, ttsTool } from "@oh-my-pi/pi-coding-agent/tools/tts";
-import { ttsClient } from "@oh-my-pi/pi-coding-agent/tts/tts-client";
+import type { FetchImpl, Model } from "@oh-my-striped-pi/pi-ai";
+import { type GeneratedProvider, getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { CustomToolContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/types";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { resolveSpeechCandidates, ttsTool } from "@oh-my-striped-pi/pi-coding-agent/tools/tts";
+import { ttsClient } from "@oh-my-striped-pi/pi-coding-agent/tts/tts-client";
 
 function requireModel(provider: GeneratedProvider, id: string): Model {
 	const model = getBundledModel(provider, id);
@@ -44,7 +44,7 @@ let tempDir: string;
 
 beforeEach(async () => {
 	authStorage = await AuthStorage.create(":memory:");
-	tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-tts-chain-"));
+	tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-tts-chain-"));
 });
 
 afterEach(() => {

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import * as os from "node:os";
-import { IpcConnection, ipcEndpoint } from "@oh-my-pi/pi-natives";
+import { IpcConnection, ipcEndpoint } from "@oh-my-striped-pi/pi-natives";
 import { type Component, Input, Text, TUI, type TuiDebugTreeNode } from "../src";
 import { VirtualTerminal } from "./virtual-terminal";
 
@@ -83,10 +83,10 @@ async function paintedText(client: DebugClient): Promise<DebugReply> {
 	throw new Error("TUI did not paint a debug frame");
 }
 
-test("OMP_TUI_DEBUG drives and inspects a live TUI", async () => {
-	const previousDebugPath = process.env.OMP_TUI_DEBUG;
+test("OMSP_TUI_DEBUG drives and inspects a live TUI", async () => {
+	const previousDebugPath = process.env.OMSP_TUI_DEBUG;
 	const socketPath = ipcEndpoint(os.tmpdir(), `pi-tui-${process.pid}-${Bun.randomUUIDv7().slice(0, 8)}`);
-	process.env.OMP_TUI_DEBUG = socketPath;
+	process.env.OMSP_TUI_DEBUG = socketPath;
 	const terminal = new VirtualTerminal(50, 12);
 	const tui = new TUI(terminal);
 	const title = new Text("Known debug content", 0, 0);
@@ -136,7 +136,7 @@ test("OMP_TUI_DEBUG drives and inspects a live TUI", async () => {
 	} finally {
 		client?.close();
 		tui.stop();
-		if (previousDebugPath === undefined) delete process.env.OMP_TUI_DEBUG;
-		else process.env.OMP_TUI_DEBUG = previousDebugPath;
+		if (previousDebugPath === undefined) delete process.env.OMSP_TUI_DEBUG;
+		else process.env.OMSP_TUI_DEBUG = previousDebugPath;
 	}
 });

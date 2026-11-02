@@ -3,25 +3,25 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { FetchImpl, Model } from "@oh-my-pi/pi-ai";
-import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
-import type { ModelSpec, OpenAICompat } from "@oh-my-pi/pi-catalog/types";
+import type { FetchImpl, Model } from "@oh-my-striped-pi/pi-ai";
+import { streamOpenAICompletions } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { writeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { resolveModelCacheProviderId } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import type { ModelSpec, OpenAICompat } from "@oh-my-striped-pi/pi-catalog/types";
 import {
 	discoverModelsByProviderType,
 	discoverOpenAIModelsList,
 	discoverProxyModels,
 	type DiscoveryProviderConfig,
-} from "@oh-my-pi/pi-coding-agent/config/model-discovery";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { ProviderDiscoverySchema } from "@oh-my-pi/pi-coding-agent/config/models-config-schema";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/config/model-discovery";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { ProviderDiscoverySchema } from "@oh-my-striped-pi/pi-coding-agent/config/models-config-schema";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 
 const provider = "company";
 const baseUrl = "https://inference.company.example/v1";

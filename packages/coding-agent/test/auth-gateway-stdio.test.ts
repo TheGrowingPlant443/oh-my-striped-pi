@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { Api, Model, ModelSpec } from "@oh-my-pi/pi-ai";
-import { selectorCandidates } from "@oh-my-pi/pi-coding-agent/cli/auth-gateway-stdio";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { Api, Model, ModelSpec } from "@oh-my-striped-pi/pi-ai";
+import { selectorCandidates } from "@oh-my-striped-pi/pi-coding-agent/cli/auth-gateway-stdio";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 
 const fastSpec = {
 	provider: "company",

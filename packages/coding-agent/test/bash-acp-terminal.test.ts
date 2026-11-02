@@ -2,17 +2,17 @@ import { afterAll, afterEach, describe, expect, it, mock, spyOn } from "bun:test
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ClientBridge, ClientBridgeTerminalHandle } from "@oh-my-pi/pi-coding-agent/session/client-bridge";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
-import { encodeTerminalImage } from "@oh-my-pi/pi-coding-agent/utils/terminal-graphics";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ClientBridge, ClientBridgeTerminalHandle } from "@oh-my-striped-pi/pi-coding-agent/session/client-bridge";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
+import { encodeTerminalImage } from "@oh-my-striped-pi/pi-coding-agent/utils/terminal-graphics";
 
 // `getShellConfig()` validates that `shellPath` exists, and `/bin/bash` does not
 // on Windows. The ACP route only forwards the path to the stubbed client
 // terminal, so an empty `bash` file stands in for the resolved shell everywhere.
-const stubShellDir = TempDir.createSync("@omp-acp-shell-");
+const stubShellDir = TempDir.createSync("@omsp-acp-shell-");
 const STUB_BASH = stubShellDir.join(process.platform === "win32" ? "bash.exe" : "bash");
 fs.writeFileSync(STUB_BASH, "");
 afterAll(() => stubShellDir.removeSync());
@@ -138,7 +138,7 @@ describe("BashTool ACP terminal routing", () => {
 		const sessionEnvOf = (call: number) =>
 			Object.fromEntries(
 				(createSpy.mock.calls[call]![0].env ?? [])
-					.filter(({ name }) => name === "PI_SESSION_ID" || name === "PI_SESSION_FILE")
+					.filter(({ name }) => name === "OMSP_SESSION_ID" || name === "OMSP_SESSION_FILE")
 					.map(({ name, value }) => [name, value]),
 			);
 
@@ -147,9 +147,9 @@ describe("BashTool ACP terminal routing", () => {
 		sessionFile = null;
 		await tool.execute("call-env-b", { command: "true" });
 
-		expect(sessionEnvOf(0)).toEqual({ PI_SESSION_ID: "session-a", PI_SESSION_FILE: fileA });
-		// Empty, not absent: an env overlay cannot unset a stale value inherited from a parent omp.
-		expect(sessionEnvOf(1)).toEqual({ PI_SESSION_ID: "session-b", PI_SESSION_FILE: "" });
+		expect(sessionEnvOf(0)).toEqual({ OMSP_SESSION_ID: "session-a", OMSP_SESSION_FILE: fileA });
+		// Empty, not absent: an env overlay cannot unset a stale value inherited from a parent omsp.
+		expect(sessionEnvOf(1)).toEqual({ OMSP_SESSION_ID: "session-b", OMSP_SESSION_FILE: "" });
 	});
 
 	it("extracts graphics from cumulative terminal snapshots without leaking escapes", async () => {

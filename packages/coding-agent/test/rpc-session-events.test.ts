@@ -2,22 +2,22 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, AssistantMessageEvent, Context, Model } from "@oh-my-pi/pi-ai";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { MAX_RPC_FRAME_BYTES, RpcFrameEncoder } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-frame";
-import { RpcSessionEventForwarder } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-session-events";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, AssistantMessageEvent, Context, Model } from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { MAX_RPC_FRAME_BYTES, RpcFrameEncoder } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-frame";
+import { RpcSessionEventForwarder } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-session-events";
 import type {
 	RpcDeltaMessageUpdateFrame,
 	RpcProjectedSessionEventFrame,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "./helpers/model-fixtures";
 import { makeAssistantMessage } from "./session-manager/helpers";
 

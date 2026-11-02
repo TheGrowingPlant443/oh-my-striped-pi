@@ -361,7 +361,7 @@ async def handle_release_ci(
     active = db.get_active_release(repo_full)
     row = db.get_release(key)
     if row is None:
-        session_dir = sandbox.workspace_root(repo_full, "release") / f".omp-session-{tag}"
+        session_dir = sandbox.workspace_root(repo_full, "release") / f".omsp-session-{tag}"
         row = db.upsert_release(
             repo=repo_full,
             tag=tag,
@@ -493,7 +493,7 @@ async def triage_issue(
         # claims to close this issue via Closes/Fixes/Resolves syntax or
         # the Development panel. We never replay closing-PR detection on
         # a follow-up because by then the bot has already committed
-        # resources (workspace, omp session) to this issue.
+        # resources (workspace, omsp session) to this issue.
         try:
             closing_prs = await github.list_closing_pull_requests(repo.full_name, issue.number)
         except GitHubError as exc:
@@ -939,7 +939,7 @@ async def handle_pr_conversation(
         issue_row = db.get_issue(issue_row.key) or issue_row
     # Bare @mention with no request body — the route stashes an empty
     # _robomp_directive; _directive_from_payload rejects it but the key
-    # being present tells us a mention happened. Reply cheaply without omp.
+    # being present tells us a mention happened. Reply cheaply without omsp.
     if directive is None and payload.get("_robomp_directive") is not None:
         comment = _comment_from_payload(payload)
         log.info(

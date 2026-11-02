@@ -13,14 +13,14 @@ import * as fs from "node:fs";
 import { parseArgs as nodeParseArgs } from "node:util";
 
 /**
- * Streaming startup marker, enabled by `PI_DEBUG_STARTUP`. Local copy of
+ * Streaming startup marker, enabled by `OMSP_DEBUG_STARTUP`. Local copy of
  * `logger.startupMarker` so the minimal `--version`/bootstrap import graph
  * stays free of the winston-backed logger module. Synchronous on purpose:
  * a command module whose import hangs (dlopen, fs on a dead mount) must
  * still leave its `:start` marker behind.
  */
 function startupMarker(text: string): void {
-	if (!process.env.PI_DEBUG_STARTUP) return;
+	if (!process.env.OMSP_DEBUG_STARTUP) return;
 	try {
 		fs.writeSync(2, `[startup] ${text}\n`);
 	} catch {
@@ -463,7 +463,7 @@ export async function run(opts: RunOptions): Promise<void> {
 	}
 
 	// Per-command help: load only the requested command. Loading the full
-	// command table here would make `omp <cmd> --help` hang or crash whenever
+	// command table here would make `omsp <cmd> --help` hang or crash whenever
 	// any *unrelated* command module misbehaves at import time.
 	if (commandArgv.includes("--help") || commandArgv.includes("-h")) {
 		const entry = findEntry(opts.commands, commandId);

@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import type { Agent } from "@oh-my-pi/pi-agent-core";
-import { logger } from "@oh-my-pi/pi-utils";
+import type { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import {
 	type BashPtyOptions,

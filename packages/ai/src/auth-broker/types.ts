@@ -169,7 +169,7 @@ export type SnapshotStreamEvent = SnapshotStreamSnapshotEvent | SnapshotStreamEn
 export const AUTH_BROKER_API_PREFIX = "/v1";
 
 /** Default port when none is configured. Loopback-only, no external exposure. */
-export const DEFAULT_AUTH_BROKER_BIND = "127.0.0.1:8765";
+export const DEFAULT_AUTH_BROKER_BIND = "127.0.0.1:8766";
 
 /** Default broker→provider refresh skew. Refresh credentials this close to expiry. */
 export const DEFAULT_REFRESH_SKEW_MS = 5 * 60_000;

@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
 import * as nodeFs from "node:fs";
 import * as fs from "node:fs/promises";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { VERSION } from "@oh-my-pi/pi-utils/dirs";
-import { findFreeCdpPort } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
-import { RelayBridge, type RelaySocket } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/bridge";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { VERSION } from "@oh-my-striped-pi/pi-utils/dirs";
+import { findFreeCdpPort } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
+import { RelayBridge, type RelaySocket } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/bridge";
 import {
 	extensionIdForPath,
 	installedRelayExtensionVersion,
 	relayExtensionFiles,
 	unpackedExtensionId,
 	writeRelayExtension,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/relay/extension-files";
-import type { RelayToExtMessage, TabSnapshot } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/protocol";
-import { type RelayServer, startRelayServer } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/server";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/extension-files";
+import type { RelayToExtMessage, TabSnapshot } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/protocol";
+import { type RelayServer, startRelayServer } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/server";
 
 const OLD = "18.6.1";
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
@@ -49,7 +49,7 @@ function tab(tabId: number): TabSnapshot {
 
 interface Hello {
 	instanceId?: string;
-	ompVersion?: string;
+	omspVersion?: string;
 	reloadProtocol?: number;
 	extensionId?: string;
 	attachedTabIds?: number[];
@@ -58,7 +58,7 @@ interface Hello {
 function hello(bridge: RelayBridge, socket: FakeExtSocket, opts: Hello = {}): void {
 	const {
 		instanceId = "chrome",
-		ompVersion = OLD,
+		omspVersion = OLD,
 		reloadProtocol = 1,
 		extensionId = EXTENSION_ID,
 		attachedTabIds = [],
@@ -72,7 +72,7 @@ function hello(bridge: RelayBridge, socket: FakeExtSocket, opts: Hello = {}): vo
 			userAgent: "test",
 			browserVersion: "Chrome/155.0.0.0",
 			discardedTabsProtocol: 1,
-			ompVersion,
+			omspVersion,
 			reloadProtocol,
 			tabs: [tab(1)],
 			attachedTabIds,
@@ -119,9 +119,9 @@ describe("relay extension self-update decisions", () => {
 		expect(socket.closed).toBe(true);
 		expect(bridge.ready).toBe(false);
 		const reloaded = new FakeExtSocket();
-		hello(bridge, reloaded, { ompVersion: VERSION });
+		hello(bridge, reloaded, { omspVersion: VERSION });
 		expect(bridge.ready).toBe(true);
-		expect(bridge.versionInfo("ws://x/cdp").ompExtensionVersion).toBe(VERSION);
+		expect(bridge.versionInfo("ws://x/cdp").omspExtensionVersion).toBe(VERSION);
 		expect(calls).toHaveLength(1);
 	});
 
@@ -129,7 +129,7 @@ describe("relay extension self-update decisions", () => {
 		const { bridge, finish } = bridgeWithUpdater();
 		const reloading = new FakeExtSocket();
 		hello(bridge, reloading, { instanceId: "chrome" });
-		hello(bridge, new FakeExtSocket(), { instanceId: "edge", ompVersion: VERSION });
+		hello(bridge, new FakeExtSocket(), { instanceId: "edge", omspVersion: VERSION });
 		await finish(true);
 		expect(reloading.reloads).toBe(1);
 		expect(bridge.ready).toBe(true);
@@ -155,17 +155,17 @@ describe("relay extension self-update decisions", () => {
 		expect(bridge.ready).toBe(true);
 	});
 
-	it("leaves an extension installed by this omp or a newer one alone", () => {
+	it("leaves an extension installed by this omsp or a newer one alone", () => {
 		const { bridge, calls } = bridgeWithUpdater();
-		hello(bridge, new FakeExtSocket(), { ompVersion: VERSION });
-		hello(bridge, new FakeExtSocket(), { ompVersion: "999.0.0" });
+		hello(bridge, new FakeExtSocket(), { omspVersion: VERSION });
+		hello(bridge, new FakeExtSocket(), { omspVersion: "999.0.0" });
 		expect(calls).toEqual([]);
 	});
 
-	it("leaves an extension with no omp version stamp alone", () => {
+	it("leaves an extension with no omsp version stamp alone", () => {
 		const { bridge, calls } = bridgeWithUpdater();
-		hello(bridge, new FakeExtSocket(), { ompVersion: "" });
-		hello(bridge, new FakeExtSocket(), { ompVersion: "dev" });
+		hello(bridge, new FakeExtSocket(), { omspVersion: "" });
+		hello(bridge, new FakeExtSocket(), { omspVersion: "dev" });
 		expect(calls).toEqual([]);
 	});
 
@@ -289,7 +289,7 @@ describe("relay extension self-update decisions", () => {
 		expect(socket.reloads).toBe(1);
 	});
 
-	it("waits out a tab create and its close when the client left mid-create, so the tab omp opened is closed", async () => {
+	it("waits out a tab create and its close when the client left mid-create, so the tab omsp opened is closed", async () => {
 		const { bridge, calls, finish } = bridgeWithUpdater();
 		const conn = bridge.cdpConnected(FAKE_CDP);
 		const socket = new FakeExtSocket();
@@ -355,7 +355,7 @@ describe("relay extension self-update decisions", () => {
 		expect(again.reloads).toBe(0);
 		bridge.extClosed(again);
 		const newer = new FakeExtSocket();
-		hello(bridge, newer, { ompVersion: "18.7.0" });
+		hello(bridge, newer, { omspVersion: "18.7.0" });
 		await finish(true);
 		expect(newer.reloads).toBe(1);
 		const back = new FakeExtSocket();
@@ -386,7 +386,7 @@ describe("relay extension self-update on a real relay", () => {
 	const sockets: WebSocket[] = [];
 
 	beforeEach(async () => {
-		home = await TempDir.create("@omp-relay-self-update-");
+		home = await TempDir.create("@omsp-relay-self-update-");
 	});
 
 	afterEach(async () => {
@@ -434,7 +434,7 @@ describe("relay extension self-update on a real relay", () => {
 				userAgent: "test",
 				browserVersion: "Chrome/155.0.0.0",
 				discardedTabsProtocol: 1,
-				ompVersion: OLD,
+				omspVersion: OLD,
 				reloadProtocol: 1,
 				tabs: [],
 				attachedTabIds: [],
@@ -447,7 +447,7 @@ describe("relay extension self-update on a real relay", () => {
 		for (const name in files) expect(await Bun.file(`${dir}/${name}`).text()).toBe(files[name]!);
 	}
 
-	it("rewrites the copy Chrome loaded from the install directory to this omp's files and asks for a reload", async () => {
+	it("rewrites the copy Chrome loaded from the install directory to this omsp's files and asks for a reload", async () => {
 		const dir = home.join("extension");
 		await writeRelayExtension(dir, OLD);
 		const { port, events, settled } = await startRelay(dir);
@@ -481,7 +481,7 @@ describe("relay extension self-update on a real relay", () => {
 		expect(await installedRelayExtensionVersion(elsewhere)).toBe(OLD);
 	});
 
-	it("leaves files a newer omp installed for that omp's relay", async () => {
+	it("leaves files a newer omsp installed for that omsp's relay", async () => {
 		const dir = home.join("extension");
 		await writeRelayExtension(dir, "999.0.0");
 		const { port, events, settled } = await startRelay(dir);

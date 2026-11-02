@@ -1,12 +1,12 @@
 import {
 	anthropicApiVersionAcceptsSamplingParams,
 	LEGACY_ANTHROPIC_API_VERSION,
-} from "@oh-my-pi/pi-catalog/compat/anthropic";
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { mapEffortToAnthropicAdaptiveEffort } from "@oh-my-pi/pi-catalog/model-thinking";
-import { calculateCost, getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { parseGitHubCopilotApiKey } from "@oh-my-pi/pi-catalog/wire/github-copilot";
-import { logger, parseJsonWithRepair, parseStreamingJsonThrottled, readSseEvents } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-catalog/compat/anthropic";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { mapEffortToAnthropicAdaptiveEffort } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { calculateCost, getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { parseGitHubCopilotApiKey } from "@oh-my-striped-pi/pi-catalog/wire/github-copilot";
+import { logger, parseJsonWithRepair, parseStreamingJsonThrottled, readSseEvents } from "@oh-my-striped-pi/pi-utils";
 import { NO_AUTH_SENTINEL } from "../auth-retry";
 import { renderDemotedThinking } from "../dialect/demotion";
 import * as AIError from "../error";
@@ -4614,7 +4614,7 @@ function collapseFallbackSegments(content: AssistantMessage["content"]): Assista
 }
 
 /**
- * Serialize omp {@link Message}s to Anthropic wire messages.
+ * Serialize omsp {@link Message}s to Anthropic wire messages.
  *
  * `opts.serverSideFallbackEnabled` — when the CURRENT request itself
  * opts into the server-side-fallback beta chain. Only then, and only on the

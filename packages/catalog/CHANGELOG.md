@@ -4,7 +4,7 @@
 
 ### Breaking Changes
 
-- Removed the raw `@oh-my-pi/pi-catalog/models.json` export; use the bundled model registry APIs instead.
+- Removed the raw `@oh-my-striped-pi/pi-catalog/models.json` export; use the bundled model registry APIs instead.
 - Removed public SaaS provider registrations other than Copilot while retaining Local, Apple Foundation Models, Ollama, llama.cpp, LM Studio, vLLM, LiteLLM and configured company protocols.
 
 ### Added

@@ -2,7 +2,7 @@
 // High-level API
 // ============================================================================
 
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
 import * as AIError from "../../error";
 import { getProviderDefinition, PROVIDER_REGISTRY } from "../registry";
 import type { OAuthCredentials, OAuthProviderId, OAuthProviderInfo, OAuthProviderInterface } from "./types";

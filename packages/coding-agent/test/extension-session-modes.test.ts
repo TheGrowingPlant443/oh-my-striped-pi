@@ -1,22 +1,22 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import type {
 	ExtensionContext,
 	ExtensionFactory,
 	ModeChangedEvent,
 	SessionModeResult,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { resolveLocalUrlToPath } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { resolveLocalUrlToPath } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { initializeExtensions } from "@oh-my-striped-pi/pi-coding-agent/modes/runtime-init";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 function refusal(result: SessionModeResult): string {
@@ -58,7 +58,7 @@ describe("ctx.sessionModes in the interactive TUI", () => {
 	afterAll(() => registry.authStorage.close());
 
 	async function createSession(extension: ExtensionFactory, settings: Record<string, unknown> = {}) {
-		const dir = TempDir.createSync("omp-session-modes-");
+		const dir = TempDir.createSync("omsp-session-modes-");
 		cleanups.push(() => dir.removeSync());
 		await Settings.init({ inMemory: true, cwd: dir.path() });
 		const { session } = await createAgentSession({

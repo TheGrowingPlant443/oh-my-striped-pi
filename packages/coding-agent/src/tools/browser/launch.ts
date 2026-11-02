@@ -10,8 +10,8 @@ import {
 	removeWithRetries,
 	toError,
 	untilAborted,
-} from "@oh-my-pi/pi-utils";
-import type * as BrowsersNs from "@oh-my-pi/pi-utils/browsers";
+} from "@oh-my-striped-pi/pi-utils";
+import type * as BrowsersNs from "@oh-my-striped-pi/pi-utils/browsers";
 import type {
 	Browser,
 	CDPSession,
@@ -39,7 +39,7 @@ import stealthPluginsScript from "../puppeteer/10_stealth_plugins.txt" with { ty
 import stealthHardwareScript from "../puppeteer/11_stealth_hardware.txt" with { type: "text" };
 import stealthCodecsScript from "../puppeteer/12_stealth_codecs.txt" with { type: "text" };
 import stealthWorkerScript from "../puppeteer/13_stealth_worker.txt" with { type: "text" };
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { withDownload } from "../../downloads/activity";
 import { probeCdpResponse } from "./attach";
 
@@ -129,7 +129,7 @@ export function isPuppeteerTimeout(error: unknown): boolean {
 }
 
 /**
- * Build Puppeteer's `TimeoutError` for a deadline omp enforces in place of one of Puppeteer's waits.
+ * Build Puppeteer's `TimeoutError` for a deadline omsp enforces in place of one of Puppeteer's waits.
  * Its `name` stays "TimeoutError" in release builds: back/forward/reload pass this error to the agent's cell as is.
  */
 export function puppeteerTimeoutError(message: string): Error {
@@ -263,7 +263,7 @@ async function debuggerEndpointOf(browserURL: string): Promise<string | undefine
 }
 
 /**
- * The connection's root session, which answers browser-level `Target.*` commands. The omp relay serves
+ * The connection's root session, which answers browser-level `Target.*` commands. The omsp relay serves
  * those but exposes no attachable browser target, so `browser.target().createCDPSession()` fails there.
  */
 export function browserConnection(browser: Browser): Connection {
@@ -292,7 +292,7 @@ export function loadedNetworkConditions(): Readonly<Record<string, NetworkCondit
 let browsersModule: typeof BrowsersNs | undefined;
 async function loadBrowsers(): Promise<typeof BrowsersNs> {
 	if (!browsersModule) {
-		browsersModule = await import("@oh-my-pi/pi-utils/browsers");
+		browsersModule = await import("@oh-my-striped-pi/pi-utils/browsers");
 	}
 	return browsersModule;
 }
@@ -310,7 +310,7 @@ async function loadBrowsers(): Promise<typeof BrowsersNs> {
  * system Chrome is used on macOS only when Chrome for Testing cannot be
  * obtained. Other platforms keep the download-avoiding system Chrome
  * preference and fall back to Chrome for Testing. The managed browser is
- * cached under ~/.omp/puppeteer (getPuppeteerDir). Returns undefined when
+ * cached under ~/.omsp/puppeteer (getPuppeteerDir). Returns undefined when
  * platform detection fails (puppeteer default resolution takes over).
  * Exported so real-browser tests can probe launchability and skip on hosts
  * missing Chrome's system libraries.
@@ -375,7 +375,7 @@ export async function ensureSignInChromiumExecutable(): Promise<string | undefin
 }
 
 let managedChromiumPromise: Promise<string | undefined> | undefined;
-/** Chrome for Testing under ~/.omp/puppeteer, downloaded on first use; undefined when platform detection fails. */
+/** Chrome for Testing under ~/.omsp/puppeteer, downloaded on first use; undefined when platform detection fails. */
 function ensureManagedChromium(): Promise<string | undefined> {
 	managedChromiumPromise ??= (async () => {
 		const browsers = await loadBrowsers();
@@ -588,9 +588,9 @@ export interface LaunchHeadlessOptions extends HeadlessLaunchFeatures {
 export interface LaunchHeadlessResult {
 	browser: Browser;
 	/**
-	 * OMP-owned temporary Chromium profile directory to remove after the browser
+	 * OMSP-owned temporary Chromium profile directory to remove after the browser
 	 * process tree exits, or `undefined` when the caller supplied its own
-	 * `--user-data-dir` (which OMP must not delete).
+	 * `--user-data-dir` (which OMSP must not delete).
 	 */
 	userDataDir?: string;
 }
@@ -657,7 +657,7 @@ export async function launchHeadlessBrowser(opts: LaunchHeadlessOptions): Promis
 	// (issue #7058). `removeUserDataDir` cleans it up on our terms instead.
 	let userDataDir: string | undefined;
 	if (!launchArgs.some(arg => arg.startsWith("--user-data-dir"))) {
-		userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-chrome-profile-"));
+		userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-chrome-profile-"));
 		launchArgs.push(`--user-data-dir=${userDataDir}`);
 	}
 	try {
@@ -681,7 +681,7 @@ export async function launchHeadlessBrowser(opts: LaunchHeadlessOptions): Promis
 }
 
 /**
- * Pin automation-safe preferences in a Chromium profile OMP owns. Password leak
+ * Pin automation-safe preferences in a Chromium profile OMSP owns. Password leak
  * detection answers a password form submit with a tab-modal "Change your
  * password" dialog; while it is open Chromium drops `Input.dispatchMouseEvent`
  * input for the tab, and a hidden browser offers no way to close it. Chromium
@@ -713,7 +713,7 @@ async function writeOwnedProfilePreferences(file: string): Promise<void> {
 	if (profile.password_manager_leak_detection === false) return;
 	profile.password_manager_leak_detection = false;
 	prefs.profile = profile;
-	const staged = `${file}.omp-${process.pid}`;
+	const staged = `${file}.omsp-${process.pid}`;
 	try {
 		await Bun.write(staged, JSON.stringify(prefs));
 		await fs.promises.rename(staged, file);
@@ -724,11 +724,11 @@ async function writeOwnedProfilePreferences(file: string): Promise<void> {
 }
 
 /**
- * Discard Chromium's session-restore state in a persistent profile OMP owns.
+ * Discard Chromium's session-restore state in a persistent profile OMSP owns.
  * When the first window of a new Chromium process opens, it reopens every page
  * recorded in `Default/Sessions`, however the previous process exited. On the
  * project-shared browser that resurrects whatever was open when its
- * predecessor stopped or was killed, and no omp process owns those pages:
+ * predecessor stopped or was killed, and no omsp process owns those pages:
  * target ownership dies with the browser instance, so neither idle-close nor
  * the orphan reaper ever closes them. Call this before a Chromium process
  * starts on the profile. Best-effort: a failure is logged and never blocks the
@@ -781,7 +781,7 @@ export async function resolveSharedBrowserLaunchSpec(opts: {
 }
 
 /**
- * Remove an OMP-owned headless Chromium profile directory, tolerating the brief
+ * Remove an OMSP-owned headless Chromium profile directory, tolerating the brief
  * window on Windows in which Chromium (or an orphaned browser subprocess) still
  * holds the profile lock. The shared temp remover centralizes retry handling
  * for EBUSY/EPERM/ENOTEMPTY; if the directory is still busy afterwards we warn

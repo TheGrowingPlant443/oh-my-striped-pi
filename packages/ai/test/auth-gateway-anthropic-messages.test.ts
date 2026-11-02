@@ -1,22 +1,26 @@
 import { describe, expect, it } from "bun:test";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { encodeResponse, encodeStream, parseRequest } from "@oh-my-pi/pi-ai/providers/anthropic-messages-server";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import {
+	encodeResponse,
+	encodeStream,
+	parseRequest,
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic-messages-server";
 import type {
 	ToolSearchServerToolUseBlockParam,
 	ToolSearchToolResultBlockParam,
 	WebSearchServerToolUseBlockParam,
 	WebSearchToolResultBlockParam,
-} from "@oh-my-pi/pi-ai/providers/anthropic-wire";
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
 import type {
 	AssistantMessage,
 	AssistantMessageEvent,
 	Model,
 	ToolCall,
 	ToolResultMessage,
-} from "@oh-my-pi/pi-ai/types";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 
 function emptyUsage(): AssistantMessage["usage"] {
 	return {

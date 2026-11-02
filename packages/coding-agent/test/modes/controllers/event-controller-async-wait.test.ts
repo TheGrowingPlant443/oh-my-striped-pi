@@ -12,23 +12,23 @@
  *     ended lands in context and does not start a model turn.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/event-controller";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AsyncJobSnapshot } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as titleGenerator from "@oh-my-pi/pi-coding-agent/utils/title-generator";
-import { TERMINAL } from "@oh-my-pi/pi-tui";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EventController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/event-controller";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AsyncJobSnapshot } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session-types";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as titleGenerator from "@oh-my-striped-pi/pi-coding-agent/utils/title-generator";
+import { TERMINAL } from "@oh-my-striped-pi/pi-tui";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 
 type AgentEnd = Extract<AgentSessionEvent, { type: "agent_end" }>;

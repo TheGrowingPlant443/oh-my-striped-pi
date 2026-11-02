@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { sanitizeErrorLine } from "@oh-my-pi/pi-tui/chrome/error-block";
-import type { SingleResult } from "@oh-my-pi/pi-tui/tools/task";
-import { formatTaskResultSummary } from "@oh-my-pi/pi-coding-agent/task/result-summary";
-import type { TaskParams, TaskToolDetails } from "@oh-my-pi/pi-coding-agent/task";
-import { BUILTIN_LIFECYCLE_SLASH_COMMANDS } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-lifecycle";
-import * as seanceResolver from "@oh-my-pi/pi-coding-agent/task/seance";
-import * as discoveryModule from "@oh-my-pi/pi-coding-agent/task/discovery";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import type { AgentTool, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { sanitizeErrorLine } from "@oh-my-striped-pi/pi-tui/chrome/error-block";
+import type { SingleResult } from "@oh-my-striped-pi/pi-tui/tools/task";
+import { formatTaskResultSummary } from "@oh-my-striped-pi/pi-coding-agent/task/result-summary";
+import type { TaskParams, TaskToolDetails } from "@oh-my-striped-pi/pi-coding-agent/task";
+import { BUILTIN_LIFECYCLE_SLASH_COMMANDS } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-lifecycle";
+import * as seanceResolver from "@oh-my-striped-pi/pi-coding-agent/task/seance";
+import * as discoveryModule from "@oh-my-striped-pi/pi-coding-agent/task/discovery";
+import { getBundledAgent } from "@oh-my-striped-pi/pi-coding-agent/task/agents";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 import { createInteractiveModeContext } from "../helpers/interactive-mode-context";
 
 const command = BUILTIN_LIFECYCLE_SLASH_COMMANDS.find(candidate => candidate.name === "seance");
@@ -61,7 +61,7 @@ afterEach(() => {
 
 describe("/seance", () => {
 	it("opens the model picker directly for a picked session with no saved model", async () => {
-		const picked = sourceSession("/elsewhere/.omp/sessions/no-model.jsonl");
+		const picked = sourceSession("/elsewhere/.omsp/sessions/no-model.jsonl");
 		const resolve = vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: picked.path,
 			id: picked.id,
@@ -83,7 +83,7 @@ describe("/seance", () => {
 		expect(ctx.showModelSelector).toHaveBeenCalledWith(expect.objectContaining({ selectOnly: expect.anything() }));
 	});
 	it("offers the saved model when the picked session recorded one", async () => {
-		const picked = sourceSession("/repo/.omp/sessions/with-model.jsonl");
+		const picked = sourceSession("/repo/.omsp/sessions/with-model.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: picked.path,
 			id: picked.id,
@@ -104,7 +104,7 @@ describe("/seance", () => {
 		expect(ctx.showModelSelector).not.toHaveBeenCalled();
 	});
 	it("bypasses model pickers for an override and reports completed IDs with the actual model", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/old.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/old.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,
@@ -143,7 +143,7 @@ describe("/seance", () => {
 		expect(ctx.showStatus).toHaveBeenCalledWith(expect.stringContaining("openai/actual-model"));
 	});
 	it("surfaces live async progress IDs and resolved model", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/async.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/async.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,
@@ -174,7 +174,7 @@ describe("/seance", () => {
 		expect(ctx.showStatus).toHaveBeenCalledWith(expect.stringContaining("anthropic/actual-model"));
 	});
 	it("keeps the latest defined streamed model when the settled result omits one", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/streamed-model.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/streamed-model.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,
@@ -211,7 +211,7 @@ describe("/seance", () => {
 	});
 
 	it("prefers the settled fallback model over the streamed primary model", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/fallback-model.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/fallback-model.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,
@@ -251,7 +251,7 @@ describe("/seance", () => {
 	});
 
 	it("reports zero-exit aborted results as failures with their abort reason", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/aborted.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/aborted.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,
@@ -288,7 +288,7 @@ describe("/seance", () => {
 	});
 
 	it("shows real preflight content and sanitizes thrown executor errors", async () => {
-		const resolved = sourceSession("/repo/.omp/sessions/failure.jsonl");
+		const resolved = sourceSession("/repo/.omsp/sessions/failure.jsonl");
 		vi.spyOn(seanceResolver, "resolveSeanceSource").mockResolvedValue({
 			file: resolved.path,
 			id: resolved.id,

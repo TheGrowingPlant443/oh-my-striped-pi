@@ -2,17 +2,17 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { findFreeCdpPort, waitForCdp } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
-import { ensureChromiumExecutable } from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { findFreeCdpPort, waitForCdp } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
+import { ensureChromiumExecutable } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
 import {
 	acquireBrowser,
 	type PuppeteerBrowserHandle,
 	releaseBrowser,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import { decodePng } from "@oh-my-pi/pi-coding-agent/tools/browser/screenshot";
-import { acquireTab, releaseTab, runInTab } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import { decodePng } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/screenshot";
+import { acquireTab, releaseTab, runInTab } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import type { Page } from "puppeteer-core";
 import { chromiumAvailable } from "./chromium-probe";
 
@@ -56,7 +56,7 @@ afterEach(async () => {
 async function connectedBrowser(): Promise<PuppeteerBrowserHandle> {
 	const exe = await ensureChromiumExecutable();
 	if (!exe) throw new Error("Expected a Chromium executable");
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-screenshot-background-"));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-screenshot-background-"));
 	const port = await findFreeCdpPort();
 	const child = Bun.spawn(
 		[
@@ -123,7 +123,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser screenshots of background tabs", (
 		expect(await visibility(userPage)).toBe("visible");
 	}, 45_000);
 
-	it("captures an OMP-owned tab without bringing it in front of another page", async () => {
+	it("captures an OMSP-owned tab without bringing it in front of another page", async () => {
 		const handle = await acquireBrowser({ kind: "headless", headless: true }, { cwd: process.cwd() });
 		if (!("browser" in handle)) throw new Error("Expected a Puppeteer browser");
 		cleanups.push(async () => {

@@ -7,14 +7,17 @@ import {
 	IndexedSessionStorage,
 	type SessionStorageBackend,
 	type SessionStorageIndexEntry,
-} from "@oh-my-pi/pi-coding-agent/session/indexed-session-storage";
+} from "@oh-my-striped-pi/pi-coding-agent/session/indexed-session-storage";
 import {
 	FileSessionStorage,
 	SessionLockError,
 	SessionWriteConflictError,
 	type WriteTextAtomicOptions,
-} from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { type SessionTitleUpdate, serializeTitleSlot } from "@oh-my-pi/pi-coding-agent/session/session-title-slot";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import {
+	type SessionTitleUpdate,
+	serializeTitleSlot,
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-title-slot";
 
 class ControlledTitleUpdateBackend implements SessionStorageBackend {
 	readonly #sessionPath: string;
@@ -97,7 +100,7 @@ describe("FileSessionStorage writer", () => {
 	let storage: FileSessionStorage;
 
 	beforeEach(async () => {
-		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-writer-"));
+		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-writer-"));
 		storage = new FileSessionStorage();
 	});
 
@@ -296,7 +299,7 @@ describe("FileSessionStorage.deleteSessionWithArtifacts", () => {
 	let storage: FileSessionStorage;
 
 	beforeEach(async () => {
-		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-storage-"));
+		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-storage-"));
 		storage = new FileSessionStorage();
 	});
 
@@ -348,7 +351,7 @@ describe("FileSessionStorage.writeTextSync", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-storage-"));
+		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-storage-"));
 	});
 
 	afterEach(async () => {
@@ -570,7 +573,7 @@ describe("FileSessionStorage line streaming", () => {
 	let tempDir: string;
 
 	beforeEach(async () => {
-		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-storage-lines-"));
+		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-storage-lines-"));
 	});
 
 	afterEach(async () => {
@@ -624,7 +627,7 @@ describe("FileSessionStorage.updateSessionTitle", () => {
 	let storage: FileSessionStorage;
 
 	beforeEach(async () => {
-		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-storage-"));
+		tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-storage-"));
 		storage = new FileSessionStorage();
 	});
 

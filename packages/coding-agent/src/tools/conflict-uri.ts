@@ -4,9 +4,9 @@
  * file line numbers, and splicing replacement content over registered blocks.
  */
 import * as fs from "node:fs/promises";
-import { type ConflictEntry, renderConflictRegion } from "@oh-my-pi/pi-tui/tools/conflict-detect";
-import { PREVIEW_LIMITS } from "@oh-my-pi/pi-tui/render/render-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { type ConflictEntry, renderConflictRegion } from "@oh-my-striped-pi/pi-tui/tools/conflict-detect";
+import { PREVIEW_LIMITS } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { getEditStore } from "../edit/store";
 import type { InternalWriteResult } from "../internal-urls/types";
 import { writethroughNoop } from "../lsp/writethrough";

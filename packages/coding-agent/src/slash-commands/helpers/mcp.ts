@@ -1,4 +1,4 @@
-import { getMCPConfigPath, logger } from "@oh-my-pi/pi-utils";
+import { getMCPConfigPath, logger } from "@oh-my-striped-pi/pi-utils";
 import { connectToServer, disconnectServer, listPrompts, listResources, listTools } from "../../mcp/client";
 import {
 	addMCPServer,
@@ -377,13 +377,13 @@ async function handleRemoveCommand(rest: string, runtime: SlashCommandRuntime): 
  * `mcp/oauth-reauth.ts` (same browser flow, client-credential assembly, and
  * persistence policy as the TUI) presented as plain text.
  *
- * omp usually runs on the user's machine when driven over ACP (emacs via
+ * omsp usually runs on the user's machine when driven over ACP (emacs via
  * agent-shell, Zed), so opening the browser works like the TUI. No clipboard
  * copy: OSC 52 escape sequences would corrupt the ACP JSON-RPC stream on
  * stdout, so the URL is emitted as text for the client to render. No
  * manual-code input either (ACP has no composer to claim), so the OAuth
  * redirect must reach this machine's local callback server: the printed URL
- * helps when the browser fails to open, not when omp runs on a remote host.
+ * helps when the browser fails to open, not when omsp runs on a remote host.
  */
 async function handleReauthCommand(rest: string, runtime: SlashCommandRuntime): Promise<SlashCommandResult> {
 	// `reauth` takes no other flags, so the entire rest is the server name —

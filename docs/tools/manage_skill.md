@@ -52,7 +52,7 @@
 
 ## Side Effects
 
-- Filesystem: writes or deletes `<agent-dir>/managed-skills/<name>/SKILL.md`; the default agent directory is `~/.omp/agent`.
+- Filesystem: writes or deletes `<agent-dir>/managed-skills/<name>/SKILL.md`; the default agent directory is `~/.omsp/agent`.
 - Network: none.
 - Session state: reads `autolearn.enabled` during tool creation and refreshes the active skill list after a successful mutation when `refreshSkills` is available.
 - Background work: none.

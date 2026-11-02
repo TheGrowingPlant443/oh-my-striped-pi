@@ -1,8 +1,8 @@
 import { clearSubmittedText, runWithDetachedDraft } from "./helpers/draft";
 import * as path from "node:path";
-import { AgentBusyError } from "@oh-my-pi/pi-agent-core";
-import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { AgentBusyError } from "@oh-my-striped-pi/pi-agent-core";
+import { formatKeyHint } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import {
 	formatModelString,
 	getModelMatchPreferences,
@@ -26,7 +26,7 @@ import { describeLoopLimitRuntime } from "../modes/loop-limit";
 import type { InteractiveModeContext } from "../modes/types";
 import ratchetKickoffPrompt from "../prompts/ratchet-kickoff.md" with { type: "text" };
 import type { AgentSession } from "../session/agent-session";
-import { CLI_THINKING_LEVELS, getConfiguredThinkingLevelMetadata } from "@oh-my-pi/pi-tui/thinking";
+import { CLI_THINKING_LEVELS, getConfiguredThinkingLevelMetadata } from "@oh-my-striped-pi/pi-tui/thinking";
 import { noThinkingMessage, resolveThinkingArgument } from "./helpers/effort";
 import { commandConsumed, errorMessage, usage } from "./helpers/parse";
 import { handleSecurityCommand } from "./helpers/security";
@@ -51,7 +51,7 @@ export function refreshStatusLine(ctx: InteractiveModeContext): void {
 }
 
 /**
- * Resolve a `/model` / `/switch` selector the way `omp bench` and `--model`
+ * Resolve a `/model` / `/switch` selector the way `omsp bench` and `--model`
  * do: exact `provider/id`, fuzzy ids (`opus`), role aliases (`@smol`, `smol`),
  * and `:level` thinking suffixes. Unqualified selectors prefer the session's
  * `--models` scope, else the authenticated set, before the full catalog.
@@ -218,7 +218,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "security",
 		icon: "shield",
-		description: "Plan, run, inspect, import, and compare OMP-native security scans",
+		description: "Plan, run, inspect, import, and compare OMSP-native security scans",
 		allowArgs: true,
 		acpInputHint: "<plan|scan|status|cancel|scans|show|import|export|validate|compare|disposition>",
 		subcommands: [
@@ -230,7 +230,7 @@ export const BUILTIN_MODE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 			{ name: "show", description: "Render a scan or security:// resource" },
 			{ name: "import", description: "Import SARIF or a Codex Security bundle" },
 			{ name: "export", description: "Export a canonical bundle, SARIF, or report" },
-			{ name: "validate", description: "Validate one finding with OMP-native tools" },
+			{ name: "validate", description: "Validate one finding with OMSP-native tools" },
 			{ name: "compare", description: "Compare finding lineage across two scans" },
 			{ name: "disposition", description: "Set a finding disposition with rationale" },
 		],

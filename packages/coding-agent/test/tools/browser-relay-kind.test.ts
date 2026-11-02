@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	createBrowserPrelude,
 	DEFAULT_RELAY_URL,
 	resolveBrowserKind,
 	resolveRelayKind,
-} from "@oh-my-pi/pi-coding-agent/tools/browser";
-import type { BrowserKindTag } from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import type { BrowserKindTag } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 
 describe("resolveRelayKind", () => {
 	it("is disabled by default", () => {
@@ -33,12 +33,12 @@ describe("resolveRelayKind", () => {
 		});
 	});
 
-	it("PI_BROWSER_RELAY=0 disables the relay even when the setting enables it", () => {
-		expect(resolveRelayKind({ settingEnabled: true }, { PI_BROWSER_RELAY: "0" })).toBeNull();
+	it("OMSP_BROWSER_RELAY=0 disables the relay even when the setting enables it", () => {
+		expect(resolveRelayKind({ settingEnabled: true }, { OMSP_BROWSER_RELAY: "0" })).toBeNull();
 	});
 
-	it("PI_BROWSER_RELAY=1 enables the relay when the setting is off", () => {
-		expect(resolveRelayKind({ settingEnabled: false }, { PI_BROWSER_RELAY: "1" })).toEqual({
+	it("OMSP_BROWSER_RELAY=1 enables the relay when the setting is off", () => {
+		expect(resolveRelayKind({ settingEnabled: false }, { OMSP_BROWSER_RELAY: "1" })).toEqual({
 			kind: "relay",
 			cdpUrl: DEFAULT_RELAY_URL,
 		});
@@ -47,9 +47,9 @@ describe("resolveRelayKind", () => {
 
 describe("browser prelude relay guidance", () => {
 	const ENV_KEYS = [
-		"PI_BROWSER_RELAY",
-		"PI_BROWSER_TERN",
-		"PI_BROWSER_CMUX",
+		"OMSP_BROWSER_RELAY",
+		"OMSP_BROWSER_TERN",
+		"OMSP_BROWSER_CMUX",
 		"TERN_PANE_SOCKET",
 		"TERN_PANE",
 		"CMUX_SOCKET_PATH",
@@ -81,8 +81,8 @@ describe("browser prelude relay guidance", () => {
 			[{ "browser.relay": true }, "0"],
 			[{ "browser.relay": false }, "1"],
 		] as const) {
-			if (env === undefined) delete process.env.PI_BROWSER_RELAY;
-			else process.env.PI_BROWSER_RELAY = env;
+			if (env === undefined) delete process.env.OMSP_BROWSER_RELAY;
+			else process.env.OMSP_BROWSER_RELAY = env;
 			const session = sessionWith(settings);
 			const onRelay = resolveBrowserKind({ action: "open" }, session).kind === "relay";
 			const guidance = createBrowserPrelude(session).guidance;
@@ -109,13 +109,13 @@ describe("browser prelude relay guidance", () => {
 				settings: {},
 				env: { TERN_PANE_SOCKET: "/tmp/tern.sock", TERN_PANE: "1" },
 				kind: "tern",
-				says: "omp's own Tern picture-in-picture instead",
+				says: "omsp's own Tern picture-in-picture instead",
 			},
 			{
 				settings: {},
 				env: { CMUX_SOCKET_PATH: "/tmp/cmux.sock" },
 				kind: "cmux",
-				says: "omp's own cmux browser surface instead",
+				says: "omsp's own cmux browser surface instead",
 			},
 		];
 		for (const { settings, env, kind, says } of cases) {

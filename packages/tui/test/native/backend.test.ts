@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { type LogEvent, registerLogSink } from "@oh-my-pi/pi-utils/logger";
-import { card, md, node } from "@oh-my-pi/pi-tui/native/describe";
-import type { NativeNode, NativeUiEvent } from "@oh-my-pi/pi-tui/native/node";
-import { nativeComponentId } from "@oh-my-pi/pi-tui/native/reconcile";
-import { settleNative } from "@oh-my-pi/pi-tui/native/settle";
-import { isNativeRendering, onNativeRenderingChange } from "@oh-my-pi/pi-tui/native/state";
-import { type Component, Container } from "@oh-my-pi/pi-tui/tui";
-import type { TspOp } from "@oh-my-pi/pi-wire";
+import { type LogEvent, registerLogSink } from "@oh-my-striped-pi/pi-utils/logger";
+import { card, md, node } from "@oh-my-striped-pi/pi-tui/native/describe";
+import type { NativeNode, NativeUiEvent } from "@oh-my-striped-pi/pi-tui/native/node";
+import { nativeComponentId } from "@oh-my-striped-pi/pi-tui/native/reconcile";
+import { settleNative } from "@oh-my-striped-pi/pi-tui/native/settle";
+import { isNativeRendering, onNativeRenderingChange } from "@oh-my-striped-pi/pi-tui/native/state";
+import { type Component, Container } from "@oh-my-striped-pi/pi-tui/tui";
+import type { TspOp } from "@oh-my-striped-pi/pi-wire";
 import { ManualScheduler, TspHarness, TspTestTerminal } from "./tsp-harness";
 
 class Probe implements Component {
@@ -189,7 +189,7 @@ describe("native backend", () => {
 
 	it("announces native rendering once its surface is open, on start and after a stop/start cycle", () => {
 		// Tern drops the shell's title when a command's first surface opens, so
-		// the tab title omp writes when rendering turns native must follow the `o`.
+		// the tab title omsp writes when rendering turns native must follow the `o`.
 		const h = new TspHarness(new TspTestTerminal({}), new ManualScheduler());
 		harness = h;
 		h.tui.addChild(new Probe(md("kept")));

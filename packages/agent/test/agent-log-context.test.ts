@@ -1,9 +1,9 @@
 import { afterEach, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Agent, type StreamFn } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { logger, TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, type StreamFn } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { logger, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const dir = TempDir.createSync("@pi-agent-log-context-");
 

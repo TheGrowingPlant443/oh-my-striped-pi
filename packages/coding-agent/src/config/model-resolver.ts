@@ -2,7 +2,7 @@ import {
 	MAX_THINKING_SUFFIX_OPTIONS,
 	splitThinkingSuffix,
 	parseModelString,
-} from "@oh-my-pi/pi-tui/overlays/model-selector";
+} from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 /**
  * Model resolution, scoping, and initial selection.
  *
@@ -19,29 +19,29 @@ import {
  *   CLI flags, scope globs — onto that pipeline.
  */
 
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { ModelRoleLookup } from "@oh-my-pi/pi-tui/overlays/model-browser";
-import { type Api, type Effort, type KnownProvider, type Model } from "@oh-my-pi/pi-ai";
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
-import { roleDefaultModels } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { resolveBareVariantSelector, resolveVariantSelector } from "@oh-my-pi/pi-catalog/compat/collapse";
-import { providerEntry } from "@oh-my-pi/pi-catalog/compat/providers";
-import { collapseVariantId, stripThinkingVariantSuffix } from "@oh-my-pi/pi-catalog/compat/taxonomy";
-import { buildModelProviderPriorityRank } from "@oh-my-pi/pi-catalog/identity";
-import { clampThinkingLevelForModel } from "@oh-my-pi/pi-catalog/model-thinking";
-import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
-import { DEFAULT_MODEL_PER_PROVIDER } from "@oh-my-pi/pi-catalog/provider-models";
-import { fuzzyMatch } from "@oh-my-pi/pi-tui";
-import { logger } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { ModelRoleLookup } from "@oh-my-striped-pi/pi-tui/overlays/model-browser";
+import { type Api, type Effort, type KnownProvider, type Model } from "@oh-my-striped-pi/pi-ai";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { roleDefaultModels } from "@oh-my-striped-pi/pi-catalog/compat/behavior";
+import { resolveBareVariantSelector, resolveVariantSelector } from "@oh-my-striped-pi/pi-catalog/compat/collapse";
+import { providerEntry } from "@oh-my-striped-pi/pi-catalog/compat/providers";
+import { collapseVariantId, stripThinkingVariantSuffix } from "@oh-my-striped-pi/pi-catalog/compat/taxonomy";
+import { buildModelProviderPriorityRank } from "@oh-my-striped-pi/pi-catalog/identity";
+import { clampThinkingLevelForModel } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { modelsAreEqual } from "@oh-my-striped-pi/pi-catalog/models";
+import { modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { DEFAULT_MODEL_PER_PROVIDER } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { fuzzyMatch } from "@oh-my-striped-pi/pi-tui";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
 	concreteThinkingLevel,
 	parseConfiguredThinkingLevel,
 	resolveThinkingLevelForModel,
-} from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import { isAuthenticated, kNoAuth, type ModelRegistry } from "./model-registry";
 import {
 	DEFAULT_MODEL_ROLE_ALIAS,
@@ -1950,7 +1950,7 @@ function resolveCliModelInScope(
 			model: undefined,
 			selector: undefined,
 			warning: undefined,
-			error: `Unknown provider "${cliProvider}". Run "omp models" to see available providers/models.`,
+			error: `Unknown provider "${cliProvider}". Run "omsp models" to see available providers/models.`,
 		};
 	}
 
@@ -2041,7 +2041,7 @@ function resolveCliModelInScope(
 					selector: undefined,
 					thinkingLevel: undefined,
 					warning: resolved.warning,
-					error: `Model "${trimmedModel}" not found. Run "omp models" to see available models.`,
+					error: `Model "${trimmedModel}" not found. Run "omsp models" to see available models.`,
 				};
 			}
 		}
@@ -2100,7 +2100,7 @@ function resolveCliModelInScope(
 			selector: undefined,
 			thinkingLevel: undefined,
 			warning,
-			error: `Model "${display}" not found.${hint} Run "omp models" to see available models.`,
+			error: `Model "${display}" not found.${hint} Run "omsp models" to see available models.`,
 		};
 	}
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import * as themeModule from "@oh-my-pi/pi-tui/theme";
-import { Text } from "@oh-my-pi/pi-tui";
+import * as themeModule from "@oh-my-striped-pi/pi-tui/theme";
+import { Text } from "@oh-my-striped-pi/pi-tui";
 
 /**
  * Regression for issue #6337: a status message presented while the auto-theme

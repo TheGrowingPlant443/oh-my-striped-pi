@@ -6,20 +6,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { recordApprovalGrant, resolveApproval } from "@oh-my-pi/pi-coding-agent/tools/approval";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { recordApprovalGrant, resolveApproval } from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
 import {
 	type ApprovalGrantStore,
 	approvalDirectoryKey,
 	approvalGrantKey,
 	getApprovalGrants,
-} from "@oh-my-pi/pi-coding-agent/tools/approval-cache";
-import { approvalTargetKey, approvalTreeSearchKey } from "@oh-my-pi/pi-coding-agent/tools/approval-targets";
-import { AstGrepTool } from "@oh-my-pi/pi-coding-agent/tools/ast-grep";
-import { GlobTool } from "@oh-my-pi/pi-coding-agent/tools/glob";
-import { GrepTool } from "@oh-my-pi/pi-coding-agent/tools/grep";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/approval-cache";
+import { approvalTargetKey, approvalTreeSearchKey } from "@oh-my-striped-pi/pi-coding-agent/tools/approval-targets";
+import { AstGrepTool } from "@oh-my-striped-pi/pi-coding-agent/tools/ast-grep";
+import { GlobTool } from "@oh-my-striped-pi/pi-coding-agent/tools/glob";
+import { GrepTool } from "@oh-my-striped-pi/pi-coding-agent/tools/grep";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 /** Minimal tool session for directly exercising a search tool's approval-cache keys. */
 function createToolSession(cwd: string): ToolSession {
@@ -46,7 +46,7 @@ describe("search tool approval cache targets", () => {
 	let notesFile: string;
 
 	beforeEach(() => {
-		temp = TempDir.createSync("@omp-search-approval-");
+		temp = TempDir.createSync("@omsp-search-approval-");
 		cwd = temp.path();
 		srcDir = path.join(cwd, "src");
 		otherDir = path.join(cwd, "other");
@@ -168,7 +168,7 @@ describe("search tool approval cache targets", () => {
 	});
 
 	it("covers a later glob with the folder grant recorded from a grep", () => {
-		const agentDir = TempDir.createSync("@omp-search-approval-agent-");
+		const agentDir = TempDir.createSync("@omsp-search-approval-agent-");
 		try {
 			const store = getApprovalGrants(agentDir.path(), "s1");
 			const grep = new GrepTool(createToolSession(cwd));

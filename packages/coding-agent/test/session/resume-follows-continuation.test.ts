@@ -1,18 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { Args } from "@oh-my-pi/pi-coding-agent/cli/args";
-import type { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EVAL_STATE_CONTEXT_TYPE } from "@oh-my-pi/pi-coding-agent/eval/state";
-import { createSessionManager } from "@oh-my-pi/pi-coding-agent/main";
-import { openRpcSession, type RpcOpenSessionSession } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import { SESSION_EXIT_CUSTOM_TYPE } from "@oh-my-pi/pi-coding-agent/session/exit-diagnostics";
-import type { SessionContinuation } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { readSessionHeaderId } from "@oh-my-pi/pi-coding-agent/session/session-loader";
-import { SessionManager, type SessionPersistenceNotice } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { writeTerminalBreadcrumb } from "@oh-my-pi/pi-coding-agent/session/session-paths";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { __resetDirsFromEnvForTests, getTerminalSessionsDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import type { Args } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import type { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EVAL_STATE_CONTEXT_TYPE } from "@oh-my-striped-pi/pi-coding-agent/eval/state";
+import { createSessionManager } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { openRpcSession, type RpcOpenSessionSession } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import { SESSION_EXIT_CUSTOM_TYPE } from "@oh-my-striped-pi/pi-coding-agent/session/exit-diagnostics";
+import type { SessionContinuation } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { readSessionHeaderId } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
+import {
+	SessionManager,
+	type SessionPersistenceNotice,
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { writeTerminalBreadcrumb } from "@oh-my-striped-pi/pi-coding-agent/session/session-paths";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { __resetDirsFromEnvForTests, getTerminalSessionsDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const SESSION_MANAGER_MODULE = path.join(import.meta.dir, "../../src/session/session-manager.ts");
 const EXIT_DIAGNOSTICS_MODULE = path.join(import.meta.dir, "../../src/session/exit-diagnostics.ts");
@@ -20,17 +23,17 @@ const EXIT_DIAGNOSTICS_MODULE = path.join(import.meta.dir, "../../src/session/ex
 const stubSettings = { get: () => undefined } as unknown as Settings;
 
 // Resume writes breadcrumbs and the custom-session-file registry under the agent dir.
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 let agentDir: TempDir | undefined;
 
 beforeEach(() => {
-	agentDir = TempDir.createSync("@omp-resume-continuation-agent-");
+	agentDir = TempDir.createSync("@omsp-resume-continuation-agent-");
 	setAgentDir(agentDir.join("agent"));
 });
 
 afterEach(() => {
-	if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
-	else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+	if (originalAgentDir === undefined) delete process.env.OMSP_CODING_AGENT_DIR;
+	else process.env.OMSP_CODING_AGENT_DIR = originalAgentDir;
 	__resetDirsFromEnvForTests();
 	agentDir?.removeSync();
 	agentDir = undefined;
@@ -40,12 +43,12 @@ afterEach(() => {
 type IdleWrite = "warm" | "compact";
 
 /**
- * Another live omp process that resumed `sessionFile`. Commands, one per line:
+ * Another live omsp process that resumed `sessionFile`. Commands, one per line:
  * `append <text>` writes a user turn (the first write makes it the file's
  * owner); `warm` records the usage of an idle cache refresh; `compact` writes
  * an idle compaction and the eval-state snapshot that follows it; `clear`
  * records the reset boundary `/clear` leaves; `exit` records the
- * `session_exit` marker every omp process appends on its way out, then closes.
+ * `session_exit` marker every omsp process appends on its way out, then closes.
  */
 class Holder {
 	readonly #child: Bun.Subprocess<"pipe", "pipe", "pipe">;
@@ -317,7 +320,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	};
 	for (const by of ["path", "id", "continue", ...Object.keys(idleWrites)]) {
 		it(`resumes the continuation, not the superseded file, when resumed by ${by}`, async () => {
-			using tempDir = TempDir.createSync("@omp-resume-continuation-");
+			using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 			const { original, continuation } = await movedOffSession(tempDir, idleWrites[by]);
 			const sessionId = await readSessionHeaderId(original);
 			if (!sessionId) throw new Error("Expected a session id");
@@ -346,7 +349,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}
 
 	it("opens the continuation when an RPC host opens the session directory", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { continuation } = await movedOffSession(tempDir);
 		const switchedTo: string[] = [];
 		const opened = await openRpcSession(rpcHost(switchedTo), tempDir.path());
@@ -355,7 +358,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("continues the copy with the newest turn when the continuation was written last but the original went on", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { original } = await divergedWithContinuationWrittenLast(tempDir);
 		// A terminal with no record of its last session: `--continue` picks the most recently written file.
 		await fs.rm(getTerminalSessionsDir(), { recursive: true, force: true });
@@ -383,7 +386,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("keeps the terminal's own last session when both copies went on, even if the other copy has the newest turn", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { continuation } = await divergedWithContinuationWrittenLast(tempDir);
 		// This terminal's record of its last session names the continuation; a
 		// terminal id is needed to keep one, so give this test its own.
@@ -405,7 +408,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("continues the continuation when both copies went on, the continuation has the newest turn and the original was written last", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const holder = await Holder.resume(tempDir, original);
 		let continuation: string;
@@ -435,7 +438,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("moves off again when the continuation is itself open in another live process", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { original, continuation } = await movedOffSession(tempDir);
 		const continuationId = await readSessionHeaderId(continuation);
 		const holder = await Holder.resume(tempDir, continuation);
@@ -471,7 +474,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("keeps the asked-for file when its own conversation moved on after the continuation", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const holder = await Holder.resume(tempDir, original);
 		try {
@@ -493,7 +496,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("keeps the asked-for file when both copies went on, even if the continuation wrote last", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const holder = await Holder.resume(tempDir, original);
 		let continuation: string;
@@ -521,7 +524,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("resumes the continuation when all it did after the move was a /clear", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const holder = await Holder.resume(tempDir, original);
 		let continuation: string;
@@ -543,7 +546,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("keeps the asked-for file when its own process ran /clear after the continuation", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const holder = await Holder.resume(tempDir, original);
 		try {
@@ -565,7 +568,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("stops at a middle copy whose own process went on after the next copy was made", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const first = await Holder.resume(tempDir, original);
 		let middle: string;
@@ -606,7 +609,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("follows the continuation of a session whose header outgrew the listing prefix", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const created = await createSession(tempDir);
 		await inflateHeader(created);
 		const { original, continuation } = await movedOffSession(tempDir, undefined, created);
@@ -620,7 +623,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("does not follow a deliberate fork", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const original = await createSession(tempDir);
 		const forker = await open(original, tempDir.path());
 		const forked = await forker.fork();
@@ -639,7 +642,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 
 	for (const by of ["path", "id"]) {
 		it(`follows the continuation when the asked-for file no longer reads as a session, resumed by ${by}`, async () => {
-			using tempDir = TempDir.createSync("@omp-resume-continuation-");
+			using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 			const { original, continuation } = await movedOffSession(tempDir);
 			const sessionId = await readSessionHeaderId(original);
 			if (!sessionId) throw new Error("Expected a session id");
@@ -663,12 +666,12 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}
 
 	it("follows the continuation of the id a replaced file is named for, and resumes that file by path as what it holds", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { original, continuation } = await movedOffSession(tempDir);
 		const sessionId = await readSessionHeaderId(original);
 		if (!sessionId) throw new Error("Expected a session id");
 		// Another session's journal now sits at the original's path.
-		using otherDir = TempDir.createSync("@omp-resume-continuation-other-");
+		using otherDir = TempDir.createSync("@omsp-resume-continuation-other-");
 		const other = await createSession(otherDir);
 		await Bun.write(original, await Bun.file(other).text());
 		const otherId = await readSessionHeaderId(original);
@@ -690,7 +693,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("continues an original with a name of its own when it has the newest turn and its continuation was written last", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		// A session resumed by path keeps writing a file of any name.
 		const named = tempDir.join("current.jsonl");
 		await fs.rename(await createSession(tempDir), named);
@@ -709,7 +712,7 @@ describe("--resume of a session that continued in a sibling file", () => {
 	}, 30_000);
 
 	it("opens the continuation from SessionManager.continueRecent itself, for SDK callers", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-continuation-");
+		using tempDir = TempDir.createSync("@omsp-resume-continuation-");
 		const { original, continuation } = await movedOffSession(tempDir);
 
 		const followed: SessionContinuation[] = [];

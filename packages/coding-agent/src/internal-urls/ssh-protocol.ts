@@ -19,8 +19,8 @@
  * SSH provider via `import "./discovery"` (sdk.ts) / `initializeWithSettings`
  * (main.ts) before any tool resolves.
  */
-import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-pi/pi-natives";
-import { $which } from "@oh-my-pi/pi-utils";
+import { type ShellFsDirEntry, ShellFsFileType } from "@oh-my-striped-pi/pi-natives";
+import { $which } from "@oh-my-striped-pi/pi-utils";
 import * as capability from "../capability";
 import { type SSHHost, sshCapability } from "../capability/ssh";
 import type { SSHConnectionTarget } from "../ssh/connection-manager";

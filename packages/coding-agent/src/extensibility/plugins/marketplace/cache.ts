@@ -14,7 +14,7 @@ import * as nodeFs from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { isEnoent, logger } from "@oh-my-pi/pi-utils";
+import { isEnoent, logger } from "@oh-my-striped-pi/pi-utils";
 
 import { isValidNameSegment } from "./types";
 

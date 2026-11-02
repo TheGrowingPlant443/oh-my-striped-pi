@@ -1,16 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it, type Mock, spyOn } from "bun:test";
 import * as os from "node:os";
-import { AuthStorage } from "@oh-my-pi/pi-ai";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { buildSessionOptions } from "@oh-my-pi/pi-coding-agent/main";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { __resetDirsFromEnvForTests, getAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { buildSessionOptions } from "@oh-my-striped-pi/pi-coding-agent/main";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { __resetDirsFromEnvForTests, getAgentDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const PRIMARY_MARKER = "primary-context-marker-7f3a";
 const EXTRA_ROOT_MARKER = "extra-root-context-marker-2c9d";
@@ -28,7 +28,7 @@ const MARKERS = [
 	EXTRA_CLAUDE_MARKER,
 	NESTED_LISTING,
 ];
-const ENV_KEYS = ["PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"] as const;
+const ENV_KEYS = ["OMSP_CODING_AGENT_DIR", "OMSP_PROFILE"] as const;
 
 describe("--no-context-files", () => {
 	let tempDir: TempDir;
@@ -41,14 +41,14 @@ describe("--no-context-files", () => {
 		tempDir = await TempDir.create("@cli-no-context-files-");
 		// User-level discovery reads the process-global agent dir and home: point both at the
 		// fixture so neither run picks up the developer's own config.
-		setAgentDir(tempDir.join("home/.omp/agent"));
+		setAgentDir(tempDir.join("home/.omsp/agent"));
 		homedirSpy = spyOn(os, "homedir").mockReturnValue(tempDir.join("home"));
 		await Promise.all([
 			Bun.write(tempDir.join("project/AGENTS.md"), `${PRIMARY_MARKER}\n`),
 			Bun.write(tempDir.join(`project/${NESTED_DIR}/AGENTS.md`), "nested\n"),
 			Bun.write(tempDir.join("extra/AGENTS.md"), `${EXTRA_ROOT_MARKER}\n@imported.md\n`),
 			Bun.write(tempDir.join("extra/imported.md"), `${IMPORTED_MARKER}\n`),
-			Bun.write(tempDir.join("home/.omp/agent/AGENTS.md"), `${USER_AGENTS_MARKER}\n`),
+			Bun.write(tempDir.join("home/.omsp/agent/AGENTS.md"), `${USER_AGENTS_MARKER}\n`),
 			Bun.write(tempDir.join("extra-claude/CLAUDE.md"), `${EXTRA_CLAUDE_MARKER}\n`),
 		]);
 		authStorage = await AuthStorage.create(tempDir.join("auth.db"));

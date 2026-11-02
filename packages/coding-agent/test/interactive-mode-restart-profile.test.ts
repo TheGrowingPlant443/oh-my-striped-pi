@@ -1,9 +1,9 @@
 import { expect, it } from "bun:test";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 it("native restart preserves the active profile and reopens its persisted session", async () => {
-	using tempDir = TempDir.createSync("@omp-restart-profile-");
+	using tempDir = TempDir.createSync("@omsp-restart-profile-");
 	const child = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixtures/restart-profile.ts")], {
 		cwd: tempDir.path(),
 		env: {
@@ -11,11 +11,10 @@ it("native restart preserves the active profile and reopens its persisted sessio
 			// os.homedir() reads USERPROFILE on Windows, HOME elsewhere.
 			HOME: tempDir.path(),
 			USERPROFILE: tempDir.path(),
-			OMP_PROFILE: undefined,
-			PI_PROFILE: undefined,
-			PI_CODING_AGENT_DIR: undefined,
-			PI_CODING_AGENT_SESSION_DIR: undefined,
-			PI_CONFIG_DIR: ".omp",
+			OMSP_PROFILE: undefined,
+			OMSP_CODING_AGENT_DIR: undefined,
+			OMSP_CODING_AGENT_SESSION_DIR: undefined,
+			OMSP_CONFIG_DIR: ".omsp",
 			XDG_DATA_HOME: undefined,
 			XDG_STATE_HOME: undefined,
 			XDG_CACHE_HOME: undefined,

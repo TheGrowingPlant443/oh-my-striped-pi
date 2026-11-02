@@ -1,18 +1,18 @@
 import { afterAll, describe, expect, it, spyOn } from "bun:test";
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import * as toolBridge from "@oh-my-pi/pi-coding-agent/eval/js/tool-bridge";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import * as toolBridge from "@oh-my-striped-pi/pi-coding-agent/eval/js/tool-bridge";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
 import {
 	getTab,
 	listTabs,
 	releaseAllTabs,
 	releaseTab,
 	runInTab,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { WorkerInbound } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-protocol";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { WorkerInbound } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-protocol";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { rejectionOf } from "../helpers/rejection";
 import { chromiumAvailable } from "./chromium-probe";
 
@@ -197,7 +197,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser tab worker exit", () => {
 		});
 		try {
 			// The tool call is posted before the rejection ends the worker, so the host registers it first.
-			const code = `void __omp_call_tool__("probe", {}); ${UNOWNED_REJECTION}`;
+			const code = `void __omsp_call_tool__("probe", {}); ${UNOWNED_REJECTION}`;
 			expect(await messageOf(run(name, code))).toContain("the tab is being reattached");
 			expect(await messageOf(run(name, code))).toContain("again right after being replaced");
 			expect(signals.map(signal => signal.aborted)).toEqual([true, true]);
@@ -350,7 +350,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser tab worker exit", () => {
 		await open(name, "idle");
 		await crashWhileIdle(name);
 		const text = textOf((await runInTab(name, { code: "return 1;", timeoutMs: 20_000, session })).displays);
-		expect(text).toContain("since the last call; omp reattached the tab to a new worker on the same page");
+		expect(text).toContain("since the last call; omsp reattached the tab to a new worker on the same page");
 		expect(text).toContain("library-internal");
 		expect(text).toContain("init scripts");
 		const next = await runInTab(name, { code: "return 2;", timeoutMs: 20_000, session });
@@ -362,7 +362,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser tab worker exit", () => {
 		await open(name, "idle");
 		await crashWhileIdle(name);
 		const result = await prelude.invoke({ action: "open", name }, context);
-		expect(textOf(result.content)).toContain("since the last call; omp reattached the tab");
+		expect(textOf(result.content)).toContain("since the last call; omsp reattached the tab");
 	}, 30_000);
 
 	it("waits for a reattach that starts while an open resumes the tab", async () => {
@@ -412,7 +412,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser tab worker exit", () => {
 		expect(settled).toBe(false);
 		gate.resolve();
 		const text = textOf((await reopened).content);
-		expect(text).toContain("since the last call; omp reattached the tab");
+		expect(text).toContain("since the last call; omsp reattached the tab");
 		expect(getTab(name)).toBe(tab);
 		expect(tab.worker).not.toBe(oldWorker);
 		expect(await run(name, "return 4;")).toBe(4);

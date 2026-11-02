@@ -217,7 +217,7 @@ function filterChildShellEnvInternal(
 		}
 		if (runtimeLaunchEnvValues || projectEnvNamesLoadedByOmp.has(key)) {
 			// Strong provenance: the launch environment is known and this name is
-			// absent from it, or OMP itself injected the value — either way it came
+			// absent from it, or OMSP itself injected the value — either way it came
 			// from a project dotenv file, not the parent shell.
 			const value = result[key];
 			if (value !== undefined) onDotenvValue?.(value);
@@ -261,8 +261,7 @@ export function getDotenvEnvValues(
 
 /**
  * Parses a complete .env file with the runtime's dotenv grammar, then retains
- * only shell-identifier names and spawn-safe values before mirroring valid
- * `OMP_` variables to their `PI_` aliases.
+ * only shell-identifier names and spawn-safe values.
  */
 export function parseEnvFile(filePath: string): Record<string, string> {
 	const result: Record<string, string> = {};
@@ -274,13 +273,6 @@ export function parseEnvFile(filePath: string): Record<string, string> {
 		}
 	} catch {
 		// File doesn't exist or can't be read - return empty result
-	}
-
-	// OMP_ overrides PI_
-	for (const k in result) {
-		if (k.startsWith("OMP_")) {
-			result[`PI_${k.slice(4)}`] = result[k];
-		}
 	}
 
 	return result;
@@ -308,7 +300,7 @@ for (const file of [projectEnv, agentEnv, piEnv, homeEnv]) {
 	}
 }
 
-// Directory-affecting keys (XDG_*_HOME, and in default mode PI_CODING_AGENT_DIR)
+// Directory-affecting keys (XDG_*_HOME, and in default mode OMSP_CODING_AGENT_DIR)
 // may have just arrived from the profile/agent `.env` applied above. The dirs
 // resolver cached its paths at module load — before this file ran — so rebuild
 // it now from the updated env. `getAgentDir()` already located the `.env` from
@@ -318,7 +310,7 @@ refreshDirsFromEnv();
 /**
  * Intentional re-export of Bun.env.
  *
- * All users should import this env module (import { $env } from "@oh-my-pi/pi-utils")
+ * All users should import this env module (import { $env } from "@oh-my-striped-pi/pi-utils")
  * before using environment variables. This ensures that .env files have been loaded and
  * overrides (project, home) have been applied, so $env always reflects the correct values.
  */
@@ -436,7 +428,7 @@ export function setInteractiveHost(interactive: boolean): boolean {
  * history.db, stats.db).
  *
  * Interactive hosts tolerate a longer synchronous wait on lock contention
- * (SQLITE_BUSY during WAL recovery/checkpoint — see oh-my-pi#2421): the
+ * (SQLITE_BUSY during WAL recovery/checkpoint — see oh-my-striped-pi#2421): the
  * operator sees a brief freeze and the statement eventually completes.
  * Headless hosts (print/RPC/ACP/eval/SDK) run a protocol on the same thread —
  * a multi-second synchronous busy-wait freezes their event loop and stalls
@@ -453,11 +445,11 @@ export function getDbBusyTimeoutMs(): number {
  * binary. Detects via the embedded virtual-filesystem path markers
  * (`$bunfs`, `~BUN`, or its URL-encoded form `%7EBUN`) in `import.meta.url`,
  * which Bun rewrites for every module bundled into the executable. The
- * `PI_COMPILED` env var (set by the build script's `--define`) is checked
+ * `OMSP_COMPILED` env var (set by the build script's `--define`) is checked
  * first for cheap fast-path detection.
  */
 export function isCompiledBinary(): boolean {
-	if (process.env.PI_COMPILED || Bun.env.PI_COMPILED) return true;
+	if (process.env.OMSP_COMPILED || Bun.env.OMSP_COMPILED) return true;
 	const url = import.meta.url;
 	return url.includes("$bunfs") || url.includes("~BUN") || url.includes("%7EBUN");
 }

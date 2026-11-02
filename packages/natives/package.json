@@ -1,18 +1,19 @@
 {
-  "name": "@oh-my-pi/pi-natives",
+  "name": "@oh-my-striped-pi/pi-natives",
+  "private": true,
   "version": "18.13.3",
   "description": "Native Rust bindings for PDF conversion, audio, grep, clipboard, image processing, syntax highlighting, PTY, and shell operations via N-API",
   "type": "module",
-  "homepage": "https://omp.sh",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
   "author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/can1357/oh-my-pi.git",
+    "url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
     "directory": "packages/natives"
   },
   "bugs": {
-    "url": "https://github.com/can1357/oh-my-pi/issues"
+    "url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
   },
   "keywords": [
     "napi",

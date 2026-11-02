@@ -1,24 +1,24 @@
 /**
  * Regression test for #3680: third-party extension / hook modules that call
- * `process.exit()` at the top level must not terminate the host OMP process.
+ * `process.exit()` at the top level must not terminate the host OMSP process.
  *
  * The harness intercepts the load via `withHostGuard`; this test pins that the
- * intercepted error surfaces as a per-module load failure (so OMP keeps going)
+ * intercepted error surfaces as a per-module load failure (so OMSP keeps going)
  * instead of crashing the test runner.
  */
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { loadHooks } from "@oh-my-pi/pi-coding-agent/extensibility/hooks/loader";
-import { ExtensionExitError, withHostGuard } from "@oh-my-pi/pi-coding-agent/extensibility/utils";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { loadExtensions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { loadHooks } from "@oh-my-striped-pi/pi-coding-agent/extensibility/hooks/loader";
+import { ExtensionExitError, withHostGuard } from "@oh-my-striped-pi/pi-coding-agent/extensibility/utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("extension/hook loader process.exit guard (#3680)", () => {
 	let project: TempDir | undefined;
 
 	beforeEach(() => {
-		project = TempDir.createSync("@omp-exit-guard-");
+		project = TempDir.createSync("@omsp-exit-guard-");
 	});
 
 	afterEach(() => {
@@ -67,8 +67,8 @@ describe("extension/hook loader process.exit guard (#3680)", () => {
 				? 'process.kill(process.pid, "SIGINT");'
 				: 'void Promise.reject(new Error("probe fatal"));';
 		return runProbe(`
-import { postmortem } from "@oh-my-pi/pi-utils";
-import { withHostGuard } from "@oh-my-pi/pi-coding-agent/extensibility/utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
+import { withHostGuard } from "@oh-my-striped-pi/pi-coding-agent/extensibility/utils";
 
 postmortem.register("probe-cleanup", reason => {
 	process.stdout.write(\`cleanup:\${reason}\\n\`);
@@ -152,8 +152,8 @@ void withHostGuard(async () => {
 
 	it("keeps postmortem.quit behind the extension exit guard", async () => {
 		const { exitCode, stdout, stderr } = await runProbe(`
-import { postmortem } from "@oh-my-pi/pi-utils";
-import { withHostGuard } from "@oh-my-pi/pi-coding-agent/extensibility/utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
+import { withHostGuard } from "@oh-my-striped-pi/pi-coding-agent/extensibility/utils";
 
 try {
 	await withHostGuard(() => postmortem.quit(37));
@@ -170,18 +170,18 @@ try {
 	it("exits cleanly on Ctrl+D while deferred extension loading guards process.exit", async () => {
 		const { exitCode, stdout, stderr } = await runProbe(`
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { withHostGuard } from "@oh-my-pi/pi-coding-agent/extensibility/utils";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { postmortem, TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { withHostGuard } from "@oh-my-striped-pi/pi-coding-agent/extensibility/utils";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { postmortem, TempDir } from "@oh-my-striped-pi/pi-utils";
 
-const dir = TempDir.createSync("@omp-deferred-quit-");
+const dir = TempDir.createSync("@omsp-deferred-quit-");
 await Settings.init({ inMemory: true, cwd: dir.path() });
 initTheme();
 const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
@@ -256,7 +256,7 @@ void withHostGuard(async () => {
 			);
 			const { exitCode, stdout, stderr } = await runProbe(
 				`
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 postmortem.register("probe", reason => process.stdout.write(\`cleanup:\${reason}\\n\`));
 process.reallyExit = globalThis.__ompNativeReallyExit;
 process.stdout.write("armed\\n");

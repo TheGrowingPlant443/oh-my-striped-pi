@@ -1,6 +1,6 @@
 /** Real stdio MCP peer for CLI regression tests; the audit survives peer shutdown. */
 import * as fs from "node:fs/promises";
-import { isRecord, readJsonl } from "@oh-my-pi/pi-utils";
+import { isRecord, readJsonl } from "@oh-my-striped-pi/pi-utils";
 
 const auditPath = process.argv[2];
 if (!auditPath) throw new Error("usage: rpc-mcp-server.ts <auditPath>");

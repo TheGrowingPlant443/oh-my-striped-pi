@@ -21,7 +21,7 @@ If your extension/tool can run headless, guard with `ctx.hasUI` / `pi.hasUI`. RP
 
 ## Project-local TUI debug tool
 
-`.omp/tools/tui.ts` provides the repository's `tui` debug tool. `start` accepts
+`.omsp/tools/tui.ts` provides the repository's `tui` debug tool. `start` accepts
 either a TypeScript/JavaScript `file` (run with Bun) or an executable `bin` with
 separate `args`. Windows uses native ConPTY without requiring a POSIX shell;
 macOS/Linux use Bun's PTY.
@@ -31,8 +31,8 @@ helper, which returns integer dimensions clamped to 20–400 columns and 5–200
 The PTY, emulated screen, and reported size use the same effective dimensions.
 
 `screen`, `send`, `resize`, and `stop` also work for programs without an
-`OMP_TUI_DEBUG` server. Renderer queries (`info`, `tree`, `values`, and `frame`)
-require an omp/pi-tui host.
+`OMSP_TUI_DEBUG` server. Renderer queries (`info`, `tree`, `values`, and `frame`)
+require an omsp/pi-tui host.
 
 `send` accepts literal text and `\e`, `\r`, `\n`, `\t`, and `\xNN` escapes.
 On Windows, each payload must contain complete, valid UTF-8; invalid or truncated
@@ -40,13 +40,13 @@ sequences are rejected before any input is written. Arbitrary non-UTF-8 bytes
 (such as `\x9b` 8-bit CSI) are not supported by the Windows PTY string API.
 Use the UTF-8-compatible `\e[` CSI sequence instead. macOS/Linux preserve raw bytes.
 
-Install the tool's dependencies with `bun install --cwd .omp/tools`.
+Install the tool's dependencies with `bun install --cwd .omsp/tools`.
 Native PTY API changes require rebuilding the addon with
 `bun --cwd=packages/natives run build` before running the tool.
-Run its real-PTY regressions with `bun test ./.omp/tests/tui.test.ts`. CI runs
+Run its real-PTY regressions with `bun test ./.omsp/tests/tui.test.ts`. CI runs
 them on Linux only; the Windows-specific cases run only on a local Windows host.
 
-## Core component contract (`@oh-my-pi/pi-tui`)
+## Core component contract (`@oh-my-striped-pi/pi-tui`)
 
 `packages/tui/src/tui.ts` defines:
 
@@ -91,7 +91,7 @@ Your `render(width)` output must be terminal-safe:
 Minimal pattern:
 
 ```ts
-import { replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
+import { replaceTabs, truncateToWidth } from "@oh-my-striped-pi/pi-tui";
 
 render(width: number): readonly string[] {
   return this.lines.map(line => truncateToWidth(replaceTabs(line), width));
@@ -229,14 +229,14 @@ return loader;
 
 ## Pause status
 
-The `/pause` screen shows the same local turn-and-job state in ANSI and TSP: draining turns and running jobs count, while parked or finished turns do not. When both counts reach zero, it hides the rows and signals readiness. These counts cover OMP-tracked work only, not device-wide idleness.
+The `/pause` screen shows the same local turn-and-job state in ANSI and TSP: draining turns and running jobs count, while parked or finished turns do not. When both counts reach zero, it hides the rows and signals readiness. These counts cover OMSP-tracked work only, not device-wide idleness.
 
 ## Realistic custom component example (extension command)
 
 ```ts
-import type { Component } from "@oh-my-pi/pi-tui";
-import { SelectList, matchesKey, replaceTabs, truncateToWidth } from "@oh-my-pi/pi-tui";
-import { getSelectListTheme, type ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { SelectList, matchesKey, replaceTabs, truncateToWidth } from "@oh-my-striped-pi/pi-tui";
+import { getSelectListTheme, type ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
 
 class Picker implements Component {
 	list: SelectList;

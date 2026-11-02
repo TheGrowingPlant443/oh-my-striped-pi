@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 
 // Usage: <db> <exchange-marker> <during-pass|after-pass>
 const [db, marker, mode] = process.argv.slice(2);

@@ -1,33 +1,37 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import * as ai from "@oh-my-pi/pi-ai";
-import type { Api, AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { rebindMemoryBackendForCwd } from "@oh-my-pi/pi-coding-agent/memory-backend/runtime";
-import { MEMORY_BACKEND_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/memory-backend/tool-names";
-import { computeMnemopiBankScope } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import { getMnemopiSessionState } from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
-import { BUILTIN_TOOLS, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { tinyModelClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
-import { resetMemoryForTests } from "@oh-my-pi/pi-mnemopi";
-import { getProjectAgentDir, getProjectDir, setProjectDir, TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import type { Api, AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { rebindMemoryBackendForCwd } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/runtime";
+import { MEMORY_BACKEND_TOOL_NAMES } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/tool-names";
+import { computeMnemopiBankScope } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/config";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import { getMnemopiSessionState } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { executeAcpBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/acp-builtins";
+import { BUILTIN_TOOLS, type ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { tinyModelClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
+import { resetMemoryForTests } from "@oh-my-striped-pi/pi-mnemopi";
+import { getProjectAgentDir, getProjectDir, setProjectDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
-import { cfgMnemopiBank, cfgMnemopiRecallLimit, cfgMnemopiScoping } from "@oh-my-pi/pi-coding-agent/mnemopi/settings";
+import { cfgMemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/settings";
+import {
+	cfgMnemopiBank,
+	cfgMnemopiRecallLimit,
+	cfgMnemopiScoping,
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/settings";
 
 function createTool(name: string): AgentTool {
 	return {

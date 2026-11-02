@@ -1,7 +1,7 @@
 /**
  * Regression for https://github.com/can1357/oh-my-pi/issues/3238.
  *
- * On macOS x64 (Intel), `omp stats` builds only the `modern`
+ * On macOS x64 (Intel), `omsp stats` builds only the `modern`
  * (`pi_natives.darwin-x64-modern.node`) variant when the host has AVX2,
  * because `scripts/host-detect.ts` uses `Bun.spawnSync("sysctl", …)` from a
  * normal shell context and correctly resolves AVX2 → modern.
@@ -26,7 +26,7 @@
  *      subprocesses inherit `process.env` at spawn, so they read the cache
  *      and skip detection entirely — sidestepping the worker-context spawn
  *      flakiness.
- *   2. The user-facing `PI_NATIVE_VARIANT` override always wins, including
+ *   2. The user-facing `OMSP_NATIVE_VARIANT` override always wins, including
  *      over a stale cache value.
  *   3. Non-x64 architectures still return `null` and never poison the cache.
  *   4. The `darwin-x64` candidate list always carries `modern` ahead of
@@ -37,7 +37,7 @@
 import { describe, expect, it } from "bun:test";
 import { getAddonFilenames, selectCpuVariant } from "../native/loader-state.js";
 
-const VARIANT_CACHE_ENV_KEY = "__PI_NATIVE_VARIANT_CACHE";
+const VARIANT_CACHE_ENV_KEY = "__OMSP_NATIVE_VARIANT_CACHE";
 
 describe("issue 3238: variant resolution across worker contexts", () => {
 	it("returns the cached variant from env without re-detecting", () => {
@@ -88,7 +88,7 @@ describe("issue 3238: variant resolution across worker contexts", () => {
 		expect(result.cacheEnvValue).toBe("baseline");
 	});
 
-	it("honors PI_NATIVE_VARIANT override above both cache and detection", () => {
+	it("honors OMSP_NATIVE_VARIANT override above both cache and detection", () => {
 		let detectorCalls = 0;
 		const result = selectCpuVariant({
 			arch: "x64",
@@ -108,7 +108,7 @@ describe("issue 3238: variant resolution across worker contexts", () => {
 		expect(result.cacheEnvKey).toBeUndefined();
 	});
 
-	it("ignores garbage values in PI_NATIVE_VARIANT and in the cache", () => {
+	it("ignores garbage values in OMSP_NATIVE_VARIANT and in the cache", () => {
 		const result = selectCpuVariant({
 			arch: "x64",
 			override: "garbage" as unknown as "modern",

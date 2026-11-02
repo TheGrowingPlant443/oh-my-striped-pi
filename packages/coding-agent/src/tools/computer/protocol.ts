@@ -1,6 +1,6 @@
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import type { CaptureRegion, DesktopCapabilities, DesktopScreenState } from "@oh-my-pi/pi-natives";
-import * as prompt from "@oh-my-pi/pi-utils/prompt";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import type { CaptureRegion, DesktopCapabilities, DesktopScreenState } from "@oh-my-striped-pi/pi-natives";
+import * as prompt from "@oh-my-striped-pi/pi-utils/prompt";
 import escapeAfterCallMessage from "../../prompts/tools/computer-escape-after-call.md" with { type: "text" };
 import escapeRefusedMessage from "../../prompts/tools/computer-escape-refused.md" with { type: "text" };
 import escapeStoppedMessage from "../../prompts/tools/computer-escape-stopped.md" with { type: "text" };

@@ -2,21 +2,25 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { SelectorController } from "@oh-my-pi/pi-coding-agent/modes/controllers/selector-controller";
-import { type CreateAgentSessionOptions, createAgentSession, discoverAuthStorage } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { cfgDefaultThinkingLevel } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { createSubagentSettings } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { SelectorController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/selector-controller";
+import {
+	type CreateAgentSessionOptions,
+	createAgentSession,
+	discoverAuthStorage,
+} from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { cfgDefaultThinkingLevel } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { createSubagentSettings } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 import { createInteractiveModeContext } from "../helpers/interactive-mode-context";
 
 // `defaultThinkingLevel` seeds new sessions. A later write that is not the user's
-// in-process choice (config reload, another omp process, a parent session) must not
+// in-process choice (config reload, another omsp process, a parent session) must not
 // re-steer a running session's explicit selection.
 describe("defaultThinkingLevel on running sessions", () => {
 	const tempDirs: string[] = [];

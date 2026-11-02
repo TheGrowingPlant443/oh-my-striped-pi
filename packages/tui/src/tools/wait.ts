@@ -1,7 +1,7 @@
 import type { Component } from "../tui";
 import { Text } from "../components/text";
 import { visibleWidth } from "../utils";
-import { formatAge } from "@oh-my-pi/pi-utils";
+import { formatAge } from "@oh-my-striped-pi/pi-utils";
 import { shimmerEnabled, shimmerText } from "../theme/shimmer";
 import type { Theme } from "../theme/theme";
 import { Ellipsis, Hasher, type RenderCache, renderStatusLine, renderTreeList, truncateToWidth } from "../render/index";
@@ -27,7 +27,7 @@ import type { StructuredSubagentOutput } from "./task";
 import { describeJobTiles, type JobTile, type JobWidgetView, renderJobTileLines } from "./job-widget";
 import type { RenderResultOptions, ToolRenderer, ToolActivitySummary } from "./renderer";
 import type { IrcDeliveryReceipt, IrcMessage } from "./irc";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { card as cardNode, compact, elapsed, keyed, md, node, row, span, text } from "../native/describe";
 import type { NativeNode } from "../native/node";
 import { OwnerMemo } from "../native/memo";
@@ -742,7 +742,7 @@ export function createIrcMessageCard(
 	// Terminal-local collapse replaces `getExpanded`; the node never changes after creation.
 	const described = cardNode(
 		{
-			role: `omp.irc.${card.kind}`,
+			role: `omsp.irc.${card.kind}`,
 			tone: "info",
 			head: [
 				span(plainText(title), "toolTitle strong"),
@@ -804,7 +804,9 @@ function describeJobsResult(
 	}
 	if (sorted.length > TILES_SHOWN) {
 		const rest = sorted.length - TILES_SHOWN;
-		body.push(text([span(`+${rest} more ${rest === 1 ? "job" : "jobs"} · /jobs`, "dim")], { role: "omp.wait.more" }));
+		body.push(
+			text([span(`+${rest} more ${rest === 1 ? "job" : "jobs"} · /jobs`, "dim")], { role: "omsp.wait.more" }),
+		);
 	}
 	for (const agent of agents) {
 		const spans: TspSpan[] = [span(plainText(agent.id), "muted")];
@@ -813,7 +815,7 @@ function describeJobsResult(
 		body.push(
 			node(
 				"row",
-				{ gap: "sm", role: "omp.wait.agent" },
+				{ gap: "sm", role: "omsp.wait.agent" },
 				[
 					node("badge", {
 						text: agent.live ? "agent" : "agent · no turn",

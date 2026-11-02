@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { readLines, TempDir } from "@oh-my-pi/pi-utils";
+import { readLines, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("set_event_filter over RPC", () => {
 	test("rejects invalid replacements atomically and echoes projection resets in v1 and v2", async () => {
-		const dir = TempDir.createSync("@omp-rpc-filter-");
+		const dir = TempDir.createSync("@omsp-rpc-filter-");
 		const model = "claude-sonnet-4-5";
 		const sse = [
 			{
@@ -45,7 +45,7 @@ describe("set_event_filter over RPC", () => {
 		});
 		const home = dir.path();
 		await Bun.write(
-			join(home, ".omp/agent/models.yml"),
+			join(home, ".omsp/agent/models.yml"),
 			JSON.stringify({
 				providers: {
 					"rpc-wire": {
@@ -89,7 +89,7 @@ describe("set_event_filter over RPC", () => {
 					PATH: process.env.PATH,
 					XDG_CONFIG_HOME: home,
 					XDG_DATA_HOME: home,
-					PI_CODING_AGENT_DIR: join(home, ".omp/agent"),
+					OMSP_CODING_AGENT_DIR: join(home, ".omsp/agent"),
 					NO_COLOR: "1",
 				},
 				stdin: "pipe",

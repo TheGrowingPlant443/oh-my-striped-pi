@@ -1,12 +1,12 @@
 /**
  * Stats activity worker. Loaded inside the subprocess spawned by
  * `activity-client.ts` (re-entered through the agent CLI's hidden
- * `__omp_worker_stats_activity` selector). Owns the stats DB handle for the
+ * `__omsp_worker_stats_activity` selector). Owns the stats DB handle for the
  * `/usage` heatmap load so the synchronous SQLite work never runs on the TUI
  * thread; the parent SIGKILLs the child once `done` arrives.
  */
-import { syncAllSessions } from "@oh-my-pi/omp-stats/aggregator";
-import { getDailyActivity } from "@oh-my-pi/omp-stats/db";
+import { syncAllSessions } from "@oh-my-striped-pi/omsp-stats/aggregator";
+import { getDailyActivity } from "@oh-my-striped-pi/omsp-stats/db";
 import type { StatsActivityTransport, StatsActivityWorkerInbound } from "./activity-protocol";
 
 async function handleLoad(

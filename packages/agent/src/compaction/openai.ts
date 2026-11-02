@@ -15,17 +15,17 @@
  *   with `{ summary, shortSummary? }`.
  */
 
-import { NO_AUTH_SENTINEL } from "@oh-my-pi/pi-ai/auth-retry";
-import { attach, create, Flag, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { applyInferenceHeaders, applySessionHeader } from "@oh-my-pi/pi-ai/providers/inference-headers";
+import { NO_AUTH_SENTINEL } from "@oh-my-striped-pi/pi-ai/auth-retry";
+import { attach, create, Flag, ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import { applyInferenceHeaders, applySessionHeader } from "@oh-my-striped-pi/pi-ai/providers/inference-headers";
 import {
 	encodeResponsesToolResultOutput,
 	getOpenAIPromptCacheKey,
 	hoistInterleavedResponsesToolBatchMessages,
 	parseTextSignature,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { transformMessages } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import type { AssistantMessage, FetchImpl, Message, Model } from "@oh-my-pi/pi-ai/types";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { transformMessages } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import type { AssistantMessage, FetchImpl, Message, Model } from "@oh-my-striped-pi/pi-ai/types";
 import {
 	dropMalformedOpenAIResponsesToolCalls,
 	getOpenAIResponsesHistoryItems,
@@ -33,10 +33,18 @@ import {
 	normalizeResponsesToolCallId,
 	stripOpenAIResponsesOutputOnlyStatusesForReplay,
 	truncateResponseItemId,
-} from "@oh-my-pi/pi-ai/utils";
-import { captureOpenAIHttpError } from "@oh-my-pi/pi-ai/utils/openai-http";
-import { wrapFetchForProxy } from "@oh-my-pi/pi-ai/utils/proxy";
-import { isRecord, logger, prompt, ptree, stringifyJson, structuredCloneJSON, untilAborted } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai/utils";
+import { captureOpenAIHttpError } from "@oh-my-striped-pi/pi-ai/utils/openai-http";
+import { wrapFetchForProxy } from "@oh-my-striped-pi/pi-ai/utils/proxy";
+import {
+	isRecord,
+	logger,
+	prompt,
+	ptree,
+	stringifyJson,
+	structuredCloneJSON,
+	untilAborted,
+} from "@oh-my-striped-pi/pi-utils";
 import { dataUrlImageSize } from "../image-tokens";
 import { Tokenizer } from "../tokenizer";
 import { isOpenAiRemoteCompactionApi } from "./compaction-v2-streaming";
@@ -828,7 +836,7 @@ export async function requestOpenAiRemoteCompaction(
 	assertRemoteCompactionInputFits(trimmed, model);
 	// Same cache identity as the V2 request: the resolved id prefers the
 	// explicit prompt-cache key and falls back to the session id, all
-	// retention-gated by getOpenAIPromptCacheKey (PI_CACHE_RETENTION=none
+	// retention-gated by getOpenAIPromptCacheKey (OMSP_CACHE_RETENTION=none
 	// resolves to nothing here, which then also drops the affinity below).
 	const cacheOptions = { sessionId: opts?.sessionId, promptCacheKey: opts?.promptCacheKey };
 	const promptCacheSessionId = getOpenAIPromptCacheKey(cacheOptions);
@@ -916,10 +924,10 @@ export async function requestOpenAiRemoteCompaction(
 /**
  * Generic remote-compaction POST. Two wire shapes are auto-selected by
  * endpoint suffix so a single `compaction.remoteEndpoint` setting can point at
- * either a purpose-built omp summarizer (`{systemPrompt, prompt}` → `{summary}`)
+ * either a purpose-built omsp summarizer (`{systemPrompt, prompt}` → `{summary}`)
  * or any OpenAI-compatible chat-completions server (`/chat/completions`,
  * `/v1/chat/completions`, …) as reported for llama.cpp / vLLM / etc. in
- * issue #4630: without this, the omp payload was rejected with
+ * issue #4630: without this, the omsp payload was rejected with
  * HTTP 400 `"'messages' is required"`, compaction silently fell back to
  * local summarization, and context grew unbounded.
  *

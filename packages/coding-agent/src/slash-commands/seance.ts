@@ -1,7 +1,7 @@
-import type { TextContent } from "@oh-my-pi/pi-ai";
-import { Snowflake } from "@oh-my-pi/pi-utils";
-import { sanitizeErrorLine } from "@oh-my-pi/pi-tui/chrome/error-block";
-import type { TaskParams, TaskToolDetails } from "@oh-my-pi/pi-tui/tools/task";
+import type { TextContent } from "@oh-my-striped-pi/pi-ai";
+import { Snowflake } from "@oh-my-striped-pi/pi-utils";
+import { sanitizeErrorLine } from "@oh-my-striped-pi/pi-tui/chrome/error-block";
+import type { TaskParams, TaskToolDetails } from "@oh-my-striped-pi/pi-tui/tools/task";
 import { discoverAgents } from "../task/discovery";
 import { isBundledSeance, resolveSeanceSource } from "../task/seance";
 import { SEANCE_AGENT_NAME } from "../task/seance-policy";

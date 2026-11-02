@@ -1,13 +1,13 @@
-OMP CLI THIRD-PARTY NOTICES
+OMSP CLI THIRD-PARTY NOTICES
 ===========================
 
-Third-party code, data, and packages shipped in the omp CLI:
-@oh-my-pi/pi-coding-agent and the @oh-my-pi TypeScript packages it is built
-from, the npm CLI bundle (dist/cli.js), and the JavaScript layer of the omp
+Third-party code, data, and packages shipped in the omsp CLI:
+@oh-my-striped-pi/pi-coding-agent and the @oh-my-striped-pi TypeScript packages it is built
+from, the npm CLI bundle (dist/cli.js), and the JavaScript layer of the omsp
 executable. Each license below governs only the material it names.
 
-The native addon has its own notices in @oh-my-pi/pi-natives
-(packages/natives/THIRD-PARTY-NOTICES.txt). `omp --license` prints both.
+The native addon has its own notices in @oh-my-striped-pi/pi-natives
+(packages/natives/THIRD-PARTY-NOTICES.txt). `omsp --license` prints both.
 
 VENDORED SOURCE AND DATA
 ========================
@@ -102,7 +102,7 @@ License.
 BUNDLED NPM PACKAGES
 ====================
 
-Bundled into dist/cli.js and the omp executable:
+Bundled into dist/cli.js and the omsp executable:
 
 - @opentelemetry/api 1.9.1 — Apache-2.0
 - @opentelemetry/api-logs 0.220.0 — Apache-2.0
@@ -132,7 +132,7 @@ Bundled into dist/cli.js and the omp executable:
 - @opentelemetry/semantic-conventions 1.43.0 — Apache-2.0
 - axe-core 4.13.0 — MPL-2.0
 
-Bundled into the omp executable only:
+Bundled into the omsp executable only:
 
 dist/cli.js resolves these from the installed dependencies instead.
 
@@ -142,7 +142,7 @@ dist/cli.js resolves these from the installed dependencies instead.
 - mitt 3.0.1 — MIT
 - puppeteer-core 25.3.0 — Apache-2.0
 
-Bundled into the stats dashboard (dist/client in @oh-my-pi/omp-stats, embedded in the CLI):
+Bundled into the stats dashboard (dist/client in @oh-my-striped-pi/omsp-stats, embedded in the CLI):
 
 - lucide-react 1.47.0 — ISC
 - react 19.2.7 — MIT
@@ -169,7 +169,7 @@ RUNTIME-INSTALLED PACKAGES
 
 Optional local-model, speech, and embedding runtimes
 (@huggingface/transformers, sherpa-onnx-node, fastembed, onnxruntime-node, and
-their dependencies) are installed on demand by the package manager or by omp
+their dependencies) are installed on demand by the package manager or by omsp
 into a per-user runtime directory. They are not part of these artifacts and
 carry their own license files.
 

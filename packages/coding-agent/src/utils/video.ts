@@ -8,11 +8,11 @@
  * anything timestamp-shaped is a seek position.
  */
 import * as path from "node:path";
-import { rasterizeSvg } from "@oh-my-pi/pi-natives";
-import { isVideoPath } from "@oh-my-pi/pi-tui/prompt/video";
-import { untilAborted } from "@oh-my-pi/pi-utils/abortable";
-import { TempDir } from "@oh-my-pi/pi-utils/temp";
-import { $which } from "@oh-my-pi/pi-utils/which";
+import { rasterizeSvg } from "@oh-my-striped-pi/pi-natives";
+import { isVideoPath } from "@oh-my-striped-pi/pi-tui/prompt/video";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils/abortable";
+import { TempDir } from "@oh-my-striped-pi/pi-utils/temp";
+import { $which } from "@oh-my-striped-pi/pi-utils/which";
 
 const VIDEO_MIME_BY_EXT: Record<string, string> = {
 	".mp4": "video/mp4",
@@ -359,7 +359,7 @@ export async function extractVideoFramePng(
 	selector: VideoSelector,
 	signal?: AbortSignal,
 ): Promise<VideoPng> {
-	const tmp = await TempDir.create("@omp-video-frame-");
+	const tmp = await TempDir.create("@omsp-video-frame-");
 	try {
 		const out = tmp.join("frame.png");
 		if (selector.kind === "time") {
@@ -412,7 +412,7 @@ export async function decodeStillImageJpeg(
 			`ffmpeg ${release.major}.${release.minor} cannot decode tiled HEIF images such as camera photos; ffmpeg 8.1 or newer can.`,
 		);
 	}
-	const tmp = await TempDir.create("@omp-still-image-");
+	const tmp = await TempDir.create("@omsp-still-image-");
 	try {
 		const out = tmp.join("image.jpg");
 		let decodedBytes = 0;
@@ -458,7 +458,7 @@ export async function buildVideoContactSheetPng(
 	const thumbs = CONTACT_SHEET_THUMBS;
 	const cols = CONTACT_SHEET_COLS;
 	const rows = Math.ceil(thumbs / cols);
-	const tmp = await TempDir.create("@omp-video-sheet-");
+	const tmp = await TempDir.create("@omsp-video-sheet-");
 	try {
 		const duration = meta.durationSec;
 		const times: number[] =
@@ -630,7 +630,7 @@ export async function buildChangedFrameContactSheetPng(
 	signal?: AbortSignal,
 ): Promise<ChangedFrameContactSheet> {
 	const maxTiles = Math.max(2, Math.min(12, Math.floor(options.maxTiles ?? 12)));
-	const tmp = await TempDir.create("@omp-video-change-sheet-");
+	const tmp = await TempDir.create("@omsp-video-change-sheet-");
 	try {
 		const raw = tmp.join("frames.gray");
 		await runFfmpeg(

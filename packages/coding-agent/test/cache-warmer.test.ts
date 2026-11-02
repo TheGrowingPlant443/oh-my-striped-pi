@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
-import type { AssistantMessage, AssistantMessageEvent, SimpleStreamOptions, Usage } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import type { Model } from "@oh-my-pi/pi-catalog/types";
+import type { AssistantMessage, AssistantMessageEvent, SimpleStreamOptions, Usage } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import type { Model } from "@oh-my-striped-pi/pi-catalog/types";
 import {
 	CacheWarmer,
 	type CacheWarmerDeps,
@@ -184,17 +184,17 @@ describe("cache warming scheduling math", () => {
 	});
 
 	test("reads the tier matching the configured request retention", () => {
-		// PI_CACHE_RETENTION feeds the default tier; scrub it so the
+		// OMSP_CACHE_RETENTION feeds the default tier; scrub it so the
 		// undefined-options assertions hold on any developer/CI environment.
-		const savedRetention = process.env.PI_CACHE_RETENTION;
-		delete process.env.PI_CACHE_RETENTION;
+		const savedRetention = process.env.OMSP_CACHE_RETENTION;
+		delete process.env.OMSP_CACHE_RETENTION;
 		try {
 			const model = makeModel();
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "short" })).toBe(300_000);
 			expect(getPromptCacheTtlMs(model, { cacheRetention: "long" })).toBe(3_600_000);
 			expect(getPromptCacheTtlMs(model, undefined)).toBe(300_000);
 		} finally {
-			if (savedRetention !== undefined) process.env.PI_CACHE_RETENTION = savedRetention;
+			if (savedRetention !== undefined) process.env.OMSP_CACHE_RETENTION = savedRetention;
 		}
 	});
 
@@ -239,7 +239,7 @@ describe("cache warming scheduling math", () => {
 describe("cache warmer lifecycle", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
-		delete process.env.PI_CACHE_RETENTION;
+		delete process.env.OMSP_CACHE_RETENTION;
 	});
 
 	afterEach(() => {

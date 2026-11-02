@@ -1,12 +1,12 @@
-import { type } from "@oh-my-pi/omptype";
-import { once } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { once } from "@oh-my-striped-pi/pi-utils";
 
 export const getSecurityContractSchemas = once(() => {
 	const stringRecordSchema = type({ "[string]": "string" });
 	const unknownRecordSchema = type({ "[string]": "unknown" });
 
 	const securityProducerSchema = type({
-		kind: "'omp-native' | 'codex-security-bundle' | 'codex-security-cloud' | 'sarif-import'",
+		kind: "'omsp-native' | 'codex-security-bundle' | 'codex-security-cloud' | 'sarif-import'",
 		name: "string > 0",
 		"version?": "string",
 		"vendor?": "string",
@@ -146,7 +146,7 @@ export const getSecurityContractSchemas = once(() => {
 	});
 
 	const securityScanPlanSchema = type({
-		documentType: "'omp-security.scan-plan'",
+		documentType: "'omsp-security.scan-plan'",
 		schemaVersion: "'1.0'",
 		id: "string > 0",
 		createdAt: "string > 0",
@@ -180,7 +180,7 @@ export const getSecurityContractSchemas = once(() => {
 	});
 
 	const securityScanSchema = type({
-		documentType: "'omp-security.scan'",
+		documentType: "'omsp-security.scan'",
 		schemaVersion: "'1.0'",
 		id: "string > 0",
 		projectKey: "string > 0",

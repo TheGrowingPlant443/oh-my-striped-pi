@@ -1,4 +1,4 @@
-import type { TspProps, TspSpace } from "@oh-my-pi/pi-wire";
+import type { TspProps, TspSpace } from "@oh-my-striped-pi/pi-wire";
 import type { MouseRoutable } from "../../mouse";
 import type { Component } from "../../tui";
 import { padding, truncateToWidth, visibleWidth } from "../../utils";

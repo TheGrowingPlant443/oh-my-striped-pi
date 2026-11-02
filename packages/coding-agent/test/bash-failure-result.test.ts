@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { Skill } from "@oh-my-pi/pi-coding-agent/extensibility/skills";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
-import { Shell } from "@oh-my-pi/pi-natives";
-import { getThemeByName } from "@oh-my-pi/pi-tui/theme";
-import { bashToolRenderer } from "@oh-my-pi/pi-tui/tools/bash";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { Skill } from "@oh-my-striped-pi/pi-coding-agent/extensibility/skills";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
+import { Shell } from "@oh-my-striped-pi/pi-natives";
+import { getThemeByName } from "@oh-my-striped-pi/pi-tui/theme";
+import { bashToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/bash";
 
 afterEach(() => {
 	mock.restore();
@@ -66,7 +66,7 @@ describe("BashTool execution results", () => {
 			const output = (view.body ?? [])
 				.flatMap(node => ("k" in node ? (node.c ?? []) : []))
 				.find(node => "k" in node && node.k === "ansi");
-			expect(output).toMatchObject({ p: { role: "omp.tool.bash.output", text: timingOutput } });
+			expect(output).toMatchObject({ p: { role: "omsp.tool.bash.output", text: timingOutput } });
 		}
 	});
 
@@ -139,10 +139,10 @@ describe("BashTool execution results", () => {
 			getSessionId: () => "session-fg-shell",
 			sessionManager: { getSessionId: () => "session-fg" },
 		} as unknown as ToolSession);
-		// The session's persistent shell carries a value an earlier command (or a parent omp) left behind.
-		await tool.execute("call-stale", { command: "export PI_SESSION_FILE=/stale/parent.jsonl" });
+		// The session's persistent shell carries a value an earlier command (or a parent omsp) left behind.
+		await tool.execute("call-stale", { command: "export OMSP_SESSION_FILE=/stale/parent.jsonl" });
 		const result = await tool.execute("call-env", {
-			command: `printf '%s|%s|' "$PI_SESSION_ID" "$PI_SESSION_FILE"`,
+			command: `printf '%s|%s|' "$OMSP_SESSION_ID" "$OMSP_SESSION_FILE"`,
 		});
 		const [id, file] = (result.content.find(c => c.type === "text")?.text ?? "").split("|");
 		expect(id).toBe("session-fg");
@@ -164,7 +164,7 @@ describe("BashTool execution results", () => {
 				return {};
 			},
 		} as unknown as ToolSession);
-		const probe = `printf '%s|%s|' "$PI_SESSION_ID" "$PI_SESSION_FILE"`;
+		const probe = `printf '%s|%s|' "$OMSP_SESSION_ID" "$OMSP_SESSION_FILE"`;
 		const fields = (result: { content: readonly { type: string; text?: string }[] }) =>
 			(result.content.find(c => c.type === "text")?.text ?? "").split("|").slice(0, 2);
 

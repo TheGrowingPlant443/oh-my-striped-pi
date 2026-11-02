@@ -6,7 +6,7 @@
  * label, and a reply that parses to nothing leaves the row unchanged.
  */
 import { describe, expect, it } from "bun:test";
-import { parseCompletionEstimate } from "@oh-my-pi/pi-coding-agent/task/completion-probe";
+import { parseCompletionEstimate } from "@oh-my-striped-pi/pi-coding-agent/task/completion-probe";
 
 describe("parseCompletionEstimate", () => {
 	it("reads the contract JSON line", () => {

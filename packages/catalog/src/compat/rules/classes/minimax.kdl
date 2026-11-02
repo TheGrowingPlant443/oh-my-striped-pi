@@ -22,7 +22,7 @@ class "minimax" {
 	family "m2" {
 		thinking-efforts "low" "medium" "high"
 	}
-	// M3 reasoning reaches omp as its plaintext trace on every host, and
+	// M3 reasoning reaches omsp as its plaintext trace on every host, and
 	// MiniMax asks agents to pass all earlier reasoning back.
 	family "m3" {
 		portable-reasoning #true

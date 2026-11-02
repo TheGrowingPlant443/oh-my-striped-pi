@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { whileDrawing } from "@oh-my-pi/pi-coding-agent/tools/browser/screenshot";
+import { whileDrawing } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/screenshot";
 import type { CDPSession, Page } from "puppeteer-core";
 
 describe("whileDrawing", () => {

@@ -10,7 +10,7 @@ import {
 	resolveTelemetry,
 	type StreamFn,
 	type ThinkingLevel,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	Context,
 	CredentialDisabledEvent,
@@ -22,22 +22,22 @@ import type {
 	ServiceTier,
 	ServiceTierByFamily,
 	SimpleStreamOptions,
-} from "@oh-my-pi/pi-ai";
-import type { DiscoverAuthStorageOptions } from "@oh-my-pi/pi-ai/auth-broker/discover";
-import type { Dialect } from "@oh-my-pi/pi-ai/dialect";
-import { prewarmModelConnection } from "@oh-my-pi/pi-ai/providers/connection-prewarm";
-import { withCredentialRedaction } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { sendsImageInputOnWire } from "@oh-my-pi/pi-ai/providers/vision-guard";
-import { FALLBACK_DIALECT, preferredDialect } from "@oh-my-pi/pi-catalog/identity";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { $env } from "@oh-my-pi/pi-utils/env";
-import { getAgentDir, getModelDbPath, getProjectDir } from "@oh-my-pi/pi-utils/dirs";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import * as postmortem from "@oh-my-pi/pi-utils/postmortem";
-import * as prompt from "@oh-my-pi/pi-utils/prompt";
-import { Snowflake } from "@oh-my-pi/pi-utils/snowflake";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
-import { DEFAULT_FRAME_DATA_BYTES_BUDGET, frameDataBytesBudget } from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-ai";
+import type { DiscoverAuthStorageOptions } from "@oh-my-striped-pi/pi-ai/auth-broker/discover";
+import type { Dialect } from "@oh-my-striped-pi/pi-ai/dialect";
+import { prewarmModelConnection } from "@oh-my-striped-pi/pi-ai/providers/connection-prewarm";
+import { withCredentialRedaction } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { sendsImageInputOnWire } from "@oh-my-striped-pi/pi-ai/providers/vision-guard";
+import { FALLBACK_DIALECT, preferredDialect } from "@oh-my-striped-pi/pi-catalog/identity";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { $env } from "@oh-my-striped-pi/pi-utils/env";
+import { getAgentDir, getModelDbPath, getProjectDir } from "@oh-my-striped-pi/pi-utils/dirs";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import * as postmortem from "@oh-my-striped-pi/pi-utils/postmortem";
+import * as prompt from "@oh-my-striped-pi/pi-utils/prompt";
+import { Snowflake } from "@oh-my-striped-pi/pi-utils/snowflake";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
+import { DEFAULT_FRAME_DATA_BYTES_BUDGET, frameDataBytesBudget } from "@oh-my-striped-pi/snapcompact";
 import {
 	discoverAdvisorConfigs,
 	discoverWatchdogFiles,
@@ -79,19 +79,19 @@ import {
 	resolveSessionModelSelector,
 	sessionModelDiscoveryProviders,
 } from "./config/model-resolver";
-import { formatModelSelectorValue, parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import { formatModelSelectorValue, parseModelString } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import { loadPromptTemplates as loadPromptTemplatesInternal, type PromptTemplate } from "./config/prompt-templates";
 import { buildServiceTierByFamily } from "./config/service-tier";
 import { bindEffects, combine } from "./config/registry";
 import { Settings } from "./config/settings";
 import "./discovery";
 import { initializeWithSettings } from "./discovery";
-import { setInvocationConfiguredExtensions, withOmpExtensionRootScope } from "./discovery/omp-extension-roots";
+import { setInvocationConfiguredExtensions, withOmpExtensionRootScope } from "./discovery/omsp-extension-roots";
 import { disposeVmContextsByOwner } from "./eval/js/context-manager";
 import { getEnabledEvalPreludes, type EvalPreludeDefinition } from "./eval/preludes";
 import { disposeAllKernelSessions, disposeKernelSessionsByOwner } from "./eval/py/executor";
 import { defaultEvalSessionId } from "./eval/session-id";
-import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
+import type { EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import {
 	type CustomCommandsLoadResult,
 	type LoadedCustomCommand,
@@ -139,7 +139,7 @@ import {
 import { type FileSlashCommand, loadSlashCommands as loadSlashCommandsInternal } from "./extensibility/slash-commands";
 import type { HindsightSessionState } from "./hindsight/state";
 import { LocalProtocolHandler, type LocalProtocolOptions, outRepliesActive } from "./internal-urls";
-import { stripXdUrlPrefix } from "@oh-my-pi/pi-tui/tools/xd-url";
+import { stripXdUrlPrefix } from "@oh-my-striped-pi/pi-tui/tools/xd-url";
 import { holdSharedLsp } from "./lsp/client";
 import { LSP_STARTUP_EVENT_CHANNEL, type LspStartupEvent } from "./lsp/startup-events";
 import {
@@ -152,7 +152,7 @@ import {
 	type MCPToolsLoadResult,
 	shouldFilterBrowserMCPForPrelude,
 } from "./mcp";
-import { parseMCPToolName } from "@oh-my-pi/pi-tui/tools/mcp";
+import { parseMCPToolName } from "@oh-my-striped-pi/pi-tui/tools/mcp";
 import { MCP_CONNECTION_STATUS_EVENT_CHANNEL, type McpConnectionStatusEvent } from "./mcp/startup-events";
 import { resolveMCPToolAlias } from "./mcp/tool-bridge";
 import { createSessionMemoryRuntimeContext, resolveMemoryBackend } from "./memory-backend";
@@ -241,7 +241,7 @@ import type { AgentDefinition } from "./task/types";
 import { AgentOutputManager } from "./task/output-manager";
 import { sessionDelegationBias } from "./task/prompt-policy";
 import { isScoutSpawnable } from "./task/spawn-policy";
-import type { StructuredSubagentSchemaMode } from "@oh-my-pi/pi-tui/tools/task";
+import type { StructuredSubagentSchemaMode } from "@oh-my-striped-pi/pi-tui/tools/task";
 import {
 	AUTO_THINKING,
 	type ConfiguredThinkingLevel,
@@ -253,7 +253,7 @@ import {
 	shouldDisableReasoning,
 	toReasoningEffort,
 	automaticThinkingLevel,
-} from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import {
 	BashTool,
 	BUILTIN_TOOLS,
@@ -304,7 +304,7 @@ import { ttsTool } from "./tools/tts";
 import { resolveActiveRepoContext } from "./utils/active-repo-context";
 import { EventBus } from "./utils/event-bus";
 import { normalizeProviderContextImagesForModel } from "./utils/image-loading";
-import { formatLocalCalendarDate } from "@oh-my-pi/pi-tui/chrome/local-date";
+import { formatLocalCalendarDate } from "@oh-my-striped-pi/pi-tui/chrome/local-date";
 import { normalizePromptPath } from "./utils/prompt-path";
 import { buildNamedToolChoice } from "./utils/tool-choice";
 import { VibeSessionRegistry } from "./vibe/runtime";
@@ -532,7 +532,7 @@ export interface CreateAgentSessionOptions {
 	cwd?: string;
 	/** Additional workspace directories beyond cwd (multi-root), absolute or cwd-relative. */
 	additionalDirectories?: string[];
-	/** Global config directory. Default: ~/.omp/agent */
+	/** Global config directory. Default: ~/.omsp/agent */
 	agentDir?: string;
 	/** Spawns to allow. Default: "*" */
 	spawns?: string;
@@ -719,7 +719,7 @@ export interface CreateAgentSessionOptions {
 	 */
 	preloadedPreparedExtensions?: readonly PreparedExtension[];
 	/**
-	 * Pre-discovered custom-tool source paths from `.omp/tools/`, `.claude/tools/`,
+	 * Pre-discovered custom-tool source paths from `.omsp/tools/`, `.claude/tools/`,
 	 * plugins, etc. When provided, the filesystem-scan inside
 	 * `discoverCustomToolPaths()` is skipped — subagents inherit the parent's
 	 * scan result and call `loadCustomTools()` themselves so each session binds
@@ -753,7 +753,7 @@ export interface CreateAgentSessionOptions {
 	excludeAgentsMd?: boolean;
 	/** Pre-built workspace tree (skips re-scanning; passed by parents to subagents). */
 	workspaceTree?: WorkspaceTree;
-	/** Prompt templates. Default: discovered from cwd/.omp/prompts/ + agentDir/prompts/ */
+	/** Prompt templates. Default: discovered from cwd/.omsp/prompts/ + agentDir/prompts/ */
 	promptTemplates?: PromptTemplate[];
 	/** File-based slash commands. Default: discovered from commands/ directories */
 	slashCommands?: FileSlashCommand[];
@@ -895,7 +895,7 @@ export interface CreateAgentSessionOptions {
 	 */
 	settingsApproval?: boolean;
 	/**
-	 * Replies render in omp's own TUI transcript, which draws Mermaid, ```svg
+	 * Replies render in omsp's own TUI transcript, which draws Mermaid, ```svg
 	 * figures and table charts; only then does the system prompt mention them.
 	 * Print, RPC, ACP and subagent sessions read replies as text. Default: false.
 	 */
@@ -1026,7 +1026,7 @@ export {
  *
  * Default: local SQLite store at `<agentDir>/agent.db`.
  *
- * Broker mode: when `OMP_AUTH_BROKER_URL` is set, credentials are pulled from
+ * Broker mode: when `OMSP_AUTH_BROKER_URL` is set, credentials are pulled from
  * a remote auth-broker over the wire. Refresh tokens never leave the broker;
  * the client receives access tokens with `refresh = "__remote__"` and calls
  * back into the broker through the {@link AuthStorageOptions.refreshOAuthCredential}
@@ -1137,13 +1137,13 @@ export async function loadSessionExtensions(
 /**
  * Load discovered/configured extensions and register their providers into
  * `modelRegistry`, then discover the dynamic provider catalogs. One-shot CLIs
- * (`omp bench`, dry-balance) build a bare {@link ModelRegistry} that only knows
+ * (`omsp bench`, dry-balance) build a bare {@link ModelRegistry} that only knows
  * built-in catalog providers; without this, providers contributed by an
  * extension (e.g. a custom OpenAI-compatible provider under
- * `~/.omp/agent/extensions/`) never reach model resolution. Mirrors the
- * session / `omp models` path: drain the queued provider registrations, then
+ * `~/.omsp/agent/extensions/`) never reach model resolution. Mirrors the
+ * session / `omsp models` path: drain the queued provider registrations, then
  * `refreshRuntimeProviders` so dynamically-discovered models exist before
- * selectors are resolved, unless `discoverModels: false` (e.g. `omp usage`,
+ * selectors are resolved, unless `discoverModels: false` (e.g. `omsp usage`,
  * which needs only registered usage providers).
  */
 export async function loadCliExtensionProviders(
@@ -1642,7 +1642,7 @@ export function createAutoLearnCaptureRunner(
 		const captureProviderSessionState = new Map<string, ProviderSessionState>();
 		const stripInheritedReasoning =
 			captureModel.api === "openai-responses" ||
-			(captureModel.api === "openrouter" && $env.PI_OPENROUTER_RESPONSES !== "0");
+			(captureModel.api === "openrouter" && $env.OMSP_OPENROUTER_RESPONSES !== "0");
 		const captureMessages = options.sourceAgent.state.messages.map((message): AgentMessage => {
 			if (message.role === "assistant") {
 				let content = message.content;
@@ -1728,7 +1728,7 @@ export function createAutoLearnCaptureRunner(
  * const { session } = await createAgentSession();
  *
  * // With explicit model
- * import { getModel } from '@oh-my-pi/pi-ai';
+ * import { getModel } from '@oh-my-striped-pi/pi-ai';
  * const { session } = await createAgentSession({
  *   model: getModel('anthropic', 'claude-opus-4-5'),
  *   thinkingLevel: 'high',
@@ -2743,7 +2743,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		let customToolPaths: ToolPathWithSource[] = [];
 		const inlineExtensions: ExtensionFactory[] = [];
 		if (!restrictToolNames) {
-			// Discover custom tools from `.omp/tools/`, `.claude/tools/`, plugins, etc.
+			// Discover custom tools from `.omsp/tools/`, `.claude/tools/`, plugins, etc.
 			// Subagents reuse the parent's scan via `preloadedCustomToolPaths` to skip
 			// the FS walk, but ALWAYS re-call `loadCustomTools` here so factories bind
 			// to THIS session's `CustomToolAPI` (cwd, exec, pushPendingAction, UI).
@@ -2895,7 +2895,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 		// Hydrate cached runtime (extension) provider catalogs before model
 		// resolution. Dynamic-only providers have no synchronous registration side
 		// effect, so a cold --model/provider resume must see the same fresh SQLite
-		// cache that `omp models find` uses before the online refresh continues in
+		// cache that `omsp models find` uses before the online refresh continues in
 		// the background.
 		await modelRegistry.refreshRuntimeProviders("offline");
 		// Online runtime discovery must not steal the event loop from the first UI
@@ -3925,7 +3925,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			let activeRepoContext = initialActiveRepoContext;
 			// Re-discover rules and context files from disk on every session-scoped
 			// rebuild. The rule buckets are otherwise frozen at
-			// session creation, so a `RULES.md` (or any rule) created or edited while omp
+			// session creation, so a `RULES.md` (or any rule) created or edited while omsp
 			// runs never reaches the prompt on /clear or /new until restart (issue #10940).
 			// resetCapabilities() clears the fs cache at those boundaries, so this observes
 			// the current file. TTSR registrations are replaced from the new snapshot while
@@ -5057,7 +5057,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 					for (const extensionPath of unloaded) announcedUnloadedExtensions.add(extensionPath);
 					session.emitNotice(
 						"warning",
-						`Restart omp to load newly enabled extensions: ${unloaded.join(", ")}`,
+						`Restart omsp to load newly enabled extensions: ${unloaded.join(", ")}`,
 						"extensions",
 					);
 				}

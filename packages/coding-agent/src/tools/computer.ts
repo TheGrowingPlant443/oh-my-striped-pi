@@ -1,13 +1,13 @@
-import { type Type, type } from "@oh-my-pi/omptype";
-import type { AgentToolResult, ToolApprovalDecision } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { classifyModel } from "@oh-my-pi/pi-catalog/identity";
-import type { DesktopCapabilities } from "@oh-my-pi/pi-natives";
-import { once } from "@oh-my-pi/pi-utils";
+import { type Type, type } from "@oh-my-striped-pi/omptype";
+import type { AgentToolResult, ToolApprovalDecision } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { classifyModel } from "@oh-my-striped-pi/pi-catalog/identity";
+import type { DesktopCapabilities } from "@oh-my-striped-pi/pi-natives";
+import { once } from "@oh-my-striped-pi/pi-utils";
 import { callSessionTool } from "../eval/js/tool-bridge";
 import type { EvalPreludeContext, EvalPreludeDefinition } from "../eval/preludes";
 import computerUsePrompt from "../prompts/system/computer-use.md" with { type: "text" };
-import { enforceInlineByteCap } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { enforceInlineByteCap } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import { type ComputerCallStep, isReadOnlyComputerCall, renderComputerCall } from "./computer/call";
 import { type ComputerScreenshot, type ComputerSessionSnapshot, screenStateNotice } from "./computer/protocol";
 import {
@@ -19,7 +19,7 @@ import {
 import type { ToolSession } from "./index";
 import { renderCallChain, renderFunctionRun } from "./run-code";
 import { throwIfAborted } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { clampTimeout } from "./tool-timeouts";
 
 import {

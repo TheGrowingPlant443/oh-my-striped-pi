@@ -3,15 +3,15 @@ import * as fsSync from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { scheduler } from "node:timers/promises";
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 import {
 	defaultSupportedEffort,
 	mapEffortToAnthropicAdaptiveEffort,
 	requireSupportedEffort,
 	resolveWireModelId,
 	withoutUnverifiedThinking,
-} from "@oh-my-pi/pi-catalog/model-thinking";
-import { getProviderInFlightRoot, isEnoent, logger, untilAborted } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { getProviderInFlightRoot, isEnoent, logger, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { getCustomApi } from "./api-registry";
 import {
 	createAuthRetryKeyState,
@@ -1207,7 +1207,7 @@ function maxTokensWithThinkingBudget(
 	return Math.min(uncappedMaxTokens, modelMaxTokens ?? Number.POSITIVE_INFINITY);
 }
 export const OUTPUT_FALLBACK_BUFFER = 4000;
-const ANTHROPIC_USE_INTERLEAVED_THINKING = Bun.env.PI_NO_INTERLEAVED_THINKING !== "1";
+const ANTHROPIC_USE_INTERLEAVED_THINKING = Bun.env.OMSP_NO_INTERLEAVED_THINKING !== "1";
 
 export const ANTHROPIC_THINKING: Record<Effort, number> = {
 	minimal: 1024,

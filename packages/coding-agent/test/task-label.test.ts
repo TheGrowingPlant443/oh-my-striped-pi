@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
 import { getTestModel } from "./helpers/model-fixtures";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { generateTaskLabel, labelEchoesHandle } from "@oh-my-pi/pi-coding-agent/task/label";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { generateTaskLabel, labelEchoesHandle } from "@oh-my-striped-pi/pi-coding-agent/task/label";
 
 function createSettings(model: Model<Api>) {
 	return Settings.isolated({

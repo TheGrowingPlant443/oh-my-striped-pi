@@ -6,8 +6,8 @@
  * exposes one option-driven core plus thin dispatchers that pin the option set
  * for each target.
  */
-import { parseLocalRefPointer } from "@oh-my-pi/omptype";
-import { logger } from "@oh-my-pi/pi-utils";
+import { parseLocalRefPointer } from "@oh-my-striped-pi/omptype";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../../error";
 import { dereferenceJsonSchema } from "./dereference";
 import { upgradeJsonSchemaTo202012 } from "./draft";
@@ -1939,7 +1939,7 @@ function inferStrictPrimitiveTypeFromEnumOrConst(node: Record<string, unknown>):
  * repeated calls (different providers, retries, batching) reuse the same
  * computed pair without re-walking the tree.
  */
-const kStrictSchema = Symbol("omp.schema.strict");
+const kStrictSchema = Symbol("omsp.schema.strict");
 
 /**
  * A boolean schema (`true`/`false`) or the empty object schema `{}`: an

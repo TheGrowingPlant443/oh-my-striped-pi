@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { getThemeByName, initTheme } from "@oh-my-pi/pi-tui/theme";
-import { renderMarkdownCell } from "@oh-my-pi/pi-tui/render/code-cell";
-import { renderOutputBlock } from "@oh-my-pi/pi-tui/render/output-block";
-import { OverlayPanel, PanelRows } from "@oh-my-pi/pi-tui/chrome/overlay-box";
-import { visibleWidth } from "@oh-my-pi/pi-tui/utils";
+import { getThemeByName, initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { renderMarkdownCell } from "@oh-my-striped-pi/pi-tui/render/code-cell";
+import { renderOutputBlock } from "@oh-my-striped-pi/pi-tui/render/output-block";
+import { OverlayPanel, PanelRows } from "@oh-my-striped-pi/pi-tui/chrome/overlay-box";
+import { visibleWidth } from "@oh-my-striped-pi/pi-tui/utils";
 
 describe("renderOutputBlock", () => {
 	beforeAll(async () => {

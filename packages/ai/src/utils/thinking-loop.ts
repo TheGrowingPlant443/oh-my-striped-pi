@@ -47,9 +47,9 @@
  * failed turn is emitted as an empty retryable stream-stall error;
  * result-awaiting callers (`complete`, `completeSimple`) re-sample at most
  * three guarded attempts and then fail closed. Disable detection with
- * `PI_NO_THINKING_LOOP_GUARD=1`.
+ * `OMSP_NO_THINKING_LOOP_GUARD=1`.
  */
-import { logger } from "@oh-my-pi/pi-utils";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../error";
 import type { Api, AssistantMessage, Model, StreamOptions } from "../types";
 import { AssistantMessageEventStream } from "./event-stream";
@@ -514,7 +514,7 @@ export function withThinkingLoopGuard<
 	options: O | undefined,
 	dispatch: (options: O | undefined) => AssistantMessageEventStream,
 ): AssistantMessageEventStream {
-	if (process.env.PI_NO_THINKING_LOOP_GUARD === "1" || options?.loopGuard?.enabled === false) {
+	if (process.env.OMSP_NO_THINKING_LOOP_GUARD === "1" || options?.loopGuard?.enabled === false) {
 		return dispatch(options);
 	}
 	const controller = new AbortController();

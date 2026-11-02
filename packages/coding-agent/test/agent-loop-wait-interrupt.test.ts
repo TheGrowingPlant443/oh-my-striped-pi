@@ -1,21 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { agentLoop, agentPauseGate, type AgentTool, TOOL_INTERRUPT_ABORT_REASON } from "@oh-my-pi/pi-agent-core";
-import { SpeculativeOperationCoordinator } from "@oh-my-pi/pi-agent-core/speculative-execution";
-import type { AgentEvent, AgentLoopConfig, AgentMessage, AsideMessage } from "@oh-my-pi/pi-agent-core/types";
-import type { Message, UserMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { applyToolProxy } from "@oh-my-pi/pi-coding-agent/extensibility/tool-proxy";
-import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
-import * as daemonClient from "@oh-my-pi/pi-coding-agent/launch/client";
-import type { DaemonBrokerClient } from "@oh-my-pi/pi-coding-agent/launch/client";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { WaitTool } from "@oh-my-pi/pi-coding-agent/tools/wait";
-import type { IrcMessage } from "@oh-my-pi/pi-tui/tools/irc";
+import { type } from "@oh-my-striped-pi/omptype";
+import {
+	agentLoop,
+	agentPauseGate,
+	type AgentTool,
+	TOOL_INTERRUPT_ABORT_REASON,
+} from "@oh-my-striped-pi/pi-agent-core";
+import { SpeculativeOperationCoordinator } from "@oh-my-striped-pi/pi-agent-core/speculative-execution";
+import type { AgentEvent, AgentLoopConfig, AgentMessage, AsideMessage } from "@oh-my-striped-pi/pi-agent-core/types";
+import type { Message, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async/job-manager";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { applyToolProxy } from "@oh-my-striped-pi/pi-coding-agent/extensibility/tool-proxy";
+import { IrcBus } from "@oh-my-striped-pi/pi-coding-agent/irc/bus";
+import * as daemonClient from "@oh-my-striped-pi/pi-coding-agent/launch/client";
+import type { DaemonBrokerClient } from "@oh-my-striped-pi/pi-coding-agent/launch/client";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { WaitTool } from "@oh-my-striped-pi/pi-coding-agent/tools/wait";
+import type { IrcMessage } from "@oh-my-striped-pi/pi-tui/tools/irc";
 
 const sources = ["background", "peer", "parent"] as const;
 type Source = (typeof sources)[number];

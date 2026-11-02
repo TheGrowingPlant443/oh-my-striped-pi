@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { TspPickerProps } from "@oh-my-pi/pi-wire";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { TspPickerProps } from "@oh-my-striped-pi/pi-wire";
 import type { DescribeContext, NativeNode } from "../src/native/node";
 import type { ModelBrowserSource } from "../src/overlays/model-browser";
 import { modelSetupScene } from "../src/setup/scenes/model";

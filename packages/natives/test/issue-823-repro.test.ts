@@ -2,12 +2,12 @@
  * Regression for https://github.com/can1357/oh-my-pi/issues/823.
  *
  * On WSL (and any host where the user moves the standalone binary away from the
- * build-time native artifacts), the compiled `omp` binary fails to load
+ * build-time native artifacts), the compiled `omsp` binary fails to load
  * `pi_natives.linux-x64-*.node`. Root cause: the old loader's
  * `isCompiledBinary` detection relied on signals that are unreliable in a Bun
  * standalone binary:
- *   - `process.env.PI_COMPILED` — never set, because `bun build --compile
- *     --define PI_COMPILED=true` substitutes the bare identifier, not
+ *   - `process.env.OMSP_COMPILED` — never set, because `bun build --compile
+ *     --define OMSP_COMPILED=true` substitutes the bare identifier, not
  *     property accesses on `process.env`.
  *   - CommonJS `__filename` bunfs markers — Bun's compiled binaries kept the
  *     original build-host absolute path there, while `import.meta.url` is the
@@ -15,7 +15,7 @@
  *
  * When both signals were false, the loader skipped the embedded-addon
  * extraction path and only tried `nativeDir` (the dev machine's checkout) and
- * `execDir`. On WSL with `~/.local/bin/omp` and no sibling `.node` file, this
+ * `execDir`. On WSL with `~/.local/bin/omsp` and no sibling `.node` file, this
  * failed with the error reported in the issue.
  *
  * The fix is to make the loader's compiled-binary detection authoritative on
@@ -40,7 +40,7 @@ import {
 describe("issue 823: standalone-binary native loader path resolution", () => {
 	it("detects compiled-binary mode from embedded-addon presence when env and url markers are absent", () => {
 		// Mirrors what a Bun standalone binary actually sees on linux-x64 / WSL:
-		// - `process.env.PI_COMPILED` is undefined (the build flag does not substitute property accesses).
+		// - `process.env.OMSP_COMPILED` is undefined (the build flag does not substitute property accesses).
 		// - `import.meta.url` points at `$bunfs` for bundled modules; the old CJS
 		//   loader used `__filename`, which is NOT rewritten.
 		// The embedded-addon module is the authoritative compiled-mode signal: it is `null` in
@@ -74,11 +74,11 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 			}),
 		).toBe(false);
 
-		// Env override (e.g. user-set PI_COMPILED=1) still wins.
+		// Env override (e.g. user-set OMSP_COMPILED=1) still wins.
 		expect(
 			detectCompiledBinary({
 				embeddedAddon: null,
-				env: { PI_COMPILED: "1" },
+				env: { OMSP_COMPILED: "1" },
 				importMetaUrl: "/anywhere",
 			}),
 		).toBe(true);
@@ -94,7 +94,7 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 	});
 
 	it("places embedded-extracted candidates ahead of build-host candidates for linux-x64 standalone", () => {
-		const versionedDir = "/home/u/.omp/natives/14.5.2";
+		const versionedDir = "/home/u/.omsp/natives/14.5.2";
 		const userDataDir = "/home/u/.local/bin";
 		const nativeDir = "/build-host/packages/natives/native";
 		const execDir = "/home/u/.local/bin";
@@ -113,8 +113,8 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 		const buildHostModern = path.join(nativeDir, "pi_natives.linux-x64-modern.node");
 
 		// Versioned cache and user-data dir candidates must exist for compiled binaries —
-		// these are where the embedded-addon extraction lands (~/.omp/natives/<v>) and where
-		// `omp update` writes the standalone binary on linux (~/.local/bin).
+		// these are where the embedded-addon extraction lands (~/.omsp/natives/<v>) and where
+		// `omsp update` writes the standalone binary on linux (~/.local/bin).
 		expect(candidates).toContain(versionedModern);
 		expect(candidates).toContain(versionedBaseline);
 		expect(candidates).toContain(userDataModern);
@@ -125,15 +125,15 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 	});
 
 	it("prefers platform leaf package candidates ahead of core nativeDir candidates on npm installs", () => {
-		const leafPackageDir = "/app/node_modules/@oh-my-pi/pi-natives-linux-x64";
-		const nativeDir = "/app/node_modules/@oh-my-pi/pi-natives/native";
+		const leafPackageDir = "/app/node_modules/@oh-my-striped-pi/pi-natives-linux-x64";
+		const nativeDir = "/app/node_modules/@oh-my-striped-pi/pi-natives/native";
 		const candidates = resolveLoaderCandidates({
 			addonFilenames: getAddonFilenames({ tag: "linux-x64", arch: "x64", variant: "baseline" }),
 			isCompiledBinary: false,
 			leafPackageDir,
 			nativeDir,
 			execDir: "/app/node_modules/.bin",
-			versionedDir: "/home/u/.omp/natives/15.5.15",
+			versionedDir: "/home/u/.omsp/natives/15.5.15",
 			userDataDir: "/home/u/.local/bin",
 		});
 
@@ -144,9 +144,9 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 	});
 
 	it("keeps Windows staging ahead of leaf package and core nativeDir candidates", () => {
-		const versionedDir = "/home/u/.omp/natives/15.5.15";
-		const leafPackageDir = "/app/node_modules/@oh-my-pi/pi-natives-win32-x64";
-		const nativeDir = "/app/node_modules/@oh-my-pi/pi-natives/native";
+		const versionedDir = "/home/u/.omsp/natives/15.5.15";
+		const leafPackageDir = "/app/node_modules/@oh-my-striped-pi/pi-natives-win32-x64";
+		const nativeDir = "/app/node_modules/@oh-my-striped-pi/pi-natives/native";
 		const candidates = resolveLoaderCandidates({
 			addonFilenames: getAddonFilenames({ tag: "win32-x64", arch: "x64", variant: "baseline" }),
 			isCompiledBinary: false,
@@ -155,7 +155,7 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 			nativeDir,
 			execDir: "/app/node_modules/.bin",
 			versionedDir,
-			userDataDir: "/home/u/AppData/Local/omp",
+			userDataDir: "/home/u/AppData/Local/omsp",
 		});
 
 		const stagedBaseline = path.join(versionedDir, "pi_natives.win32-x64-baseline.node");
@@ -174,7 +174,7 @@ describe("issue 823: standalone-binary native loader path resolution", () => {
 			isCompiledBinary: false,
 			nativeDir,
 			execDir,
-			versionedDir: "/home/u/.omp/natives/15.5.15",
+			versionedDir: "/home/u/.omsp/natives/15.5.15",
 			userDataDir: "/home/u/.local/bin",
 		});
 

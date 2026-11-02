@@ -7,19 +7,22 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { trackUserWaits } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/user-wait";
-import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { computerTurnInFlight, registerComputerController } from "@oh-my-pi/pi-coding-agent/tools/computer/supervisor";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ExtensionUIContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { trackUserWaits } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/user-wait";
+import { initializeExtensions } from "@oh-my-striped-pi/pi-coding-agent/modes/runtime-init";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import {
+	computerTurnInFlight,
+	registerComputerController,
+} from "@oh-my-striped-pi/pi-coding-agent/tools/computer/supervisor";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "./helpers/model-fixtures";
 
 describe("SDK session dialogs and the computer display hold", () => {

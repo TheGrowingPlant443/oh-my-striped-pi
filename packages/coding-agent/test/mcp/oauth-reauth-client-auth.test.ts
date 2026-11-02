@@ -18,11 +18,14 @@ import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import * as mcpClient from "@oh-my-pi/pi-coding-agent/mcp/client";
-import { clearMcpClientAuthSurface, reconnectMcpManagerServer } from "@oh-my-pi/pi-coding-agent/mcp/oauth-reauth";
-import type { MCPAuthConfig, MCPServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { MCPManager } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import * as mcpClient from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import {
+	clearMcpClientAuthSurface,
+	reconnectMcpManagerServer,
+} from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-reauth";
+import type { MCPAuthConfig, MCPServerConfig } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const staleAuth: MCPAuthConfig = {
 	type: "oauth",
@@ -187,7 +190,7 @@ describe("MCPManager.updateServerConfig", () => {
 	});
 
 	test("returns the in-flight reconnection so a fresh attempt can supersede it", async () => {
-		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-manager-update-"));
+		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-manager-update-"));
 		// Drive a real reconnect: the connect hangs until released, then fails;
 		// the attempt aborts on the identity check once the definition is
 		// replaced (no retry ladder is walked on that path).

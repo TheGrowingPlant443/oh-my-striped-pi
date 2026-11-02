@@ -10,11 +10,11 @@
  * through {@link InternalUrlRouter.normalize}.
  */
 import * as path from "node:path";
-import type { ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
-import { setInternalUrlCompletionHost } from "@oh-my-pi/pi-tui/prompt/internal-url-autocomplete";
-import { splitInternalUrlSel } from "@oh-my-pi/pi-tui/tools/read";
-import { setInternalUrlSchemeHost, splitUrlScheme } from "@oh-my-pi/pi-tui/tools/url-scheme-host";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import type { ToolApprovalDecision, ToolTier } from "@oh-my-striped-pi/pi-agent-core";
+import { setInternalUrlCompletionHost } from "@oh-my-striped-pi/pi-tui/prompt/internal-url-autocomplete";
+import { splitInternalUrlSel } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { setInternalUrlSchemeHost, splitUrlScheme } from "@oh-my-striped-pi/pi-tui/tools/url-scheme-host";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import type { ToolSession } from "../tools";
 import { TIER_RANK } from "../tools/approval";
 import { AgentProtocolHandler } from "./agent-protocol";
@@ -28,7 +28,7 @@ import { LocalProtocolHandler } from "./local-protocol";
 import { McpProtocolHandler } from "./mcp-protocol";
 import { MemoryProtocolHandler } from "./memory-protocol";
 import { MrProtocolHandler } from "./mr-protocol";
-import { OmpProtocolHandler } from "./omp-protocol";
+import { OmpProtocolHandler } from "./omsp-protocol";
 import { OutProtocolHandler } from "./out-protocol";
 import { extractUriScheme, parseInternalUrl } from "./parse";
 import { ProcProtocolHandler } from "./proc-protocol";
@@ -101,7 +101,7 @@ export class InternalUrlRouter {
 	#handlers = new Map<string, ProtocolHandler>();
 	/** Scheme whose handler resolves resources of unregistered custom schemes (MCP resource URIs). */
 	readonly #resourceFallbackScheme: string;
-	/** Schemes the constructor registers: OMP-owned, never replaced by hosts. */
+	/** Schemes the constructor registers: OMSP-owned, never replaced by hosts. */
 	readonly #builtinSchemes: ReadonlySet<string>;
 
 	constructor() {
@@ -119,7 +119,7 @@ export class InternalUrlRouter {
 		this.register(new ProcProtocolHandler());
 		this.register(new CfgProtocolHandler());
 		this.register(new SshProtocolHandler());
-		// Reserved OMP-owned security-analysis namespace; vendor adapters normalize into its store.
+		// Reserved OMSP-owned security-analysis namespace; vendor adapters normalize into its store.
 		this.register(new SecurityProtocolHandler());
 		this.register(new VaultProtocolHandler());
 		this.register(new IssueProtocolHandler());
@@ -174,7 +174,7 @@ export class InternalUrlRouter {
 		this.#handlers.set(scheme.toLowerCase(), handler);
 	}
 
-	/** Whether the router constructor registered `scheme` (case-insensitive): an OMP-owned scheme hosts may not replace. */
+	/** Whether the router constructor registered `scheme` (case-insensitive): an OMSP-owned scheme hosts may not replace. */
 	isBuiltin(scheme: string): boolean {
 		return this.#builtinSchemes.has(scheme.toLowerCase());
 	}

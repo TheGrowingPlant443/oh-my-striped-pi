@@ -9,8 +9,8 @@
  * APIs report tokens only, so the cost is priced from the catalog model for the
  * response header and the broker's observed-usage ledger.
  */
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import { logger } from "@oh-my-pi/pi-utils";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../../error";
 import { classifyGatewayError } from "../../error/gateway";
 import { checkNativeJudgmentImages, createNativeJudge, isJudgmentApi } from "../../judgment/native";

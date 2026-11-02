@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { parseExportArgs } from "@oh-my-pi/pi-coding-agent/export/html";
+import { parseExportArgs } from "@oh-my-striped-pi/pi-coding-agent/export/html";
 
 describe("HTML export themes", () => {
 	it("parses the optional user-theme flag before or after the output path", () => {

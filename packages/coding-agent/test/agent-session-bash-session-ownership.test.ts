@@ -1,21 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as bashExecutor from "@oh-my-pi/pi-coding-agent/exec/bash-executor";
-import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { createBashTool } from "@oh-my-pi/pi-coding-agent/extensibility/legacy-pi-coding-agent-shim";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as bashExecutor from "@oh-my-striped-pi/pi-coding-agent/exec/bash-executor";
+import type { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { createBashTool } from "@oh-my-striped-pi/pi-coding-agent/extensibility/legacy-pi-coding-agent-shim";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgShellPath } from "@oh-my-pi/pi-coding-agent/exec/settings";
+import { cfgShellPath } from "@oh-my-striped-pi/pi-coding-agent/exec/settings";
 
 const bashResult = {
 	output: "old-output",
@@ -131,7 +131,7 @@ describe("AgentSession bash session ownership", () => {
 		});
 		const spawnHook = vi.fn(spawn => ({
 			...spawn,
-			env: { ...spawn.env, OMP_USER_SHELL_ENV: "extension-value" },
+			env: { ...spawn.env, OMSP_USER_SHELL_ENV: "extension-value" },
 		}));
 		const definition = createBashTool(tempDir.path(), { spawnHook });
 		const extensionRunner = {
@@ -142,14 +142,14 @@ describe("AgentSession bash session ownership", () => {
 		} as unknown as ExtensionRunner;
 		createSession(undefined, extensionRunner);
 
-		const result = await session.executeBash('printf "%s" "$OMP_USER_SHELL_ENV"', undefined, {
+		const result = await session.executeBash('printf "%s" "$OMSP_USER_SHELL_ENV"', undefined, {
 			useUserShell: true,
 		});
 
 		expect(result.output).toBe("extension-value");
 		expect(spawnHook).toHaveBeenCalledWith(
 			expect.objectContaining({
-				command: 'printf "%s" "$OMP_USER_SHELL_ENV"',
+				command: 'printf "%s" "$OMSP_USER_SHELL_ENV"',
 				cwd: tempDir.path(),
 			}),
 		);
@@ -171,12 +171,12 @@ describe("AgentSession bash session ownership", () => {
 			env: { PATH: Bun.env.PATH ?? "", HOME: tempDir.path(), SHELL: shell },
 			prefix: undefined,
 		});
-		const previousMirror = process.env.OMP_USER_SHELL_MIRROR;
-		process.env.OMP_USER_SHELL_MIRROR = "mirrored-value";
+		const previousMirror = process.env.OMSP_USER_SHELL_MIRROR;
+		process.env.OMSP_USER_SHELL_MIRROR = "mirrored-value";
 		try {
 			const spawnHook = vi.fn(spawn => ({
 				...spawn,
-				env: { ...spawn.env, OMP_USER_SHELL_MIRROR: "mirrored-value" },
+				env: { ...spawn.env, OMSP_USER_SHELL_MIRROR: "mirrored-value" },
 			}));
 			const definition = createBashTool(tempDir.path(), { spawnHook });
 			const extensionRunner = {
@@ -187,14 +187,14 @@ describe("AgentSession bash session ownership", () => {
 			} as unknown as ExtensionRunner;
 			createSession(undefined, extensionRunner);
 
-			const result = await session.executeBash('printf "%s" "$OMP_USER_SHELL_MIRROR"', undefined, {
+			const result = await session.executeBash('printf "%s" "$OMSP_USER_SHELL_MIRROR"', undefined, {
 				useUserShell: true,
 			});
 
 			expect(result.output).toBe("mirrored-value");
 		} finally {
-			if (previousMirror === undefined) delete process.env.OMP_USER_SHELL_MIRROR;
-			else process.env.OMP_USER_SHELL_MIRROR = previousMirror;
+			if (previousMirror === undefined) delete process.env.OMSP_USER_SHELL_MIRROR;
+			else process.env.OMSP_USER_SHELL_MIRROR = previousMirror;
 		}
 	});
 
@@ -218,7 +218,7 @@ describe("AgentSession bash session ownership", () => {
 		};
 		vi.spyOn(Settings.prototype, "getShellConfig").mockReturnValue(cachedShellConfig);
 		const spawnHook = vi.fn(context => {
-			context.env.OMP_INJECTED_TOKEN = "injected-value";
+			context.env.OMSP_INJECTED_TOKEN = "injected-value";
 			return context;
 		});
 		const definition = createBashTool(tempDir.path(), { spawnHook });
@@ -235,9 +235,9 @@ describe("AgentSession bash session ownership", () => {
 		await session.executeBash("true", undefined, { useUserShell: true });
 
 		expect(executeBashSpy).toHaveBeenCalledTimes(2);
-		expect(executeBashSpy.mock.calls[0]?.[1]?.env).toEqual({ OMP_INJECTED_TOKEN: "injected-value" });
-		expect(executeBashSpy.mock.calls[1]?.[1]?.env).toEqual({ OMP_INJECTED_TOKEN: "injected-value" });
-		expect(cachedShellConfig.env).not.toHaveProperty("OMP_INJECTED_TOKEN");
+		expect(executeBashSpy.mock.calls[0]?.[1]?.env).toEqual({ OMSP_INJECTED_TOKEN: "injected-value" });
+		expect(executeBashSpy.mock.calls[1]?.[1]?.env).toEqual({ OMSP_INJECTED_TOKEN: "injected-value" });
+		expect(cachedShellConfig.env).not.toHaveProperty("OMSP_INJECTED_TOKEN");
 	});
 
 	it("does not run the shell environment hook when a user_bash handler replaces the result", async () => {
@@ -431,13 +431,13 @@ describe("AgentSession bash session ownership", () => {
 	it("starts a fresh shell when it returns to a session it left", async () => {
 		const oldSessionFile = await createSwitchableSession();
 		const oldSessionId = session.sessionId;
-		await session.executeBash("PI_LEFT_SESSION_MARK=kept");
+		await session.executeBash("OMSP_LEFT_SESSION_MARK=kept");
 
 		await session.newSession();
 		await session.switchSession(oldSessionFile);
 
 		expect(session.sessionId).toBe(oldSessionId);
-		const result = await session.executeBash('printf "[%s]" "$PI_LEFT_SESSION_MARK"');
+		const result = await session.executeBash('printf "[%s]" "$OMSP_LEFT_SESSION_MARK"');
 		expect(result.output).toBe("[]");
 	});
 
@@ -451,14 +451,14 @@ describe("AgentSession bash session ownership", () => {
 			emitBeforeAgentStart: vi.fn().mockResolvedValue(undefined),
 		} as unknown as ExtensionRunner;
 		const oldSessionFile = await createSwitchableSession(extensionRunner);
-		const pending = session.executeBash("PI_LEFT_SESSION_MARK=kept");
+		const pending = session.executeBash("OMSP_LEFT_SESSION_MARK=kept");
 
 		await session.newSession();
 		hook.resolve(undefined);
 		await pending;
 		await session.switchSession(oldSessionFile);
 
-		const result = await session.executeBash('printf "[%s]" "$PI_LEFT_SESSION_MARK"');
+		const result = await session.executeBash('printf "[%s]" "$OMSP_LEFT_SESSION_MARK"');
 		expect(result.output).toBe("[]");
 	});
 

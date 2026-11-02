@@ -26,7 +26,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as logger from "@oh-my-pi/pi-utils/logger";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
 import {
 	TSP_DEFAULT_APC_LIMIT,
 	TSP_DEFAULT_CREDITS,
@@ -37,7 +37,7 @@ import {
 	type TspKind,
 	type TspNode,
 	type TspOp,
-} from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-wire";
 import type { Terminal } from "../terminal";
 import { getCurrentThemeName, isLightTheme, setNativeSymbolPreset } from "../theme/theme";
 import type { Component, OverlayOptions, RenderScheduler, RenderTimer } from "../tui";
@@ -91,9 +91,9 @@ export interface NativeHost {
 export interface NativeBackendOptions {
 	/** Keep the reference document and recent frames for debugging. */
 	readonly mirror?: boolean;
-	/** Append every TSP message to this JSONL file. Defaults to `PI_TUI_TSP_RECORD`. */
+	/** Append every TSP message to this JSONL file. Defaults to `OMSP_TUI_TSP_RECORD`. */
 	readonly recordPath?: string;
-	/** Log the `rows` fallback count per frame. Defaults to `PI_TUI_NATIVE_STATS=1`. */
+	/** Log the `rows` fallback count per frame. Defaults to `OMSP_TUI_NATIVE_STATS=1`. */
 	readonly stats?: boolean;
 	/** Clock and timers (stall wake-up); defaults to `Date.now` and unref'd `setTimeout`. */
 	readonly scheduler?: RenderScheduler;
@@ -117,7 +117,7 @@ const RECENT_FRAMES = 64;
 /** An unanswered frame older than this no longer holds rendering back. */
 const STALLED_ACK_MS = 5000;
 /** Role of the session's surfaces; a screen page may name its own. */
-const SESSION_ROLE = "omp.session";
+const SESSION_ROLE = "omsp.session";
 /** A `blobs` query unanswered this long counts its ids as missing: they go inline. */
 const BLOB_REPLY_MS = 3000;
 /** Expired queries kept to pair late replies with their queries, at most. */
@@ -207,7 +207,7 @@ const UNASSUMED_KINDS: Partial<Record<TspKind, true>> = { media: true, json: tru
  * The reply a v1 terminal is assumed to give before its real `hello` arrives
  * (the `TERM_PROGRAM=tern` optimistic start): the whole vocabulary except
  * {@link UNASSUMED_KINDS}, the default APC limit and credits, the terminal's
- * width, the appearance omp already detected, full motion, and `blobs`, so a
+ * width, the appearance omsp already detected, full motion, and `blobs`, so a
  * resumed session's images are asked about rather than resent before the
  * reply comes.
  */
@@ -230,7 +230,7 @@ export function assumedTspHello(terminal: Terminal): TspHello {
 class Surface {
 	readonly id: string;
 	readonly mode: "inline" | "screen";
-	/** The `o` role: `omp.session`, or a screen page's own (`NativeScreen.role`). */
+	/** The `o` role: `omsp.session`, or a screen page's own (`NativeScreen.role`). */
 	readonly role: string;
 	readonly reconciler: Reconciler;
 	readonly doc: TspDocument | null;
@@ -323,8 +323,8 @@ export class NativeBackend {
 		this.#credits = TSP_DEFAULT_CREDITS;
 		this.#applyHello(hello);
 		this.#mirror = options.mirror === true;
-		this.#recordPath = options.recordPath ?? (Bun.env.PI_TUI_TSP_RECORD || undefined);
-		this.#stats = options.stats ?? Bun.env.PI_TUI_NATIVE_STATS === "1";
+		this.#recordPath = options.recordPath ?? (Bun.env.OMSP_TUI_TSP_RECORD || undefined);
+		this.#stats = options.stats ?? Bun.env.OMSP_TUI_NATIVE_STATS === "1";
 		this.#scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
 		this.#inline = this.#newSurface("inline");
 	}
@@ -407,7 +407,7 @@ export class NativeBackend {
 		surface.stallResets = 0;
 		surface.focus = null;
 		surface.dirty = false;
-		this.#write("o", { id: surface.id, mode: "inline", title: "omp", role: SESSION_ROLE, adopt: true });
+		this.#write("o", { id: surface.id, mode: "inline", title: "omsp", role: SESSION_ROLE, adopt: true });
 		// After the `o`, as in `start()`.
 		setNativeRendering(true);
 		this.render();
@@ -547,7 +547,7 @@ export class NativeBackend {
 	}
 
 	#open(surface: Surface): void {
-		this.#write("o", { id: surface.id, mode: surface.mode, title: "omp", role: surface.role });
+		this.#write("o", { id: surface.id, mode: surface.mode, title: "omsp", role: surface.role });
 	}
 
 	#close(surface: Surface, keep: boolean): void {

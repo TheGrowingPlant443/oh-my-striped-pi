@@ -2,16 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import * as path from "node:path";
-import { type ExtensionModule, extensionModuleCapability } from "@oh-my-pi/pi-coding-agent/capability/extension-module";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { getCapability, initializeWithSettings } from "@oh-my-pi/pi-coding-agent/discovery";
+import {
+	type ExtensionModule,
+	extensionModuleCapability,
+} from "@oh-my-striped-pi/pi-coding-agent/capability/extension-module";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { getCapability, initializeWithSettings } from "@oh-my-striped-pi/pi-coding-agent/discovery";
 import {
 	discoverAndLoadExtensions,
 	discoverExtensionPaths,
 	loadExtensions,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { discoverSessionExtensionPaths } from "@oh-my-pi/pi-coding-agent/sdk";
-import { getProjectAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { discoverSessionExtensionPaths } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { getProjectAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { filterUserScoped } from "./utils/filter-user-extensions";
 
 describe("extensions discovery", () => {
@@ -104,29 +107,29 @@ describe("extensions discovery", () => {
 		expect(result.extensions[0].path).toContain("index.ts");
 	});
 
-	it("discovers subdirectory with package.json pi field", async () => {
-		const subdir = path.join(extensionsDir, "my-package");
-		const srcDir = path.join(subdir, "src");
-		fs.mkdirSync(subdir);
-		fs.mkdirSync(srcDir);
-		fs.writeFileSync(path.join(srcDir, "main.ts"), extensionCode);
-		fs.writeFileSync(
-			path.join(subdir, "package.json"),
-			JSON.stringify({
-				name: "my-package",
-				pi: {
-					extensions: ["./src/main.ts"],
-				},
-			}),
-		);
+	for (const manifestField of ["omsp", "omp", "pi"]) {
+		it(`loads subdirectory package.json ${manifestField} entries through configured and ambient discovery`, async () => {
+			const subdir = path.join(extensionsDir, "my-package");
+			const srcDir = path.join(subdir, "src");
+			fs.mkdirSync(srcDir, { recursive: true });
+			fs.writeFileSync(path.join(srcDir, "main.ts"), extensionCode);
+			fs.writeFileSync(
+				path.join(subdir, "package.json"),
+				JSON.stringify({
+					name: "my-package",
+					[manifestField]: { extensions: ["./src/main.ts"] },
+				}),
+			);
 
-		const result = await discoverForTest();
-
-		expect(result.errors).toHaveLength(0);
-		expect(result.extensions).toHaveLength(1);
-		expect(result.extensions[0].path).toContain("src");
-		expect(result.extensions[0].path).toContain("main.ts");
-	});
+			for (const ambient of [false, true]) {
+				const result = await discoverForTest([], ambient);
+				expect(result.errors).toHaveLength(0);
+				expect(result.extensions).toHaveLength(1);
+				expect(result.extensions[0].path).toBe(path.join(srcDir, "main.ts"));
+				expect(result.extensions[0].commands.has("test")).toBe(true);
+			}
+		});
+	}
 
 	it("SDK explicit-only discovery loads package hooks without ambient package hooks", async () => {
 		const ambientPackage = path.join(tempDir.path(), "ambient-package");
@@ -148,7 +151,7 @@ describe("extensions discovery", () => {
 			path.join(packageDir, "package.json"),
 			JSON.stringify({
 				name: "explicit-package",
-				omp: {
+				omsp: {
 					extensions: ["./src/main.ts"],
 				},
 			}),
@@ -237,7 +240,7 @@ describe("extensions discovery", () => {
 			path.join(packageDir, "package.json"),
 			JSON.stringify({
 				name: "explicit-package",
-				omp: {
+				omsp: {
 					extensions: ["./src/main.ts"],
 				},
 			}),
@@ -427,7 +430,7 @@ describe("extensions discovery", () => {
 		fs.writeFileSync(path.join(realDir, "index.ts"), extensionCodeWithTool("ctk-tool"));
 		fs.writeFileSync(
 			path.join(realDir, "package.json"),
-			JSON.stringify({ name: "ctk", omp: { extensions: ["./index.ts"] } }),
+			JSON.stringify({ name: "ctk", omsp: { extensions: ["./index.ts"] } }),
 		);
 		fs.symlinkSync(realDir, path.join(extensionsDir, "ctk"), "dir");
 
@@ -527,7 +530,7 @@ describe("extensions discovery", () => {
 		fs.writeFileSync(path.join(configuredDir, "index.ts"), extensionCodeWithTool("decoy-index"));
 		fs.writeFileSync(
 			path.join(configuredDir, "package.json"),
-			JSON.stringify({ omp: { extensions: ["./missing.ts"] } }),
+			JSON.stringify({ omsp: { extensions: ["./missing.ts"] } }),
 		);
 
 		const paths = await discoverExtensionPaths([configuredDir], tempDir.path(), undefined, { ambient: false });
@@ -569,7 +572,7 @@ describe("extensions discovery", () => {
 				name: "pi-extension-with-deps",
 				version: "1.0.0",
 				type: "module",
-				omp: { extensions: ["./index.ts"] },
+				omsp: { extensions: ["./index.ts"] },
 			}),
 		);
 

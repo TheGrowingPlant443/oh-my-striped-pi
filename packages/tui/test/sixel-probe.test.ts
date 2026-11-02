@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { ImageProtocol, resolveImageProtocol, setTerminalImageProtocol, TERMINAL, TUI } from "@oh-my-pi/pi-tui";
+import { ImageProtocol, resolveImageProtocol, setTerminalImageProtocol, TERMINAL, TUI } from "@oh-my-striped-pi/pi-tui";
 import { VirtualTerminal } from "./virtual-terminal";
 import {
 	createProcessTerminalRenderHarness,
@@ -21,7 +21,7 @@ const originalProtocol = TERMINAL.imageProtocol;
 const originalWtSession = Bun.env.WT_SESSION;
 const originalWslDistro = Bun.env.WSL_DISTRO_NAME;
 const originalWslInterop = Bun.env.WSL_INTEROP;
-const originalForcedProtocol = Bun.env.PI_FORCE_IMAGE_PROTOCOL;
+const originalForcedProtocol = Bun.env.OMSP_FORCE_IMAGE_PROTOCOL;
 const stdinIsTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const stdoutIsTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
 
@@ -58,7 +58,7 @@ describe("TUI SIXEL capability probe", () => {
 		restoreEnv("WT_SESSION", originalWtSession);
 		restoreEnv("WSL_DISTRO_NAME", originalWslDistro);
 		restoreEnv("WSL_INTEROP", originalWslInterop);
-		restoreEnv("PI_FORCE_IMAGE_PROTOCOL", originalForcedProtocol);
+		restoreEnv("OMSP_FORCE_IMAGE_PROTOCOL", originalForcedProtocol);
 		restoreIsTty(process.stdin, stdinIsTtyDescriptor);
 		restoreIsTty(process.stdout, stdoutIsTtyDescriptor);
 	});
@@ -164,10 +164,10 @@ describe("TUI SIXEL capability probe", () => {
 		tui.stop();
 	});
 
-	it("respects the PI_FORCE_IMAGE_PROTOCOL kill switch", () => {
+	it("respects the OMSP_FORCE_IMAGE_PROTOCOL kill switch", () => {
 		// `off` resolves imageProtocol to null on purpose; the probe must not
 		// re-enable images behind the user's back.
-		Bun.env.PI_FORCE_IMAGE_PROTOCOL = "off";
+		Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = "off";
 		const terminal = new VirtualTerminal(80, 24);
 		const tui = startProbe(terminal);
 
@@ -180,17 +180,17 @@ describe("TUI SIXEL capability probe", () => {
 
 describe("ProcessTerminal DA1 SIXEL detection", () => {
 	withoutTerminalMultiplexer();
-	const envKeys = ["PI_FORCE_IMAGE_PROTOCOL", "PI_TUI_NATIVE", "PI_NO_GLYPH_PROTOCOL", "TERM_PROGRAM"] as const;
+	const envKeys = ["OMSP_FORCE_IMAGE_PROTOCOL", "OMSP_TUI_NATIVE", "OMSP_NO_GLYPH_PROTOCOL", "TERM_PROGRAM"] as const;
 	const previousEnv = new Map<string, string | undefined>();
 	let harness: ProcessTerminalRenderHarness | undefined;
 
 	beforeEach(() => {
 		vi.useFakeTimers();
 		for (const key of envKeys) previousEnv.set(key, Bun.env[key]);
-		delete Bun.env.PI_FORCE_IMAGE_PROTOCOL;
+		delete Bun.env.OMSP_FORCE_IMAGE_PROTOCOL;
 		delete Bun.env.TERM_PROGRAM;
-		Bun.env.PI_TUI_NATIVE = "0";
-		Bun.env.PI_NO_GLYPH_PROTOCOL = "1";
+		Bun.env.OMSP_TUI_NATIVE = "0";
+		Bun.env.OMSP_NO_GLYPH_PROTOCOL = "1";
 		setTerminalImageProtocol(null);
 	});
 
@@ -346,7 +346,7 @@ describe("ProcessTerminal DA1 SIXEL detection", () => {
 
 	for (const override of ["off", "none"]) {
 		it(`keeps graphics disabled by an explicit ${override} override`, () => {
-			Bun.env.PI_FORCE_IMAGE_PROTOCOL = override;
+			Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = override;
 			harness = createProcessTerminalRenderHarness(80, 24, { conpty: true, nativeWindowsConsole: false });
 
 			process.stdin.emit("data", "\x1b[?61;4;6;22c");

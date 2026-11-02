@@ -37,7 +37,7 @@ export class BtwPanelComponent extends OverlayPanel {
 
 	constructor(options: BtwPanelComponentOptions) {
 		const baseTitle = replaceTabs(options.title ?? `/btw ${options.question}`);
-		super(baseTitle, "omp.overlay.btw");
+		super(baseTitle, "omsp.overlay.btw");
 		this.#baseTitle = baseTitle;
 		this.#tui = options.tui;
 		this.#canBranch = options.canBranch;
@@ -144,7 +144,7 @@ export class BtwPanelComponent extends OverlayPanel {
 		const rest = space === -1 ? "" : this.#baseTitle.slice(space);
 		const title = text([span(command, "accent"), ...(rest ? [span(rest)] : [])], { truncate: "end", lines: 1 });
 		const live = this.#state === "running" || this.#state === "branching";
-		const head = node("row", { role: "omp.sheet.head", gap: "sm", align: "center" }, [
+		const head = node("row", { role: "omsp.sheet.head", gap: "sm", align: "center" }, [
 			...(live ? [node("spinner", {})] : []),
 			title,
 		]);

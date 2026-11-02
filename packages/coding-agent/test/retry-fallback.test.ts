@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import type { Model, ModelKind } from "@oh-my-pi/pi-catalog/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import type { Model, ModelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	expandDefaultRetryFallbackChains,
 	findRetryFallbackCandidates,
@@ -10,8 +10,8 @@ import {
 	parseRetryFallbackSelector,
 	resolveRetryFallbackChainKey,
 	validateRetryFallbackChains,
-} from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 
 function companyModel(
 	provider: string,

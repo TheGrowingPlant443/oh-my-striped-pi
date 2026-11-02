@@ -1,9 +1,9 @@
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { Component, OverlayHandle, TUI } from "@oh-my-pi/pi-tui";
-import { Container, Spacer, Text } from "@oh-my-pi/pi-tui";
-import type { CollabUiRequestDraft, CollabUiSelectItem } from "@oh-my-pi/pi-wire";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { Component, OverlayHandle, TUI } from "@oh-my-striped-pi/pi-tui";
+import { Container, Spacer, Text } from "@oh-my-striped-pi/pi-tui";
+import type { CollabUiRequestDraft, CollabUiSelectItem } from "@oh-my-striped-pi/pi-wire";
 import type { CollabHost } from "../../collab/host";
-import { formatKeyHint, formatKeyHints, KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
+import { formatKeyHint, formatKeyHints, KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
 import type {
 	CompactOptions,
 	ExtensionActions,
@@ -28,25 +28,35 @@ import type {
 } from "../../extensibility/extensions";
 import { getSessionSlashCommands } from "../../extensibility/extensions/get-commands-handler";
 import { cfgExtensionAssistantTextRenderers } from "../../extensibility/settings";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { isNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { ApprovalDialogComponent } from "@oh-my-pi/pi-tui/overlays/approval-dialog";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { isNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { ApprovalDialogComponent } from "@oh-my-striped-pi/pi-tui/overlays/approval-dialog";
 import {
 	type AskDialogPrompt,
 	type AskDialogPromptValue,
 	AskDialogComponent,
 	normalizeDialogQuestions,
-} from "@oh-my-pi/pi-tui/overlays/ask-dialog";
-import { installExtensionComposerShape } from "@oh-my-pi/pi-tui/overlays/composer-shape-registry";
-import { EditorTopGap } from "@oh-my-pi/pi-tui/prompt/editor-top-gap";
-import { boundPromptTitle, HookEditorComponent, type HookEditorOptions } from "@oh-my-pi/pi-tui/overlays/hook-editor";
-import { HookInputComponent } from "@oh-my-pi/pi-tui/overlays/hook-input";
-import { extensionLinkClicksAvailable } from "@oh-my-pi/pi-tui/render/extension-links";
-import { HookSelectorComponent, type HookSelectorSlider } from "@oh-my-pi/pi-tui/overlays/hook-selector";
-import { getAvailableThemesWithPaths, getThemeByName, setTheme, type Theme, theme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-tui/overlays/ask-dialog";
+import { installExtensionComposerShape } from "@oh-my-striped-pi/pi-tui/overlays/composer-shape-registry";
+import { EditorTopGap } from "@oh-my-striped-pi/pi-tui/prompt/editor-top-gap";
+import {
+	boundPromptTitle,
+	HookEditorComponent,
+	type HookEditorOptions,
+} from "@oh-my-striped-pi/pi-tui/overlays/hook-editor";
+import { HookInputComponent } from "@oh-my-striped-pi/pi-tui/overlays/hook-input";
+import { extensionLinkClicksAvailable } from "@oh-my-striped-pi/pi-tui/render/extension-links";
+import { HookSelectorComponent, type HookSelectorSlider } from "@oh-my-striped-pi/pi-tui/overlays/hook-selector";
+import {
+	getAvailableThemesWithPaths,
+	getThemeByName,
+	setTheme,
+	type Theme,
+	theme,
+} from "@oh-my-striped-pi/pi-tui/theme";
 import type { InteractiveModeContext, InteractiveSelectorDialogOptions } from "../../modes/types";
 import { normalizeCustomMessagePayload, USER_INTERRUPT_LABEL } from "../../session/messages";
-import { disambiguateDisplayLabels, sanitizeCarriageReturns } from "@oh-my-pi/pi-tui/render/render-utils";
+import { disambiguateDisplayLabels, sanitizeCarriageReturns } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { setExtensionTerminalTitle, setSessionTerminalTitle } from "../../utils/title-generator";
 import { getEditorCommand, openInEditor } from "../../utils/external-editor";
 import { launchTerminal } from "../../subprocess/terminal-launch";

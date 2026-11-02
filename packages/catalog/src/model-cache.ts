@@ -4,7 +4,13 @@
  */
 import type { Database } from "bun:sqlite";
 import * as path from "node:path";
-import { getModelDbPath, isSqliteCorruptionError, logger, openSqliteDatabaseSync, VERSION } from "@oh-my-pi/pi-utils";
+import {
+	getModelDbPath,
+	isSqliteCorruptionError,
+	logger,
+	openSqliteDatabaseSync,
+	VERSION,
+} from "@oh-my-striped-pi/pi-utils";
 import RULES from "./compat/rules.json" with { type: "json" };
 import type { Api, Model } from "./types";
 

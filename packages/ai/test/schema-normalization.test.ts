@@ -13,7 +13,7 @@ import {
 	stripResidualCombiners,
 	tryEnforceStrictSchema,
 	upgradeJsonSchemaTo202012,
-} from "@oh-my-pi/pi-ai/utils/schema";
+} from "@oh-my-striped-pi/pi-ai/utils/schema";
 
 // ---------------------------------------------------------------------------
 // mergeCompatibleEnumSchemas

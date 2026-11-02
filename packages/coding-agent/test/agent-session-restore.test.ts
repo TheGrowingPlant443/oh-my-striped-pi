@@ -1,21 +1,21 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Message, Model } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Message, Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
 import {
 	createInterruptedToolResults,
 	createInterruptedTurnAbortMessage,
-} from "@oh-my-pi/pi-coding-agent/session/exit-diagnostics";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/exit-diagnostics";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const zeroUsage = {
 	input: 0,
@@ -67,7 +67,7 @@ function closedByExitRecovery(persisted: Message[]): Message[] {
 	return [...persisted, ...createInterruptedToolResults(branch), abort];
 }
 
-describe("AgentSession.restoreInterruptedTurn (omp --restore)", () => {
+describe("AgentSession.restoreInterruptedTurn (omsp --restore)", () => {
 	let tempDir: TempDir;
 	let authStorage: AuthStorage;
 	let modelRegistry: ModelRegistry;

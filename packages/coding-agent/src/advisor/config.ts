@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { isEnoent, logger, slugify } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { isEnoent, logger, slugify } from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import { expandAtImports } from "../discovery/at-imports";
 import { BUILTIN_TOOL_NAMES, normalizeToolNames } from "../tools/builtin-names";
@@ -14,18 +14,18 @@ import {
 	type AdvisorConfigScope,
 	type AdvisorSyncBacklog,
 	type WatchdogConfigDoc,
-} from "@oh-my-pi/pi-tui/overlays/advisor-config";
+} from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 
 export {
 	ADVISOR_REVIEW_MODES,
 	ADVISOR_SESSION_SCOPES,
 	ADVISOR_SYNC_BACKLOG_MODES,
-} from "@oh-my-pi/pi-tui/overlays/advisor-config";
+} from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 export type {
 	AdvisorReviewMode,
 	AdvisorSessionScope,
 	AdvisorSyncBacklog,
-} from "@oh-my-pi/pi-tui/overlays/advisor-config";
+} from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 /**
  * Runtime health of a single advisor, surfaced in stats and the status line.
  * - `running` — actively processing primary turns

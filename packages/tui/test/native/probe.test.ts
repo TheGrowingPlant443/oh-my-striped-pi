@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import type { TspHello } from "@oh-my-pi/pi-tui/native/encode";
-import { ProcessTerminal } from "@oh-my-pi/pi-tui/terminal";
-import { TERMINAL_MULTIPLEXER_ENV_KEYS } from "@oh-my-pi/pi-tui/terminal-multiplexer";
-import * as utils from "@oh-my-pi/pi-utils";
-import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
-import * as logger from "@oh-my-pi/pi-utils/logger";
+import type { TspHello } from "@oh-my-striped-pi/pi-tui/native/encode";
+import { ProcessTerminal } from "@oh-my-striped-pi/pi-tui/terminal";
+import { TERMINAL_MULTIPLEXER_ENV_KEYS } from "@oh-my-striped-pi/pi-tui/terminal-multiplexer";
+import * as utils from "@oh-my-striped-pi/pi-utils";
+import { setTerminalHeadless } from "@oh-my-striped-pi/pi-utils";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
 
 const DA1_REPLY = "\x1b[?1;2c";
 const HELLO_REPLY = '\x1b_tsp;r;{"r":"hello","v":1,"term":"tern","kinds":["col","text"],"credits":3,"future":1}\x1b\\';
@@ -13,7 +13,7 @@ const EVENT = '\x1b_tsp;e;{"ev":"ack","sf":"s:1","s":1}\x1b\\';
 const stdinIsTty = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const stdoutIsTty = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
 const stdinSetRawMode = Object.getOwnPropertyDescriptor(process.stdin, "setRawMode");
-const originalNative = Bun.env.PI_TUI_NATIVE;
+const originalNative = Bun.env.OMSP_TUI_NATIVE;
 const originalTmux = Bun.env.TMUX;
 const originalTmuxPane = Bun.env.TMUX_PANE;
 
@@ -39,15 +39,15 @@ function mockTmux(ternTsp: string): string[][] {
 
 /**
  * Run `body` in a pane whose TSP-relevant environment is exactly `env`, with the
- * probe enabled as outside `bun test` (no `PI_TUI_NATIVE`); restores the environment.
+ * probe enabled as outside `bun test` (no `OMSP_TUI_NATIVE`); restores the environment.
  */
 function inPane(env: Record<string, string>, body: () => void): void {
 	const saved = { ...Bun.env };
 	try {
-		for (const key of [...TERMINAL_MULTIPLEXER_ENV_KEYS, "TERM_PROGRAM", "DEVENV_RELOAD_FILE", "PI_TUI_NATIVE"]) {
+		for (const key of [...TERMINAL_MULTIPLEXER_ENV_KEYS, "TERM_PROGRAM", "DEVENV_RELOAD_FILE", "OMSP_TUI_NATIVE"]) {
 			delete Bun.env[key];
 		}
-		Bun.env.PI_TUI_TSP_PROBE = "1";
+		Bun.env.OMSP_TUI_TSP_PROBE = "1";
 		Object.assign(Bun.env, env);
 		body();
 	} finally {
@@ -95,7 +95,7 @@ describe("TSP hello probe", () => {
 
 	beforeEach(() => {
 		previousHeadless = setTerminalHeadless(false);
-		Bun.env.PI_TUI_NATIVE = "1";
+		Bun.env.OMSP_TUI_NATIVE = "1";
 		// Whatever tmux runs the test suite must not count.
 		delete Bun.env.TMUX;
 		delete Bun.env.TMUX_PANE;
@@ -107,8 +107,8 @@ describe("TSP hello probe", () => {
 		restoreEnv("TMUX", originalTmux);
 		restoreEnv("TMUX_PANE", originalTmuxPane);
 		setTerminalHeadless(previousHeadless);
-		if (originalNative === undefined) delete Bun.env.PI_TUI_NATIVE;
-		else Bun.env.PI_TUI_NATIVE = originalNative;
+		if (originalNative === undefined) delete Bun.env.OMSP_TUI_NATIVE;
+		else Bun.env.OMSP_TUI_NATIVE = originalNative;
 		restoreProperty(process.stdin, "isTTY", stdinIsTty);
 		restoreProperty(process.stdout, "isTTY", stdoutIsTty);
 		restoreProperty(process.stdin, "setRawMode", stdinSetRawMode);
@@ -163,7 +163,7 @@ describe("TSP hello probe", () => {
 		}
 	});
 
-	it("expects TSP from TERM_PROGRAM=tern, except inside a multiplexer or with PI_TUI_NATIVE=0", () => {
+	it("expects TSP from TERM_PROGRAM=tern, except inside a multiplexer or with OMSP_TUI_NATIVE=0", () => {
 		const saved = { ...Bun.env };
 		try {
 			// Whatever multiplexer runs the test suite must not count.
@@ -180,7 +180,7 @@ describe("TSP hello probe", () => {
 			Bun.env.TMUX = "/tmp/tmux-501/default,1,0";
 			expect(terminal.tspExpected).toBe(false);
 			delete Bun.env.TMUX;
-			Bun.env.PI_TUI_NATIVE = "0";
+			Bun.env.OMSP_TUI_NATIVE = "0";
 			expect(terminal.tspExpected).toBe(false);
 		} finally {
 			for (const key of Object.keys(Bun.env)) if (!(key in saved)) delete Bun.env[key];
@@ -207,8 +207,8 @@ describe("TSP hello probe", () => {
 		],
 		// Without Tern's identity, a screen TERM still stands for a session whose markers were stripped.
 		["a screen TERM without Tern's identity", { TERM: "screen-256color" }, false, false],
-		// PI_TUI_NATIVE=1 still forces the probe past a multiplexer, never the optimistic surface.
-		["a forced probe inside zellij", { TERM_PROGRAM: "tern", ZELLIJ: "0", PI_TUI_NATIVE: "1" }, true, false],
+		// OMSP_TUI_NATIVE=1 still forces the probe past a multiplexer, never the optimistic surface.
+		["a forced probe inside zellij", { TERM_PROGRAM: "tern", ZELLIJ: "0", OMSP_TUI_NATIVE: "1" }, true, false],
 	])("decides the probe for %s", (_name, env, probes, expected) => {
 		inPane(env, () => {
 			const { terminal, writes, hellos } = setup();
@@ -263,8 +263,8 @@ describe("TSP hello probe", () => {
 		});
 	});
 
-	it("never probes with PI_TUI_NATIVE=0", () => {
-		Bun.env.PI_TUI_NATIVE = "0";
+	it("never probes with OMSP_TUI_NATIVE=0", () => {
+		Bun.env.OMSP_TUI_NATIVE = "0";
 		const { terminal, writes, hellos } = setup();
 		try {
 			expect(writes.join("")).not.toContain("\x1b_tsp;");
@@ -274,7 +274,7 @@ describe("TSP hello probe", () => {
 		}
 	});
 
-	it("never probes inside tmux without @tern-tsp, even with PI_TUI_NATIVE=1", () => {
+	it("never probes inside tmux without @tern-tsp, even with OMSP_TUI_NATIVE=1", () => {
 		const commands = mockTmux("");
 		const { terminal, writes, hellos } = setup();
 		try {
@@ -290,7 +290,7 @@ describe("TSP hello probe", () => {
 	});
 
 	it("probes inside tmux with @tern-tsp: gates APC titles, sends hello without DA1, resolves on the reply", () => {
-		delete Bun.env.PI_TUI_NATIVE;
+		delete Bun.env.OMSP_TUI_NATIVE;
 		const commands = mockTmux("1");
 		const { terminal, writes, hellos } = setup();
 		try {

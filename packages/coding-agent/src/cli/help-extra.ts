@@ -1,6 +1,6 @@
-import "@oh-my-pi/pi-utils/env";
-import chalk from "@oh-my-pi/pi-utils/chalk";
-import { APP_NAME, CONFIG_DIR_NAME } from "@oh-my-pi/pi-utils/dirs";
+import "@oh-my-striped-pi/pi-utils/env";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
+import { APP_NAME, CONFIG_DIR_NAME } from "@oh-my-striped-pi/pi-utils/dirs";
 
 export function getExtraHelpText(): string {
 	return `${chalk.bold("Environment Variables:")}
@@ -16,14 +16,14 @@ export function getExtraHelpText(): string {
   FIRECRAWL_API_KEY         - Optional key for the configured Firecrawl endpoint
 
   ${chalk.dim("# Configuration")}
-  OMP_PROFILE                 - Named profile for isolated agent state (same as --profile)
-  Use \`omp --profile <name> --alias <command>\` to create a shell shortcut for a profile
-  PI_CODING_AGENT_DIR        - Session storage directory (default: ~/${CONFIG_DIR_NAME}/agent)
-  PI_PACKAGE_DIR             - Override package directory (for Nix/Guix store paths)
-  PI_SMOL_MODEL              - Override smol/fast model (see --smol)
-  PI_SLOW_MODEL              - Override slow/reasoning model (see --slow)
-  PI_PLAN_MODEL              - Override planning model (see --plan)
-  PI_NO_PTY                  - Disable PTY-based interactive bash execution
+  OMSP_PROFILE                 - Named profile for isolated agent state (same as --profile)
+  Use \`omsp --profile <name> --alias <command>\` to create a shell shortcut for a profile
+  OMSP_CODING_AGENT_DIR        - Session storage directory (default: ~/${CONFIG_DIR_NAME}/agent)
+  OMSP_PACKAGE_DIR             - Override package directory (for Nix/Guix store paths)
+  OMSP_SMOL_MODEL              - Override smol/fast model (see --smol)
+  OMSP_SLOW_MODEL              - Override slow/reasoning model (see --slow)
+  OMSP_PLAN_MODEL              - Override planning model (see --plan)
+  OMSP_NO_PTY                  - Disable PTY-based interactive bash execution
   For complete environment variable reference, see:
   ${chalk.dim("docs/environment-variables.md")}
 ${chalk.bold("Available Tools (default-enabled unless noted):")}
@@ -47,6 +47,6 @@ ${chalk.bold("Plugin Options:")}
   --plugin-dir <path>        Load plugin from directory (repeatable)
 
 ${chalk.bold("Useful Commands:")}
-  omp agents unpack           - Export bundled subagents to ~/.omp/agent/agents (default)
-  omp agents unpack --project - Export bundled subagents to ./.omp/agents`;
+  omsp agents unpack           - Export bundled subagents to ~/.omsp/agent/agents (default)
+  omsp agents unpack --project - Export bundled subagents to ./.omsp/agents`;
 }

@@ -1,5 +1,5 @@
-import type { PipeStreamInfo, PipeStreams } from "@oh-my-pi/pi-natives";
-import { truncate } from "@oh-my-pi/pi-utils";
+import type { PipeStreamInfo, PipeStreams } from "@oh-my-striped-pi/pi-natives";
+import { truncate } from "@oh-my-striped-pi/pi-utils";
 import type { JobTextChunk, JobTextSource } from "./types";
 
 /** Longest pipe label: `producer → consumer` on one line. */

@@ -1,17 +1,17 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createSessionManager } from "@oh-my-pi/pi-coding-agent/main";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as natives from "@oh-my-pi/pi-natives";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { postmortem, TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createSessionManager } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as natives from "@oh-my-striped-pi/pi-natives";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { postmortem, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("InteractiveMode restart", () => {
 	let tempDir: TempDir;
@@ -23,7 +23,7 @@ describe("InteractiveMode restart", () => {
 	beforeAll(() => initTheme());
 	beforeEach(async () => {
 		resetSettingsForTest();
-		tempDir = TempDir.createSync("@omp-restart-");
+		tempDir = TempDir.createSync("@omsp-restart-");
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		originalArgv = process.argv;
@@ -123,7 +123,7 @@ describe("InteractiveMode restart", () => {
 	});
 
 	it("resumes a journal created in a flag-looking relative directory", async () => {
-		using relativeDir = TempDir.createSync("-omp-restart-");
+		using relativeDir = TempDir.createSync("-omsp-restart-");
 		await sessionManager.close();
 		sessionManager = SessionManager.create(tempDir.path(), relativeDir.path());
 		sessionManager.appendMessage({ role: "user", content: "saved request", timestamp: 1 });

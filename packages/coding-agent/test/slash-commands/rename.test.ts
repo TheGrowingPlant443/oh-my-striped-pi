@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
 import { getTestModel } from "../helpers/model-fixtures";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { MemorySessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
-import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import type { SlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-commands/types";
-import { DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY } from "@oh-my-pi/pi-coding-agent/tiny/models";
-import { tinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
-import { cfgTitleIcons } from "@oh-my-pi/pi-coding-agent/utils/title-settings";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { MemorySessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { executeAcpBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/acp-builtins";
+import { executeBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import type { SlashCommandRuntime } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/types";
+import { DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY } from "@oh-my-striped-pi/pi-coding-agent/tiny/models";
+import { tinyTitleClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
+import { cfgTitleIcons } from "@oh-my-striped-pi/pi-coding-agent/utils/title-settings";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 import { createInteractiveModeContext } from "../helpers/interactive-mode-context";
 
@@ -490,8 +490,8 @@ it.each(["TUI", "headless"] as const)(
 	"keeps a manual %s rename after an older automatic title completes",
 	async mode => {
 		const { session, sessionManager, execute } = createRuntime(mode);
-		const previousNoTitle = Bun.env.PI_NO_TITLE;
-		delete Bun.env.PI_NO_TITLE;
+		const previousNoTitle = Bun.env.OMSP_NO_TITLE;
+		delete Bun.env.OMSP_NO_TITLE;
 		const automatic = Promise.withResolvers<string | null>();
 		const manual = Promise.withResolvers<string | null>();
 		const applied = Promise.withResolvers<void>();
@@ -520,8 +520,8 @@ it.each(["TUI", "headless"] as const)(
 			manual.resolve(null);
 			await pending;
 			unsubscribe();
-			if (previousNoTitle === undefined) delete Bun.env.PI_NO_TITLE;
-			else Bun.env.PI_NO_TITLE = previousNoTitle;
+			if (previousNoTitle === undefined) delete Bun.env.OMSP_NO_TITLE;
+			else Bun.env.OMSP_NO_TITLE = previousNoTitle;
 		}
 	},
 );

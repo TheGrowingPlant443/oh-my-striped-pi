@@ -1,4 +1,4 @@
-import { isRetryableError, isUnexpectedSocketCloseMessage } from "@oh-my-pi/pi-utils";
+import { isRetryableError, isUnexpectedSocketCloseMessage } from "@oh-my-striped-pi/pi-utils";
 import {
 	ALIYUN_MM_GATEWAY_PATTERN,
 	isRetryableStreamEnvelopeError,

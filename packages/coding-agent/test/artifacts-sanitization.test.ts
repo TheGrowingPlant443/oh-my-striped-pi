@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ArtifactManager } from "@oh-my-pi/pi-coding-agent/session/artifacts";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+import { ArtifactManager } from "@oh-my-striped-pi/pi-coding-agent/session/artifacts";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 describe("ArtifactManager tool-type sanitization", () => {
 	const dirs: string[] = [];
 
 	function freshDir(): string {
-		const dir = path.join(os.tmpdir(), `omp-artifacts-${crypto.randomUUID()}`, "session");
+		const dir = path.join(os.tmpdir(), `omsp-artifacts-${crypto.randomUUID()}`, "session");
 		dirs.push(path.dirname(dir));
 		return dir;
 	}

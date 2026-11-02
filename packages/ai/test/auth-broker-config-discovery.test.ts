@@ -2,18 +2,22 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { discoverAuthStorage, loadAuthAccountPolicyConfig, resolveAuthBrokerConfig } from "@oh-my-pi/pi-ai/auth-broker";
-import { type AuthAccountPolicies, DEFAULT_USAGE_RESERVE_PCT } from "@oh-my-pi/pi-ai/auth-storage";
-import { writeAuthBrokerSnapshotCache } from "@oh-my-pi/pi-ai/auth-broker/snapshot-cache";
-import type { SnapshotResponse } from "@oh-my-pi/pi-ai/auth-broker/types";
-import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
+import {
+	discoverAuthStorage,
+	loadAuthAccountPolicyConfig,
+	resolveAuthBrokerConfig,
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
+import { type AuthAccountPolicies, DEFAULT_USAGE_RESERVE_PCT } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { writeAuthBrokerSnapshotCache } from "@oh-my-striped-pi/pi-ai/auth-broker/snapshot-cache";
+import type { SnapshotResponse } from "@oh-my-striped-pi/pi-ai/auth-broker/types";
+import * as oauthUtils from "@oh-my-striped-pi/pi-ai/registry/oauth";
 import { removeWithRetries } from "../../utils/src/temp";
 import { withEnv } from "./helpers";
 
 const SUPPRESS_AUTH_BROKER_ENV = {
-	OMP_AUTH_BROKER_URL: undefined,
-	OMP_AUTH_BROKER_TOKEN: undefined,
-	OMP_AUTH_BROKER_ACCOUNT_POOL_FILE: undefined,
+	OMSP_AUTH_BROKER_URL: undefined,
+	OMSP_AUTH_BROKER_TOKEN: undefined,
+	OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE: undefined,
 } as const;
 
 describe("resolveAuthBrokerConfig config discovery", () => {
@@ -312,8 +316,8 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 		await withEnv(
 			{
 				...SUPPRESS_AUTH_BROKER_ENV,
-				OMP_AUTH_BROKER_URL: url,
-				OMP_AUTH_BROKER_TOKEN: token,
+				OMSP_AUTH_BROKER_URL: url,
+				OMSP_AUTH_BROKER_TOKEN: token,
 			},
 			async () => {
 				const storage = await discoverAuthStorage({ agentDir, cachePath });
@@ -330,14 +334,14 @@ describe("resolveAuthBrokerConfig config discovery", () => {
 		const poolPath = path.join(agentDir, "account-pool.json");
 		const brokerEnv = {
 			...SUPPRESS_AUTH_BROKER_ENV,
-			OMP_AUTH_BROKER_URL: "http://127.0.0.1:1",
-			OMP_AUTH_BROKER_TOKEN: "test-token",
-			OMP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
+			OMSP_AUTH_BROKER_URL: "http://127.0.0.1:1",
+			OMSP_AUTH_BROKER_TOKEN: "test-token",
+			OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE: poolPath,
 		} as const;
 
 		await withEnv(brokerEnv, async () => {
 			await expect(discoverAuthStorage({ agentDir })).rejects.toThrow(
-				"Unable to read OMP_AUTH_BROKER_ACCOUNT_POOL_FILE",
+				"Unable to read OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE",
 			);
 
 			const invalidFiles = [

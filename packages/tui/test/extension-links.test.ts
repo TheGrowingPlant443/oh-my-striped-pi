@@ -1,24 +1,24 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { type Component, TUI } from "@oh-my-pi/pi-tui";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { Markdown } from "@oh-my-pi/pi-tui/components/markdown";
-import { COMPOSER_DEFAULTS, Composer } from "@oh-my-pi/pi-tui/prompt/composer";
+import { type Component, TUI } from "@oh-my-striped-pi/pi-tui";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { Markdown } from "@oh-my-striped-pi/pi-tui/components/markdown";
+import { COMPOSER_DEFAULTS, Composer } from "@oh-my-striped-pi/pi-tui/prompt/composer";
 import {
 	extensionLinkLabels,
 	formatExtensionLink,
 	linkHintTags,
 	setExtensionLinks,
 	stripExtensionLinkMarkers,
-} from "@oh-my-pi/pi-tui/render/extension-links";
+} from "@oh-my-striped-pi/pi-tui/render/extension-links";
 import {
 	ImageProtocol,
 	setTerminalImageProtocol,
 	setTerminalTextSizing,
 	TERMINAL,
-} from "@oh-my-pi/pi-tui/terminal-capabilities";
-import { getMarkdownTheme, initTheme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
+import { getMarkdownTheme, initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import { VirtualTerminal } from "./virtual-terminal";
 
 beforeAll(async () => {
@@ -72,7 +72,7 @@ describe("extension-owned links", () => {
 		expect(cells.every(run => run.endsWith("=demo:open/8"))).toBe(true);
 	});
 
-	it("strips only omp's link markers from what the terminal receives, even once unclaimed", () => {
+	it("strips only omsp's link markers from what the terminal receives, even once unclaimed", () => {
 		setExtensionLinks(["demo"]);
 		const rows = render(
 			"Some words before [a much longer link label](demo:open/8) then [docs](https://example.com)",
@@ -87,11 +87,11 @@ describe("extension-owned links", () => {
 		// A row drawn while the scheme was claimed must not leak its URL after the claim is gone.
 		setExtensionLinks([]);
 		expect(rows.map(stripExtensionLinkMarkers)).toEqual(out);
-		// A hyperlink omp did not mark is kept, whatever its scheme.
+		// A hyperlink omsp did not mark is kept, whatever its scheme.
 		const foreign = "See \x1b]8;;demo:open/7\x07the details\x1b]8;;\x07.";
 		expect(stripExtensionLinkMarkers(foreign)).toBe(foreign);
-		// Every marker form omp draws is stripped: numbered or not, BEL or ST terminated.
-		for (const params of ["id=omp-extension-link", "id=omp-extension-link-12"]) {
+		// Every marker form omsp draws is stripped: numbered or not, BEL or ST terminated.
+		for (const params of ["id=omsp-extension-link", "id=omsp-extension-link-12"]) {
 			for (const end of ["\x07", "\x1b\\"]) {
 				const stripped = stripExtensionLinkMarkers(`a\x1b]8;${params};demo:x${end}b\x1b]8;;${end}c`);
 				expect(plain(stripped)).toBe("abc");
@@ -130,11 +130,11 @@ describe("extension-owned links", () => {
 		}
 	});
 
-	it("treats only omp's marked links as extension links, not a hyperlink of a claimed scheme", () => {
+	it("treats only omsp's marked links as extension links, not a hyperlink of a claimed scheme", () => {
 		setExtensionLinks(["demo"]);
 		expect(extensionLinkLabels("See \x1b]8;;demo:open/7\x07the details\x1b]8;;\x07.")).toEqual([]);
 		expect(extensionLinkLabels("See \x1b]8;id=other;demo:open/7\x07the details\x1b]8;;\x07.")).toEqual([]);
-		expect(linkCells(["See \x1b]8;id=omp-extension-link-3;demo:open/7\x07the details\x1b]8;;\x07."])).toEqual([
+		expect(linkCells(["See \x1b]8;id=omsp-extension-link-3;demo:open/7\x07the details\x1b]8;;\x07."])).toEqual([
 			"0:4-14=demo:open/7",
 		]);
 	});

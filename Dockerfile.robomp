@@ -2,21 +2,21 @@
 ###############################################################################
 # robomp — GitHub triage+fix bot orchestrator.
 #
-# Extends `pi-base` (from /Dockerfile, default target oh-my-pi/pi:dev) and adds
+# Extends `pi-base` (from /Dockerfile, default target oh-my-striped-pi/pi:dev) and adds
 # the robomp Python package + a Vite-built SolidJS dashboard bundle. The pi
-# toolchain (python + bun + rustup launcher + pi-natives + omp_rpc wheel +
-# /usr/local/bin/omp shim) all comes from PI_BASE; this file only layers what's
+# toolchain (python + bun + rustup launcher + pi-natives + omsp_rpc wheel +
+# /usr/local/bin/omsp shim) all comes from OMSP_BASE; this file only layers what's
 # robomp-specific.
 #
 # Build (from pi root):
-#     bun run pi:image                              # build oh-my-pi/pi:dev first
+#     bun run pi:image                              # build oh-my-striped-pi/pi:dev first
 #     docker build -f Dockerfile.robomp -t robomp:dev .
 #
 # Compose (recommended):
 #     docker compose --project-directory python/robomp build
 ###############################################################################
 
-ARG PI_BASE=oh-my-pi/pi:dev
+ARG OMSP_BASE=oh-my-striped-pi/pi:dev
 ARG BUN_VERSION=1.4.4
 
 ############################
@@ -38,15 +38,15 @@ RUN bun --cwd=python/robomp/web run build
 ############################
 # 2) runtime — pi-base + robomp src + web bundle + pip install
 ############################
-FROM ${PI_BASE} AS runtime
+FROM ${OMSP_BASE} AS runtime
 
 # robomp runs against the host pi checkout mounted at /work/pi read-only.
-ENV PI_ROOT=/work/pi
+ENV OMSP_ROOT=/work/pi
 
 WORKDIR /app
 
 # robomp is an MIT product; its notices cover the dashboard bundle. The native
-# addon's payload remains available from the base image under /usr/share/doc/omp.
+# addon's payload remains available from the base image under /usr/share/doc/omsp.
 COPY LICENSE python/robomp/THIRD-PARTY-NOTICES.txt /usr/share/doc/robomp/
 
 # robomp itself. Drop the Vite-built dashboard into the package tree before
@@ -65,10 +65,10 @@ RUN pip install --no-cache-dir \
 # Host agent config is mounted read-only under /srv/agent-home-stage with
 # host-controlled permissions. The entrypoint copies it into root-owned
 # world-readable files under /srv/agent-home; the agent subprocess runs with
-# HOME=/srv/agent-home, so ~/.omp and ~/.agent resolve there without exposing
+# HOME=/srv/agent-home, so ~/.omsp and ~/.agent resolve there without exposing
 # mutable host mounts.
-RUN mkdir -p /srv/agent-home/.agent /srv/agent-home/.omp/agent \
-    && mkdir -p /srv/agent-home-stage/.agent /srv/agent-home-stage/.omp/agent \
+RUN mkdir -p /srv/agent-home/.agent /srv/agent-home/.omsp/agent \
+    && mkdir -p /srv/agent-home-stage/.agent /srv/agent-home-stage/.omsp/agent \
     && printf '[install]\nbackend = "copyfile"\n' > /srv/agent-home/.bunfig.toml
 
 COPY python/robomp/entrypoint.sh /usr/local/bin/robomp-entrypoint

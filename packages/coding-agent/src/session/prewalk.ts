@@ -1,7 +1,7 @@
-import type { Agent, AgentMessage, AgentToolResult, AgentTurnEndContext } from "@oh-my-pi/pi-agent-core";
-import { invalidateMessageCache } from "@oh-my-pi/pi-agent-core/compaction";
-import type { Model, ToolResultMessage } from "@oh-my-pi/pi-ai";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+import type { Agent, AgentMessage, AgentToolResult, AgentTurnEndContext } from "@oh-my-striped-pi/pi-agent-core";
+import { invalidateMessageCache } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { Model, ToolResultMessage } from "@oh-my-striped-pi/pi-ai";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import type { AutoPrewalkDecision } from "../auto-prewalk/classifier";
 import type { Settings } from "../config/settings";
 import type { LocalProtocolOptions } from "../internal-urls";
@@ -13,7 +13,7 @@ import planYoloHandoffPrompt from "../prompts/system/plan-yolo-handoff.md" with 
 import prewalkChecklistPrompt from "../prompts/system/prewalk-checklist.md" with { type: "text" };
 import prewalkContinuePrompt from "../prompts/system/prewalk-continue.md" with { type: "text" };
 import prewalkPlanPrompt from "../prompts/system/prewalk-plan.md" with { type: "text" };
-import { type ConfiguredThinkingLevel, prewalkWouldBeNoop } from "@oh-my-pi/pi-tui/thinking";
+import { type ConfiguredThinkingLevel, prewalkWouldBeNoop } from "@oh-my-striped-pi/pi-tui/thinking";
 import { isMCPToolName } from "../tools/builtin-names";
 import {
 	replaceTabs,
@@ -21,9 +21,9 @@ import {
 	shortenPath,
 	TRUNCATE_LENGTHS,
 	truncateToWidth,
-} from "@oh-my-pi/pi-tui/render/render-utils";
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import type { PlanProposalHandler } from "../tools/resolve";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import type { PlanYolo, Prewalk } from "./agent-session-types";
 import { PREWALK_PLAN_MESSAGE_TYPE } from "./messages";
 import { PREWALK_MODEL_CHANGE_ROLE } from "./session-entries";

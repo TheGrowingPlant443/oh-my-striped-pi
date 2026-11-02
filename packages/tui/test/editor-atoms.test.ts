@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Editor } from "@oh-my-pi/pi-tui";
+import { Editor } from "@oh-my-striped-pi/pi-tui";
 import { defaultEditorTheme } from "./test-themes";
 
 describe("Editor atom table", () => {

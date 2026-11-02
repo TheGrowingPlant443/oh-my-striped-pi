@@ -1,5 +1,10 @@
-import type { AgentToolContext, AgentToolResult, AgentToolUpdateCallback, ToolApproval } from "@oh-my-pi/pi-agent-core";
-import { untilAborted } from "@oh-my-pi/pi-utils";
+import type {
+	AgentToolContext,
+	AgentToolResult,
+	AgentToolUpdateCallback,
+	ToolApproval,
+} from "@oh-my-striped-pi/pi-agent-core";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils";
 import type { ToolSession } from "../tools";
 import {
 	approvalRestrictions,

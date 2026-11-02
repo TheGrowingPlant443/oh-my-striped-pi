@@ -6,7 +6,7 @@
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { isRecord, logger } from "@oh-my-pi/pi-utils";
+import { isRecord, logger } from "@oh-my-striped-pi/pi-utils";
 import { isUserSourceEnabled, registerProvider } from "../capability";
 import { readFile } from "../capability/fs";
 import { type Hook, hookCapability } from "../capability/hook";
@@ -105,6 +105,7 @@ async function readMarketplaceRootManifest(root: ClaudePluginRoot): Promise<Clau
 	const catalogs = await Promise.all(
 		[
 			path.join(root.path, "marketplace.json"),
+			path.join(root.path, ".omsp-plugin", "marketplace.json"),
 			path.join(root.path, ".omp-plugin", "marketplace.json"),
 			path.join(root.path, ".claude-plugin", "marketplace.json"),
 		].map(catalogPath => readFile(catalogPath)),
@@ -462,7 +463,7 @@ function extractServerMap(obj: Record<string, unknown>): Record<string, unknown>
  * Resolve where a plugin's MCP servers come from, honoring the manifest's
  * `mcpServers` field before the conventional root `.mcp.json`.
  *
- * `.omp-plugin/plugin.json` takes precedence over `.claude-plugin/plugin.json`.
+ * `.omsp-plugin/plugin.json` takes precedence over `.omp-plugin`, then `.claude-plugin`.
  * The field may be an inline object (the server map itself) or a string path to
  * a config file within the plugin root; a path escaping the root is rejected
  * with a warning. When no manifest declares the field, `<root>/.mcp.json` is the
@@ -470,7 +471,7 @@ function extractServerMap(obj: Record<string, unknown>): Record<string, unknown>
  */
 async function resolvePluginMCPConfig(root: ClaudePluginRoot): Promise<ResolvedMCPConfig> {
 	const fallback = path.join(root.path, ".mcp.json");
-	for (const manifestDir of [".omp-plugin", ".claude-plugin"]) {
+	for (const manifestDir of [".omsp-plugin", ".omp-plugin", ".claude-plugin"]) {
 		const manifestPath = path.join(root.path, manifestDir, "plugin.json");
 		const raw = await readFile(manifestPath);
 		if (raw === null) continue;
@@ -539,7 +540,7 @@ async function resolvePluginMCPConfig(root: ClaudePluginRoot): Promise<ResolvedM
  * Split a marketplace stdio env map into final values and legacy values.
  *
  * `${VAR}`/`${VAR:-default}` placeholders (and `${CLAUDE_PLUGIN_ROOT}` /
- * `${OMP_PLUGIN_ROOT}`) are expanded here and recorded as literal keys: the
+ * `${OMSP_PLUGIN_ROOT}` / `${OMP_PLUGIN_ROOT}`) are expanded here and recorded as literal keys: the
  * result is final package data and must never be reinterpreted later as a
  * bare env name or `!command` (a second resolution would execute expanded
  * values or substitute ambient variables). Values that contained no
@@ -557,11 +558,12 @@ async function resolveMarketplaceEnv(
 	const literalKeys: string[] = [];
 	for (const [key, rawValue] of Object.entries(env)) {
 		// Feed the reserved plugin-root names through extraEnv: expansion then
-		// cannot consume an ambient CLAUDE_PLUGIN_ROOT/OMP_PLUGIN_ROOT, and
+		// cannot consume ambient plugin-root values, and
 		// the registered root inserted as the value is never re-scanned
 		// for `${...}`.
 		const final = expandEnvVarsDeep(rawValue, {
 			CLAUDE_PLUGIN_ROOT: rootPath,
+			OMSP_PLUGIN_ROOT: rootPath,
 			OMP_PLUGIN_ROOT: rootPath,
 		}) as string;
 		if (final !== rawValue) literalKeys.push(key);
@@ -607,7 +609,7 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 				continue;
 			}
 			// Two file shapes are supported:
-			//   nested: { "mcpServers": { name: cfg, ... } }   (OMP/Claude Code project shape)
+			//   nested: { "mcpServers": { name: cfg, ... } }   (OMSP/Claude Code project shape)
 			//   flat:   { name: cfg, ... }                      (Claude marketplace plugin shape)
 			if (!isRecord(parsed)) continue;
 			servers = extractServerMap(parsed);

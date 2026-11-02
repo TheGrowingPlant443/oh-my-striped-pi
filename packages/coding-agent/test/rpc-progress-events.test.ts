@@ -7,9 +7,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import type { AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const FIXTURE = path.join(import.meta.dir, "fixtures", "progress-events-rpc-agent.ts");
 
@@ -25,11 +25,11 @@ afterEach(async () => {
 
 /** Start the fixture and record every session event frame it writes. */
 async function start(): Promise<{ rpc: RpcClient; events: AgentSessionEvent[] }> {
-	directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-progress-"));
+	directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-progress-"));
 	client = new RpcClient({
 		command: [process.execPath, FIXTURE],
 		cwd: directory,
-		env: { PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1" },
+		env: { OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1" },
 	});
 	const events: AgentSessionEvent[] = [];
 	client.onSessionEvent(event => events.push(event));

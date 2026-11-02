@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
+import { createMockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
 import {
 	CallableLlmBackend,
 	resetHostLlmBackendForTests,
 	setHostLlmBackend,
-} from "@oh-my-pi/pi-mnemopi/core/llm-backends";
+} from "@oh-my-striped-pi/pi-mnemopi/core/llm-backends";
 import {
 	buildHostPrompt,
 	chunkMemoriesByBudget,
@@ -12,10 +12,10 @@ import {
 	complete,
 	llmAvailable,
 	summarizeMemories,
-} from "@oh-my-pi/pi-mnemopi/core/local-llm";
-import { Mnemopi } from "@oh-my-pi/pi-mnemopi/core/memory";
-import { withMnemopiRuntimeOptions } from "@oh-my-pi/pi-mnemopi/core/runtime-options";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-mnemopi/core/local-llm";
+import { Mnemopi } from "@oh-my-striped-pi/pi-mnemopi/core/memory";
+import { withMnemopiRuntimeOptions } from "@oh-my-striped-pi/pi-mnemopi/core/runtime-options";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const OLD_ENV = { ...process.env };
 

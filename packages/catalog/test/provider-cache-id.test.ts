@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { PROVIDER_DESCRIPTORS } from "@oh-my-pi/pi-catalog/provider-models";
+import { PROVIDER_DESCRIPTORS } from "@oh-my-striped-pi/pi-catalog/provider-models";
 import {
 	isCredentialScopedModelCacheProvider,
 	resolveModelCacheProviderId,
-} from "@oh-my-pi/pi-catalog/provider-models/cache-provider-id";
+} from "@oh-my-striped-pi/pi-catalog/provider-models/cache-provider-id";
 
 test("lightweight cache resolver matches every descriptor default and configured scope", () => {
 	for (const descriptor of PROVIDER_DESCRIPTORS) {

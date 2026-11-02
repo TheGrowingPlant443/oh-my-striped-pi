@@ -8,7 +8,7 @@ import {
 	type SkillSearchResponse,
 	type SkillSearchSort,
 	type SkillVersionManifest,
-} from "@oh-my-pi/pi-wire/skillshare";
+} from "@oh-my-striped-pi/pi-wire/skillshare";
 import { Settings } from "../config/settings";
 
 import { cfgSkillsRegistryUrl } from "../extensibility/settings";

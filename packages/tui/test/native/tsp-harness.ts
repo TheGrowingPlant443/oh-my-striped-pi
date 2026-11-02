@@ -12,11 +12,16 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type TspApplyError, TspDocument } from "@oh-my-pi/pi-tui/native/apply";
-import { splitTspMessage, type TspHello } from "@oh-my-pi/pi-tui/native/encode";
-import type { Terminal, TerminalAppearance, TerminalStartOptions, TspHelloHandler } from "@oh-my-pi/pi-tui/terminal";
-import { type RenderScheduler, type RenderTimer, TUI } from "@oh-my-pi/pi-tui/tui";
-import { TSP_KINDS, type TspEvent, type TspFrame, type TspNode } from "@oh-my-pi/pi-wire";
+import { type TspApplyError, TspDocument } from "@oh-my-striped-pi/pi-tui/native/apply";
+import { splitTspMessage, type TspHello } from "@oh-my-striped-pi/pi-tui/native/encode";
+import type {
+	Terminal,
+	TerminalAppearance,
+	TerminalStartOptions,
+	TspHelloHandler,
+} from "@oh-my-striped-pi/pi-tui/terminal";
+import { type RenderScheduler, type RenderTimer, TUI } from "@oh-my-striped-pi/pi-tui/tui";
+import { TSP_KINDS, type TspEvent, type TspFrame, type TspNode } from "@oh-my-striped-pi/pi-wire";
 
 export interface TspHarnessOptions {
 	cols?: number;

@@ -9,13 +9,16 @@ import type {
 	ToolResultMessage,
 	ToolResultProviderMetadata,
 	UserMessage,
-} from "@oh-my-pi/pi-ai";
-import { decodeDataUri } from "@oh-my-pi/pi-ai/providers/openai-data-uri";
-import { resolveInlineImageByteBudget, resolveRequestBodyByteLimit } from "@oh-my-pi/pi-catalog/compat/request-size";
-import { isRecord } from "@oh-my-pi/pi-utils";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
-import { capFrameDataBytes, frameDataBytesBudget, providerImageBudget } from "@oh-my-pi/snapcompact";
-import { imageDecodeFailureReason } from "@oh-my-pi/pi-tui/chat/image-loading";
+} from "@oh-my-striped-pi/pi-ai";
+import { decodeDataUri } from "@oh-my-striped-pi/pi-ai/providers/openai-data-uri";
+import {
+	resolveInlineImageByteBudget,
+	resolveRequestBodyByteLimit,
+} from "@oh-my-striped-pi/pi-catalog/compat/request-size";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
+import { capFrameDataBytes, frameDataBytesBudget, providerImageBudget } from "@oh-my-striped-pi/snapcompact";
+import { imageDecodeFailureReason } from "@oh-my-striped-pi/pi-tui/chat/image-loading";
 
 const IMAGE_OMISSION: TextContent = {
 	type: "text",

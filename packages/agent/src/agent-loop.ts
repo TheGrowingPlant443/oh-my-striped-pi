@@ -23,7 +23,7 @@ import {
 	type TSchema,
 	toolWireSchema,
 	type UserMessage,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	type Dialect,
 	encodeInbandToolHistory,
@@ -31,12 +31,12 @@ import {
 	renderInbandToolPrompt,
 	renderToolExamples,
 	wrapInbandToolStream,
-} from "@oh-my-pi/pi-ai/dialect";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { appendDuplicateSuffix, MAX_TOOL_CALL_ID_LENGTH } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { schemaDefinesProperty } from "@oh-my-pi/pi-ai/utils/schema/json-schema-validator";
-import { stamp } from "@oh-my-pi/pi-ai/utils/schema/stamps";
+} from "@oh-my-striped-pi/pi-ai/dialect";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { appendDuplicateSuffix, MAX_TOOL_CALL_ID_LENGTH } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { getStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import { schemaDefinesProperty } from "@oh-my-striped-pi/pi-ai/utils/schema/json-schema-validator";
+import { stamp } from "@oh-my-striped-pi/pi-ai/utils/schema/stamps";
 import {
 	createHarmonyAuditEvent,
 	detectHarmonyLeakInAssistantMessage,
@@ -46,10 +46,10 @@ import {
 	isHarmonyLeakMitigationTarget,
 	recoverHarmonyToolCall,
 	signalListLabel,
-} from "@oh-my-pi/pi-ai/utils/harmony-leak";
-import { isDsmlLeakRecoveryTarget, removeDsmlToolMarkupLeak } from "@oh-my-pi/pi-ai/utils/dsml-leak";
-import { cloneJsonTree, logger, sanitizeText, structuredCloneJSON } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-ai/utils/harmony-leak";
+import { isDsmlLeakRecoveryTarget, removeDsmlToolMarkupLeak } from "@oh-my-striped-pi/pi-ai/utils/dsml-leak";
+import { cloneJsonTree, logger, sanitizeText, structuredCloneJSON } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import { LiveSteeringChannel } from "./live-steering";
 import { agentPauseGate } from "./pause";
 import { type AgentRunCoverage, type AgentRunSummary, ToolCallBlockedError } from "./run-collector";
@@ -922,7 +922,7 @@ export function normalizeMessagesForProvider(
 	});
 }
 
-/** Schema description of the injected `i` field; `PI_INTENT_DESC` replaces it. */
+/** Schema description of the injected `i` field; `OMSP_INTENT_DESC` replaces it. */
 const DEFAULT_INTENT_FIELD_DESCRIPTION = "concise intent";
 const INTENT_SCHEMA_UNION_KEYS = ["anyOf", "oneOf"] as const;
 
@@ -1000,7 +1000,7 @@ function injectIntentIntoSchema(
 		...schemaRecord,
 		properties: {
 			[INTENT_FIELD]: describeIntent
-				? { type: "string", description: Bun.env.PI_INTENT_DESC || DEFAULT_INTENT_FIELD_DESCRIPTION }
+				? { type: "string", description: Bun.env.OMSP_INTENT_DESC || DEFAULT_INTENT_FIELD_DESCRIPTION }
 				: { type: "string" },
 			...properties,
 		},
@@ -1009,7 +1009,7 @@ function injectIntentIntoSchema(
 }
 
 export interface NormalizeToolsOptions {
-	/** Inject the `i` intent field into tool schemas (subject to `PI_NO_INTENT`). */
+	/** Inject the `i` intent field into tool schemas (subject to `OMSP_NO_INTENT`). */
 	injectIntent: boolean;
 	/** Strip descriptions from the wire specs when the catalog rides in the system prompt. */
 	pruneDescriptions?: boolean;
@@ -1017,7 +1017,7 @@ export interface NormalizeToolsOptions {
 
 export function normalizeTools(tools: AgentContext["tools"], options: NormalizeToolsOptions): Context["tools"] {
 	const pruneDescriptions = options.pruneDescriptions === true;
-	const injectIntent = options.injectIntent && Bun.env.PI_NO_INTENT !== "1";
+	const injectIntent = options.injectIntent && Bun.env.OMSP_NO_INTENT !== "1";
 	return tools?.map(t => {
 		const intentMode = resolveIntentMode(t.intent);
 		const doInjectIntent =
@@ -1921,7 +1921,8 @@ async function prepareProviderCall(
 	const llmMessages = await config.convertToLlm(messages);
 	const normalizedMessages = normalizeMessagesForProvider(llmMessages, model);
 	const ownedDialect: Dialect | undefined =
-		(config.getDialect ? config.getDialect(model) : config.dialect) ?? resolveOwnedDialectFromEnv(Bun.env.PI_DIALECT);
+		(config.getDialect ? config.getDialect(model) : config.dialect) ??
+		resolveOwnedDialectFromEnv(Bun.env.OMSP_DIALECT);
 	const pruneToolDescriptions = !!config.pruneToolDescriptions && !ownedDialect;
 	let llmContext: Context;
 	if (config.appendOnlyContext) {

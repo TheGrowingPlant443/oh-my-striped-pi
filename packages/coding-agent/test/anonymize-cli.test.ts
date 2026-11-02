@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { runAnonymizeCommand } from "../src/cli/anonymize-cli";
 import { CliUsageError } from "../src/cli/usage-error";
 import { collectPendingToolCalls } from "../src/session/exit-diagnostics";
@@ -15,11 +15,11 @@ const SESSION = `${JSON.stringify({ type: "session", version: 3, id: "01a0c9ac",
 ${JSON.stringify({ type: "message", id: "a1b2c3d4", parentId: null, timestamp: "2026-10-01T00:00:01.000Z", message: { role: "user", content: "keep me", timestamp: 1 } })}
 `;
 
-describe("omp anonymize output", () => {
+describe("omsp anonymize output", () => {
 	let tempDir: TempDir;
 
 	beforeEach(() => {
-		tempDir = TempDir.createSync("@omp-anonymize-");
+		tempDir = TempDir.createSync("@omsp-anonymize-");
 	});
 
 	afterEach(async () => {

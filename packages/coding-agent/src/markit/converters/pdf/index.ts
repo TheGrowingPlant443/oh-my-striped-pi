@@ -1,5 +1,5 @@
-import { pdfToMarkdown } from "@oh-my-pi/pi-natives";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { pdfToMarkdown } from "@oh-my-striped-pi/pi-natives";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import pdfTextIncompleteTemplate from "../../../prompts/tools/pdf-text-incomplete.md" with { type: "text" };
 import type { ConversionResult, Converter, StreamInfo } from "../../types";
 

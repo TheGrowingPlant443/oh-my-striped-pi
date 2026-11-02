@@ -12,26 +12,26 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { getInternalUrlSuggestions } from "@oh-my-pi/pi-tui/prompt/internal-url-autocomplete";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { getInternalUrlSuggestions } from "@oh-my-striped-pi/pi-tui/prompt/internal-url-autocomplete";
 import {
 	formatCurrentBranchFullHistory,
 	HistoryProtocolHandler,
-} from "@oh-my-pi/pi-coding-agent/internal-urls/history-protocol";
+} from "@oh-my-striped-pi/pi-coding-agent/internal-urls/history-protocol";
 import {
 	registerArtifactsDir,
 	resetRegisteredArtifactDirsForTests,
-} from "@oh-my-pi/pi-coding-agent/internal-urls/registry-helpers";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { CURRENT_SESSION_VERSION, type SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { removeWithRetries, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/internal-urls/registry-helpers";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { CURRENT_SESSION_VERSION, type SessionEntry } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { removeWithRetries, TempDir } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgCompactionExperimentalContextManagement } from "@oh-my-pi/pi-coding-agent/session/context-settings";
+import { cfgCompactionExperimentalContextManagement } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "history-protocol-"));
@@ -698,7 +698,7 @@ describe("history:// protocol", () => {
 	});
 
 	it("serves a seance only the consulted source's transcript tree, read in place", async () => {
-		using tempDir = TempDir.createSync("@omp-history-seance-");
+		using tempDir = TempDir.createSync("@omsp-history-seance-");
 		const dir = tempDir.path();
 		const cwd = path.join(dir, "project");
 		const sourceArtifacts = path.join(dir, "source", "source");
@@ -752,7 +752,7 @@ describe("history:// protocol", () => {
 	});
 
 	it("keeps a seance fork's foreign source children out of the parent's history", async () => {
-		using tempDir = TempDir.createSync("@omp-history-seance-parent-");
+		using tempDir = TempDir.createSync("@omsp-history-seance-parent-");
 		const dir = tempDir.path();
 		const cwd = path.join(dir, "project");
 		const foreignSource = path.join(dir, "foreign", "source.jsonl");

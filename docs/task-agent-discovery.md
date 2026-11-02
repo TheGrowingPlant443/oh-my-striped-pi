@@ -16,7 +16,7 @@ It covers runtime behavior as implemented today, including precedence, invalid-d
 - [`src/prompts/agents/task.md`](../packages/coding-agent/src/prompts/agents/task.md)
 - [`src/prompts/tools/task.md`](../packages/coding-agent/src/prompts/tools/task.md)
 - [`src/discovery/helpers.ts`](../packages/coding-agent/src/discovery/helpers.ts)
-- [`src/discovery/omp-extension-roots.ts`](../packages/coding-agent/src/discovery/omp-extension-roots.ts)
+- [`src/discovery/omsp-extension-roots.ts`](../packages/coding-agent/src/discovery/omsp-extension-roots.ts)
 - [`src/config.ts`](../packages/coding-agent/src/config.ts)
 - [`src/task/executor.ts`](../packages/coding-agent/src/task/executor.ts)
 
@@ -41,7 +41,7 @@ Parsing comes from frontmatter via `parseAgentFields()` (`src/discovery/helpers.
 - `output` is passed through as opaque schema data
 - `read-summarize: false` (normalized to `readSummarize`) disables structural summaries for the subagent's `read` tool — `runSubprocess` applies a `read.summarize.enabled: false` override on the child's isolated settings (`src/task/executor.ts`). `scout` ships with it disabled. When absent, the child inherits the parent's read-summary setting.
 - `model` accepts one selector, CSV, or an array. Entries are tried in order after role aliases are expanded.
-- `thinking-level` / `thinking` selects the agent's configured effort. When `task.enableEffort` (default `false`) exposes it, a task item's coarse `effort` (`lo`, `med`, `hi`) takes precedence at launch. OMP maps that hint to the selected model's lowest, middle, or highest supported effort, then clamps it to `task.maxEffort` (default `max`). The ceiling is carried across retry-fallback model switches. If the selected model has no supported effort at or below the ceiling, the spawn fails; models without a controllable effort surface instead fall back to their normal selector.
+- `thinking-level` / `thinking` selects the agent's configured effort. When `task.enableEffort` (default `false`) exposes it, a task item's coarse `effort` (`lo`, `med`, `hi`) takes precedence at launch. OMSP maps that hint to the selected model's lowest, middle, or highest supported effort, then clamps it to `task.maxEffort` (default `max`). The ceiling is carried across retry-fallback model switches. If the selected model has no supported effort at or below the ceiling, the spawn fails; models without a controllable effort surface instead fall back to their normal selector.
 - `blocking: true` makes the parent wait for that agent even when async task execution is enabled
 - `structured: true` keeps structured results for that agent while `task.structured` (default `false`) is off: its task spawns get the `yield` tool and resolve their output schema exactly as with `task.structured: true` (see [structured-output precedence](#model-and-structured-output-precedence)). With `task.structured` on, the field changes nothing; `false` or absent follows the setting. The caller-side `outputSchema`/`schemaMode` task parameters stay hidden while the setting is off. The decision is made from the resolved agent in `resolveEffectiveSubagentPolicy()`, so plan-mode spawns keep it, and cold revival restores `yield` from the child's persisted tool list.
 - `autoloadSkills` names skills from the parent session to inject before the first child prompt; unknown names are ignored
@@ -50,11 +50,11 @@ Parsing comes from frontmatter via `parseAgentFields()` (`src/discovery/helpers.
 
 ## Role-backed custom agents
 
-OMP discovers user agents from `~/.omp/agent/agents/*.md` and project agents from `.omp/agents/*.md`.
+OMSP discovers user agents from `~/.omsp/agent/agents/*.md` and project agents from `.omsp/agents/*.md`.
 
 Give the agent a role alias in frontmatter, then dispatch it by name. For model routing, task dispatch sets only `agent`; it does not set a worker model:
 
-`~/.omp/agent/agents/reviewer.md`:
+`~/.omsp/agent/agents/reviewer.md`:
 
 ```md
 ---
@@ -66,7 +66,7 @@ model: "@review"
 Review the assigned change and report concrete findings.
 ```
 
-Set the role mapping in `~/.omp/agent/config.yml`:
+Set the role mapping in `~/.omsp/agent/config.yml`:
 
 ```yaml
 modelRoles:
@@ -145,23 +145,23 @@ Because bundled parsing uses `level: "fatal"`, unrecoverable YAML errors or inva
 
 ## Filesystem and plugin discovery
 
-`discoverAgents(cwd, home, extensionRoots?)` (`src/task/discovery.ts`) merges agents from OMP-native roots, OMP extension packages, and Claude marketplace plugin roots before appending bundled definitions. Direct cross-harness roots such as `.claude/agents`, `.codex/agents`, and `.gemini/agents` are intentionally skipped — their frontmatter schema is not the OMP task-agent contract (`TASK_AGENT_CONFIG_SOURCE = ".omp"` filters the native config-dir lists).
+`discoverAgents(cwd, home, extensionRoots?)` (`src/task/discovery.ts`) merges agents from OMSP-native roots, OMSP extension packages, and Claude marketplace plugin roots before appending bundled definitions. Direct cross-harness roots such as `.claude/agents`, `.codex/agents`, and `.gemini/agents` are intentionally skipped — their frontmatter schema is not the OMSP task-agent contract (`TASK_AGENT_CONFIG_SOURCE = ".omsp"` filters the native config-dir lists).
 
 ### Discovery inputs and precedence
 
-1. Nearest project `.omp/agents` dir from `findAllNearestProjectConfigDirs("agents", cwd)` (first `.omp` hit only)
-2. User `.omp/agents` dir from `getConfigDirs("agents", { project: false })` (first `.omp` hit only)
-3. `<extension-root>/agents` for every enabled OMP extension package returned by `listOmpExtensionRoots(...)`, in this order:
+1. Nearest project `.omsp/agents` dir from `findAllNearestProjectConfigDirs("agents", cwd)` (first `.omsp` hit only)
+2. User `.omsp/agents` dir from `getConfigDirs("agents", { project: false })` (first `.omsp` hit only)
+3. `<extension-root>/agents` for every enabled OMSP extension package returned by `listOmpExtensionRoots(...)`, in this order:
    - explicit CLI `--extension` / SDK `additionalExtensionPaths` directory roots
    - the session's effective `extensions:` array, in its configured order
    - installed npm/link plugins
      Project and user `extensions:` arrays are not concatenated: settings use array-replacement precedence. Session overlays/runtime overrides and the configured array's project/user provenance are preserved. In `explicit-only` mode (`--no-extensions` or SDK `disableExtensionDiscovery`), only explicit roots contribute this package surface; file entrypoints have no `agents/` subdirectory to scan.
-4. Claude marketplace plugin roots (`listClaudePluginRoots(home, cwd)`) with `agents/` subdirs — only when `isProviderEnabled("claude-plugins")`; project-scope plugins sort before user-scope. User-scope roots additionally require the `claude-plugins` or `claude` user source to be enabled (`isUserSourceEnabled`: normally via `enabledProviders`, e.g. `["claude-plugins"]`; `claude` is also enabled implicitly when `CLAUDE_CONFIG_DIR` is set), except roots whose origin is not the foreign `~/.claude/plugins` tree (omp's own installs with `origin: "omp"` and `--plugin-dir` roots) — mirroring the skills path's exemption.
+4. Claude marketplace plugin roots (`listClaudePluginRoots(home, cwd)`) with `agents/` subdirs — only when `isProviderEnabled("claude-plugins")`; project-scope plugins sort before user-scope. User-scope roots additionally require the `claude-plugins` or `claude` user source to be enabled (`isUserSourceEnabled`: normally via `enabledProviders`, e.g. `["claude-plugins"]`; `claude` is also enabled implicitly when `CLAUDE_CONFIG_DIR` is set), except roots whose origin is not the foreign `~/.claude/plugins` tree (omsp's own installs with `origin: "omsp"` and `--plugin-dir` roots) — mirroring the skills path's exemption.
 5. Bundled agents (`loadBundledAgents()`)
 
-The OMP extension-package surface is disabled when the `omp-plugins` capability provider is disabled. Marketplace roots are excluded from `listOmpExtensionRoots` and enter only through the separately gated Claude-plugin path.
+The OMSP extension-package surface is disabled when the `omsp-plugins` capability provider is disabled. Marketplace roots are excluded from `listOmpExtensionRoots` and enter only through the separately gated Claude-plugin path.
 
-Claude-dialect plugin agents discard their frontmatter `model` so Claude aliases are not misread as OMP selectors. This applies to foreign Claude roots and packages whose manifest declares the Claude format, including OMP installs or `--plugin-dir` roots. OMP-native and Agent-Plugins-standard packages retain their model selectors.
+Claude-dialect plugin agents discard their frontmatter `model` so Claude aliases are not misread as OMSP selectors. This applies to foreign Claude roots and packages whose manifest declares the Claude format, including OMSP installs or `--plugin-dir` roots. OMSP-native and Agent-Plugins-standard packages retain their model selectors.
 
 ## Merge and collision rules
 
@@ -173,7 +173,7 @@ Discovery uses first-wins dedup by exact `agent.name`:
 
 Implications:
 
-- Project `.omp` overrides user `.omp`.
+- Project `.omsp` overrides user `.omsp`.
 - Earlier extension roots override later extension roots, Claude marketplace plugins, and bundled agents.
 - Non-bundled agents override bundled agents with the same name.
 - Name matching is case-sensitive (`Task` and `task` are distinct).
@@ -260,7 +260,7 @@ the task/eval wire formats do not expose a tier field or automatic Fast policy.
 Account selection is independent of model and service-tier selection: an exact, case-sensitive
 `task.agentAccountPools[agentName]` entry maps provider ids to OAuth identity keys (the `identityKey`
 values broker [client account pools](./auth-broker-gateway.md#client-account-pools-routing-not-authorization)
-use, such as `email:<address>|org:<id>` for Anthropic; [`omp usage accounts`](./cli-reference.md)
+use, such as `email:<address>|org:<id>` for Anthropic; [`omsp usage accounts`](./cli-reference.md)
 lists them). For each listed provider the child authenticates
 only with those accounts: ranking, the parent's copied account affinity, restored pins, fallback
 passes, credential rotation, and saved-reset restores stay inside the pool, and runtime,
@@ -321,7 +321,7 @@ If denied: `Cannot spawn '...'. Allowed: ...`.
 
 ### Blocked self-recursion env guard
 
-`PI_BLOCKED_AGENT` (or the internal request override) rejects an attempt to spawn the same blocked agent before discovery.
+`OMSP_BLOCKED_AGENT` (or the internal request override) rejects an attempt to spawn the same blocked agent before discovery.
 
 ### Recursion-depth gating
 

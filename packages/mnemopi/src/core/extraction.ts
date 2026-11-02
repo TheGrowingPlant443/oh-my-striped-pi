@@ -1,4 +1,4 @@
-import { withLoopPhase } from "@oh-my-pi/pi-utils";
+import { withLoopPhase } from "@oh-my-striped-pi/pi-utils";
 import { getDiagnostics, safeForLog } from "./extraction/diagnostics";
 import { callHostLlm, getHostLlmBackend } from "./llm-backends";
 import { callConfiguredCompletion, cleanOutput, configuredLlmWillHandleCall } from "./local-llm";

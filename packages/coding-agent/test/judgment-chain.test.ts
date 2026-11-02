@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import type { ChatUsageEvent } from "@oh-my-pi/pi-agent-core";
-import type { Api, AssistantMessage, ChoiceQuestion, ImageContent, Model } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { JudgmentCache } from "@oh-my-pi/pi-coding-agent/judgment/cache";
-import { cfgModelRoles } from "@oh-my-pi/pi-coding-agent/config/model-settings";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ChainJudge, journalJudgmentUsage } from "@oh-my-pi/pi-coding-agent/judgment";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { tinyModelClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
+import type { ChatUsageEvent } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, AssistantMessage, ChoiceQuestion, ImageContent, Model } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { JudgmentCache } from "@oh-my-striped-pi/pi-coding-agent/judgment/cache";
+import { cfgModelRoles } from "@oh-my-striped-pi/pi-coding-agent/config/model-settings";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ChainJudge, journalJudgmentUsage } from "@oh-my-striped-pi/pi-coding-agent/judgment";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { tinyModelClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 const LOCAL = getBundledModel("local", "qwen2.5-1.5b");

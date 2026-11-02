@@ -89,14 +89,14 @@ class Settings(BaseSettings):
     # agent having reached a terminal tool (`gh_open_pr`,
     # `mark_unable_to_reproduce`, `abort_task`) for a `bug`/`documentation`
     # classification, the driver sends up to this many "you stopped before
-    # opening a PR — continue" reminder prompts into the same omp session.
+    # opening a PR — continue" reminder prompts into the same omsp session.
     # Set to 0 to disable.
     task_completion_max_reminders: int = Field(2, alias="ROBOMP_TASK_COMPLETION_MAX_REMINDERS")
-    omp_command: str = Field("omp", alias="ROBOMP_OMP_COMMAND")
+    omsp_command: str = Field("omsp", alias="ROBOMP_OMSP_COMMAND")
 
     # Graceful shutdown (Phase B). On SIGTERM the dispatcher stops claiming
     # new work, then waits up to `drain` seconds for in-flight events to
-    # complete cleanly; any still running after that get their omp
+    # complete cleanly; any still running after that get their omsp
     # subprocess killed and the row left in `running` so it requeues on
     # next start. Sum of both MUST stay below the compose `stop_grace_period`.
     shutdown_drain_timeout_seconds: float = Field(25.0, alias="ROBOMP_SHUTDOWN_DRAIN_TIMEOUT_SECONDS")

@@ -1,12 +1,12 @@
 /** Self-contained, shadow-scoped trace viewer registered by the export bundle. */
-import statsStyles from "@oh-my-pi/omp-stats/client/styles.css" with { type: "text" };
+import statsStyles from "@oh-my-striped-pi/omsp-stats/client/styles.css" with { type: "text" };
 import {
 	type SessionTrace,
 	SessionTraceView,
 	type TraceEntryLoader,
 	TraceThemeRoot,
-} from "@oh-my-pi/omp-stats/client/traces";
-import traceStyles from "@oh-my-pi/omp-stats/client/traces/traces.css" with { type: "text" };
+} from "@oh-my-striped-pi/omsp-stats/client/traces";
+import traceStyles from "@oh-my-striped-pi/omsp-stats/client/traces/traces.css" with { type: "text" };
 import { createRoot, type Root } from "react-dom/client";
 
 /** Embedded transcripts and trace consumed by the standalone export element. */
@@ -165,6 +165,6 @@ export class OmpSessionTraceElement extends HTMLElement {
 	}
 }
 
-if (!customElements.get("omp-session-trace")) {
-	customElements.define("omp-session-trace", OmpSessionTraceElement);
+if (!customElements.get("omsp-session-trace")) {
+	customElements.define("omsp-session-trace", OmpSessionTraceElement);
 }

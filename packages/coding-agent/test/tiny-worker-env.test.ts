@@ -1,12 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { ipcEndpoint } from "@oh-my-pi/pi-natives";
-import { sharedWorkerLogPath } from "@oh-my-pi/pi-coding-agent/subprocess/shared-worker";
-import { nativeLibraryPathOverlay, workerEnvFromParent } from "@oh-my-pi/pi-coding-agent/subprocess/worker-client";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { cfgProvidersTinyModelDevice } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { tinyWorkerEnvOverlay } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
-import { tinyWorkerName } from "@oh-my-pi/pi-coding-agent/tiny/title-protocol";
+import { ipcEndpoint } from "@oh-my-striped-pi/pi-natives";
+import { sharedWorkerLogPath } from "@oh-my-striped-pi/pi-coding-agent/subprocess/shared-worker";
+import {
+	nativeLibraryPathOverlay,
+	workerEnvFromParent,
+} from "@oh-my-striped-pi/pi-coding-agent/subprocess/worker-client";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { cfgProvidersTinyModelDevice } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { tinyWorkerEnvOverlay } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
+import { tinyWorkerName } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-protocol";
 
 describe("workerEnvFromParent", () => {
 	it("drops inherited git repo-location overrides but keeps an explicit overlay", () => {
@@ -16,10 +19,10 @@ describe("workerEnvFromParent", () => {
 		const previous = process.env.GIT_DIR;
 		process.env.GIT_DIR = "/primary/.git";
 		try {
-			const env = workerEnvFromParent({ GIT_WORK_TREE: "/secondary", OMP_WORKER_ENV_PROBE: "kept" });
+			const env = workerEnvFromParent({ GIT_WORK_TREE: "/secondary", OMSP_WORKER_ENV_PROBE: "kept" });
 			expect(env.GIT_DIR).toBeUndefined();
 			expect(env.GIT_WORK_TREE).toBe("/secondary");
-			expect(env.OMP_WORKER_ENV_PROBE).toBe("kept");
+			expect(env.OMSP_WORKER_ENV_PROBE).toBe("kept");
 		} finally {
 			if (previous === undefined) delete process.env.GIT_DIR;
 			else process.env.GIT_DIR = previous;
@@ -30,8 +33,8 @@ describe("workerEnvFromParent", () => {
 describe("tinyWorkerEnvOverlay", () => {
 	it("maps non-default settings onto the worker env vars when neither is already set", () => {
 		expect(tinyWorkerEnvOverlay("cuda", "fp16")).toEqual({
-			PI_TINY_DEVICE: "cuda",
-			PI_TINY_DTYPE: "fp16",
+			OMSP_TINY_DEVICE: "cuda",
+			OMSP_TINY_DTYPE: "fp16",
 		});
 	});
 
@@ -41,18 +44,18 @@ describe("tinyWorkerEnvOverlay", () => {
 	});
 });
 
-describe("PI_TINY_DEVICE", () => {
+describe("OMSP_TINY_DEVICE", () => {
 	it("wins over the persisted setting case-insensitively and ignores unknown devices", () => {
-		const previous = process.env.PI_TINY_DEVICE;
+		const previous = process.env.OMSP_TINY_DEVICE;
 		const settings = Settings.isolated({ "providers.tinyModelDevice": "cuda" });
 		try {
-			process.env.PI_TINY_DEVICE = "CPU";
+			process.env.OMSP_TINY_DEVICE = "CPU";
 			expect(cfgProvidersTinyModelDevice.get(settings)).toBe("cpu");
-			process.env.PI_TINY_DEVICE = "quantum";
+			process.env.OMSP_TINY_DEVICE = "quantum";
 			expect(cfgProvidersTinyModelDevice.get(settings)).toBe("cuda");
 		} finally {
-			if (previous === undefined) delete process.env.PI_TINY_DEVICE;
-			else process.env.PI_TINY_DEVICE = previous;
+			if (previous === undefined) delete process.env.OMSP_TINY_DEVICE;
+			else process.env.OMSP_TINY_DEVICE = previous;
 		}
 	});
 });
@@ -61,7 +64,7 @@ describe("nativeLibraryPathOverlay", () => {
 	it("appends the advertised dirs after an inherited LD_LIBRARY_PATH", () => {
 		expect(
 			nativeLibraryPathOverlay(
-				{ LD_LIBRARY_PATH: "/inherited", OMP_NATIVE_LIBRARY_PATH: "/store/gcc/lib" },
+				{ LD_LIBRARY_PATH: "/inherited", OMSP_NATIVE_LIBRARY_PATH: "/store/gcc/lib" },
 				"linux",
 			),
 		).toEqual({ LD_LIBRARY_PATH: "/inherited:/store/gcc/lib" });
@@ -69,25 +72,25 @@ describe("nativeLibraryPathOverlay", () => {
 
 	it("uses the advertised dirs alone when nothing is inherited", () => {
 		expect(
-			nativeLibraryPathOverlay({ OMP_NATIVE_LIBRARY_PATH: "/store/gcc/lib:/store/libgcc/lib" }, "linux"),
+			nativeLibraryPathOverlay({ OMSP_NATIVE_LIBRARY_PATH: "/store/gcc/lib:/store/libgcc/lib" }, "linux"),
 		).toEqual({ LD_LIBRARY_PATH: "/store/gcc/lib:/store/libgcc/lib" });
 	});
 
 	it("stays out of the env on non-Linux platforms", () => {
-		const env = { OMP_NATIVE_LIBRARY_PATH: "/store/gcc/lib" };
+		const env = { OMSP_NATIVE_LIBRARY_PATH: "/store/gcc/lib" };
 		expect(nativeLibraryPathOverlay(env, "darwin")).toEqual({});
 		expect(nativeLibraryPathOverlay(env, "win32")).toEqual({});
 	});
 
 	it("stays out of the env on Linux when no dirs are advertised", () => {
 		expect(nativeLibraryPathOverlay({ LD_LIBRARY_PATH: "/inherited" }, "linux")).toEqual({});
-		expect(nativeLibraryPathOverlay({ OMP_NATIVE_LIBRARY_PATH: "" }, "linux")).toEqual({});
+		expect(nativeLibraryPathOverlay({ OMSP_NATIVE_LIBRARY_PATH: "" }, "linux")).toEqual({});
 	});
 });
 
 describe("sharedWorkerLogPath", () => {
 	// Regression: the log used to be `${endpoint}.log`, which on Windows turns
-	// the named-pipe endpoint (`\\.\pipe\omp-tiny-…`) into an unopenable file
+	// the named-pipe endpoint (`\\.\pipe\omsp-tiny-…`) into an unopenable file
 	// path and crashed `--smoke-test` with ENOENT.
 	it("stays under the runtime directory instead of deriving from the endpoint", () => {
 		const runtimeDir = "/runtime";

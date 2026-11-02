@@ -2,8 +2,8 @@ import { SEANCE_SLASH_COMMAND } from "./seance";
 import { clearSubmittedText, refuseImages, runWithDetachedDraft } from "./helpers/draft";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { CompactionCancelledError } from "@oh-my-pi/pi-agent-core/compaction";
-import { logger, setProjectDir } from "@oh-my-pi/pi-utils";
+import { CompactionCancelledError } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { logger, setProjectDir } from "@oh-my-striped-pi/pi-utils";
 import { clearClaudePluginRootsCache } from "../discovery/helpers";
 import { rebindMemoryBackendForCwd } from "../memory-backend/runtime";
 import { memoryStatsUnavailableMessage, resolveMemoryBackend } from "../memory-backend";
@@ -858,7 +858,7 @@ export const BUILTIN_LIFECYCLE_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> =
 	{
 		name: "restart",
 		icon: "restart",
-		description: "Restart omp with the same launch flags, resuming this session",
+		description: "Restart omsp with the same launch flags, resuming this session",
 		handleTui: async (_command, runtime) => {
 			clearSubmittedText(runtime);
 			await runtime.ctx.restart();

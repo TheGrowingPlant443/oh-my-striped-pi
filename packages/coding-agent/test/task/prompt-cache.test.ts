@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
-import type { Model, ProviderSessionState, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildParams as buildResponsesParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import * as sdk from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as settingsStream from "@oh-my-pi/pi-coding-agent/session/settings-stream-fn";
-import type { TaskTool } from "@oh-my-pi/pi-coding-agent/task";
-import * as discovery from "@oh-my-pi/pi-coding-agent/task/discovery";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Model, ProviderSessionState, SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildParams as buildResponsesParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import * as catalogPolicy from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import * as sdk from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as settingsStream from "@oh-my-striped-pi/pi-coding-agent/session/settings-stream-fn";
+import type { TaskTool } from "@oh-my-striped-pi/pi-coding-agent/task";
+import * as discovery from "@oh-my-striped-pi/pi-coding-agent/task/discovery";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("task sibling prompt-cache routing", () => {
 	const sessions: AgentSession[] = [];
@@ -87,7 +87,7 @@ describe("task sibling prompt-cache routing", () => {
 	] as const)(
 		"%s without sharing child conversation or response state",
 		async (_name, provider, modelId, parentCacheKey, parentTaskKey, expected) => {
-			using directory = TempDir.createSync("@omp-task-cache-");
+			using directory = TempDir.createSync("@omsp-task-cache-");
 			vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 			const authStorage = await AuthStorage.create(directory.join("auth.db"));
 			const parentOverride = unoptedParentLanes[_name];
@@ -283,7 +283,7 @@ describe("task sibling prompt-cache routing", () => {
 	// each child keeps its own wire identity instead of coalescing every
 	// empty-lineage parent onto one cache family.
 	it("explicit empty parent lineage keeps independent parents' children on their own wire identity", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-empty-");
+		using directory = TempDir.createSync("@omsp-task-cache-empty-");
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const authStorage = await AuthStorage.create(directory.join("auth.db"));
 		authStorage.keys.setRuntime("github-copilot", "test-key");
@@ -512,7 +512,7 @@ describe("task sibling prompt-cache routing", () => {
 	// explicit session key keeps priority, and an explicitly empty parent
 	// lineage still derives no candidate across the switch.
 	it("shares the family key across siblings after an initially unopted child switches to an opted lane", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-transition-");
+		using directory = TempDir.createSync("@omsp-task-cache-transition-");
 		const h = await createUnoptedTaskFixture(directory);
 		const { authStorage, initialModel, optedModel, requests, createParent, runTask, childFor } = h;
 		try {
@@ -590,7 +590,7 @@ describe("task sibling prompt-cache routing", () => {
 	});
 
 	it("gates the authenticated fallback after deferred Copilot selection", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-fallback-");
+		using directory = TempDir.createSync("@omsp-task-cache-fallback-");
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const requests: Array<{ model: Model; cacheKey: string | undefined }> = [];
 		const mock = createMockModel({ handler: { content: [{ type: "text", text: "Done." }] } });
@@ -661,7 +661,7 @@ describe("task sibling prompt-cache routing", () => {
 
 	const cacheModels = ["gpt-5.4"];
 	it.each(cacheModels)("rechecks %s while explicit session and request keys win", async modelId => {
-		using directory = TempDir.createSync("@omp-task-cache-model-");
+		using directory = TempDir.createSync("@omsp-task-cache-model-");
 		vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network is disabled in this test"));
 		const requests: Array<{ provider: string; options: SimpleStreamOptions | undefined; wireKey: unknown }> = [];
 		const mock = createMockModel({ handler: { content: [{ type: "text", text: "Done." }] } });
@@ -777,7 +777,7 @@ describe("task sibling prompt-cache routing", () => {
 	// from disk — otherwise the next still-opted request reverts to the
 	// conversation id.
 	it("keeps the family key across fork and reopen after an unopted child switches to the opted lane", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-stash-fork-");
+		using directory = TempDir.createSync("@omsp-task-cache-stash-fork-");
 		const h = await createUnoptedTaskFixture(directory);
 		const {
 			authStorage,
@@ -857,7 +857,7 @@ describe("task sibling prompt-cache routing", () => {
 	// and a same-file reload keep it working (their headers are unseeded, so
 	// those guards read the stash itself).
 	it("does not leak the stashed family key across a switch to a different session", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-switch-");
+		using directory = TempDir.createSync("@omsp-task-cache-switch-");
 		const h = await createUnoptedTaskFixture(directory);
 		const {
 			authStorage,
@@ -942,7 +942,7 @@ describe("task sibling prompt-cache routing", () => {
 	// family, while a move that rolls back never moved anything — the stash
 	// must keep feeding that child's opted-in requests.
 	it("drops the stashed family key after a successful moveTo but keeps it across a rolled-back move", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-move-");
+		using directory = TempDir.createSync("@omsp-task-cache-move-");
 		const h = await createUnoptedTaskFixture(directory);
 		const { authStorage, initialModel, optedModel, requests, createParent, runTask, childFor } = h;
 		try {
@@ -1021,7 +1021,7 @@ describe("task sibling prompt-cache routing", () => {
 	// rolled-back move lost the family candidate: the next eligible model
 	// would send a child-scoped key instead of the parent family.
 	it("keeps the stashed family key when a caller rolls back a completed moveTo", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-move-rollback-");
+		using directory = TempDir.createSync("@omsp-task-cache-move-rollback-");
 		const h = await createUnoptedTaskFixture(directory);
 		const { authStorage, initialModel, optedModel, requests, createParent, runTask, childFor } = h;
 		try {
@@ -1071,7 +1071,7 @@ describe("task sibling prompt-cache routing", () => {
 	// finds neither header nor stash and falls back to the child's own wire
 	// identity instead of the family key.
 	it("carries the pending family key across park and revive before the first eligible request", async () => {
-		using directory = TempDir.createSync("@omp-task-cache-revive-");
+		using directory = TempDir.createSync("@omsp-task-cache-revive-");
 		const h = await createUnoptedTaskFixture(directory);
 		const { authStorage, initialModel, optedModel, requests, createParent, runTask, childFor } = h;
 		try {

@@ -1,5 +1,5 @@
-import type { FetchImpl, Model, Usage } from "@oh-my-pi/pi-catalog/types";
-import { base64ImageDataFailureReason, isRecord, parseImageMetadata, USER_AGENT } from "@oh-my-pi/pi-utils";
+import type { FetchImpl, Model, Usage } from "@oh-my-striped-pi/pi-catalog/types";
+import { base64ImageDataFailureReason, isRecord, parseImageMetadata, USER_AGENT } from "@oh-my-striped-pi/pi-utils";
 import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import type { ImageContent } from "../types";

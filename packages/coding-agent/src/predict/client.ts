@@ -1,7 +1,7 @@
 /**
  * Client half of the machine-global text-prediction daemon.
  *
- * The composer's word-completion provider (`@oh-my-pi/pi-tui/prompt/word-completion`)
+ * The composer's word-completion provider (`@oh-my-striped-pi/pi-tui/prompt/word-completion`)
  * reaches the daemon through {@link textPredictionBackend}. The first request
  * starts the daemon under the `text-predict` global broker when nothing is
  * listening; one connection per process then carries every request. Failures never
@@ -10,9 +10,9 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { IpcConnection, ipcEndpoint, type PredictedWord } from "@oh-my-pi/pi-natives";
-import type { WordCompletionEngine, WordPredictionBackend } from "@oh-my-pi/pi-tui/prompt/word-completion";
-import { compareVersions, getAgentDir, logger, ptree, VERSION } from "@oh-my-pi/pi-utils";
+import { IpcConnection, ipcEndpoint, type PredictedWord } from "@oh-my-striped-pi/pi-natives";
+import type { WordCompletionEngine, WordPredictionBackend } from "@oh-my-striped-pi/pi-tui/prompt/word-completion";
+import { compareVersions, getAgentDir, logger, ptree, VERSION } from "@oh-my-striped-pi/pi-utils";
 import { daemonClientForGlobal } from "../launch/client";
 import { describeQuietly, stopQuietly, waitReady } from "../launch/ensure";
 import { resolveWorkerSpawnCmd, SMOKE_TEST_TIMEOUT_MS, workerEnvFromParent } from "../subprocess/worker-client";
@@ -116,7 +116,7 @@ class DaemonConnection {
 }
 
 /**
- * Connect and confirm the daemon speaks this omp version or a newer one;
+ * Connect and confirm the daemon speaks this omsp version or a newer one;
  * `undefined` when nothing usable listens.
  */
 async function connectDaemon(endpoint: string): Promise<DaemonConnection | undefined> {
@@ -132,7 +132,7 @@ async function connectDaemon(endpoint: string): Promise<DaemonConnection | undef
 		if (pong.ok && pong.op === "ping" && (pong.version === VERSION || compareVersions(pong.version, VERSION) > 0)) {
 			return connection;
 		}
-		// A daemon from an older omp version: retire it so this version's starts. A newer
+		// A daemon from an older omsp version: retire it so this version's starts. A newer
 		// one keeps serving: after an in-place upgrade this process would start that same
 		// newer build again, and retiring it cuts off every process already on it.
 		await connection.request(id => ({ id, op: "shutdown" }), REQUEST_TIMEOUT_MS).catch(() => undefined);
@@ -294,7 +294,7 @@ export function textPredictionBackend(method: WordCompletionEngine): WordPredict
 
 /**
  * One completion from the daemon with its confidence, for diagnostics such as
- * `omp predict`. Unlike the editor backend, failures reject instead of
+ * `omsp predict`. Unlike the editor backend, failures reject instead of
  * degrading to no ghost text.
  */
 export function requestTextPrediction(
@@ -308,7 +308,7 @@ export function requestTextPrediction(
 
 /**
  * Close this process's daemon connection (the daemon keeps running). For
- * short-lived commands such as `omp predict`; the composer keeps its
+ * short-lived commands such as `omsp predict`; the composer keeps its
  * connection for the process lifetime.
  */
 export function closeTextPrediction(): void {
@@ -327,7 +327,7 @@ export function syncTextPrediction(): void {
  * and shut it down.
  */
 export async function smokeTestTextPredictDaemon(): Promise<void> {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-text-predict-smoke-"));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-text-predict-smoke-"));
 	const endpoint = ipcEndpoint(root, "text-predict");
 	const spawn = resolveWorkerSpawnCmd(TEXT_PREDICT_WORKER_ARG);
 	const proc = ptree.spawn(spawn.cmd, {

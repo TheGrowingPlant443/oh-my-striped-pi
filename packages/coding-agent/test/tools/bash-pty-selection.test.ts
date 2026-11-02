@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { canUseInteractiveBashPty } from "@oh-my-pi/pi-coding-agent/tools/bash-pty-selection";
+import { canUseInteractiveBashPty } from "@oh-my-striped-pi/pi-coding-agent/tools/bash-pty-selection";
 
 const originalPlatform = process.platform;
-const originalNoPty = Bun.env.PI_NO_PTY;
+const originalNoPty = Bun.env.OMSP_NO_PTY;
 
 function setPlatform(platform: NodeJS.Platform): void {
 	Object.defineProperty(process, "platform", {
@@ -22,10 +22,10 @@ function restorePlatform(): void {
 
 function setNoPty(value: string | undefined): void {
 	if (value === undefined) {
-		delete Bun.env.PI_NO_PTY;
+		delete Bun.env.OMSP_NO_PTY;
 		return;
 	}
-	Bun.env.PI_NO_PTY = value;
+	Bun.env.OMSP_NO_PTY = value;
 }
 
 function interactiveContext() {

@@ -1,8 +1,8 @@
 import { afterEach, expect, test, vi } from "bun:test";
-import { AuthStorage, type UsageReport } from "@oh-my-pi/pi-ai";
-import { runUsageCommand } from "@oh-my-pi/pi-coding-agent/cli/usage-cli";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
+import { AuthStorage, type UsageReport } from "@oh-my-striped-pi/pi-ai";
+import { runUsageCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/usage-cli";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
 
 afterEach(() => vi.restoreAllMocks());
 

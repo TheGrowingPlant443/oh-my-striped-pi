@@ -11,10 +11,10 @@
  * is started, so a card that names generation N can never reach session N+1.
  */
 import { randomBytes } from "node:crypto";
-import { logger } from "@oh-my-pi/pi-utils";
-import { sanitizeDisplayLine } from "@oh-my-pi/pi-tui/overlays/extensions/display-text";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import { sanitizeDisplayLine } from "@oh-my-striped-pi/pi-tui/overlays/extensions/display-text";
 import type { InteractiveModeContext } from "../modes/types";
-import { TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-pi/pi-tui/render/render-utils";
+import { TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { CollabHost, CollabHostStoppedError, CollabRelayUnavailableError } from "./host";
 import type { CollabAccess } from "./registry";
 
@@ -66,7 +66,7 @@ export class CollabController {
 
 	constructor(ctx: InteractiveModeContext) {
 		this.#ctx = ctx;
-		// 64 random bits: unique per process on one machine, short enough for `omp collab link <id>` and socket paths.
+		// 64 random bits: unique per process on one machine, short enough for `omsp collab link <id>` and socket paths.
 		this.instanceId = randomBytes(8).toString("hex");
 	}
 
@@ -98,7 +98,7 @@ export class CollabController {
 	autoStart(): void {
 		// Observe session changes from now on even when auto-start is currently
 		// off: the setting is read live, so enabling it later applies to the
-		// next `/new`, `/resume`, or branch without restarting omp.
+		// next `/new`, `/resume`, or branch without restarting omsp.
 		this.#observeSessionChanges();
 		const access = this.autoStartMode;
 		if (access === "off" || this.#shutdown || this.host || this.#ctx.collabGuest) return;
@@ -135,7 +135,7 @@ export class CollabController {
 		this.#unsubscribeSessionChange ??= this.#ctx.session.registerSessionChangeCallback(() =>
 			this.#onSessionChanged(),
 		);
-		// A write that finds the session file open in another omp process (or
+		// A write that finds the session file open in another omsp process (or
 		// replaced/contested on disk) moves the session to a sibling file under a
 		// new id without an AgentSession transition; rotate the room for it too.
 		// Moves replayed at subscription predate every room this controller hosts.

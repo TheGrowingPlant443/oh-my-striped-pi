@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createTools, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createTools, type ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 
-Bun.env.PI_PYTHON_SKIP_CHECK = "1";
+Bun.env.OMSP_PYTHON_SKIP_CHECK = "1";
 
 function createTestSession(overrides: Partial<ToolSession> = {}): ToolSession {
 	return {
@@ -97,7 +97,7 @@ describe("createTools", () => {
 	it("still exposes eval when python kernel is unavailable (dispatches to js)", async () => {
 		const session = createTestSession();
 		vi.spyOn(
-			await import("@oh-my-pi/pi-coding-agent/eval/py/kernel"),
+			await import("@oh-my-striped-pi/pi-coding-agent/eval/py/kernel"),
 			"checkPythonKernelAvailability",
 		).mockResolvedValue({
 			ok: false,

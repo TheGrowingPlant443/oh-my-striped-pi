@@ -3,7 +3,7 @@ import { mockOAuthApiKey, resetOAuthMocks } from "./oauth-test-utils";
 beforeEachOAuthFixture(() => mockOAuthApiKey());
 afterEachOAuthFixture(() => resetOAuthMocks());
 import { afterEach, describe, expect, it } from "bun:test";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
 
 /**
  * Model discovery resolves its key through `keys.peek()`, and credential-scoped

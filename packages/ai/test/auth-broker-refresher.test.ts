@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
-import { AuthBrokerRefresher } from "@oh-my-pi/pi-ai/auth-broker";
-import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
+import { AuthBrokerRefresher } from "@oh-my-striped-pi/pi-ai/auth-broker";
+import * as oauthUtils from "@oh-my-striped-pi/pi-ai/registry/oauth";
 import { removeWithRetries } from "../../utils/src/temp";
 
 const COPILOT_ENV = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN"] as const;

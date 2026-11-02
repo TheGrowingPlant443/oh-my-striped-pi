@@ -1,4 +1,4 @@
-import { type DelegationBias, resolveDelegationBias } from "@oh-my-pi/pi-catalog/compat/delegation";
+import { type DelegationBias, resolveDelegationBias } from "@oh-my-striped-pi/pi-catalog/compat/delegation";
 import type { ToolSession } from "..";
 
 /**

@@ -1,10 +1,10 @@
-import type { Api, Model, ModelSpec, RemoteCompactionConfig, ThinkingConfig } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { providerEntry } from "@oh-my-pi/pi-catalog/compat/providers";
-import { PROVIDER_DESCRIPTORS } from "@oh-my-pi/pi-catalog/provider-models";
-import { toModelSpec } from "@oh-my-pi/pi-catalog/provider-models/bundled-references";
-import { apiServesKind, modelKind, type ModelKind, runnerApiKind } from "@oh-my-pi/pi-catalog/types";
-import { isRecord } from "@oh-my-pi/pi-utils";
+import type { Api, Model, ModelSpec, RemoteCompactionConfig, ThinkingConfig } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { providerEntry } from "@oh-my-striped-pi/pi-catalog/compat/providers";
+import { PROVIDER_DESCRIPTORS } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { toModelSpec } from "@oh-my-striped-pi/pi-catalog/provider-models/bundled-references";
+import { apiServesKind, modelKind, type ModelKind, runnerApiKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import { createConfigHeaderResolver } from "./resolve-config-value";
 import type { ModelOverride } from "./models-config-schema";
 /** Provider override config (baseUrl, headers, apiKey, compat, transport). */

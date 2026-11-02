@@ -1,10 +1,10 @@
 import { afterEach, expect, it } from "bun:test";
-import { discoverAuthStorage } from "@oh-my-pi/pi-coding-agent/sdk";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import { getDbBusyTimeoutMs, setInteractiveHost, TempDir } from "@oh-my-pi/pi-utils";
+import { discoverAuthStorage } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { getDbBusyTimeoutMs, setInteractiveHost, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 // `runRootCommand` registers the CLI's extension roots (`--no-extensions` → explicit-only) process-wide.
 afterEach(() => {
@@ -38,8 +38,8 @@ it("classifies an interactive host before opening auth storage", async () => {
 	expect(observedTimeout).toBe(5000);
 });
 
-it("standalone auth discovery routes by PI_CONFIG_FILES policy over main config", async () => {
-	using tempDir = TempDir.createSync("@omp-standalone-policy-");
+it("standalone auth discovery routes by OMSP_CONFIG_FILES policy over main config", async () => {
+	using tempDir = TempDir.createSync("@omsp-standalone-policy-");
 	const overlayPath = tempDir.join("policy.yml");
 	await Bun.write(
 		tempDir.join("config.yml"),
@@ -59,8 +59,8 @@ it("standalone auth discovery routes by PI_CONFIG_FILES policy over main config"
 			"",
 		].join("\n"),
 	);
-	const previousOverlay = process.env.PI_CONFIG_FILES;
-	process.env.PI_CONFIG_FILES = overlayPath;
+	const previousOverlay = process.env.OMSP_CONFIG_FILES;
+	process.env.OMSP_CONFIG_FILES = overlayPath;
 	resetSettingsForTest();
 	try {
 		const storage = await discoverAuthStorage(tempDir.path(), { cwd: tempDir.path() });
@@ -86,8 +86,8 @@ it("standalone auth discovery routes by PI_CONFIG_FILES policy over main config"
 			storage.close();
 		}
 	} finally {
-		if (previousOverlay === undefined) delete process.env.PI_CONFIG_FILES;
-		else process.env.PI_CONFIG_FILES = previousOverlay;
+		if (previousOverlay === undefined) delete process.env.OMSP_CONFIG_FILES;
+		else process.env.OMSP_CONFIG_FILES = previousOverlay;
 		resetSettingsForTest();
 	}
 });

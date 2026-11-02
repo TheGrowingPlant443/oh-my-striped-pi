@@ -7,7 +7,7 @@ import {
 	pruneHttpRequestDumps,
 	type RawHttpRequestDump,
 	shouldDumpRejectedRequest,
-} from "@oh-my-pi/pi-ai/utils/http-inspector";
+} from "@oh-my-striped-pi/pi-ai/utils/http-inspector";
 
 class HttpError extends Error {
 	constructor(
@@ -117,7 +117,7 @@ describe("pruneHttpRequestDumps", () => {
 	}
 
 	it("deletes dumps past the age limit and the oldest dumps beyond the size cap", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-http-dumps-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-http-dumps-"));
 		roots.push(dir);
 		await writeDump(dir, "newest.json", 400, 1_000);
 		await writeDump(dir, "recent.json", 400, DAY_MS);
@@ -131,7 +131,7 @@ describe("pruneHttpRequestDumps", () => {
 	});
 
 	it("never deletes the dump it was asked to keep, even past the caps", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-http-dumps-keep-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-http-dumps-keep-"));
 		roots.push(dir);
 		await writeDump(dir, "just-written.json", 2_000, 0);
 		await writeDump(dir, "previous.json", 10, DAY_MS);

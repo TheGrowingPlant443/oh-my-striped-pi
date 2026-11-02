@@ -13,7 +13,7 @@
 import * as fs from "node:fs/promises";
 import { ADVISOR_TRANSCRIPT_STEM } from "../advisor/transcript-recorder";
 /** HUD expander click target reserved by the allocator so it cannot name a subagent. */
-export const PINNED_HUD_TOGGLE_ID = "@omp:toggle-pinned-hud";
+export const PINNED_HUD_TOGGLE_ID = "@omsp:toggle-pinned-hud";
 
 /**
  * Manages agent output ID allocation to ensure uniqueness.

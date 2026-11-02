@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Process, ProcessStatus } from "@oh-my-pi/pi-natives";
+import { Process, ProcessStatus } from "@oh-my-striped-pi/pi-natives";
 import type { Subprocess } from "bun";
 import { getAgentDir, getProjectDir, MAIN_CONFIG_FILENAMES } from "./dirs";
 import { $env, filterChildShellEnv } from "./env";
@@ -32,7 +32,7 @@ let capturedChildShellEnv: Record<string, string> | undefined;
 /**
  * Project whose dotenv values the spawn environment filters out: the one current
  * when it was first built or captured.
- * That is normally the launch project, whose dotenv files Bun and omp load into
+ * That is normally the launch project, whose dotenv files Bun and omsp load into
  * `process.env`; a later session in another project must not receive them.
  */
 let spawnEnvProjectDir: string | undefined;
@@ -41,14 +41,14 @@ let spawnEnvProjectDir: string | undefined;
  * Build the spawn environment (cached).
  */
 function buildSpawnEnv(shell: string): Record<string, string> {
-	const noCI = $env.PI_BASH_NO_CI || $env.CLAUDE_BASH_NO_CI;
+	const noCI = $env.OMSP_BASH_NO_CI || $env.CLAUDE_BASH_NO_CI;
 	spawnEnvProjectDir ??= getProjectDir();
 	return {
 		...(capturedChildShellEnv ?? filterChildShellEnv(Bun.env, spawnEnvProjectDir)),
 		SHELL: shell,
 		GIT_EDITOR: "true",
 		GPG_TTY: "not a tty",
-		OMPCODE: "1",
+		OMSPCODE: "1",
 		CLAUDECODE: "1",
 		...(noCI ? {} : { CI: "true" }),
 	} as Record<string, string>;
@@ -57,7 +57,7 @@ function buildSpawnEnv(shell: string): Record<string, string> {
 /**
  * Get shell args for the resolved shell.
  * cmd.exe takes `/c`; PowerShell (powershell.exe / pwsh) takes
- * `-NoLogo -Command`, with `-NoProfile` when PI_BASH_NO_LOGIN /
+ * `-NoLogo -Command`, with `-NoProfile` when OMSP_BASH_NO_LOGIN /
  * CLAUDE_BASH_NO_LOGIN is set (profile scripts are PowerShell's login-shell
  * analog); POSIX shells take `-c`, with `-l` unless the same env is set.
  *
@@ -65,7 +65,7 @@ function buildSpawnEnv(shell: string): Record<string, string> {
  */
 export function getShellArgs(shell: string, env: Record<string, string | undefined> = $env): string[] {
 	if (isCmdShell(shell)) return ["/c"];
-	const noLogin = env.PI_BASH_NO_LOGIN || env.CLAUDE_BASH_NO_LOGIN;
+	const noLogin = env.OMSP_BASH_NO_LOGIN || env.CLAUDE_BASH_NO_LOGIN;
 	if (isPowerShell(shell)) {
 		return noLogin ? ["-NoLogo", "-NoProfile", "-Command"] : ["-NoLogo", "-Command"];
 	}
@@ -99,7 +99,7 @@ export function isPosixShell(shell: string): boolean {
  * Get shell prefix for wrapping commands (profilers, strace, etc.).
  */
 function getShellPrefix(): string | undefined {
-	return $env.PI_SHELL_PREFIX || $env.CLAUDE_CODE_SHELL_PREFIX;
+	return $env.OMSP_SHELL_PREFIX || $env.CLAUDE_CODE_SHELL_PREFIX;
 }
 
 /**

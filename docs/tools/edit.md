@@ -19,11 +19,11 @@
 `edit` is an essential built-in tool. `resolveEditMode()` selects the active wire contract in this order:
 
 1. model-specific configured variant;
-2. `PI_EDIT_VARIANT`;
+2. `OMSP_EDIT_VARIANT`;
 3. `edit.mode`;
 4. default `hashline`.
 
-Supported modes are `hashline`, `apply_patch`, `patch`, `replace`, and `sloppy`. `edit.modelVariants` uses the first case-insensitive substring match against the active model string. `PI_EDIT_VARIANT` pins the mode exactly; for settings-derived `hashline`, `PI_STRICT_EDIT_MODE` disables the model-family fallback to `replace` (Kimi, MiMo, MiniMax, DeepSeek, StepFun, Codex Spark, and GLM 5.3 Flash).
+Supported modes are `hashline`, `apply_patch`, `patch`, `replace`, and `sloppy`. `edit.modelVariants` uses the first case-insensitive substring match against the active model string. `OMSP_EDIT_VARIANT` pins the mode exactly; for settings-derived `hashline`, `OMSP_STRICT_EDIT_MODE` disables the model-family fallback to `replace` (Kimi, MiMo, MiniMax, DeepSeek, StepFun, Codex Spark, and GLM 5.3 Flash).
 
 This page primarily documents hashline. The schema, prompt, examples, renderer, and optional Lark format switch with the mode. Models with `editPromptVariant: "compact"` receive the compact hashline prompt. In `apply_patch` custom-tool mode the wire name is `apply_patch`; dispatch still reaches the same internal tool. The tool is strict, essential, and uses exclusive concurrency.
 

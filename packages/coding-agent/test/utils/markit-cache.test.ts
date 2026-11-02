@@ -10,10 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Markit } from "@oh-my-pi/pi-coding-agent/markit";
-import { convertBufferWithMarkit, convertFileWithMarkit } from "@oh-my-pi/pi-coding-agent/utils/markit";
-import { pruneMarkitConversionCache } from "@oh-my-pi/pi-coding-agent/utils/markit-cache";
-import { __resetDirsFromEnvForTests, getAgentDir, Snowflake, setAgentDir } from "@oh-my-pi/pi-utils";
+import { Markit } from "@oh-my-striped-pi/pi-coding-agent/markit";
+import { convertBufferWithMarkit, convertFileWithMarkit } from "@oh-my-striped-pi/pi-coding-agent/utils/markit";
+import { pruneMarkitConversionCache } from "@oh-my-striped-pi/pi-coding-agent/utils/markit-cache";
+import { __resetDirsFromEnvForTests, getAgentDir, Snowflake, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 function restoreEnv(key: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -31,9 +31,9 @@ describe("document conversion cache", () => {
 	let originalXdgCacheHome: string | undefined;
 
 	beforeEach(async () => {
-		originalPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
-		originalOmpProfile = process.env.OMP_PROFILE;
-		originalPiProfile = process.env.PI_PROFILE;
+		originalPiCodingAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+		originalOmpProfile = process.env.OMSP_PROFILE;
+		originalPiProfile = process.env.OMSP_PROFILE;
 		originalXdgCacheHome = process.env.XDG_CACHE_HOME;
 		testDir = path.join(os.tmpdir(), `markit-cache-${Snowflake.next()}`);
 		await fs.mkdir(testDir, { recursive: true });
@@ -42,9 +42,9 @@ describe("document conversion cache", () => {
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		restoreEnv("PI_CODING_AGENT_DIR", originalPiCodingAgentDir);
-		restoreEnv("OMP_PROFILE", originalOmpProfile);
-		restoreEnv("PI_PROFILE", originalPiProfile);
+		restoreEnv("OMSP_CODING_AGENT_DIR", originalPiCodingAgentDir);
+		restoreEnv("OMSP_PROFILE", originalOmpProfile);
+		restoreEnv("OMSP_PROFILE", originalPiProfile);
 		restoreEnv("XDG_CACHE_HOME", originalXdgCacheHome);
 		__resetDirsFromEnvForTests();
 		await fs.rm(testDir, { recursive: true, force: true });

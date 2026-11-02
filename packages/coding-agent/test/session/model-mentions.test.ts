@@ -2,30 +2,30 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { dispatchRpcSkillPrompt } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { dispatchRpcSkillPrompt } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import {
 	RpcExtensionUserMessageTracker,
 	RpcPromptResults,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-prompt-results";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SKILL_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/session/messages";
-import type { CustomMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { expandModelMentionTags } from "@oh-my-pi/pi-tui/prompt/model-mention-syntax";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-prompt-results";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SKILL_PROMPT_MESSAGE_TYPE } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import type { CustomMessage } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { expandModelMentionTags } from "@oh-my-striped-pi/pi-tui/prompt/model-mention-syntax";
 import {
 	MODEL_MENTION_ENTRY_TYPE,
 	ModelMentionRegistry,
 	readModelMentions,
-} from "@oh-my-pi/pi-coding-agent/session/model-mentions";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/model-mentions";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getBundledAgent } from "@oh-my-striped-pi/pi-coding-agent/task/agents";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 function model(provider: string, id: string, name: string): Model {
 	return buildModel({
@@ -43,7 +43,7 @@ function model(provider: string, id: string, name: string): Model {
 }
 
 async function createTaggedSkill() {
-	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-model-mention-skill-"));
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-model-mention-skill-"));
 	const filePath = path.join(dir, "SKILL.md");
 	await Bun.write(filePath, "Skill body: ^c/w");
 	return { dir, skill: { name: "test", filePath, baseDir: dir } };

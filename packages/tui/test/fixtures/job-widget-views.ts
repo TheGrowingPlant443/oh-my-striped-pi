@@ -3,7 +3,7 @@
  * them: a decode-throughput benchmark, a per-model eval, a CI run and a trial
  * sweep. Some text carries a tab and a colour escape, as raw job output does.
  */
-import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
+import type { JobWidgetView } from "@oh-my-striped-pi/pi-tui/tools/job-widget";
 
 const UPDATED_AT = 1_760_000_000_000;
 

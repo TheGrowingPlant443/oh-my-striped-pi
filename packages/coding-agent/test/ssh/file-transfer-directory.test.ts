@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ShellFsFileType } from "@oh-my-pi/pi-natives";
+import { ShellFsFileType } from "@oh-my-striped-pi/pi-natives";
 import * as connectionManager from "../../src/ssh/connection-manager";
 import { listRemoteDir } from "../../src/ssh/file-transfer";
 import { fakeSshTransport } from "../helpers/fake-ssh-transport";

@@ -801,7 +801,7 @@ export const cfgGithubCacheEnabled = register({
 		tab: "tools",
 		group: "GitHub",
 		label: "GitHub View Cache",
-		description: "Cache rendered issue/PR view output in ~/.omp/cache/github-cache.db so repeated reads are free",
+		description: "Cache rendered issue/PR view output in ~/.omsp/cache/github-cache.db so repeated reads are free",
 	},
 });
 
@@ -851,7 +851,7 @@ export const cfgSecurityEnabled = register({
 		group: "Available Tools",
 		label: "Security",
 		description:
-			"Enable OMP-native security scan planning, execution, and the read-only security:// resource namespace",
+			"Enable OMSP-native security scan planning, execution, and the read-only security:// resource namespace",
 	},
 });
 
@@ -885,7 +885,7 @@ export const cfgToolsIntentTracing = register({
 	id: "tools.intentTracing",
 	type: "boolean",
 	default: true,
-	env: "PI_INTENT_TRACING",
+	env: "OMSP_INTENT_TRACING",
 	ui: {
 		tab: "tools",
 		group: "Execution",

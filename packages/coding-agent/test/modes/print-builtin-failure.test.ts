@@ -1,7 +1,7 @@
 /**
  * Contract: print mode is automation surface — a dispatched `/mcp reauth`
  * that consumes an input but fails (unknown server, usage error, refused
- * operation) must not exit 0, or `omp -p '/mcp reauth foo'` scripts treat a
+ * operation) must not exit 0, or `omsp -p '/mcp reauth foo'` scripts treat a
  * failed reauthorization as success. Conversely a consumed reauth that
  * succeeded exits 0 without prompting the model or reprinting the persisted
  * previous turn, and the merged stdin/@file message is never dispatched as a
@@ -11,10 +11,10 @@ import { describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { runPrintMode } from "@oh-my-pi/pi-coding-agent/modes/print-mode";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { runPrintMode } from "@oh-my-striped-pi/pi-coding-agent/modes/print-mode";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 function printSession(cwd: string, prompts: string[]): AgentSession {
 	return {
@@ -43,7 +43,7 @@ function printSession(cwd: string, prompts: string[]): AgentSession {
 
 describe("print mode builtin exit codes", () => {
 	test("exits 1 when the dispatched reauth fails, 0 for other slash input", async () => {
-		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-print-builtin-"));
+		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-print-builtin-"));
 		const stderrLines: string[] = [];
 		const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
 			stderrLines.push(String(chunk));
@@ -79,10 +79,10 @@ describe("print mode builtin exit codes", () => {
 	});
 
 	test("never dispatches the merged stdin/@file message as a command", async () => {
-		// Security: `curl … | omp "summarize"` merges the pipe into
+		// Security: `curl … | omsp "summarize"` merges the pipe into
 		// `initialMessage`; a slash-shaped payload there (e.g. a persisted
 		// `/mcp add`) must reach the model as text, never run as a command.
-		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-print-stdin-"));
+		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-print-stdin-"));
 		const stderrLines: string[] = [];
 		const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
 			stderrLines.push(String(chunk));
@@ -113,7 +113,7 @@ describe("print mode builtin exit codes", () => {
 		// (`agentInvoked`); that turn's answer belongs to this run, so it is
 		// printed — not suppressed as a stale persisted turn — and its stop
 		// reason decides the exit status.
-		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-print-retry-"));
+		const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-print-retry-"));
 		const stdoutLines: string[] = [];
 		const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(((
 			chunk: unknown,

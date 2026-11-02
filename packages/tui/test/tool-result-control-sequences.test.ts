@@ -3,11 +3,11 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ReadToolGroupComponent } from "@oh-my-pi/pi-tui/chat/read-tool-group";
-import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { applyHyperlinkSetting } from "@oh-my-pi/pi-tui/render/hyperlink";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { ReadToolGroupComponent } from "@oh-my-striped-pi/pi-tui/chat/read-tool-group";
+import { ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { applyHyperlinkSetting } from "@oh-my-striped-pi/pi-tui/render/hyperlink";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 /**
  * Tool `details` carry raw file text (grep/read `displayContent`) straight to
@@ -79,7 +79,7 @@ describe("tool result details with raw control sequences", () => {
 	it.skipIf(process.platform === "win32")(
 		"keeps a control-byte filename as the hyperlink target while cleaning its label",
 		async () => {
-			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-read-link-"));
+			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-read-link-"));
 			const filename = path.join(dir, `fixture${FILE_ESCAPES}.txt`);
 			try {
 				await Bun.write(filename, "needle");
@@ -131,7 +131,7 @@ describe("tool result details with raw control sequences", () => {
 		"standalone read cards keep the original file hyperlink target",
 		async () => {
 			applyHyperlinkSetting("always");
-			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-read-single-link-"));
+			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-read-single-link-"));
 			const filename = path.join(dir, `fixture${FILE_ESCAPES}.txt`);
 			try {
 				await Bun.write(filename, "needle");

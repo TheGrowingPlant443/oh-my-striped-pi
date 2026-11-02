@@ -12,9 +12,9 @@
  * than the POST — so the cancellation paths are pinned here alongside the wait.
  */
 import { afterEach, describe, expect, it, spyOn, vi } from "bun:test";
-import * as mcpTimeout from "@oh-my-pi/pi-coding-agent/mcp/timeout";
-import { HttpTransport } from "@oh-my-pi/pi-coding-agent/mcp/transports/http";
-import { LegacySseTransport } from "@oh-my-pi/pi-coding-agent/mcp/transports/sse";
+import * as mcpTimeout from "@oh-my-striped-pi/pi-coding-agent/mcp/timeout";
+import { HttpTransport } from "@oh-my-striped-pi/pi-coding-agent/mcp/transports/http";
+import { LegacySseTransport } from "@oh-my-striped-pi/pi-coding-agent/mcp/transports/sse";
 
 interface StallingServer {
 	server: Bun.Server<undefined>;
@@ -97,7 +97,7 @@ async function connected(server: Bun.Server<undefined>, timeout: number): Promis
 
 /**
  * State the deadline a transport resolves instead of inheriting it from
- * `OMP_MCP_TIMEOUT_MS`. A spy on the module the transports read keeps the run
+ * `OMSP_MCP_TIMEOUT_MS`. A spy on the module the transports read keeps the run
  * hermetic without mutating any global; `vi.restoreAllMocks()` undoes it.
  */
 function pinDeadline(ms: number): void {

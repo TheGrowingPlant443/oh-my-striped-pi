@@ -1,12 +1,12 @@
 # security_scan
 
-> Plan and run OMP-native security reviews and validate stored findings.
+> Plan and run OMSP-native security reviews and validate stored findings.
 
 ## Availability and prerequisites
 
 - `security.enabled` defaults to `false`. When disabled, `security_scan` is omitted from the available tool set and `security://` reads fail with an enablement message. Enable it in **Settings → Tools → Security** or set `security.enabled = true`.
 - The tool is discoverable, strict-schema, and classified as `exec`.
-- Native `preflight` requires a Git repository, an active retained model, and a stored Copilot OAuth credential. The scan runs through OMP's local tool workflow; model context is still sent to Copilot.
+- Native `preflight` requires a Git repository, an active retained model, and a stored Copilot OAuth credential. The scan runs through OMSP's local tool workflow; model context is still sent to Copilot.
 - If several OAuth accounts exist and none is active, pass `credential_id`; a lone account is selected automatically. The immutable plan pins the credential row and recorded account/workspace identity. Execution and token refresh stay on that row rather than rotating to another account.
 
 ## Source
@@ -46,7 +46,7 @@ Unused optional fields are ignored by actions that do not read them.
 
 ## Outputs and execution model
 
-Every action returns one text content block plus structured `details` containing `action` and the action-specific object described below. The tool itself does not stream partial arguments or progress updates. `start` returns an operation immediately; an OMP job reports progress when a job manager is available, otherwise the coordinator runs its local background promise. Use `status` for durable operation state.
+Every action returns one text content block plus structured `details` containing `action` and the action-specific object described below. The tool itself does not stream partial arguments or progress updates. `start` returns an operation immediately; an OMSP job reports progress when a job manager is available, otherwise the coordinator runs its local background promise. Use `status` for durable operation state.
 
 ## Action reference
 
@@ -73,7 +73,7 @@ The plan pins:
 
 For `repository`, `scoped_path`, and `working_tree`, the target digest covers in-scope tracked and untracked file paths and contents, executable bits, symlink targets, and the current HEAD (or `unborn`). `ref_diff` instead fingerprints the resolved base/head commits and their raw tree diff. Scope paths must be repository-relative, must exist and resolve inside the repository, and are normalized, deduplicated, and sorted.
 
-If `output_root` is omitted, preflight allocates a private unique directory under the project's OMP security state. A caller-supplied output directory is created during preflight if absent; its parent must already have a canonical identity. Nonempty directories require `archive_existing=true`.
+If `output_root` is omitted, preflight allocates a private unique directory under the project's OMSP security state. A caller-supplied output directory is created during preflight if absent; its parent must already have a canonical identity. Nonempty directories require `archive_existing=true`.
 
 ### `start`
 
@@ -142,7 +142,7 @@ Finding <finding-id> validation is now <status>.
 
 Publication checks cited finding and evidence locations against real files and line counts in the reviewed tree (the pinned head worktree for `ref_diff`). Findings with missing/unreadable paths or out-of-range lines are withheld and reported in `details.droppedFindings`. Grounded paths must be repository-relative and in scope. Repeated findings with the same canonical fingerprint are deduplicated. A second successful publication call fails. If the scan session ends without publication, the scan is persisted as `partial`; a successful publication remains `completed` even if later metrics/output refresh fails.
 
-Canonical state is private and project-keyed under OMP's security state root. A completed native output directory contains:
+Canonical state is private and project-keyed under OMSP's security state root. A completed native output directory contains:
 
 - `scan.json` — public scan manifest, written last as the commit marker;
 - `findings.json`;
@@ -191,7 +191,7 @@ Plan an exact revision diff with an external output directory:
 	"target_kind": "ref_diff",
 	"base_revision": "origin/main",
 	"head_revision": "HEAD",
-	"output_root": "/tmp/omp-security-review"
+	"output_root": "/tmp/omsp-security-review"
 }
 ```
 

@@ -8,7 +8,7 @@
  * tests to spy on.
  */
 
-import { USER_AGENT, truncate } from "@oh-my-pi/pi-utils";
+import { USER_AGENT, truncate } from "@oh-my-striped-pi/pi-utils";
 import { isTimeoutError, withTimeoutSignal } from "../utils/fetch-timeout";
 import type { HindsightConfig } from "./config";
 

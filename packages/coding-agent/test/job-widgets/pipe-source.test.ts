@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import * as os from "node:os";
-import { executeBash } from "@oh-my-pi/pi-coding-agent/exec/bash-executor";
-import { PipeStreams } from "@oh-my-pi/pi-natives";
+import { executeBash } from "@oh-my-striped-pi/pi-coding-agent/exec/bash-executor";
+import { PipeStreams } from "@oh-my-striped-pi/pi-natives";
 import { JobWidgetRuntime, PipeTextSources } from "../../src/job-widgets";
 
 describe("PipeTextSources", () => {

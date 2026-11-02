@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getBundledModels } from "@oh-my-pi/pi-catalog/models";
+import { getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
 describe("anthropic Fable 5.1 bundled row", () => {
 	// `getProviderModels` consumes models.json verbatim and never reruns
 	// `buildModel`, so an offline/static startup reports whatever the committed

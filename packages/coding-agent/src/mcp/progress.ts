@@ -1,5 +1,5 @@
-import { type MCPProgress, parseMCPProgress } from "@oh-my-pi/pi-tui/tools/mcp";
-import { isRecord, logger } from "@oh-my-pi/pi-utils";
+import { type MCPProgress, parseMCPProgress } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import { isRecord, logger } from "@oh-my-striped-pi/pi-utils";
 import { MCPNotificationMethods } from "./types";
 
 /** Add request-scoped progress metadata without changing caller-owned objects. */

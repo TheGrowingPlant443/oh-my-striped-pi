@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { convertAnthropicMessages, streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
+import { convertAnthropicMessages, streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
 import type {
 	AssistantMessage,
 	DeveloperMessage,
 	Message,
 	ToolResultMessage,
 	UserMessage,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 // Claude reads JPEG, PNG, GIF and WebP only. A video, PDF or HEIC attached to the
 // turn being answered must fail the request, not reach the model as a text stub

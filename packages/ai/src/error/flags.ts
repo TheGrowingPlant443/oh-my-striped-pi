@@ -1,4 +1,4 @@
-import { isUnexpectedSocketCloseMessage } from "@oh-my-pi/pi-utils/fetch-retry";
+import { isUnexpectedSocketCloseMessage } from "@oh-my-striped-pi/pi-utils/fetch-retry";
 import type { Api, AssistantMessage, Usage } from "../types";
 import { AwsCredentialsError } from "./aws";
 import {
@@ -200,7 +200,7 @@ export function isResponsesRequestBodyReadTimeout(message: {
  * Transport-failure wording that marks an error transient. Covers
  * diagnostics forwarded verbatim by gateways/proxies in other runtimes, e.g.
  * undici's "other side closed" and Go's `net.ErrClosed` ("use of closed
- * network connection", #15385). Also covers OMP's own network-failure
+ * network connection", #15385). Also covers OMSP's own network-failure
  * sentences from `networkFailureMessage` (offline / unreachable / refused /
  * TLS), which must stay at least as retryable as the bare `Connection error.`
  * text they replaced.

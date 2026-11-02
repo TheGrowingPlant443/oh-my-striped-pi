@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { createAcpClientBridge } from "@oh-my-pi/pi-coding-agent/modes/acp/acp-client-bridge";
+import { createAcpClientBridge } from "@oh-my-striped-pi/pi-coding-agent/modes/acp/acp-client-bridge";
 import {
 	RequestError,
 	type AgentSideConnection,
 	type RequestPermissionRequest,
 	type RequestPermissionResponse,
-} from "@oh-my-pi/pi-utils/acp";
+} from "@oh-my-striped-pi/pi-utils/acp";
 
 const ALLOW_SELECTED: RequestPermissionResponse = { outcome: { outcome: "selected", optionId: "allow_once" } };
 

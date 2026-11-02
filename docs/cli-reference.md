@@ -1,55 +1,55 @@
 # CLI reference
 
-`omp` is invoked as:
+`omsp` is invoked as:
 
 ```sh
-omp [command] [flags] [messages...]
+omsp [command] [flags] [messages...]
 ```
 
-When the first positional argument is **not** a registered subcommand, `omp`
+When the first positional argument is **not** a registered subcommand, `omsp`
 normally routes to the default [`launch`](#launch-the-default-command) command.
-So `omp "fix the build"` launches a session with that message, while `omp models`
+So `omsp "fix the build"` launches a session with that message, while `omsp models`
 runs the `models` subcommand. Bare plugin-management words such as `marketplace`,
-`uninstall`, or `extensions` instead produce a hint to use `omp plugin …`;
-use `omp launch <word>` when such a word is the intended prompt.
+`uninstall`, or `extensions` instead produce a hint to use `omsp plugin …`;
+use `omsp launch <word>` when such a word is the intended prompt.
 
 A recognized subcommand can follow leading launch flags. Those flags are
 forwarded to `launch` and `acp`, but recognized launch-only flags before other
-subcommands are stripped, not applied (for example, `omp --cwd dir update`).
+subcommands are stripped, not applied (for example, `omsp --cwd dir update`).
 
 `--profile` is applied before subcommand routing, so it also scopes commands
 such as `config`, `models`, and `update`.
 
 Runtime help is also available:
 
-- `omp --help` lists user-facing subcommands and common launch flags.
-- `omp <command> --help` prints that command's public flags and examples.
+- `omsp --help` lists user-facing subcommands and common launch flags.
+- `omsp <command> --help` prints that command's public flags and examples.
 
 This page is the consolidated reference for the shared **launch surface** (the
-flags accepted by `omp` / `omp launch`) and every top-level **subcommand**.
-Per-subcommand flags (for example `omp auth-broker --json`) are documented by
+flags accepted by `omsp` / `omsp launch`) and every top-level **subcommand**.
+Per-subcommand flags (for example `omsp auth-broker --json`) are documented by
 each command's `--help`.
 
 ## Launch (the default command)
 
-`omp` and `omp launch` start a coding session. Positional arguments become the
+`omsp` and `omsp launch` start a coding session. Positional arguments become the
 initial message(s):
 
 ```sh
 # Interactive session
-omp
+omsp
 
 # Interactive session with an initial prompt
-omp "List all .ts files in src/"
+omsp "List all .ts files in src/"
 
 # Attach files/images to the initial message (prefix with @)
-omp @prompt.md @image.png "What color is the sky?"
+omsp @prompt.md @image.png "What color is the sky?"
 
 # Non-interactive: process the prompt and exit (headless / print mode)
-omp -p "List all .ts files in src/"
+omsp -p "List all .ts files in src/"
 
 # Continue the previous session
-omp --continue "What did we discuss?"
+omsp --continue "What did we discuss?"
 ```
 
 Argument handling:
@@ -74,7 +74,7 @@ Argument handling:
 | `--add-dir <dir>`     | Add a workspace directory beyond the working directory (repeatable).                         |
 | `--allow-home`        | Allow starting in `~` without auto-switching to a temp dir.                                  |
 | `--profile <name>`    | Use an isolated profile for auth, sessions, settings, and caches.                            |
-| `--alias <name>`      | Create a shell shortcut for a named profile and exit; requires `--profile` or `OMP_PROFILE`. |
+| `--alias <name>`      | Create a shell shortcut for a named profile and exit; requires `--profile` or `OMSP_PROFILE`. |
 | `--config <file>`     | Load an extra `config.yml`-style overlay for this run (repeatable).                          |
 | `--session-dir <dir>` | Directory for session storage and lookup.                                                    |
 | `--no-session`        | Don't save the session (ephemeral).                                                          |
@@ -87,10 +87,10 @@ Argument handling:
 | `--resume [id]`, `-r`, `--session [id]` | Resume a session by ID prefix or path, or open the picker when no value is given.                                                                                                                                                                                                                             |
 | `--restore [id]`                        | Resume a session as `--resume` does, then go on with what its last process left unfinished when it crashed or was killed: the interrupted turn and the subagents it was running. Interactive only; takes no prompt. See [session operations](./session-operations-export-share-fork-resume.md#cli---restore). |
 | `--fork <session>`                      | Fork a saved session (by ID prefix or path) into a new session. See [session operations](./session-operations-export-share-fork-resume.md).                                                                                                                                                                   |
-| `--from-claude`                         | Import a Claude Code session into OMP.                                                                                                                                                                                                                                                                        |
-| `--from-codex`                          | Import a Codex session into OMP.                                                                                                                                                                                                                                                                              |
+| `--from-claude`                         | Import a Claude Code session into OMSP.                                                                                                                                                                                                                                                                        |
+| `--from-codex`                          | Import a Codex session into OMSP.                                                                                                                                                                                                                                                                              |
 | `--export <session>`                    | Export a session file to HTML and exit.                                                                                                                                                                                                                                                                       |
-| `--no-title`                            | Disable title auto-generation (equivalent to the `PI_NO_TITLE` [environment variable](./environment-variables.md)).                                                                                                                                                                                           |
+| `--no-title`                            | Disable title auto-generation (equivalent to the `OMSP_NO_TITLE` [environment variable](./environment-variables.md)).                                                                                                                                                                                           |
 
 `--continue`, `--resume`, `--restore`, `--fork`, and foreign-session imports require
 persistence and cannot use `--no-session`. `--from-claude` and `--from-codex`
@@ -102,9 +102,9 @@ or `--fork`.
 | Flag                         | Description                                                                                                                |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `--model <id-or-role>` | Model or configured role (`slow` or `@slow`); provider-qualified selectors must be exact, e.g. `github-copilot/gpt-4.1`. |
-| `--smol <id>`                | Smol/fast model for lightweight tasks (or `PI_SMOL_MODEL`).                                                                |
-| `--slow <id>`                | Slow/reasoning model for thorough analysis (or `PI_SLOW_MODEL`).                                                           |
-| `--plan <id>`                | Plan model for architectural planning (or `PI_PLAN_MODEL`).                                                                |
+| `--smol <id>`                | Smol/fast model for lightweight tasks (or `OMSP_SMOL_MODEL`).                                                                |
+| `--slow <id>`                | Slow/reasoning model for thorough analysis (or `OMSP_SLOW_MODEL`).                                                           |
+| `--plan <id>`                | Plan model for architectural planning (or `OMSP_PLAN_MODEL`).                                                                |
 | `--provider <name>`          | Provider to use (legacy; prefer `--model`).                                                                                |
 | `--api-key <key>`            | API key (defaults to env vars).                                                                                            |
 | `--provider-session-id <id>` | Reuse a specific provider-side session id for continuity and cache scoping.                                                |
@@ -183,35 +183,35 @@ See [providers](./providers.md) and [models](./models.md) for model resolution.
 
 | Flag              | Description                                   |
 | ----------------- | --------------------------------------------- |
-| `--help`, `-h`    | Show help for `omp` or a subcommand and exit. |
+| `--help`, `-h`    | Show help for `omsp` or a subcommand and exit. |
 | `--version`, `-v` | Print the installed version and exit.         |
 
 ### Headless / print mode
 
-`--print` / `-p` runs `omp` non-interactively: it processes the prompts, writes
+`--print` / `-p` runs `omsp` non-interactively: it processes the prompts, writes
 the last assistant response to stdout, and exits without entering the TUI. Text
 output is emitted after the turn completes, not token-by-token; a `Working...`
 indicator goes to stderr. This is the entry point for scripting and automation.
 
 ```sh
 # Print the answer and exit
-omp -p "Summarize the changes in the last commit"
+omsp -p "Summarize the changes in the last commit"
 
 # Include the model's thinking blocks in the printed text
-omp -p --print-thoughts "Explain your reasoning for this refactor"
+omsp -p --print-thoughts "Explain your reasoning for this refactor"
 
 # Machine-readable output for pipelines
-omp -p --mode json "List every TODO in src/" > todos.json
+omsp -p --mode json "List every TODO in src/" > todos.json
 
 # Pipe a prompt via stdin
-echo "review this diff" | omp -p
+echo "review this diff" | omsp -p
 ```
 
 Related flags for headless runs:
 
 - `--print-thoughts` — include thinking blocks in the printed text output.
 - `--mode json` — emit structured events instead of rendered text.
-- `--no-title` — skip title auto-generation (also `PI_NO_TITLE`).
+- `--no-title` — skip title auto-generation (also `OMSP_NO_TITLE`).
 - `--max-time <duration>` — bound the run.
 - `--wait-async` — keep the run alive for its background jobs (below).
 - `--warn-cost <usd>` / `--max-cost <usd>` — warn at, or stop sending model requests from, a spend.
@@ -227,7 +227,7 @@ unattended runs with `--max-time`.
 
 ```sh
 # Start a long build in the background, then react to its result in the same session
-omp -p --wait-async --max-time 2h "Run the integration suite in the background and fix what fails"
+omsp -p --wait-async --max-time 2h "Run the integration suite in the background and fix what fails"
 ```
 
 `--mode json` emits a session header followed by events as JSON lines.
@@ -257,13 +257,13 @@ print-mode disposal semantics when the advisor runtime is enabled.
 
 ## Subcommands
 
-Run `omp <command> --help` for each command's own flags and examples.
+Run `omsp <command> --help` for each command's own flags and examples.
 
 | Command                     | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | See also                                                                                                                                             |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `launch`                    | Start a coding session (the default command).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | [Launch flags](#launch-flags)                                                                                                                        |
-| `acp`                       | Run omp as an ACP (Agent Client Protocol) server over stdio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [approval mode](./approval-mode.md#acp-sessions)                                                                                                     |
-| `auth-broker`               | Manage the omp auth-broker (credential vault).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [auth broker / gateway](./auth-broker-gateway.md)                                                                                                    |
+| `acp`                       | Run omsp as an ACP (Agent Client Protocol) server over stdio.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [approval mode](./approval-mode.md#acp-sessions)                                                                                                     |
+| `auth-broker`               | Manage the omsp auth-broker (credential vault).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | [auth broker / gateway](./auth-broker-gateway.md)                                                                                                    |
 | `auth-gateway`              | Run an auth-gateway: an HTTP forward proxy backed by the configured broker (`serve`), or JSON lines on stdin/stdout for a parent process with your own credentials (`stdio`).                                                                                                                                                                                                                                                                                                                                                                                                                                          | [auth broker / gateway](./auth-broker-gateway.md)                                                                                                    |
 | `agents`                    | Manage bundled task agents.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [task agent discovery](./task-agent-discovery.md)                                                                                                    |
 | `bench`                     | Benchmark models: TTFT/prefill vs decode throughput with p50/p95 across chat, prefill, generation, and prompt-cache workloads, rendered in a live dashboard (`--prefill-bytes` sizes the synthetic prefill input). `--detailed` runs single-user, `--par`-way parallel (aggregate tok/s and scaling), and prefill phases per model.                                                                                                                                                                                                                                                                                    |                                                                                                                                                      |
@@ -308,15 +308,15 @@ Run `omp <command> --help` for each command's own flags and examples.
 
 `/providers` exposes retained Copilot and self-hosted login integrations. On-device workers, Apple availability and explicitly configured company providers remain distinct from those login flows; `local` means the bundled tiny/TTS/STT workers.
 
-`/update` directly invokes the CLI without an agent turn. Application self-updates and upstream release checks are removed: deploy this fork through Git, Nix or your company's release process. The command does not obtain GitHub credentials or launch an application installer. `omp update --plugins` remains available; add `--check` to preview plugin upgrades without changing them.
+`/update` directly invokes the CLI without an agent turn. Application self-updates and upstream release checks are removed: deploy this fork through Git, Nix or your company's release process. The command does not obtain GitHub credentials or launch an application installer. `omsp update --plugins` remains available; add `--check` to preview plugin upgrades without changing them.
 
-Local `/record` and `omp play` remain without publication; `/export` and `--export` produce self-contained local HTML. Private collaboration requires configured endpoints. Search uses configured SearXNG/private Firecrawl; public reader fallbacks, QA/sharing and Smithery cloud flows are removed. Copilot, approved GitHub workflows and ordinary trusted tools/configured services remain network-capable: this is not an egress sandbox.
+Local `/record` and `omsp play` remain without publication; `/export` and `--export` produce self-contained local HTML. Private collaboration requires configured endpoints. Search uses configured SearXNG/private Firecrawl; public reader fallbacks, QA/sharing and Smithery cloud flows are removed. Copilot, approved GitHub workflows and ordinary trusted tools/configured services remain network-capable: this is not an egress sandbox.
 
 `__complete` is an internal, hidden subcommand used by shell completion scripts.
 
 ### Worktree clones
 
-When `worktree.clone` is enabled, `omp worktree add` and other clone-first
+When `worktree.clone` is enabled, `omsp worktree add` and other clone-first
 worktree callers carry relocatable ignored caches such as `node_modules`.
 Directories containing `pyvenv.cfg` or `CMakeCache.txt` are not carried, even
 when they are nested or ignore themselves. Recreate Python environments and

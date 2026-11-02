@@ -1,9 +1,9 @@
-import type { AgentMessage, Tokenizer } from "@oh-my-pi/pi-agent-core";
-import type { CompactionSettings } from "@oh-my-pi/pi-agent-core/compaction";
-import { effectiveReserveTokens, resolveThresholdTokens } from "@oh-my-pi/pi-agent-core/compaction";
-import type { Tool as AiTool, Model } from "@oh-my-pi/pi-ai";
-import { renderToolExamples } from "@oh-my-pi/pi-ai/dialect";
-import { stripSchemaDescriptions, toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
+import type { AgentMessage, Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionSettings } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { effectiveReserveTokens, resolveThresholdTokens } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { Tool as AiTool, Model } from "@oh-my-striped-pi/pi-ai";
+import { renderToolExamples } from "@oh-my-striped-pi/pi-ai/dialect";
+import { stripSchemaDescriptions, toolWireSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
 
 interface ContextSkill {
 	readonly name: string;

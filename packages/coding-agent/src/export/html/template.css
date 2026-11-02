@@ -401,7 +401,7 @@
     #trace-summary { color: var(--dim); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .chrome-button { color: var(--muted); background: transparent; border: 1px solid var(--hairline); padding: 3px 9px; border-radius: 6px; font-size: 11px; }
     #trace-body { height: clamp(240px, 42dvh, 480px); overflow: auto; overscroll-behavior: contain; padding: 8px 16px 16px; }
-    omp-session-trace { display: block; }
+    omsp-session-trace { display: block; }
     .trace-view #trace-panel { display: flex; flex-direction: column; flex: 1; border-top: 0; }
     .trace-view #trace-body { flex: 1; height: auto; }
     .trace-view .timeline-chevron { display: none; }
@@ -771,9 +771,9 @@
       margin-left: 10px;
     }
 
-    /* Tool calls render inside the <omp-tool-view> web component, which draws
+    /* Tool calls render inside the <omsp-tool-view> web component, which draws
        its own card chrome; the host box collapses to a plain block. */
-    omp-tool-view.tool-execution {
+    omsp-tool-view.tool-execution {
       display: block;
       padding: 0;
       background: none;

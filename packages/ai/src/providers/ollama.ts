@@ -1,5 +1,5 @@
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import { fetchWithRetry, parseStreamingJson, readJsonl } from "@oh-my-pi/pi-utils";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
+import { fetchWithRetry, parseStreamingJson, readJsonl } from "@oh-my-striped-pi/pi-utils";
 import { NO_AUTH_SENTINEL } from "../auth-retry";
 import * as AIError from "../error";
 import { parseToolCallArguments } from "../utils/tool-call-arguments";

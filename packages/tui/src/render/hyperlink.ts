@@ -7,8 +7,8 @@
  */
 import * as os from "node:os";
 import * as url from "node:url";
-import { logger } from "@oh-my-pi/pi-utils";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { span } from "../native/describe";
 import { setTerminalHyperlinks, TERMINAL, type TerminalId } from "../terminal-capabilities";
 
@@ -53,20 +53,20 @@ const FILE_LINK_HOST = /^[A-Za-z0-9._-]+(?::\d{1,5})?$/;
  */
 export function applyFileLinkSetting(
 	config: FileLinkConfig = {
-		scheme: Bun.env.PI_LINK_SCHEME,
-		host: Bun.env.PI_LINK_HOST,
+		scheme: Bun.env.OMSP_LINK_SCHEME,
+		host: Bun.env.OMSP_LINK_HOST,
 	},
 ): void {
 	fileLinkTarget = undefined;
 	if (!config.scheme) return;
 	const scheme = config.scheme.toLowerCase();
 	if (!FILE_LINK_SCHEME.test(scheme)) {
-		logger.warn("Invalid PI_LINK_SCHEME; using ordinary file links", { scheme: config.scheme });
+		logger.warn("Invalid OMSP_LINK_SCHEME; using ordinary file links", { scheme: config.scheme });
 		return;
 	}
 	const host = config.host || os.hostname();
 	if (!FILE_LINK_HOST.test(host)) {
-		logger.warn("Invalid PI_LINK_HOST; using ordinary file links", { host });
+		logger.warn("Invalid OMSP_LINK_HOST; using ordinary file links", { host });
 		return;
 	}
 	fileLinkTarget = { scheme, host };

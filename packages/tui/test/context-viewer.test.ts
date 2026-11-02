@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as os from "node:os";
-import type { TspText } from "@oh-my-pi/pi-wire";
+import type { TspText } from "@oh-my-striped-pi/pi-wire";
 import type {
 	ContextThinkingGroup,
 	ContextViewCategory,

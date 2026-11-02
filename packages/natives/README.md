@@ -1,4 +1,4 @@
-# @oh-my-pi/pi-natives
+# @oh-my-striped-pi/pi-natives
 
 Native Rust functionality via N-API.
 
@@ -21,7 +21,7 @@ that terminal protocol.
 ## Usage
 
 ```typescript
-import { encodeSixelAsync, grep, pdfToMarkdown } from "@oh-my-pi/pi-natives";
+import { encodeSixelAsync, grep, pdfToMarkdown } from "@oh-my-striped-pi/pi-natives";
 
 // Grep for a pattern
 const results = await grep({
@@ -67,7 +67,7 @@ emulator so its viewport matches the native PTY.
 ### Lazy Windows path helpers
 
 Import `expandWindowsLongPath` and `getWindowsShortPath` from
-`@oh-my-pi/pi-natives/path` when importing a module must not load the native addon.
+`@oh-my-striped-pi/pi-natives/path` when importing a module must not load the native addon.
 The addon loads only when a helper is called on Windows; other platforms preserve
 the input path without loading it. These helpers change long/8.3 spellings without
 resolving symlinks or junctions.
@@ -84,8 +84,9 @@ bun run check
 
 ## Architecture
 
-`@oh-my-pi/pi-natives` publishes a small core package plus generated
-platform-specific optional dependency packages:
+`@oh-my-striped-pi/pi-natives` is a private source workspace with managed-local
+native build outputs. The retained upstream packaging layout also describes
+platform-specific optional dependency leaves; it is not an active public release:
 
 ```
 crates/pi-natives/       # Rust source (workspace member)
@@ -99,14 +100,15 @@ native/                  # Core loader files and local/CI native build outputs
   pi_natives.<platform>-<arch>-modern.node   # x64 modern ISA (local/CI artifact)
   pi_natives.<platform>-<arch>-baseline.node # x64 baseline ISA (local/CI artifact)
   pi_natives.<platform>-<arch>.node          # non-x64 build artifact
-npm/<platform>-<arch>/   # Generated at publish time, not committed
-  package.json           # @oh-my-pi/pi-natives-<platform>-<arch>
+npm/<platform>-<arch>/   # Retained upstream/generated packaging layout, not committed
+  package.json           # @oh-my-striped-pi/pi-natives-<platform>-<arch>
   *.node                 # Only that platform's addon binary or x64 ISA variants
 ```
 
-The published core package contains only the JS loader, declarations, README,
-and `package.json`. Release publishing generates one leaf package per supported
-`os`/`cpu` pair and injects those leaves into the core manifest as pinned
-`optionalDependencies`, so package managers install only the host platform's
-native addon. x64 leaves include every built ISA variant, and the loader keeps
-choosing between `baseline` and `modern` at runtime.
+In the upstream packaging design, the core contains only the JS loader,
+declarations, README, and `package.json`; generated leaves contain one supported
+`os`/`cpu` pair and are pinned as `optionalDependencies`. Public publishing is
+disabled for this fork, so those names are not public installation routes.
+Prepared workspaces use local native outputs; standalone CLI builds use the
+[root README's Nix build](../../README.md) (`nix build --no-link .#omsp`).
+The loader chooses between `baseline` and `modern` x64 ISA variants at runtime.

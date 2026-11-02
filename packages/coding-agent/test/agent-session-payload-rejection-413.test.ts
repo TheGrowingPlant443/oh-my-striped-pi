@@ -1,18 +1,18 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { CompactionPreparation } from "@oh-my-pi/pi-agent-core/compaction";
-import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionMaintenance } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionPreparation } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import * as compactionModule from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionMaintenance } from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 /** Byte-limit 413s may be recoverable when older live history can be compacted. */

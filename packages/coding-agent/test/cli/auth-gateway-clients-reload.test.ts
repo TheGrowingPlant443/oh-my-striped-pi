@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { hashAuthGatewayToken } from "@oh-my-pi/pi-ai/auth-gateway";
-import { createAuthGatewayClientsReloader } from "@oh-my-pi/pi-coding-agent/cli/auth-gateway-cli";
+import { hashAuthGatewayToken } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { createAuthGatewayClientsReloader } from "@oh-my-striped-pi/pi-coding-agent/cli/auth-gateway-cli";
 
 describe("auth-gateway serve --clients reload", () => {
 	let dir = "";
 
 	beforeEach(async () => {
-		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-gateway-clients-"));
+		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-gateway-clients-"));
 	});
 
 	afterEach(async () => {

@@ -16,18 +16,18 @@ import {
 	generateBranchSummary,
 	generateHandoff,
 	generateSummary,
-} from "@oh-my-pi/pi-agent-core/compaction";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
 import {
 	type AgentTelemetryConfig,
 	GenAIAttr,
 	GenAIOperation,
 	OmpGenAIAttr,
 	resolveTelemetry,
-} from "@oh-my-pi/pi-agent-core/telemetry";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core/types";
-import type { AssistantMessage, Model, Usage } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-agent-core/telemetry";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core/types";
+import type { AssistantMessage, Model, Usage } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
 	BasicTracerProvider,
@@ -208,7 +208,7 @@ describe("compaction oneshot telemetry", () => {
 });
 
 describe("handoff oneshot telemetry", () => {
-	it("tags generateHandoff with omp.gen_ai.oneshot.kind = handoff and toolChoice = none", async () => {
+	it("tags generateHandoff with omsp.gen_ai.oneshot.kind = handoff and toolChoice = none", async () => {
 		const spy = vi.spyOn(ai, "completeSimple").mockResolvedValueOnce(makeAssistantMessage("## Goal\nContinue"));
 
 		const telemetry = resolveTelemetry(makeTelemetryConfig(), "session-handoff");
@@ -233,7 +233,7 @@ describe("handoff oneshot telemetry", () => {
 });
 
 describe("branch summary oneshot telemetry", () => {
-	it("tags generateBranchSummary with omp.gen_ai.oneshot.kind = branch_summary", async () => {
+	it("tags generateBranchSummary with omsp.gen_ai.oneshot.kind = branch_summary", async () => {
 		const spy = vi
 			.spyOn(ai, "completeSimple")
 			.mockResolvedValueOnce(makeAssistantMessage("branch summary text", makeUsage(50, 30)));

@@ -1,5 +1,5 @@
 import { scheduler } from "node:timers/promises";
-import { isSqliteBusyError, logger, postmortem } from "@oh-my-pi/pi-utils";
+import { isSqliteBusyError, logger, postmortem } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../error";
 import { refreshOAuthToken } from "../registry/oauth";
 import { assertSupportedOAuthCredentialProvider } from "./provider-policy";

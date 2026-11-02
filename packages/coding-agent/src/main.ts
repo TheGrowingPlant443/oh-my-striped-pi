@@ -6,10 +6,10 @@
  */
 import * as fsSync from "node:fs";
 import * as os from "node:os";
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core/thinking";
-import type { ImageContent, Model } from "@oh-my-pi/pi-ai";
-import { getModelPricingStatus } from "@oh-my-pi/pi-catalog/models";
-import { isEnoent, isEnotdir } from "@oh-my-pi/pi-utils";
+import type { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core/thinking";
+import type { ImageContent, Model } from "@oh-my-striped-pi/pi-ai";
+import { getModelPricingStatus } from "@oh-my-striped-pi/pi-catalog/models";
+import { isEnoent, isEnotdir } from "@oh-my-striped-pi/pi-utils";
 import {
 	APP_NAME,
 	directoryIsMissing,
@@ -19,12 +19,12 @@ import {
 	normalizePathForComparison,
 	setProjectDir,
 	VERSION,
-} from "@oh-my-pi/pi-utils/dirs";
-import { $env, isBunTestRuntime, setInteractiveHost } from "@oh-my-pi/pi-utils/env";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import * as postmortem from "@oh-my-pi/pi-utils/postmortem";
-import { fuzzyFilter } from "@oh-my-pi/pi-tui/fuzzy";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+} from "@oh-my-striped-pi/pi-utils/dirs";
+import { $env, isBunTestRuntime, setInteractiveHost } from "@oh-my-striped-pi/pi-utils/env";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import * as postmortem from "@oh-my-striped-pi/pi-utils/postmortem";
+import { fuzzyFilter } from "@oh-my-striped-pi/pi-tui/fuzzy";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import { reset as resetCapabilities } from "./capability";
 import {
 	type Args,
@@ -39,12 +39,12 @@ import {
 import { applyExtensionFlags, type ExtensionFlagSink } from "./cli/extension-flags";
 import { processFileArguments } from "./cli/file-processor";
 import { buildInitialMessage } from "./cli/initial-message";
-import { formatKeyHint, KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import type { SessionPickerOptions } from "@oh-my-pi/pi-tui/apps/session-picker";
+import { formatKeyHint, KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import type { SessionPickerOptions } from "@oh-my-striped-pi/pi-tui/apps/session-picker";
 import { applyStartupCwd } from "./cli/startup-cwd";
 import { findConfigFile } from "./config";
 import { ModelRegistry } from "./config/model-registry";
-import { formatModelSelectorValue } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import { formatModelSelectorValue } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import {
 	DEFAULT_PREWALK_TARGET,
 	disabledProviderIds,
@@ -67,7 +67,7 @@ import {
 	preloadPluginRoots,
 	resolveActiveProjectRegistryPath,
 } from "./discovery/helpers";
-import { injectOmpExtensionCliRoots } from "./discovery/omp-extension-roots";
+import { injectOmpExtensionCliRoots } from "./discovery/omsp-extension-roots";
 import { formatExtensionLoadNotifications } from "./extensibility/extensions/load-errors";
 import { loadExtensions } from "./extensibility/extensions/loader";
 import { ExtensionRunner } from "./extensibility/extensions/runner";
@@ -83,9 +83,9 @@ import { formatSessionContinuationNotice } from "./modes/persistence-failure";
 import type { PrintModeOptions } from "./modes/print-mode";
 import type { RpcModeOptions } from "./modes/rpc/rpc-mode";
 import { claimRpcInput } from "./modes/rpc/rpc-input";
-import { CURRENT_SETUP_VERSION } from "@oh-my-pi/pi-tui/setup/setup-version";
+import { CURRENT_SETUP_VERSION } from "@oh-my-striped-pi/pi-tui/setup/setup-version";
 import type * as SetupWizardModule from "./modes/setup";
-import type { SetupScene } from "@oh-my-pi/pi-tui/setup/scenes/types";
+import type { SetupScene } from "@oh-my-striped-pi/pi-tui/setup/scenes/types";
 import { invokeSkillCommandFromText, isKnownSkillCommand } from "./modes/skill-command";
 import {
 	applyStartupComposerPreferences,
@@ -93,7 +93,7 @@ import {
 	stopPendingStartupComposer,
 	takeStartupComposerLease,
 } from "./modes/startup-composer";
-import { ensureTheme, initTheme, stopThemeWatcher } from "@oh-my-pi/pi-tui/theme";
+import { ensureTheme, initTheme, stopThemeWatcher } from "@oh-my-striped-pi/pi-tui/theme";
 import type { SubmittedUserInput } from "./modes/types";
 import { createWarpEventBridgeExtension } from "./modes/warp-events";
 import { AgentLifecycleManager } from "./registry/agent-lifecycle";
@@ -139,9 +139,13 @@ import { type RestoreOutcome, restoreSession } from "./task/restore";
 import { createTelemetryExportConfig, initTelemetryExport, isTelemetryExportEnabled } from "./telemetry-export";
 import { cfgTelemetryOtlpExportEnabled } from "./telemetry-settings";
 import { registerLocalInferenceApi } from "./tiny/local-inference-api";
-import { automaticThinkingLevel, concreteThinkingLevel, parseConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+import {
+	automaticThinkingLevel,
+	concreteThinkingLevel,
+	parseConfiguredThinkingLevel,
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import type { LspStartupServerInfo } from "./tools";
-import { sanitizeDisplayWarnings } from "@oh-my-pi/pi-tui/render/render-utils";
+import { sanitizeDisplayWarnings } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import {
 	getChangelogPath,
 	readLastChangelogVersion,
@@ -215,7 +219,7 @@ type SessionPicker = (
 async function loadSessionPicker(init?: { foreign?: boolean }): Promise<SessionPicker> {
 	const [{ selectSession }, { HistoryStorage }, { loadPinnedSessionIds, setSessionPinned }, { FileSessionStorage }] =
 		await Promise.all([
-			import("@oh-my-pi/pi-tui/apps/session-picker"),
+			import("@oh-my-striped-pi/pi-tui/apps/session-picker"),
 			import("./session/history-storage"),
 			import("./session/session-pins"),
 			import("./session/session-storage"),
@@ -267,7 +271,7 @@ function writeStartupWarning(warning: string): void {
 	process.stderr.write(`${chalk.yellow(`Warning: ${warning}`)}\n`);
 }
 
-// Protocol hosts inherit OMP's neutral defaults for settings declaring `protocolDefault`
+// Protocol hosts inherit OMSP's neutral defaults for settings declaring `protocolDefault`
 // instead of the local user's interactive preferences. The pin holds only while nothing
 // configures the setting — caller `Settings.isolated` overrides, project `.claude/settings.yml`,
 // `--config` overlays, or global `config.yml` always win (#2598, #3207), including a config
@@ -325,7 +329,7 @@ export async function readPipedInput(): Promise<string | undefined> {
 // stderr line every 10s naming the deepest in-flight startup phase. Turns
 // zero-output indefinite hangs (stuck discovery read, network wait, stdin
 // pipe) into self-diagnosing reports instead of "it just hangs" (see the
-// PI_DEBUG_STARTUP markers for the synchronous-hang counterpart).
+// OMSP_DEBUG_STARTUP markers for the synchronous-hang counterpart).
 
 const STARTUP_WATCHDOG_INTERVAL_MS = 10_000;
 let startupWatchdogTimer: NodeJS.Timeout | undefined;
@@ -340,7 +344,7 @@ function armStartupWatchdog(): void {
 		const phase = logger.openSpanPath().join(" > ") || "module load / pre-phase work";
 		process.stderr.write(
 			`${chalk.yellow(`Still starting after ${elapsed}s`)}${chalk.dim(` — phase: ${phase}`)}\n` +
-				`${chalk.dim(`  logs: ${getLogPath()} · re-run with PI_DEBUG_STARTUP=1 for streaming phase markers`)}\n`,
+				`${chalk.dim(`  logs: ${getLogPath()} · re-run with OMSP_DEBUG_STARTUP=1 for streaming phase markers`)}\n`,
 		);
 	}, STARTUP_WATCHDOG_INTERVAL_MS);
 	startupWatchdogTimer.unref?.();
@@ -730,7 +734,7 @@ async function runInteractiveMode(
 			await mode.maybeAutoCreateWorktree();
 		}
 
-		// `omp join <link>`: dispatch through the same builtin path as a typed
+		// `omsp join <link>`: dispatch through the same builtin path as a typed
 		// `/join` so collab guards and error rendering stay in one place.
 		if (joinLink !== undefined) {
 			const executeBuiltinSlashCommand = await loadBuiltinSlashCommandExecutor();
@@ -920,7 +924,7 @@ async function openRelocatedSession(
 		// Its directory is gone, so it cannot be resumed in place either.
 		throw new SessionResolutionError(
 			err.message,
-			"Close the session in the other omp process, then resume it again.",
+			"Close the session in the other omsp process, then resume it again.",
 		);
 	}
 }
@@ -1074,7 +1078,7 @@ export interface ScopedModelSink {
  * whose model first materializes through runtime discovery (e.g.
  * `opencode-go/ox-alpha-free` on a fresh launch with no cache row) is absent from
  * the frozen scoped `/models` list even though it is in `enabledModels`, invokable
- * via `--model`, and listed by `omp models find`. Once the initial refresh settles,
+ * via `--model`, and listed by `omsp models find`. Once the initial refresh settles,
  * re-resolve the scope and, when the set changed, push the fuller list into the
  * session so the scoped picker and Ctrl+P cycle include it. A scope that resolved
  * to zero models may become active here when the startup discovery pass returned
@@ -1196,7 +1200,7 @@ export function normalizeContinueSessionArgs(parsed: Args, rawArgs?: readonly st
 	parsed.messages.splice(messageIndex, 1);
 }
 const SESSION_NOT_FOUND_HINT =
-	"Run `omp --resume` without an argument to pick from recent sessions, or `omp` to start a new one.";
+	"Run `omsp --resume` without an argument to pick from recent sessions, or `omsp` to start a new one.";
 
 function validateSessionPersistenceArgs(parsed: Pick<Args, "continue" | "noSession" | "resume">): void {
 	if (!parsed.noSession) return;
@@ -1861,7 +1865,7 @@ export async function runRootCommand(
 		// sibling hooks/tools/commands/MCP content could be discovered implicitly.
 		if (!parsedArgs.trustedExtensions?.length) {
 			// Register CLI-provided extension package paths (`--extension`, `--hook`) so
-			// the `omp-plugins` discovery provider can surface their `skills/`, `hooks/`,
+			// the `omsp-plugins` discovery provider can surface their `skills/`, `hooks/`,
 			// `tools/`, `commands/`, `rules/`, `prompts/`, and `.mcp.json` sub-trees.
 			// Explicit roots remain authorized under `--no-extensions`; only ambient
 			// extension discovery is disabled.
@@ -1915,7 +1919,7 @@ export async function runRootCommand(
 			stopPendingStartupComposer();
 		}
 		// Account routing must use the effective settings, including `--config` and
-		// `PI_CONFIG_FILES` overlays, rather than independently re-reading only the
+		// `OMSP_CONFIG_FILES` overlays, rather than independently re-reading only the
 		// main config file during auth discovery.
 		const settingsPromise = deps.settings
 			? Promise.resolve(deps.settings)
@@ -1975,7 +1979,7 @@ export async function runRootCommand(
 		// awaited before any session entry is written.
 		const runtimeIdentityLoad = logger.time("loadRuntimeIdentity", loadRuntimeIdentity);
 		if (parsedArgs.noPty || parsedArgs.mode === "rpc-ui") {
-			Bun.env.PI_NO_PTY = "1";
+			Bun.env.OMSP_NO_PTY = "1";
 		}
 		if (
 			parsedArgs.noTitle ||
@@ -1983,16 +1987,16 @@ export async function runRootCommand(
 			parsedArgs.mode === "rpc-ui" ||
 			parsedArgs.mode === "acp"
 		) {
-			Bun.env.PI_NO_TITLE = "1";
+			Bun.env.OMSP_NO_TITLE = "1";
 		}
 
 		// Initialize discovery system with settings for provider persistence
 		logger.time("initializeWithSettings", initializeWithSettings, settingsInstance);
 
 		// Apply model role overrides from CLI args or env vars (ephemeral, not persisted)
-		const smolModel = parsedArgs.smol ?? $env.PI_SMOL_MODEL;
-		const slowModel = parsedArgs.slow ?? $env.PI_SLOW_MODEL;
-		const planModel = parsedArgs.plan ?? $env.PI_PLAN_MODEL;
+		const smolModel = parsedArgs.smol ?? $env.OMSP_SMOL_MODEL;
+		const slowModel = parsedArgs.slow ?? $env.OMSP_SLOW_MODEL;
+		const planModel = parsedArgs.plan ?? $env.OMSP_PLAN_MODEL;
 		if (smolModel || slowModel || planModel) {
 			settingsInstance.overrideModelRoles({
 				smol: smolModel,
@@ -2071,7 +2075,7 @@ export async function runRootCommand(
 		await runtimeIdentityLoad;
 
 		// Resolve native resume/fork flags or import one foreign transcript into a
-		// fresh persisted OMP session before constructing the AgentSession.
+		// fresh persisted OMSP session before constructing the AgentSession.
 		const explicitSessionSelection = Boolean(
 			parsedArgs.continue ||
 			parsedArgs.resume ||
@@ -2472,7 +2476,7 @@ export async function runRootCommand(
 					process.stderr.write(`${chalk.yellow(`${message}\n`)}`);
 				}
 			}
-			// Fail fast on stale/typo flags (e.g. `omp --list-models`) and invalid
+			// Fail fast on stale/typo flags (e.g. `omsp --list-models`) and invalid
 			// built-in enum values now that we know the real extension flag set —
 			// an extension may shadow `--mode`/`--thinking`/`--approval-mode`, so
 			// neither can be judged by the pre-extension parse. Without this check
@@ -2518,7 +2522,7 @@ export async function runRootCommand(
 				isInteractive,
 				resuming: Boolean(parsedArgs.continue || parsedArgs.resume || parsedArgs.fork || foreignSource),
 				quiet: cfgStartupQuiet.get(settingsInstance),
-				timing: Boolean($env.PI_TIMING),
+				timing: Boolean($env.OMSP_TIMING),
 				stdinIsTTY: process.stdin.isTTY,
 				stdoutIsTTY: process.stdout.isTTY,
 			});
@@ -2785,7 +2789,7 @@ export async function runRootCommand(
 					notifs.push({ kind: "warn", message: pythonEvalWarning });
 				}
 
-				if ($env.PI_TIMING) {
+				if ($env.OMSP_TIMING) {
 					logger.printTimings();
 					if (logger.shouldExitAfterTimings()) {
 						process.exit(0);
@@ -2824,9 +2828,9 @@ export async function runRootCommand(
 			} else {
 				// Branch-only single-shot runner: keep print-mode code out of normal interactive startup.
 				stopStartupWatchdog();
-				// PI_TIMING prints the tree after the run; otherwise stop recording now so a
+				// OMSP_TIMING prints the tree after the run; otherwise stop recording now so a
 				// long `-p` run's subagents do not keep growing it.
-				if (!$env.PI_TIMING) logger.endTiming();
+				if (!$env.OMSP_TIMING) logger.endTiming();
 				const runPrintMode: RunPrintMode = (await import("./modes/print-mode")).runPrintMode;
 				const exitCode = await runPrintMode(session, {
 					mode,
@@ -2838,7 +2842,7 @@ export async function runRootCommand(
 					mcpManager,
 					deadline: sessionOptions.deadline,
 				});
-				if ($env.PI_TIMING) {
+				if ($env.OMSP_TIMING) {
 					logger.printTimings();
 				}
 				await disposeSessionQuietly(session);

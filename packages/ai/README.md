@@ -1,4 +1,4 @@
-# @oh-my-pi/pi-ai
+# @oh-my-striped-pi/pi-ai
 
 Streaming, tool calling, reasoning controls, credential rotation, and usage accounting for GitHub Copilot, local models, and configured self-hosted services.
 
@@ -20,8 +20,8 @@ Configured self-hosted embeddings, reranking, images, speech, transcription, and
 Select a Copilot model from the catalog and supply a resolved Copilot credential (or `COPILOT_GITHUB_TOKEN`):
 
 ```typescript
-import { getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { completeSimple, streamSimple, type Context } from "@oh-my-pi/pi-ai";
+import { getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
+import { completeSimple, streamSimple, type Context } from "@oh-my-striped-pi/pi-ai";
 
 const model = getBundledModels("github-copilot").find(model => model.kind === "chat");
 if (!model) throw new Error("No Copilot chat model is available");
@@ -44,7 +44,7 @@ const finalMessage = await events.result();
 ## Tools
 
 ```typescript
-import { type, type Tool } from "@oh-my-pi/pi-ai";
+import { type, type Tool } from "@oh-my-striped-pi/pi-ai";
 
 const tool: Tool = {
 	name: "get_time",

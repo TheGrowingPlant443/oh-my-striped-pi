@@ -113,7 +113,7 @@ describe("extractArchive symlink handling", () => {
 	test("refuses to overwrite an occupied symlink-copy destination", async () => {
 		if (!platformDescriptor) throw new Error("process.platform descriptor is unavailable");
 		Object.defineProperty(process, "platform", { ...platformDescriptor, value: "win32" });
-		const dest = await fsPromises.mkdtemp(path.join(os.tmpdir(), "omp-ar-copy-collision-"));
+		const dest = await fsPromises.mkdtemp(path.join(os.tmpdir(), "omsp-ar-copy-collision-"));
 		const occupied = path.join(dest, "current");
 		try {
 			await Bun.write(occupied, "existing user content");
@@ -131,7 +131,7 @@ describe("extractArchive symlink handling", () => {
 	});
 
 	test.skipIf(process.platform === "win32")("refuses to follow an occupied symlink-copy destination", async () => {
-		const root = await fsPromises.mkdtemp(path.join(os.tmpdir(), "omp-ar-copy-link-collision-"));
+		const root = await fsPromises.mkdtemp(path.join(os.tmpdir(), "omsp-ar-copy-link-collision-"));
 		const dest = path.join(root, "extract");
 		const target = path.join(root, "outside.txt");
 		const occupied = path.join(dest, "current");
@@ -156,7 +156,7 @@ describe("extractArchive symlink handling", () => {
 	});
 
 	test.skipIf(process.platform === "win32")("materializes zip symlinks as real symlinks", async () => {
-		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omp-ar-link-"));
+		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omsp-ar-link-"));
 		const count = await extractArchive({ bytes: symlinkedZip(), format: "zip" }, dest);
 
 		expect(count).toBe(4);
@@ -175,7 +175,7 @@ describe("extractArchive symlink handling", () => {
 			throw error;
 		});
 
-		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omp-ar-dangling-"));
+		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omsp-ar-dangling-"));
 		const count = await extractArchive({ bytes: await arFixture("tar-links.tar"), format: "tar" }, dest);
 
 		// Real members still land; the directory alias survives as a junction
@@ -191,7 +191,7 @@ describe("extractArchive symlink handling", () => {
 		// The link-before-isDirectory reorder: entries that are BOTH directory
 		// and a link used to be dropped from the link queue entirely, so
 		// directory aliases silently never appeared on extraction.
-		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omp-ar-alias-"));
+		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omsp-ar-alias-"));
 		const count = await extractArchive({ bytes: await arFixture("tar-links.tar"), format: "tar" }, dest);
 		expect(count).toBeGreaterThan(0);
 		expect(fsSync.statSync(path.join(dest, "pkg/current")).isDirectory()).toBe(true);
@@ -212,7 +212,7 @@ describe("extractArchive symlink handling", () => {
 			throw error;
 		});
 
-		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omp-ar-eprem-"));
+		const dest = fsSync.mkdtempSync(path.join(os.tmpdir(), "omsp-ar-eprem-"));
 		const count = await extractArchive({ bytes: symlinkedZip(), format: "zip" }, dest);
 
 		// The directory alias survives as a junction; the file link as a copy.

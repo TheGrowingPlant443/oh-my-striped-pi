@@ -5,7 +5,7 @@
  * results and internal reasoning. Source timestamps survive for temporal recall.
  */
 
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
 import type { SessionEntry } from "../session/session-entries";
 import { type MemoryMessage, hasSubstantiveContent } from "./content";
 

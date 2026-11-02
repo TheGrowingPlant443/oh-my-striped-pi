@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { AnthropicCompat, Context, Model } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type { AnthropicCompat, Context, Model } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** Explicit disabled-thinking dialect overrides layer onto resolved Copilot policy. */
 function model(id: string, compat: AnthropicCompat = {}): Model<"anthropic-messages"> {

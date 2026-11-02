@@ -1,6 +1,6 @@
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
 
 /** Whether a model transport can suppress native reasoning while private scratchpad thoughts are active. */
 export function supportsExternalThinking(model: Model | null | undefined): boolean {

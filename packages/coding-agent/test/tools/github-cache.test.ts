@@ -2,15 +2,15 @@
  * Cache-layer tests for `github-cache` (storage + TTL semantics) and for the
  * `getOrFetchIssue` / `getOrFetchPr` wrappers wired into `gh.ts`.
  *
- * Each test isolates `OMP_GITHUB_CACHE_DB` to a temp file and clears
+ * Each test isolates `OMSP_GITHUB_CACHE_DB` to a temp file and clears
  * `github.json` / `github.text` mocks between cases.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { getOrFetchIssue, getOrFetchPr } from "@oh-my-pi/pi-coding-agent/tools/gh";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { getOrFetchIssue, getOrFetchPr } from "@oh-my-striped-pi/pi-coding-agent/tools/gh";
 import { Database } from "bun:sqlite";
 import {
 	getCached,
@@ -23,10 +23,10 @@ import {
 	resetForTests as resetCacheForTests,
 	resolveGitlabCacheAuthKey,
 	retainCachedGeneration,
-} from "@oh-my-pi/pi-coding-agent/tools/github-cache";
-import { ToolAbortError, throwIfAborted } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
-import { github } from "@oh-my-pi/pi-coding-agent/utils/github";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/github-cache";
+import { ToolAbortError, throwIfAborted } from "@oh-my-striped-pi/pi-coding-agent/tools/tool-errors";
+import { github } from "@oh-my-striped-pi/pi-coding-agent/utils/github";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const TEST_REPO = "owner/example";
 const TEST_AUTH_KEY = "test-auth";
@@ -36,17 +36,17 @@ let originalEnv: string | undefined;
 
 beforeEach(async () => {
 	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gh-cache-"));
-	originalEnv = process.env.OMP_GITHUB_CACHE_DB;
-	process.env.OMP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
+	originalEnv = process.env.OMSP_GITHUB_CACHE_DB;
+	process.env.OMSP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
 	resetCacheForTests();
 });
 
 afterEach(async () => {
 	resetCacheForTests();
 	if (originalEnv === undefined) {
-		delete process.env.OMP_GITHUB_CACHE_DB;
+		delete process.env.OMSP_GITHUB_CACHE_DB;
 	} else {
-		process.env.OMP_GITHUB_CACHE_DB = originalEnv;
+		process.env.OMSP_GITHUB_CACHE_DB = originalEnv;
 	}
 	vi.restoreAllMocks();
 	await removeWithRetries(tempDir);
@@ -151,7 +151,7 @@ describe("github-cache db layer", () => {
 		const parent = path.join(tempDir, "caller-owned-parent");
 		await fs.mkdir(parent, { recursive: true, mode: 0o755 });
 		await fs.chmod(parent, 0o755);
-		process.env.OMP_GITHUB_CACHE_DB = path.join(parent, "github-cache.db");
+		process.env.OMSP_GITHUB_CACHE_DB = path.join(parent, "github-cache.db");
 		resetCacheForTests();
 
 		const db = openDb();
@@ -162,7 +162,7 @@ describe("github-cache db layer", () => {
 	});
 
 	it("migrates a v3 cache whose kind CHECK predates mr-diff rows", () => {
-		const legacy = new Database(process.env.OMP_GITHUB_CACHE_DB!);
+		const legacy = new Database(process.env.OMSP_GITHUB_CACHE_DB!);
 		legacy.run(`
 			CREATE TABLE github_view_cache (
 				auth_key TEXT NOT NULL, repo TEXT NOT NULL,

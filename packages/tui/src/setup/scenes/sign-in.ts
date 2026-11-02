@@ -1,8 +1,8 @@
-import type { AuthStorage } from "@oh-my-pi/pi-ai";
-import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthProvider } from "@oh-my-pi/pi-ai/oauth/types";
-import type { TspText } from "@oh-my-pi/pi-wire";
-import { getAgentDbPath } from "@oh-my-pi/pi-utils";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-ai";
+import { getOAuthProviders } from "@oh-my-striped-pi/pi-ai/oauth";
+import type { OAuthProvider } from "@oh-my-striped-pi/pi-ai/oauth/types";
+import type { TspText } from "@oh-my-striped-pi/pi-wire";
+import { getAgentDbPath } from "@oh-my-striped-pi/pi-utils";
 import { Container } from "../../tui";
 import { Spacer } from "../../components/spacer";
 import { Text } from "../../components/text";
@@ -168,7 +168,7 @@ export class SignInScene implements SetupSceneController {
 			this.#statusLines().forEach((line, index) => {
 				children.push(node("text", { spans: [span(line.text, line.color)] }, undefined, `status:${index}`));
 			});
-			return col(children, { gap: "sm", role: "omp.setup.sign-in" });
+			return col(children, { gap: "sm", role: "omsp.setup.sign-in" });
 		});
 	}
 

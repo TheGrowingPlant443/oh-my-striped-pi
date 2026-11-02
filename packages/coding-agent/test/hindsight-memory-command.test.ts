@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import { loadHindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import type { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { HindsightApi } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import { loadHindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import type { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 
 afterEach(() => {
 	vi.restoreAllMocks();

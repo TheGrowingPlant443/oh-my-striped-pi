@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { buildSessionOptions } from "@oh-my-pi/pi-coding-agent/main";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { buildSessionOptions } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("--service-tier", () => {
 	it("parses supported OpenAI tiers without leaking the value into the prompt", () => {
@@ -70,7 +70,7 @@ describe("--service-tier", () => {
 	});
 
 	it("persists a resumed OpenAI override without changing other families", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-resume-");
+		using tempDir = TempDir.createSync("@omsp-service-tier-resume-");
 		const authStorage = await AuthStorage.create(":memory:");
 		const sessionFile = path.join(tempDir.path(), "session.jsonl");
 		const seededManager = await SessionManager.open(sessionFile, tempDir.path());

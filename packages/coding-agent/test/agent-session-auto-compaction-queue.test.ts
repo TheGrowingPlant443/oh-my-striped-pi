@@ -1,24 +1,27 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { scheduler } from "node:timers/promises";
-import { Agent, AgentBusyError, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { CompactionCancelledError } from "@oh-my-pi/pi-agent-core/compaction";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { CompactOptions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionMaintenance } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as unexpectedStopClassifier from "@oh-my-pi/pi-coding-agent/session/unexpected-stop-classifier";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import * as imageLoading from "@oh-my-pi/pi-coding-agent/utils/image-loading";
-import { TempDir, withTimeout } from "@oh-my-pi/pi-utils";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import { MAIN_AGENT_ID } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
+import { Agent, AgentBusyError, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { CompactionCancelledError } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { CompactOptions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionMaintenance } from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as unexpectedStopClassifier from "@oh-my-striped-pi/pi-coding-agent/session/unexpected-stop-classifier";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import * as imageLoading from "@oh-my-striped-pi/pi-coding-agent/utils/image-loading";
+import { TempDir, withTimeout } from "@oh-my-striped-pi/pi-utils";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import { MAIN_AGENT_ID } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
 import { activateTodoTool, createAssistantMessage } from "./helpers/agent-session-setup";
 import { flush as flushEventLoop, until } from "./helpers/fake-clock";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
@@ -33,7 +36,7 @@ import {
 	cfgCompactionThresholdPercent,
 	cfgCompactionThresholdTokens,
 	cfgContextPromotionEnabled,
-} from "@oh-my-pi/pi-coding-agent/session/context-settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 import {
 	cfgFeaturesUnexpectedStopDetection,
 	cfgRetryBaseDelayMs,
@@ -42,7 +45,7 @@ import {
 	cfgRetryMaxDelayMs,
 	cfgRetryMaxRetries,
 	cfgRetryModelFallback,
-} from "@oh-my-pi/pi-coding-agent/session/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 const runtimeSignalStoreKey = "__ompRuntimeSignals";
 

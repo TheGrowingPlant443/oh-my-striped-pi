@@ -12,11 +12,11 @@
  * one, or a model/thinking change lands on the main session instead of the agent.
  */
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { AgentBusyError } from "@oh-my-pi/pi-agent-core";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import { InputController } from "@oh-my-pi/pi-coding-agent/modes/controllers/input-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { AgentBusyError } from "@oh-my-striped-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import { InputController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/input-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 import { beginSettingsTest, restoreSettingsTestState } from "./helpers/settings-test-state";
 
 function createFocusedContext() {
@@ -146,7 +146,7 @@ describe("focused subagent view slash commands", () => {
 					description: "",
 					content: "Report. Focus: $ARGUMENTS",
 					side: true,
-					source: "via OMP User",
+					source: "via OMSP User",
 				},
 			],
 		});
@@ -167,7 +167,7 @@ describe("focused subagent view slash commands", () => {
 		const focused = createFocusedContext();
 		Object.assign(focused.raw, { fileSlashCommands: new Set(["clear"]) });
 		Object.assign(focused.raw.session, {
-			slashCommands: [{ name: "clear", description: "", content: "Side", side: true, source: "via OMP User" }],
+			slashCommands: [{ name: "clear", description: "", content: "Side", side: true, source: "via OMSP User" }],
 		});
 		const controller = new InputController(focused.ctx);
 		controller.setupEditorSubmitHandler();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import * as vm from "node:vm";
-import { buildStealthInjectionScriptForTest } from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
+import { buildStealthInjectionScriptForTest } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
 
 // Minimal canvas DOM: one cached 2d context per canvas, like Chromium.
 const CANVAS_DOM = `

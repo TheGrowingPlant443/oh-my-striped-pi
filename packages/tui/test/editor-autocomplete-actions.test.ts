@@ -7,9 +7,9 @@ import {
 	type AutocompleteProvider,
 	CombinedAutocompleteProvider,
 	findLeadingSlashCommandStart,
-} from "@oh-my-pi/pi-tui/autocomplete";
-import { Editor } from "@oh-my-pi/pi-tui/components/editor";
-import { applyEmojiCompletion, getEmojiSuggestions } from "@oh-my-pi/pi-tui/prompt/emoji-autocomplete";
+} from "@oh-my-striped-pi/pi-tui/autocomplete";
+import { Editor } from "@oh-my-striped-pi/pi-tui/components/editor";
+import { applyEmojiCompletion, getEmojiSuggestions } from "@oh-my-striped-pi/pi-tui/prompt/emoji-autocomplete";
 import { defaultEditorTheme } from "./test-themes";
 
 function onceAutocompleteUpdate(editor: Editor): Promise<void> {

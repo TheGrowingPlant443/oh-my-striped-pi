@@ -1,13 +1,13 @@
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 /**
- * `omp ttsr` — inspect and test Time-Traveling Stream Rules.
+ * `omsp ttsr` — inspect and test Time-Traveling Stream Rules.
  *
- * `omp ttsr test` feeds a snippet (inline, --file, or stdin) through the real
- * TTSR matching pipeline and reports which rules would trigger. `omp ttsr list`
+ * `omsp ttsr test` feeds a snippet (inline, --file, or stdin) through the real
+ * TTSR matching pipeline and reports which rules would trigger. `omsp ttsr list`
  * shows every TTSR-registered rule the current project/user config would load.
  */
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
 import { ttsrHelp as commandHelp } from "../cli/command-help";
 import {
 	runTtsrCommand,
@@ -62,18 +62,18 @@ export default class Ttsr extends Command {
 	};
 
 	static examples = [
-		"omp ttsr list",
-		"omp ttsr test 'const x: any = 1'",
-		"omp ttsr test src/foo.ts",
-		"omp ttsr test --file src/foo.ts",
-		"omp ttsr test --file src/foo.ts --source text",
-		"omp ttsr test --rule .omp/rules/no-any.md --source tool --path src/foo.ts 'const x: any = 1'",
-		"omp ttsr test --agent scout 'const x: any = 1'",
-		"echo 'Box::leak(&mut v)' | omp ttsr test --file - --path src/lib.rs",
-		"omp ttsr test --source tool --tool edit --path src/foo.ts 'const x: any = 1'",
-		"omp ttsr scan",
-		"omp ttsr scan src/",
-		"omp ttsr scan -r .omp/rules/no-any.md src/",
+		"omsp ttsr list",
+		"omsp ttsr test 'const x: any = 1'",
+		"omsp ttsr test src/foo.ts",
+		"omsp ttsr test --file src/foo.ts",
+		"omsp ttsr test --file src/foo.ts --source text",
+		"omsp ttsr test --rule .omsp/rules/no-any.md --source tool --path src/foo.ts 'const x: any = 1'",
+		"omsp ttsr test --agent scout 'const x: any = 1'",
+		"echo 'Box::leak(&mut v)' | omsp ttsr test --file - --path src/lib.rs",
+		"omsp ttsr test --source tool --tool edit --path src/foo.ts 'const x: any = 1'",
+		"omsp ttsr scan",
+		"omsp ttsr scan src/",
+		"omsp ttsr scan -r .omsp/rules/no-any.md src/",
 	];
 
 	async run(): Promise<void> {
@@ -81,7 +81,7 @@ export default class Ttsr extends Command {
 		const action = (args.action ?? "list") as (typeof TTSR_ACTIONS)[number];
 
 		// A positional that resolves to an existing file is a snippet file, not
-		// inline text — so `omp ttsr test src/foo.ts` works without --file.
+		// inline text — so `omsp ttsr test src/foo.ts` works without --file.
 		// --file always wins over the positional.
 		let file = flags.file;
 		let snippet = args.snippet;

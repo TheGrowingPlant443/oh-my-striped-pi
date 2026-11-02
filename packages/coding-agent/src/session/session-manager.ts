@@ -7,7 +7,7 @@ import type {
 	ServiceTierByFamily,
 	TextContent,
 	Usage,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	directoryIsEnterable,
 	directoryIsMissing,
@@ -23,9 +23,9 @@ import {
 	pathIsWithin,
 	stringifyJson,
 	toError,
-} from "@oh-my-pi/pi-utils";
-import { isTaskToolDetails, type StructuredSubagentSchemaMode } from "@oh-my-pi/pi-tui/tools/task";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-utils";
+import { isTaskToolDetails, type StructuredSubagentSchemaMode } from "@oh-my-striped-pi/pi-tui/tools/task";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { moveFileAcrossDevices } from "../utils/atomic-file";
 import { hasAnnotationDraftsSync } from "../extensibility/custom-commands/bundled/annotate/draft-store";
 import { ArtifactManager } from "./artifacts";
@@ -146,7 +146,7 @@ export function mintSessionId(): string {
 }
 
 /**
- * `moveTo` refused before anything moved: another live omp process writes the
+ * `moveTo` refused before anything moved: another live omsp process writes the
  * session, or the session file at the destination.
  */
 export class SessionMoveRefusedError extends Error {
@@ -324,7 +324,7 @@ async function mergeDirectoryInto(
  * The destination may already exist: a session moving back into a bucket it
  * lived in before finds its own `<id>/` there whenever a writer that captured
  * the old path — subagents adopt the parent's `ArtifactManager`, eval
- * subprocesses inherit `PI_ARTIFACTS_DIR` — kept writing after the move away.
+ * subprocesses inherit `OMSP_ARTIFACTS_DIR` — kept writing after the move away.
  * Renaming onto an existing directory fails with a platform-specific code
  * (ENOTEMPTY, EEXIST, EPERM on Windows), so the fallback is decided by what is
  * there, not by the code: an existing directory is merged into.
@@ -846,7 +846,7 @@ export class SessionPersistenceIndeterminateError extends AggregateError {
  */
 export interface SessionPersistenceNotice {
 	/**
-	 * `"open-elsewhere"`: another live omp process wrote `from` first and still
+	 * `"open-elsewhere"`: another live omsp process wrote `from` first and still
 	 * has it open, so this process saves its entries elsewhere instead of mixing
 	 * them into that file. `"replaced"`: `from` changed on disk and no longer
 	 * reads as this session's journal, so it is left untouched. `"contested"`:
@@ -1031,7 +1031,7 @@ export class SessionManager {
 
 	private constructor(cwd: string, sessionDir: string, persist: boolean, storage: SessionStorage) {
 		this.#cwd = cwd;
-		// Absolute, so session files (and `PI_SESSION_FILE` in bash and eval) stay
+		// Absolute, so session files (and `OMSP_SESSION_FILE` in bash and eval) stay
 		// valid after a command changes directory: `--session-dir` may be relative.
 		this.#sessionDir = sessionDir ? path.resolve(sessionDir) : sessionDir;
 		this.#persist = persist;
@@ -1128,7 +1128,7 @@ export class SessionManager {
 	}
 
 	/**
-	 * Whether another live omp process owns this session, claiming it first
+	 * Whether another live omsp process owns this session, claiming it first
 	 * when it is free. A non-owner never writes the session's file: its next
 	 * write moves this session to a sibling with a new id instead, so two
 	 * processes never mix their entries in one journal and the owner's full
@@ -1203,7 +1203,7 @@ export class SessionManager {
 
 	/**
 	 * A synchronous full rewrite of `#sessionFile` met bytes this manager did
-	 * not write: usually a writer without the ownership lease (an older omp,
+	 * not write: usually a writer without the ownership lease (an older omsp,
 	 * an external tool) appending to the file this process owns. Overwriting
 	 * would erase those entries and retrying blindly can never succeed, so read
 	 * the file back, keep its new entries, and retry against the size just read.
@@ -2549,7 +2549,7 @@ export class SessionManager {
 		}
 
 		// A move writes both paths: it must neither move a session another live
-		// omp process writes nor replace a destination one writes. Checked before
+		// omsp process writes nor replace a destination one writes. Checked before
 		// relocation starts (appends still go to the source) and before any
 		// directory is created, so a refusal touches nothing.
 		let destination: { id: string; release: () => void } | undefined;
@@ -2562,7 +2562,7 @@ export class SessionManager {
 			const release = this.#storage.claimSession?.(id, file);
 			if (release === null) {
 				throw new SessionMoveRefusedError(
-					`Cannot move session to "${file}": another live omp process writes the session there. Nothing was moved.`,
+					`Cannot move session to "${file}": another live omsp process writes the session there. Nothing was moved.`,
 				);
 			}
 			destination?.release();
@@ -2586,7 +2586,7 @@ export class SessionManager {
 			this.#claimSession();
 			if (this.#sessionClaim?.release === undefined) {
 				throw new SessionMoveRefusedError(
-					`Cannot move session "${this.#sessionFile}": another live omp process writes it. Nothing was moved.`,
+					`Cannot move session "${this.#sessionFile}": another live omsp process writes it. Nothing was moved.`,
 				);
 			}
 			if (expectedSessionFile && path.resolve(this.#sessionFile) !== path.resolve(expectedSessionFile)) {
@@ -2752,7 +2752,7 @@ export class SessionManager {
 		await this.#rewriteAtomically();
 	}
 
-	/** Persist this session's transcript as a newly identified OMP session. */
+	/** Persist this session's transcript as a newly identified OMSP session. */
 	async persistCopy(
 		options?: { sessionDir?: string; suppressBreadcrumb?: boolean },
 		storage: SessionStorage = new FileSessionStorage(),
@@ -4423,7 +4423,7 @@ export class SessionManager {
 	 * Open a session whose recorded directory `recordedCwd` is gone and move it,
 	 * artifacts included, into `cwd` so it resumes from there.
 	 * @param sessionDir Target session directory; defaults to `cwd`'s.
-	 * @throws {SessionMoveRefusedError} when another live omp process writes the session.
+	 * @throws {SessionMoveRefusedError} when another live omsp process writes the session.
 	 */
 	static async openRelocated(
 		sessionPath: string,
@@ -4588,10 +4588,10 @@ export class SessionManager {
 						return manager;
 					} catch (err) {
 						if (!(err instanceof SessionMoveRefusedError)) throw err;
-						// Another live omp process still writes the session (the
+						// Another live omsp process still writes the session (the
 						// project was renamed under it): leave it there and continue
 						// as if no move were possible.
-						logger.warn("Not re-rooting moved session: it is open in another omp process", {
+						logger.warn("Not re-rooting moved session: it is open in another omsp process", {
 							from: breadcrumbCwd,
 							to: resolvedCwd,
 						});

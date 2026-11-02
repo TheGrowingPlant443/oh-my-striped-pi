@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { AuthStorage, REMOTE_REFRESH_SENTINEL, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
+import { type } from "@oh-my-striped-pi/omptype";
+import { AuthStorage, REMOTE_REFRESH_SENTINEL, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
 import {
 	AuthBrokerClient,
 	type AuthBrokerServerHandle,
@@ -10,10 +10,10 @@ import {
 	RemoteAuthCredentialStore,
 	type SnapshotResponse,
 	startAuthBroker,
-} from "@oh-my-pi/pi-ai/auth-broker";
-import { snapshotResponseSchema } from "@oh-my-pi/pi-ai/auth-broker/wire-schemas";
-import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
-import type { UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
+import { snapshotResponseSchema } from "@oh-my-striped-pi/pi-ai/auth-broker/wire-schemas";
+import * as oauthUtils from "@oh-my-striped-pi/pi-ai/registry/oauth";
+import type { UsageLimit, UsageProvider, UsageReport } from "@oh-my-striped-pi/pi-ai/usage";
 import { mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
 
 function requireLimit(report: UsageReport, id: string): UsageLimit {

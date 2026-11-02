@@ -5,11 +5,11 @@
  * a summary of the branch being left so context isn't lost.
  */
 
-import type { Api, ApiKey, AssistantMessage, Context, Model, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { preferredDialect } from "@oh-my-pi/pi-catalog/identity";
-import { prompt } from "@oh-my-pi/pi-utils";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+import type { Api, ApiKey, AssistantMessage, Context, Model, SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
+import { resolveCatalogPolicy } from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { preferredDialect } from "@oh-my-striped-pi/pi-catalog/identity";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { type AgentTelemetry, instrumentedCompleteSimple } from "../telemetry";
 import { Tokenizer } from "../tokenizer";
 import type { AgentMessage } from "../types";
@@ -88,7 +88,7 @@ export interface GenerateBranchSummaryOptions {
 	convertToLlm?: ConvertToLlm;
 	/**
 	 * Optional telemetry handle. When provided, the branch summary LLM call is
-	 * wrapped in an OTEL chat span tagged with `omp.gen_ai.oneshot.kind = "branch_summary"`.
+	 * wrapped in an OTEL chat span tagged with `omsp.gen_ai.oneshot.kind = "branch_summary"`.
 	 */
 	telemetry?: AgentTelemetry;
 	/**

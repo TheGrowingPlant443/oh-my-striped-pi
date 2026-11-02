@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { toolWireSchema } from "@oh-my-pi/pi-ai";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { pythonBackend } from "@oh-my-pi/pi-coding-agent/eval";
-import * as probe from "@oh-my-pi/pi-coding-agent/eval/probe";
-import * as pyKernel from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import * as pyRuntime from "@oh-my-pi/pi-coding-agent/eval/py/runtime";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { toolWireSchema } from "@oh-my-striped-pi/pi-ai";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { pythonBackend } from "@oh-my-striped-pi/pi-coding-agent/eval";
+import * as probe from "@oh-my-striped-pi/pi-coding-agent/eval/probe";
+import * as pyKernel from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import * as pyRuntime from "@oh-my-striped-pi/pi-coding-agent/eval/py/runtime";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EvalTool } from "@oh-my-striped-pi/pi-coding-agent/tools/eval";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { restoreEnvValue } from "../helpers/settings-test-state";
 
 function languages(tool: EvalTool): string[] {
@@ -23,17 +23,17 @@ describe("eval Python availability contract", () => {
 
 	beforeEach(() => {
 		dir = TempDir.createSync("@eval-availability-contract-");
-		savedPy = Bun.env.PI_PY;
-		savedJs = Bun.env.PI_JS;
-		delete Bun.env.PI_PY;
-		delete Bun.env.PI_JS;
+		savedPy = Bun.env.OMSP_PY;
+		savedJs = Bun.env.OMSP_JS;
+		delete Bun.env.OMSP_PY;
+		delete Bun.env.OMSP_JS;
 		vi.spyOn(pyRuntime, "enumeratePythonRuntimes").mockReturnValue([{ pythonPath: "/tmp/broken-python", env: {} }]);
 	});
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		restoreEnvValue("PI_PY", savedPy);
-		restoreEnvValue("PI_JS", savedJs);
+		restoreEnvValue("OMSP_PY", savedPy);
+		restoreEnvValue("OMSP_JS", savedJs);
 		await dir.remove();
 	});
 

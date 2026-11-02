@@ -5,8 +5,8 @@ import {
 	type TerminalFrameProvider,
 	TUI,
 	type ViewportSize,
-} from "@oh-my-pi/pi-tui";
-import { TERMINAL_MULTIPLEXER_ENV_KEYS } from "@oh-my-pi/pi-tui/terminal-multiplexer";
+} from "@oh-my-striped-pi/pi-tui";
+import { TERMINAL_MULTIPLEXER_ENV_KEYS } from "@oh-my-striped-pi/pi-tui/terminal-multiplexer";
 import { VirtualTerminal } from "./virtual-terminal";
 
 // Regression coverage for the SIGWINCH-side pre-erase archiving the unfinished
@@ -97,7 +97,7 @@ class ResizeScheduler {
 // Every signal multiplexer classification reads; the suite itself may run under
 // any recognized multiplexer, and the SIGWINCH-side erase only runs on direct
 // terminals.
-const MUX_SIGNALS = [...TERMINAL_MULTIPLEXER_ENV_KEYS, "TERM_PROGRAM", "PI_TUI_RESIZE_IN_PLACE"];
+const MUX_SIGNALS = [...TERMINAL_MULTIPLEXER_ENV_KEYS, "TERM_PROGRAM", "OMSP_TUI_RESIZE_IN_PLACE"];
 
 function startRig(markerRow?: number, columns = 40, rows = 12) {
 	const terminal = new PreservedClearTerminal(columns, rows);

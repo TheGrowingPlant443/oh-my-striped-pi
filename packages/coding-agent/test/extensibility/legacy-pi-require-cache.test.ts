@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "bun:test";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const probePath = path.resolve(import.meta.dir, "../fixtures/legacy-pi-require-cache-clear-probe.ts");
 const tempDirs: TempDir[] = [];
@@ -13,7 +13,7 @@ afterEach(async () => {
 // key and assigns them back. Under Bun that also unloaded the host's ES modules,
 // so the next host import evaluated a second, uninitialized settings singleton.
 it("keeps host modules loaded when extension CommonJS clears and restores require.cache", async () => {
-	const dir = TempDir.createSync("@omp-require-cache-clear-");
+	const dir = TempDir.createSync("@omsp-require-cache-clear-");
 	tempDirs.push(dir);
 	await Bun.write(dir.join("package.json"), JSON.stringify({ name: "cache-clearing-extension", version: "1.0.0" }));
 	await Bun.write(
@@ -30,7 +30,7 @@ it("keeps host modules loaded when extension CommonJS clears and restores requir
 	// Subprocess: without the guard the probe's whole module graph is unloaded.
 	const proc = Bun.spawn([process.execPath, probePath, dir.join("index.mjs")], {
 		cwd: path.resolve(import.meta.dir, "../.."),
-		env: { ...process.env, PI_CODING_AGENT_DIR: dir.join("agent") },
+		env: { ...process.env, OMSP_CODING_AGENT_DIR: dir.join("agent") },
 		stdout: "pipe",
 		stderr: "pipe",
 	});

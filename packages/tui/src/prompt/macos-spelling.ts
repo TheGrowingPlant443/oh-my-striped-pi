@@ -1,7 +1,7 @@
-import * as native from "@oh-my-pi/pi-natives";
+import * as native from "@oh-my-striped-pi/pi-natives";
 import { TERMINAL } from "../index";
 import type { EditorInlineReplacement, EditorTextAssistProvider, EditorWordReplacements } from "../components/editor";
-import { logger, withTimeout } from "@oh-my-pi/pi-utils";
+import { logger, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { isMagicKeyword } from "./magic-keywords";
 import { maskNonProse } from "./markdown-prose";
 import { isProseWord, lineContext, ProseSource, type SpellingDecorationContext } from "./prose-gate";

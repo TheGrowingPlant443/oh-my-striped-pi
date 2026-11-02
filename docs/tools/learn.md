@@ -60,7 +60,7 @@
 
 - Filesystem:
    - Local backend writes `<agent-dir>/memories/<encoded-cwd>/learned.md`.
-   - Managed skills write `<agent-dir>/managed-skills/<sanitized-name>/SKILL.md`; the default agent directory is `~/.omp/agent`.
+   - Managed skills write `<agent-dir>/managed-skills/<sanitized-name>/SKILL.md`; the default agent directory is `~/.omsp/agent`.
    - Mnemopi writes its scoped SQLite database.
 - Inference: Mnemopi can schedule local embedding or managed model work after the row write; local file-backed storage is offline.
 - Session state: reads backend settings, cwd, and session id; refreshes skills after a skill write.

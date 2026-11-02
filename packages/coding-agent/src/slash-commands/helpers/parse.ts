@@ -46,7 +46,7 @@ export function parseSlashCommand(text: string): ParsedSlashCommand | null {
  *
  * Pass `failed` when the command consumed the input but did not accomplish
  * what was asked (usage error, unknown server, refused operation): interactive
- * hosts ignore it, print mode turns it into a nonzero exit code so `omp -p`
+ * hosts ignore it, print mode turns it into a nonzero exit code so `omsp -p`
  * automation does not treat a failed builtin as success.
  */
 export function commandConsumed(options?: { agentInvoked?: boolean; failed?: boolean }): {
@@ -64,7 +64,7 @@ export function commandConsumed(options?: { agentInvoked?: boolean; failed?: boo
 /**
  * Emit a usage/error message and consume the command as failed: the command
  * consumed the input but did not accomplish what was asked. Interactive hosts
- * ignore the marker; print mode turns it into a nonzero exit code so `omp -p`
+ * ignore the marker; print mode turns it into a nonzero exit code so `omsp -p`
  * automation does not treat a failed builtin as success.
  */
 export async function usage(text: string, runtime: SlashCommandRuntime): Promise<SlashCommandResult> {

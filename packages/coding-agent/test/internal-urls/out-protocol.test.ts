@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { isReplyWrite } from "@oh-my-pi/pi-tui/chat/reply-write";
+import { isReplyWrite } from "@oh-my-striped-pi/pi-tui/chat/reply-write";
 import { Settings } from "../../src/config/settings";
 import { InternalUrlRouter } from "../../src/internal-urls";
 import type { SchemeHost } from "../../src/internal-urls/types";

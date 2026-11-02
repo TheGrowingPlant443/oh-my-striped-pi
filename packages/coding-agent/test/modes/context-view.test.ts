@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentMessage, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import { Settings } from "../../src/config/settings";
 import { AgentSession } from "../../src/session/agent-session";
 import { SessionManager } from "../../src/session/session-manager";
@@ -11,7 +11,7 @@ import { buildSessionContextView } from "../../src/session/context-view";
 import { buildSystemPrompt } from "../../src/system-prompt";
 import type { Skill } from "../../src/extensibility/skills";
 import { computeSessionContextBreakdown } from "../../src/session/context-usage-runtime";
-import type { ContextViewData } from "@oh-my-pi/pi-tui/chrome/context-view-model";
+import type { ContextViewData } from "@oh-my-striped-pi/pi-tui/chrome/context-view-model";
 
 const model = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 const sessions: AgentSession[] = [];

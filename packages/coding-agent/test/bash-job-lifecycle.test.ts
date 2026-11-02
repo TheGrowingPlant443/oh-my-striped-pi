@@ -14,7 +14,7 @@ let tool: BashTool;
 let write: WriteTool;
 
 beforeEach(async () => {
-	cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-job-lifecycle-"));
+	cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-job-lifecycle-"));
 	manager = new AsyncJobManager({});
 	const session: ToolSession = {
 		cwd,
@@ -92,7 +92,7 @@ it.skipIf(process.platform === "win32")("gives a background job the session iden
 		settings: Settings.isolated({}),
 	});
 	const result = await job.execute("bg-env", {
-		command: `printf '%s|%s' "$PI_SESSION_ID" "$PI_SESSION_FILE" > env.txt`,
+		command: `printf '%s|%s' "$OMSP_SESSION_ID" "$OMSP_SESSION_FILE" > env.txt`,
 		async: true,
 	});
 	if (!result.details?.async?.jobId) throw new Error("expected background job");

@@ -15,7 +15,7 @@ import {
 	type MessageRenderer,
 	type AssistantThinkingRenderer,
 	type AssistantTextRenderer,
-} from "@oh-my-pi/pi-tui/chat/extension-types";
+} from "@oh-my-striped-pi/pi-tui/chat/extension-types";
 export {
 	type ExtensionUiComponent,
 	type ExtensionUiComponentFactory,
@@ -26,10 +26,10 @@ export {
 	type AssistantThinkingRenderer,
 	type AssistantTextRenderContext,
 	type AssistantTextRenderer,
-} from "@oh-my-pi/pi-tui/chat/extension-types";
-import type { type as ArkType } from "@oh-my-pi/omptype";
-import type * as TypeBox from "@oh-my-pi/omptype/typebox";
-import type * as zod from "@oh-my-pi/omptype/zod";
+} from "@oh-my-striped-pi/pi-tui/chat/extension-types";
+import type { type as ArkType } from "@oh-my-striped-pi/omptype";
+import type * as TypeBox from "@oh-my-striped-pi/omptype/typebox";
+import type * as zod from "@oh-my-striped-pi/omptype/zod";
 import type {
 	AgentMessage,
 	AgentToolResult,
@@ -37,11 +37,11 @@ import type {
 	ThinkingLevel,
 	ToolApproval,
 	ToolLoadMode,
-} from "@oh-my-pi/pi-agent-core";
-import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
-import type { ContextUsage } from "@oh-my-pi/pi-tui/status-line/types";
-import type { LoopConditionConfig } from "@oh-my-pi/pi-tui/status-line/loop";
-import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { ContextUsage } from "@oh-my-striped-pi/pi-tui/status-line/types";
+import type { LoopConditionConfig } from "@oh-my-striped-pi/pi-tui/status-line/loop";
+import type { ConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
 import type {
 	Api,
 	AssistantMessage,
@@ -60,8 +60,8 @@ import type {
 	TextContent,
 	TSchema,
 	UsageProvider,
-} from "@oh-my-pi/pi-ai";
-import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-pi/pi-ai/oauth/types";
+} from "@oh-my-striped-pi/pi-ai";
+import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-striped-pi/pi-ai/oauth/types";
 import type {
 	AutocompleteItem,
 	AutocompleteProvider,
@@ -71,14 +71,14 @@ import type {
 	OverlayHandle,
 	OverlayOptions,
 	TUI,
-} from "@oh-my-pi/pi-tui";
-import type { logger as PiLogger } from "@oh-my-pi/pi-utils";
-import type { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import type { ComposerShapeDefinition } from "@oh-my-pi/pi-tui/overlays/composer-shape-registry";
-import type { CodeReviewAnnotation, TextReviewAnnotation } from "@oh-my-pi/pi-tui/overlays/annotation-types";
-export type { ComposerShapeDefinition } from "@oh-my-pi/pi-tui/overlays/composer-shape-registry";
+} from "@oh-my-striped-pi/pi-tui";
+import type { logger as PiLogger } from "@oh-my-striped-pi/pi-utils";
+import type { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import type { ComposerShapeDefinition } from "@oh-my-striped-pi/pi-tui/overlays/composer-shape-registry";
+import type { CodeReviewAnnotation, TextReviewAnnotation } from "@oh-my-striped-pi/pi-tui/overlays/annotation-types";
+export type { ComposerShapeDefinition } from "@oh-my-striped-pi/pi-tui/overlays/composer-shape-registry";
 import type { ModelRegistry } from "../../config/model-registry";
-import type { EditToolDetails } from "@oh-my-pi/pi-tui/tools/edit";
+import type { EditToolDetails } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import type { PythonResult } from "../../eval/py/executor";
 import type { BashResult } from "../../exec/bash-executor";
 import type { ExecOptions, ExecResult } from "../../exec/exec";
@@ -86,20 +86,20 @@ import type * as PiCodingAgent from "../../index";
 import type { LocalProtocolOptions } from "../../internal-urls/local-protocol";
 import type { LoopLimitConfig } from "../../modes/loop-limit";
 import type { MemoryRuntimeContext } from "../../memory-backend";
-import type { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
-import type { Theme } from "@oh-my-pi/pi-tui/theme";
-import type { NativeToolView } from "@oh-my-pi/pi-tui/tools/renderer";
+import type { CustomEditor } from "@oh-my-striped-pi/pi-tui/prompt/custom-editor";
+import type { Theme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { NativeToolView } from "@oh-my-striped-pi/pi-tui/tools/renderer";
 import type { AsyncJobSnapshot, SendUserMessageOptions } from "../../session/agent-session";
 import type { EphemeralTurnOptions, EphemeralTurnResult } from "../../session/agent-session-types";
 import type { CompactMode } from "../../session/compact-modes";
 import type { CustomMessagePayload } from "../../session/messages";
 import type { ReadonlySessionManager, SessionManager } from "../../session/session-manager";
 import type { BashToolInput, GlobToolInput, GrepToolInput, ReadToolInput, WriteToolInput } from "../../tools";
-import type { GlobToolDetails } from "@oh-my-pi/pi-tui/tools/glob";
-import type { GrepToolDetails } from "@oh-my-pi/pi-tui/tools/grep";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
+import type { GlobToolDetails } from "@oh-my-striped-pi/pi-tui/tools/glob";
+import type { GrepToolDetails } from "@oh-my-striped-pi/pi-tui/tools/grep";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
 import type { ApprovalMode } from "../../tools/approval";
-import type { BashToolDetails } from "@oh-my-pi/pi-tui/tools/bash";
+import type { BashToolDetails } from "@oh-my-striped-pi/pi-tui/tools/bash";
 import type { FileDeleteFallbackHandler, FileWriteFallbackHandler } from "../../tools/file-write-fallback";
 import type { EventBus } from "../../utils/event-bus";
 import type {
@@ -144,8 +144,8 @@ import type {
 import type { SlashCommandInfo } from "../slash-commands";
 import type { TerminalLaunchRequest, TerminalLaunchResult } from "../../subprocess/terminal-launch";
 
-export type { OverlayHandle, OverlayOptions } from "@oh-my-pi/pi-tui";
-export type { AppKeybinding, KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
+export type { OverlayHandle, OverlayOptions } from "@oh-my-striped-pi/pi-tui";
+export type { AppKeybinding, KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
 export type { ExecOptions, ExecResult } from "../../exec/exec";
 export type { AgentToolResult, AgentToolUpdateCallback };
 
@@ -164,7 +164,7 @@ import type {
 	ExtensionAskDialogQuestion,
 	ExtensionAskDialogResult,
 	ExtensionAskDialogSubmitResult,
-} from "@oh-my-pi/pi-tui/overlays/ask-dialog";
+} from "@oh-my-striped-pi/pi-tui/overlays/ask-dialog";
 export type {
 	ExtensionAskDialogOption,
 	ExtensionAskDialogQuestion,
@@ -172,7 +172,7 @@ export type {
 	ExtensionAskDialogSubmitResult,
 	ExtensionAskDialogChatResult,
 	ExtensionAskDialogResult,
-} from "@oh-my-pi/pi-tui/overlays/ask-dialog";
+} from "@oh-my-striped-pi/pi-tui/overlays/ask-dialog";
 
 export function getExtensionUISelectOptionLabel(option: ExtensionUISelectItem): string {
 	return typeof option === "string" ? option : option.label;
@@ -765,7 +765,7 @@ export interface ExtensionContext {
 	/** Identity of the agent this session runs: the top-level session or a subagent. */
 	agent: ExtensionAgentIdentity;
 	/**
-	 * Whether the current project/workspace is trusted. OMP performs no
+	 * Whether the current project/workspace is trusted. OMSP performs no
 	 * project-trust gating — project-level settings and extensions load
 	 * unconditionally — so this always returns `true`. Exposed for
 	 * compatibility with extensions authored against upstream Pi, whose
@@ -834,11 +834,11 @@ export interface ExtensionContext {
 	 * here; extensions written against that API (e.g. Plannotator) feature-detect this method to
 	 * decide whether project-local config is safe to load, and warn when it is absent.
 	 *
-	 * OMP has no equivalent per-directory trust gate: `.omp/extensions`, `.omp/config.yml`, and
+	 * OMSP has no equivalent per-directory trust gate: `.omsp/extensions`, `.omsp/config.yml`, and
 	 * other project-local inputs are already discovered and loaded unconditionally (see
 	 * `docs/extension-loading.md`). This method exists for compatibility with that upstream surface
-	 * and always returns `true`, truthfully reflecting that OMP already trusts project-local inputs
-	 * by default -- it does not narrow or widen OMP's own security model.
+	 * and always returns `true`, truthfully reflecting that OMSP already trusts project-local inputs
+	 * by default -- it does not narrow or widen OMSP's own security model.
 	 */
 	isProjectTrusted(): boolean;
 }

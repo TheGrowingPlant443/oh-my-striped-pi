@@ -1,7 +1,7 @@
 /** Read live model request settings for main, advisor, and auxiliary streams. */
-import { fitOutputTokensToContextWindow, type StreamFn, Tokenizer } from "@oh-my-pi/pi-agent-core";
-import { type SimpleStreamOptions, streamSimple } from "@oh-my-pi/pi-ai";
-import { openAIResponsesReplaysNativeHistory } from "@oh-my-pi/pi-ai/providers/openai-responses-state";
+import { fitOutputTokensToContextWindow, type StreamFn, Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
+import { type SimpleStreamOptions, streamSimple } from "@oh-my-striped-pi/pi-ai";
+import { openAIResponsesReplaysNativeHistory } from "@oh-my-striped-pi/pi-ai/providers/openai-responses-state";
 import type { Settings } from "../config/settings";
 
 import {
@@ -41,7 +41,7 @@ export function createSettingsAwareStreamFn(settings: Settings, base: StreamFn =
 	return (model, context, streamOptions) => {
 		const textVerbosity = model.api === "openai-responses" ? cfgTextVerbosity.get(settings) : undefined;
 		// "auto" leaves the option unset so provider defaults and the
-		// PI_CACHE_RETENTION env override keep working; anything else is an
+		// OMSP_CACHE_RETENTION env override keep working; anything else is an
 		// explicit per-request retention (long restores 1h Anthropic TTLs and
 		// implicitly disables the short-entry keep-alive refresh loop).
 		const cacheRetentionSetting = cfgProvidersCacheRetention.get(settings);

@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Judge } from "@oh-my-pi/pi-ai";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Judge } from "@oh-my-striped-pi/pi-ai";
 import { compileRuleCondition, type Rule } from "../../capability/rule";
 import { buildRuleFromMarkdown, createSourceMeta } from "../../discovery/helpers";
 import { judgeRules, TtsrManager, type TtsrOutput } from "../../export/ttsr";

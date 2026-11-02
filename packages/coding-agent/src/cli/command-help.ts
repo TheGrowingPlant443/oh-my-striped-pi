@@ -1,7 +1,7 @@
-import type { CommandMetadata } from "@oh-my-pi/pi-utils/cli";
+import type { CommandMetadata } from "@oh-my-striped-pi/pi-utils/cli";
 
 export const acpHelp = {
-	description: "Run omp as an ACP (Agent Client Protocol) server over stdio",
+	description: "Run omsp as an ACP (Agent Client Protocol) server over stdio",
 } satisfies CommandMetadata;
 
 export const agentsHelp = { description: "Manage bundled task agents" } satisfies CommandMetadata;
@@ -16,7 +16,7 @@ export const authHelp = {
 } satisfies CommandMetadata;
 
 export const authBrokerHelp = {
-	description: "Manage the omp auth-broker (credential vault)",
+	description: "Manage the omsp auth-broker (credential vault)",
 } satisfies CommandMetadata;
 
 export const authGatewayHelp = {

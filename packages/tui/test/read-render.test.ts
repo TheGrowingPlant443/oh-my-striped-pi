@@ -3,8 +3,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
 import { applyHyperlinkSetting } from "../src/render/hyperlink";
-import { getThemeByName, initTheme } from "@oh-my-pi/pi-tui/theme";
-import { readToolRenderer } from "@oh-my-pi/pi-tui/tools/read";
+import { getThemeByName, initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { readToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/read";
 
 function extractLinkUris(text: string): string[] {
 	return [...text.matchAll(/\x1b\]8;[^;]*;([^\x1b]+)\x1b\\/g)].map(match => match[1]!);
@@ -30,7 +30,7 @@ describe("readToolRenderer hyperlinks", () => {
 		const theme = await getThemeByName("dark");
 		expect(theme).toBeDefined();
 
-		const handoffPath = path.resolve("/tmp/omp-local/handoff.md");
+		const handoffPath = path.resolve("/tmp/omsp-local/handoff.md");
 		const component = readToolRenderer.renderResult(
 			{
 				content: [{ type: "text", text: "second line" }],
@@ -59,7 +59,7 @@ describe("readToolRenderer hyperlinks", () => {
 		const theme = await getThemeByName("dark");
 		expect(theme).toBeDefined();
 
-		const examplePath = path.resolve("/tmp/omp-read/example.ts");
+		const examplePath = path.resolve("/tmp/omsp-read/example.ts");
 		const component = readToolRenderer.renderCall(
 			{ path: `${examplePath}:10-12` },
 			{ expanded: false, isPartial: false },

@@ -7,7 +7,7 @@
  * cache), else uploads it with verb `b` before the frame that first
  * references it.
  */
-import type { TspProps } from "@oh-my-pi/pi-wire";
+import type { TspProps } from "@oh-my-striped-pi/pi-wire";
 import { tryFileUri } from "../render/hyperlink";
 import { resolveImageOptions } from "../render/render-utils";
 import { getImageDimensions } from "../terminal-capabilities";

@@ -2,18 +2,18 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import { RpcGoalController, type RpcGoalSession } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-goal";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import { RpcGoalController, type RpcGoalSession } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-goal";
 import {
 	RpcSessionSettleWatcher,
 	watchedScheduledTurnProbe,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-session-settle";
-import type { RpcSessionState } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import type { AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { isSessionSettled, type SessionSettleState } from "@oh-my-pi/pi-coding-agent/session/session-settle";
-import type { GoalModeState } from "@oh-my-pi/pi-coding-agent/goals/state";
-import { removeWithRetries, withTimeout } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-session-settle";
+import type { RpcSessionState } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import type { AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { isSessionSettled, type SessionSettleState } from "@oh-my-striped-pi/pi-coding-agent/session/session-settle";
+import type { GoalModeState } from "@oh-my-striped-pi/pi-coding-agent/goals/state";
+import { removeWithRetries, withTimeout } from "@oh-my-striped-pi/pi-utils";
 
 function nextMacrotask(): Promise<void> {
 	const { promise, resolve } = Promise.withResolvers<void>();
@@ -50,13 +50,13 @@ describe("RPC goal command", () => {
 		plan?: boolean;
 		persist?: boolean;
 	}): Promise<RpcClient> {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-goal-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-goal-"));
 		client = new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "goal-rpc-agent.ts")],
 			cwd: directory,
 			env: {
-				PI_CODING_AGENT_DIR: directory,
-				PI_NO_TITLE: "1",
+				OMSP_CODING_AGENT_DIR: directory,
+				OMSP_NO_TITLE: "1",
 				GOAL_RPC_CONTINUATION: options.continuation ? "1" : "0",
 				GOAL_RPC_SCRIPT: options.script ?? "complete",
 				GOAL_RPC_PLAN: options.plan ? "1" : "0",

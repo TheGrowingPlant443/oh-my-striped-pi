@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { type Component, CURSOR_MARKER, type Focusable, type OverlayFocusOwner, TUI } from "@oh-my-pi/pi-tui";
+import { type Component, CURSOR_MARKER, type Focusable, type OverlayFocusOwner, TUI } from "@oh-my-striped-pi/pi-tui";
 import { withoutTerminalMultiplexer } from "./helpers/terminal-multiplexer";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";

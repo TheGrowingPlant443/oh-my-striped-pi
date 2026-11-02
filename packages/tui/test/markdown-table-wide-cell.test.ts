@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { Markdown } from "@oh-my-pi/pi-tui/components/markdown";
-import { visibleWidth } from "@oh-my-pi/pi-tui/utils";
+import { Markdown } from "@oh-my-striped-pi/pi-tui/components/markdown";
+import { visibleWidth } from "@oh-my-striped-pi/pi-tui/utils";
 import { defaultMarkdownTheme } from "./test-themes.js";
 
 // Four sixteen-cell words squeeze the trailing emoji column down to one cell.

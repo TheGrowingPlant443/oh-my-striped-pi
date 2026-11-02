@@ -9,9 +9,9 @@
  * captured before it: timers, the settling check and an in-flight recap, so a late reply can never
  * be announced.
  */
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { isPromptCachePersistent } from "@oh-my-pi/pi-catalog/compat/prompt-cache-persistent";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { isPromptCachePersistent } from "@oh-my-striped-pi/pi-catalog/compat/prompt-cache-persistent";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import { combine } from "../config/registry";
 import { cfgRecap } from "../modes/settings";
 import idleRecapPrompt from "../prompts/system/recap-user.md" with { type: "text" };

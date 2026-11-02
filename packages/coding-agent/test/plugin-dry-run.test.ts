@@ -1,5 +1,5 @@
 /**
- * Regression tests for `--dry-run` on `omp plugin` actions beyond install/uninstall/link.
+ * Regression tests for `--dry-run` on `omsp plugin` actions beyond install/uninstall/link.
  *
  * These actions used to accept `--dry-run` and silently apply their change:
  * `upgrade --dry-run` rewrote installed_plugins.json and replaced the plugin's
@@ -14,17 +14,17 @@ import { afterEach, beforeAll, beforeEach, describe, expect, spyOn, test, vi } f
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type PluginCommandArgs, runPluginCommand } from "@oh-my-pi/pi-coding-agent/cli/plugin-cli";
-import Update from "@oh-my-pi/pi-coding-agent/commands/update";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import * as piUtils from "@oh-my-pi/pi-utils";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
-import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
+import { type PluginCommandArgs, runPluginCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/plugin-cli";
+import Update from "@oh-my-striped-pi/pi-coding-agent/commands/update";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
+import type { CliConfig } from "@oh-my-striped-pi/pi-utils/cli";
 
 const PLUGIN_ID = "hello@fixmkt";
 const LINKED = "lp";
 const UPGRADE_PREVIEW = `Would upgrade ${PLUGIN_ID} (user): 1.0.0 -> 2.0.0`;
-const CLI_CONFIG: CliConfig = { bin: "omp", version: "0.0.0-test", commands: new Map() };
+const CLI_CONFIG: CliConfig = { bin: "omsp", version: "0.0.0-test", commands: new Map() };
 
 async function writeMarketplace(dir: string, name: string, version: string | undefined): Promise<void> {
 	await Bun.write(
@@ -69,7 +69,7 @@ describe("plugin --dry-run beyond install, uninstall and link", () => {
 	});
 
 	beforeEach(async () => {
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-plugin-dry-run-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-plugin-dry-run-"));
 		pluginsDir = path.join(root, "state", "plugins");
 		marketplaceDir = path.join(root, "marketplace");
 		otherMarketplaceDir = path.join(root, "other-marketplace");
@@ -77,11 +77,11 @@ describe("plugin --dry-run beyond install, uninstall and link", () => {
 		spyOn(piUtils, "getPluginsDir").mockReturnValue(pluginsDir);
 		spyOn(piUtils, "getPluginsNodeModules").mockReturnValue(path.join(pluginsDir, "node_modules"));
 		spyOn(piUtils, "getPluginsPackageJson").mockReturnValue(path.join(pluginsDir, "package.json"));
-		spyOn(piUtils, "getPluginsLockfile").mockReturnValue(path.join(pluginsDir, "omp-plugins.lock.json"));
+		spyOn(piUtils, "getPluginsLockfile").mockReturnValue(path.join(pluginsDir, "omsp-plugins.lock.json"));
 		spyOn(piUtils, "getMarketplacesRegistryPath").mockReturnValue(path.join(root, "state", "marketplaces.json"));
 		spyOn(piUtils, "getProjectDir").mockReturnValue(projectDir);
 		spyOn(piUtils, "getProjectPluginOverridesPath").mockReturnValue(
-			path.join(projectDir, ".omp", "plugin-overrides.json"),
+			path.join(projectDir, ".omsp", "plugin-overrides.json"),
 		);
 		output = [];
 		spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -92,7 +92,7 @@ describe("plugin --dry-run beyond install, uninstall and link", () => {
 		// An npm-installed plugin as package.json records it, for the npm/git upgrade path.
 		await Bun.write(
 			path.join(pluginsDir, "package.json"),
-			JSON.stringify({ name: "omp-plugins", private: true, dependencies: { "remote-pkg": "^1.0.0" } }),
+			JSON.stringify({ name: "omsp-plugins", private: true, dependencies: { "remote-pkg": "^1.0.0" } }),
 		);
 		// A linked local plugin with a feature and a setting, for enable/features/config.
 		const linkedDir = path.join(root, LINKED);
@@ -101,7 +101,7 @@ describe("plugin --dry-run beyond install, uninstall and link", () => {
 			JSON.stringify({
 				name: LINKED,
 				version: "1.0.0",
-				omp: {
+				omsp: {
 					features: { search: { description: "search", default: false } },
 					settings: { apiKey: { type: "string", description: "key" } },
 				},

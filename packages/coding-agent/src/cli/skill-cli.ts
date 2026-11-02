@@ -1,8 +1,8 @@
 /**
- * `omp skill <action>` handlers for installing and discovering skills.
+ * `omsp skill <action>` handlers for installing and discovering skills.
  */
-import { CliUsageError } from "@oh-my-pi/pi-utils/cli";
-import type { SkillSearchSort } from "@oh-my-pi/pi-wire/skillshare";
+import { CliUsageError } from "@oh-my-striped-pi/pi-utils/cli";
+import type { SkillSearchSort } from "@oh-my-striped-pi/pi-wire/skillshare";
 import { installSkills, searchSkills, showSkillInfo, uninstallSkills, updateSkills } from "../skillshare/installer";
 import { handleSkillList } from "./skill-list";
 
@@ -22,7 +22,7 @@ export interface SkillCommandArgs {
 	};
 }
 
-export const SKILL_USAGE = `Usage: omp skill <action> [...]
+export const SKILL_USAGE = `Usage: omsp skill <action> [...]
 
 Install and discover:
   install [@scope/name[@range]...] [-g] [--yes]   Install skills (no specs: install from skills.json)
@@ -41,25 +41,25 @@ async function dispatch(cmd: SkillCommandArgs): Promise<number> {
 		case "update":
 			return updateSkills({ names: args, global: flags.global === true, yes: flags.yes === true, cwd });
 		case "uninstall":
-			if (args.length === 0) throw new CliUsageError("usage: omp skill uninstall <name...> [-g]");
+			if (args.length === 0) throw new CliUsageError("usage: omsp skill uninstall <name...> [-g]");
 			return uninstallSkills({ names: args, global: flags.global === true, cwd });
 		case "search": {
 			const query = args.join(" ").trim();
-			if (!query) throw new CliUsageError("usage: omp skill search <query>");
+			if (!query) throw new CliUsageError("usage: omsp skill search <query>");
 			return searchSkills({ query, sort: flags.sort ?? "relevance", json: flags.json === true });
 		}
 		case "list":
 			return handleSkillList(args, cwd, flags.json === true);
 		case "info": {
 			const spec = args[0];
-			if (!spec) throw new CliUsageError("usage: omp skill info <@scope/name[@version]>");
+			if (!spec) throw new CliUsageError("usage: omsp skill info <@scope/name[@version]>");
 			return showSkillInfo({ spec, json: flags.json === true });
 		}
 	}
 }
 
 /**
- * Run one `omp skill` action and return the process exit code. Usage mistakes
+ * Run one `omsp skill` action and return the process exit code. Usage mistakes
  * propagate as {@link CliUsageError}; registry and validation failures are
  * printed as `skill <action>: <message>` and yield 1.
  */

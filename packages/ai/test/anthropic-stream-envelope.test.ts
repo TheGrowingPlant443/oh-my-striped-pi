@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { scheduler } from "node:timers/promises";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { convertAnthropicMessages, streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { AnthropicMessages, type AnthropicMessagesClientLike } from "@oh-my-pi/pi-ai/providers/anthropic-client";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { convertAnthropicMessages, streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import {
+	AnthropicMessages,
+	type AnthropicMessagesClientLike,
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
 import type {
 	ToolSearchToolResultBlockParam,
 	WebSearchToolResultBlockParam,
-} from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import type { AssistantMessageEvent, Context, Model, ModelSpec, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
-import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { structuredCloneJSON } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
+import type {
+	AssistantMessageEvent,
+	Context,
+	Model,
+	ModelSpec,
+	ProviderSessionState,
+} from "@oh-my-striped-pi/pi-ai/types";
+import { validateToolArguments } from "@oh-my-striped-pi/pi-ai/utils/validation";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { structuredCloneJSON } from "@oh-my-striped-pi/pi-utils";
 import { withOfficialAnthropicEndpoint } from "./helpers";
 
 const model: Model<"anthropic-messages"> = buildModel({

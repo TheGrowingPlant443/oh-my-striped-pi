@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import * as piNatives from "@oh-my-pi/pi-natives";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import * as pdfRead from "@oh-my-pi/pi-coding-agent/tools/read-pdf";
-import { ToolAbortError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
-import * as markit from "@oh-my-pi/pi-coding-agent/utils/markit";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
-import { __resetDirsFromEnvForTests, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
-import * as ar from "@oh-my-pi/pi-utils/ar";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import * as piNatives from "@oh-my-striped-pi/pi-natives";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import * as pdfRead from "@oh-my-striped-pi/pi-coding-agent/tools/read-pdf";
+import { ToolAbortError } from "@oh-my-striped-pi/pi-coding-agent/tools/tool-errors";
+import * as markit from "@oh-my-striped-pi/pi-coding-agent/utils/markit";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { __resetDirsFromEnvForTests, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
+import * as ar from "@oh-my-striped-pi/pi-utils/ar";
 import { restoreEnvValue } from "../helpers/settings-test-state";
 
 const MEMBER = "folder/sample document.pdf";
@@ -71,17 +71,17 @@ describe("PDF archive members", () => {
 	beforeEach(async () => {
 		temp = await TempDir.create("@read-archive-pdf-");
 		pdf = textPdf();
-		originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-		originalOmpProfile = process.env.OMP_PROFILE;
-		originalPiProfile = process.env.PI_PROFILE;
+		originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+		originalOmpProfile = process.env.OMSP_PROFILE;
+		originalPiProfile = process.env.OMSP_PROFILE;
 		setAgentDir(temp.join("agent"));
 	});
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		restoreEnvValue("PI_CODING_AGENT_DIR", originalAgentDir);
-		restoreEnvValue("OMP_PROFILE", originalOmpProfile);
-		restoreEnvValue("PI_PROFILE", originalPiProfile);
+		restoreEnvValue("OMSP_CODING_AGENT_DIR", originalAgentDir);
+		restoreEnvValue("OMSP_PROFILE", originalOmpProfile);
+		restoreEnvValue("OMSP_PROFILE", originalPiProfile);
 		__resetDirsFromEnvForTests();
 		await temp.remove();
 	});

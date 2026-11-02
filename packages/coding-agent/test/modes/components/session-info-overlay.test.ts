@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import { type Component, type OverlayHandle, setKeybindings, TUI, visibleWidth } from "@oh-my-pi/pi-tui";
-import type { Terminal, TerminalAppearance } from "@oh-my-pi/pi-tui/terminal";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
+import { type Component, type OverlayHandle, setKeybindings, TUI, visibleWidth } from "@oh-my-striped-pi/pi-tui";
+import type { Terminal, TerminalAppearance } from "@oh-my-striped-pi/pi-tui/terminal";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
 import { Settings } from "../../../src/config/settings";
-import { SessionInfoOverlay } from "@oh-my-pi/pi-tui/overlays/session-info-overlay";
-import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-pi/pi-tui/theme";
+import { SessionInfoOverlay } from "@oh-my-striped-pi/pi-tui/overlays/session-info-overlay";
+import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
 
 class MinimalTerminal implements Terminal {
 	columns = 80;

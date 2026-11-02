@@ -2,7 +2,7 @@
       'use strict';
 
       const marked = new globalThis.ompMarkdown.Marked();
-      const THEME_STORAGE_KEY = 'omp-export-theme';
+      const THEME_STORAGE_KEY = 'omsp-export-theme';
       const themeSelect = document.getElementById('theme-select');
       let themePreference = 'auto';
       try {
@@ -565,8 +565,8 @@
       }
 
       /**
-       * Split an OMP interleaved assistant into sidebar text/tool rows.
-       * Pi stores those continuations as separate entries; OMP keeps one
+       * Split an OMSP interleaved assistant into sidebar text/tool rows.
+       * Pi stores those continuations as separate entries; OMSP keeps one
        * content array. Do not mutate session entries or parentIds.
        */
       function buildInterleavedAssistantRows(flatNode, toolResultNodes, includeTools) {
@@ -911,12 +911,12 @@
       // TOOL CALL RENDERING
       // ============================================================
       //
-      // Tool calls use the embedded <omp-tool-view> web component shared with collab-web.
+      // Tool calls use the embedded <omsp-tool-view> web component shared with collab-web.
       // Payloads are handed over via a global store keyed by data-key, which
       // survives innerHTML serialization and cloneNode round trips.
 
       const TOOL_VIEW_DATA = new Map();
-      globalThis.__OMP_TOOL_VIEW_DATA = TOOL_VIEW_DATA;
+      globalThis.__OMSP_TOOL_VIEW_DATA = TOOL_VIEW_DATA;
       let toolViewSeq = 0;
 
       function renderToolCall(call, sctx, blockId) {
@@ -932,7 +932,7 @@
             openAgent: (id) => openSubSession(joinKey(sctx.prefix, id)),
           },
         });
-        return '<omp-tool-view class="tool-execution ' + statusClass + '" id="' + blockId + '" data-key="' + key + '" open></omp-tool-view>';
+        return '<omsp-tool-view class="tool-execution ' + statusClass + '" id="' + blockId + '" data-key="' + key + '" open></omsp-tool-view>';
       }
 
       // Session destinations share the transcript tree and renderer. Only one
@@ -1309,7 +1309,7 @@
 
       function renderHeader() {
         const title = header?.title || (activeSessionKey ? subSessions[activeSessionKey].agentId : 'Session transcript');
-        document.title = `${title} · omp`;
+        document.title = `${title} · omsp`;
         const totalCost = globalStats.cost.input + globalStats.cost.output + globalStats.cost.cacheRead + globalStats.cost.cacheWrite;
 
         const tokenParts = [];
@@ -1552,7 +1552,7 @@
       const overlay = document.getElementById('sidebar-overlay');
       const hamburger = document.getElementById('hamburger');
       const sidebarResizer = document.getElementById('sidebar-resizer');
-      const SIDEBAR_WIDTH_STORAGE_KEY = 'omp-export:sidebar-width';
+      const SIDEBAR_WIDTH_STORAGE_KEY = 'omsp-export:sidebar-width';
       const MIN_CONTENT_WIDTH = 320;
 
       function isMobileLayout() {
@@ -1701,7 +1701,7 @@
       // Keyboard shortcuts
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          if (e.defaultPrevented || e.composedPath().some(node => node.tagName === 'OMP-SESSION-TRACE')) return;
+          if (e.defaultPrevented || e.composedPath().some(node => node.tagName === 'OMSP-SESSION-TRACE')) return;
           if (e.target?.matches('input, textarea, [contenteditable="true"]')) return;
           if (currentView === 'trace' || timelineOpen) {
             setView('transcript');
@@ -1721,7 +1721,7 @@
           // so the chord can't fire on a user's letter input. Avoid Ctrl/Cmd-based
           // chords entirely — every major browser reserves Ctrl+T (new tab) and
           // Ctrl+O (open file), so the shortcut would never reach the page.
-          if (e.defaultPrevented || e.composedPath().some(node => node.tagName === 'OMP-SESSION-TRACE')) return;
+          if (e.defaultPrevented || e.composedPath().some(node => node.tagName === 'OMSP-SESSION-TRACE')) return;
           const t = e.target;
           const editable =
             t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
@@ -1736,7 +1736,7 @@
       // The same embedded snapshot drives both transcript navigation and trace inspection.
       const tracePanel = document.getElementById('trace-panel');
       const traceBody = document.getElementById('trace-body');
-      const traceElement = document.querySelector('omp-session-trace');
+      const traceElement = document.querySelector('omsp-session-trace');
       const timelineToggle = document.getElementById('timeline-toggle');
       const traceExpand = document.getElementById('trace-expand');
       let currentView = 'transcript';

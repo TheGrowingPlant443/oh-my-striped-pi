@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { IpcServer } from "@oh-my-pi/pi-natives";
-import { getAgentDir, VERSION } from "@oh-my-pi/pi-utils";
+import { IpcServer } from "@oh-my-striped-pi/pi-natives";
+import { getAgentDir, VERSION } from "@oh-my-striped-pi/pi-utils";
 import * as launchClient from "../src/launch/client";
 import { closeTextPrediction, requestTextPrediction } from "../src/predict/client";
 import { type TextPredictRequest, type TextPredictResponse, textPredictDaemon } from "../src/predict/protocol";
@@ -23,7 +23,7 @@ afterEach(async () => {
  * use this daemon or fail. Returns the ops the daemon received.
  */
 async function serveDaemon(version: string): Promise<string[]> {
-	const runtimeDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-text-predict-client-"));
+	const runtimeDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-text-predict-client-"));
 	const received: string[] = [];
 	const server = await IpcServer.listen(
 		textPredictDaemon(runtimeDir, getAgentDir()).endpoint,
@@ -63,8 +63,8 @@ async function serveDaemon(version: string): Promise<string[]> {
 	return received;
 }
 
-describe("text-predict client against a daemon from another omp version", () => {
-	it("uses a daemon from a newer omp instead of shutting it down", async () => {
+describe("text-predict client against a daemon from another omsp version", () => {
+	it("uses a daemon from a newer omsp instead of shutting it down", async () => {
 		// After an in-place upgrade, a session still running the old build must not
 		// stop the daemon every session on the new build is using.
 		const [major] = VERSION.split(".");
@@ -76,7 +76,7 @@ describe("text-predict client against a daemon from another omp version", () => 
 		expect(received).toEqual(["ping", "complete"]);
 	});
 
-	it("shuts down a daemon from an older omp so this version's can start", async () => {
+	it("shuts down a daemon from an older omsp so this version's can start", async () => {
 		const received = await serveDaemon("0.0.1");
 
 		const error = await rejectionOf(requestTextPrediction("ngram", "please ", "re"));

@@ -1,33 +1,36 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent, CompactionCancelledError, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, UserMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { CONTEXT_NOTES_ENTRY_TYPE, getContextNotes } from "@oh-my-pi/pi-coding-agent/session/context-notes";
+import { Agent, CompactionCancelledError, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { CONTEXT_NOTES_ENTRY_TYPE, getContextNotes } from "@oh-my-striped-pi/pi-coding-agent/session/context-notes";
 import {
 	createCustomMessage,
 	convertToLlm,
 	SKILL_PROMPT_MESSAGE_TYPE,
-} from "@oh-my-pi/pi-coding-agent/session/messages";
-import type { CompactionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { computeNonMessageTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import type { Tool, ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+} from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import type { CompactionEntry } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { computeNonMessageTokens } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import type { Tool, ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
-import { ContextNotesTool, NewContextTool } from "@oh-my-pi/pi-coding-agent/tools/context-notes";
-import { BUILTIN_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/tools/builtin-names";
-import { GrepTool } from "@oh-my-pi/pi-coding-agent/tools/grep";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
+import { ContextNotesTool, NewContextTool } from "@oh-my-striped-pi/pi-coding-agent/tools/context-notes";
+import { BUILTIN_TOOL_NAMES } from "@oh-my-striped-pi/pi-coding-agent/tools/builtin-names";
+import { GrepTool } from "@oh-my-striped-pi/pi-coding-agent/tools/grep";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 const companyChatModel = buildModel({

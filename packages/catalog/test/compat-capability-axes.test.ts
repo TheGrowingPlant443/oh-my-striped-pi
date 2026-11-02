@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { supportsOutputTokenLimit } from "@oh-my-pi/pi-catalog/compat/output-limits";
-import { requiresNativeTools, requiresToolFreeHistoryForToolOptOut } from "@oh-my-pi/pi-catalog/compat/tools";
-import { getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import type { KnownApi, Model } from "@oh-my-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { supportsOutputTokenLimit } from "@oh-my-striped-pi/pi-catalog/compat/output-limits";
+import { requiresNativeTools, requiresToolFreeHistoryForToolOptOut } from "@oh-my-striped-pi/pi-catalog/compat/tools";
+import { getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
+import type { KnownApi, Model } from "@oh-my-striped-pi/pi-catalog/types";
 
 function copilotFixture(api: KnownApi): Model {
 	const found = getBundledModels("github-copilot").find(model => model.api === api);

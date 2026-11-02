@@ -1,6 +1,6 @@
-import { renderJobsSection, renderFailedJobLogs, renderRunSection } from "@oh-my-pi/pi-tui/tools/github";
+import { renderJobsSection, renderFailedJobLogs, renderRunSection } from "@oh-my-striped-pi/pi-tui/tools/github";
 import { scheduler } from "node:timers/promises";
-import type { AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
+import type { AgentToolResult, AgentToolUpdateCallback } from "@oh-my-striped-pi/pi-agent-core";
 import { github } from "../utils/github";
 import type { ToolSession } from ".";
 import type {
@@ -9,7 +9,7 @@ import type {
 	GhRunWatchRunDetails,
 	GhRunWatchViewDetails,
 	GhToolDetails,
-} from "@oh-my-pi/pi-tui/tools/github";
+} from "@oh-my-striped-pi/pi-tui/tools/github";
 import {
 	buildTextResult,
 	formatRepoRef,
@@ -26,8 +26,8 @@ import {
 	saveArtifactText,
 	tryResolveCurrentRepoFresh,
 } from "./gh-common";
-import { pushLine } from "@oh-my-pi/pi-tui/tools/gh-format";
-import { formatShortSha } from "@oh-my-pi/pi-tui/tools/gh-format";
+import { pushLine } from "@oh-my-striped-pi/pi-tui/tools/gh-format";
+import { formatShortSha } from "@oh-my-striped-pi/pi-tui/tools/gh-format";
 import type {
 	GhActionsJobApi,
 	GhActionsJobsResponse,
@@ -37,10 +37,10 @@ import type {
 	GhRunReference,
 	GithubInput,
 } from "./gh-types";
-import type { GhFailedJobLog, GhRunJobSnapshot, GhRunSnapshot } from "@oh-my-pi/pi-tui/tools/github";
-import { truncateLineBytes } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import type { GhFailedJobLog, GhRunJobSnapshot, GhRunSnapshot } from "@oh-my-striped-pi/pi-tui/tools/github";
+import { truncateLineBytes } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import { throwIfAborted } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 
 export const RUN_WATCH_INTERVAL_DEFAULT = 3;
 export const RUN_WATCH_INTERVAL_SLOW = 15;

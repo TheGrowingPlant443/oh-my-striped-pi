@@ -1,9 +1,9 @@
 /**
- * List and clean up agent-managed git worktrees under `~/.omp/wt`.
+ * List and clean up agent-managed git worktrees under `~/.omsp/wt`.
  */
 
-import { getProjectDir } from "@oh-my-pi/pi-utils";
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { getProjectDir } from "@oh-my-striped-pi/pi-utils";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
 import { worktreeHelp as commandHelp } from "../cli/command-help";
 import { addWorktree, clearWorktrees, listWorktrees } from "../cli/worktree-cli";
 import { Settings } from "../config/settings";
@@ -13,7 +13,7 @@ export default class Worktree extends Command {
 	static aliases = ["wt"];
 
 	static args = {
-		// A positional action keeps `omp worktree` (the no-arg form) useful.
+		// A positional action keeps `omsp worktree` (the no-arg form) useful.
 		action: Args.string({
 			description: "list (default), clear, or add",
 			required: false,
@@ -68,20 +68,20 @@ export default class Worktree extends Command {
 	};
 
 	static examples = [
-		"omp worktree",
-		"omp worktree list --json",
-		"omp worktree add ../feature",
-		"omp worktree add -b feature ../feature origin/main",
-		"omp worktree add --detach ../review HEAD~2",
-		"omp worktree clear",
-		"omp worktree clear --dry-run",
-		"omp worktree clear --all",
+		"omsp worktree",
+		"omsp worktree list --json",
+		"omsp worktree add ../feature",
+		"omsp worktree add -b feature ../feature origin/main",
+		"omsp worktree add --detach ../review HEAD~2",
+		"omsp worktree clear",
+		"omsp worktree clear --dry-run",
+		"omsp worktree clear --all",
 	];
 
 	async run(): Promise<void> {
 		const { args, flags } = await this.parse(Worktree);
 		// Load settings so the `worktree.base` override is applied before we scan
-		// — otherwise this command would inspect ~/.omp/wt while the agent created
+		// — otherwise this command would inspect ~/.omsp/wt while the agent created
 		// its worktrees under the configured base.
 		if (args.action === "add") {
 			if (!args.path) {

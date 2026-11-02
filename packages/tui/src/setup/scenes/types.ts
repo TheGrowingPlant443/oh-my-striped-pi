@@ -1,4 +1,4 @@
-import type { AuthStorage, Model } from "@oh-my-pi/pi-ai";
+import type { AuthStorage, Model } from "@oh-my-striped-pi/pi-ai";
 import type { SgrMouseEvent } from "../../mouse";
 import type { ComposerPreviewStatusSource } from "../../overlays/composer-shape-preview";
 import type { ComposerShape } from "../../overlays/composer-shape-registry";
@@ -83,10 +83,10 @@ export interface SetupSceneController extends Component {
  * TSP terminal. The terminal's setup stylesheet seats it under the wizard's
  * brand and stepper instead of floating it over a dimmed page.
  */
-export const SETUP_SHEET_ROLE = "omp.setup.sheet";
+export const SETUP_SHEET_ROLE = "omsp.setup.sheet";
 
 /** Surface role of the setup page (wizard and startup splash) in a TSP terminal. */
-export const SETUP_SURFACE_ROLE = "omp.app.setup";
+export const SETUP_SURFACE_ROLE = "omsp.app.setup";
 
 /** Versioned onboarding scene definition. */
 export interface SetupScene {

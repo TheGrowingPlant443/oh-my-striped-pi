@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { Agent, AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { IrcBridge, type IrcBridgeHost } from "@oh-my-pi/pi-coding-agent/session/irc-bridge";
-import type { CustomMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
+import type { Agent, AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { IrcBridge, type IrcBridgeHost } from "@oh-my-striped-pi/pi-coding-agent/session/irc-bridge";
+import type { CustomMessage } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
 
 function makeBridge() {
 	const woken: AgentMessage[][] = [];

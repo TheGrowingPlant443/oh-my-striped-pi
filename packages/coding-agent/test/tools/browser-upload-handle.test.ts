@@ -2,11 +2,11 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { chromiumAvailable } from "./chromium-probe";
 
 const CHROMIUM_AVAILABLE = await chromiumAvailable();
@@ -53,7 +53,7 @@ function makeSession(): ToolSession {
 }
 
 beforeAll(async () => {
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-upload-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-upload-"));
 	await Bun.write(path.join(tempDir, "alpha.txt"), "alpha");
 	await Bun.write(path.join(tempDir, "beta.txt"), "beta");
 	site = Bun.serve({

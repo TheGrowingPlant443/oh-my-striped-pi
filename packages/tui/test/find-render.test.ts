@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { getThemeByName } from "@oh-my-pi/pi-tui/theme";
-import { findToolRenderer, type FindToolDetails } from "@oh-my-pi/pi-tui/tools/find";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import { getThemeByName } from "@oh-my-striped-pi/pi-tui/theme";
+import { findToolRenderer, type FindToolDetails } from "@oh-my-striped-pi/pi-tui/tools/find";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import { applyHyperlinkSetting } from "../src/render/hyperlink";
 
 function extractLinkUris(text: string): string[] {
@@ -101,15 +101,15 @@ describe("findToolRenderer", () => {
 		expect(native).not.toContain("\\u001b");
 	});
 
-	it("links omp hits to their doc URL instead of joining them onto cwd", async () => {
+	it("links omsp hits to their doc URL instead of joining them onto cwd", async () => {
 		applyHyperlinkSetting("always");
 		const uiTheme = (await getThemeByName("dark"))!;
 		const ompDetails: FindToolDetails = {
 			...details,
-			scopePath: "omp://",
+			scopePath: "omsp://",
 			hits: [
 				{
-					rel: "omp://tools/read.md",
+					rel: "omsp://tools/read.md",
 					contentScore: 0.9,
 					linesSeen: 40,
 					truncated: false,
@@ -126,9 +126,9 @@ describe("findToolRenderer", () => {
 			)
 			.render(200);
 		const uris = extractLinkUris(lines.join("\n"));
-		expect(uris).toContain("omp://tools/read.md");
-		expect(uris).toContain("omp://tools/read.md:10");
-		expect(uris.every(uri => !uri.endsWith("/repo/omp://tools/read.md"))).toBe(true);
+		expect(uris).toContain("omsp://tools/read.md");
+		expect(uris).toContain("omsp://tools/read.md:10");
+		expect(uris.every(uri => !uri.endsWith("/repo/omsp://tools/read.md"))).toBe(true);
 	});
 
 	it("shows one range per hit collapsed and all ranges plus failures expanded", async () => {

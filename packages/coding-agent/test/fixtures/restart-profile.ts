@@ -1,7 +1,7 @@
 import { vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { getActiveProfile, setProfile } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { getActiveProfile, setProfile } from "@oh-my-striped-pi/pi-utils";
 import { extractProfileFlags } from "../../src/cli/profile-bootstrap";
 import { ModelRegistry } from "../../src/config/model-registry";
 import { Settings } from "../../src/config/settings";
@@ -10,7 +10,7 @@ import { AuthStorage } from "../../src/session/auth-storage";
 import { AgentSession } from "../../src/session/agent-session";
 import { SessionManager } from "../../src/session/session-manager";
 import * as workerClient from "../../src/subprocess/worker-client";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 if (process.argv[2] === "receive") {
 	const extracted = extractProfileFlags(process.argv.slice(3));

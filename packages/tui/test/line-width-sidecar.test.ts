@@ -13,7 +13,7 @@ import {
 	resetHangulCompatibilityJamoWidthForTests,
 	setHangulCompatibilityJamoWidth,
 	visibleWidth,
-} from "@oh-my-pi/pi-tui/utils";
+} from "@oh-my-striped-pi/pi-tui/utils";
 
 afterEach(() => {
 	resetHangulCompatibilityJamoWidthForTests();

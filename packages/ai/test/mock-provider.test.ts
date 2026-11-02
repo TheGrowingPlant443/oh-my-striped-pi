@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createMockModel, MOCK_API, type MockHandler, streamMock } from "@oh-my-pi/pi-ai/providers/mock";
-import type { AssistantMessage, AssistantMessageEvent, Context, ToolCall } from "@oh-my-pi/pi-ai/types";
+import { createMockModel, MOCK_API, type MockHandler, streamMock } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import type { AssistantMessage, AssistantMessageEvent, Context, ToolCall } from "@oh-my-striped-pi/pi-ai/types";
 
 function emptyContext(): Context {
 	return {

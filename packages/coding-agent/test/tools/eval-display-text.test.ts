@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as evalIndex from "@oh-my-pi/pi-coding-agent/eval";
-import type { EvalDisplayOutput } from "@oh-my-pi/pi-coding-agent/eval/types";
-import * as pyKernel from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
-import { splitEvalOutput } from "@oh-my-pi/pi-tui/tools/eval";
-import { OutputSink } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as evalIndex from "@oh-my-striped-pi/pi-coding-agent/eval";
+import type { EvalDisplayOutput } from "@oh-my-striped-pi/pi-coding-agent/eval/types";
+import * as pyKernel from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EvalTool } from "@oh-my-striped-pi/pi-coding-agent/tools/eval";
+import { splitEvalOutput } from "@oh-my-striped-pi/pi-tui/tools/eval";
+import { OutputSink } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 
 function makeSession(): ToolSession {
 	return {

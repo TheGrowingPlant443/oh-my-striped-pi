@@ -14,7 +14,7 @@ import { Buffer } from "node:buffer";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { removeWithRetries, VERSION } from "@oh-my-pi/pi-utils";
+import { removeWithRetries, VERSION } from "@oh-my-striped-pi/pi-utils";
 import { lookup } from "../../src/config/registry";
 import { Settings } from "../../src/config/settings";
 import {
@@ -36,8 +36,8 @@ import {
 	writeLastChangelogVersion,
 } from "../../src/utils/changelog";
 
-import { cfgStartupChangelogMode } from "@oh-my-pi/pi-coding-agent/modes/settings";
-import { CURRENT_SETUP_VERSION } from "@oh-my-pi/pi-tui/setup/setup-version";
+import { cfgStartupChangelogMode } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
+import { CURRENT_SETUP_VERSION } from "@oh-my-striped-pi/pi-tui/setup/setup-version";
 
 const CURRENT_VERSION = "2.0.0";
 const repoRoot = path.resolve(import.meta.dir, "..", "..", "..", "..");
@@ -118,7 +118,7 @@ describe("parseChangelogView", () => {
 });
 
 async function withTempAgentDir<T>(callback: (agentDir: string) => Promise<T>): Promise<T> {
-	const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-changelog-marker-"));
+	const agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-changelog-marker-"));
 	try {
 		const result = await callback(agentDir);
 		return result;
@@ -396,7 +396,7 @@ describe.skipIf(!hasPtyHarness)("interactive startup changelog PTY smoke", () =>
 		"does not dump packaged changelog history on first install with uncollapsed notes",
 		async () => {
 			await withTempAgentDir(async agentDir => {
-				const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-changelog-pty-"));
+				const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-changelog-pty-"));
 				try {
 					await fs.mkdir(path.join(root, "xdg-config"), { recursive: true });
 					await fs.mkdir(path.join(root, "xdg-state"), { recursive: true });
@@ -414,17 +414,17 @@ describe.skipIf(!hasPtyHarness)("interactive startup changelog PTY smoke", () =>
 						stderr: "pipe",
 						env: {
 							...process.env,
-							// ci-test-ts children inherit PI_TEST_RUNTIME=1, which makes the CLI
+							// ci-test-ts children inherit OMSP_TEST_RUNTIME=1, which makes the CLI
 							// headless: it paints nothing and exits once startup drains. Clear it so
 							// CI runs the same painting interactive startup as a local `bun test`.
-							PI_TEST_RUNTIME: undefined,
+							OMSP_TEST_RUNTIME: undefined,
 							HOME: root,
 							XDG_CONFIG_HOME: path.join(root, "xdg-config"),
 							XDG_STATE_HOME: path.join(root, "xdg-state"),
 							XDG_DATA_HOME: path.join(root, "xdg-data"),
-							PI_CODING_AGENT_DIR: agentDir,
-							PI_PACKAGE_DIR: packageDir,
-							PI_NO_TITLE: "1",
+							OMSP_CODING_AGENT_DIR: agentDir,
+							OMSP_PACKAGE_DIR: packageDir,
+							OMSP_NO_TITLE: "1",
 							NO_COLOR: "1",
 							TERM: "xterm-256color",
 						},

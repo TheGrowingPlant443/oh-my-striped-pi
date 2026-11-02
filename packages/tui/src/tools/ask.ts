@@ -1,5 +1,5 @@
 import type { NativeToolHead, NativeToolView, ToolRenderer, ToolRenderResult } from "./renderer";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { compact, md, node, row, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { OwnerMemo } from "../native/memo";
@@ -314,7 +314,7 @@ function describeQuestionSection(id: string, question: string, rest: readonly Na
 function answerRow(key: string, label: TspSpan[], chosen: boolean): NativeNode {
 	return row(
 		compact([chosen ? node("icon", { name: "check", tone: "success" }) : undefined, text(label, { wrap: "word" })]),
-		{ gap: "sm", align: "baseline", role: chosen ? "omp.tool.answer" : "omp.tool.answer.off", key },
+		{ gap: "sm", align: "baseline", role: chosen ? "omsp.tool.answer" : "omsp.tool.answer.off", key },
 	);
 }
 
@@ -344,7 +344,7 @@ function describeAnswers(
 	return compact([
 		...rows,
 		note !== undefined
-			? text([span(plainText(note), "muted")], { wrap: "word", role: "omp.tool.context" })
+			? text([span(plainText(note), "muted")], { wrap: "word", role: "omsp.tool.context" })
 			: undefined,
 	]);
 }
@@ -430,7 +430,7 @@ function describeAskResult(result: ToolRenderResult<AskToolDetails>, args: AskRe
 			details.timedOut
 				? text([span("auto-selected after timeout — not a user choice", "muted")], {
 						wrap: "word",
-						role: "omp.tool.notice",
+						role: "omsp.tool.notice",
 					})
 				: undefined,
 		]),

@@ -1,13 +1,13 @@
 import {
 	getOAuthProviders as rootGetOAuthProviders,
 	refreshOAuthToken as rootRefreshOAuthToken,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	getOAuthProviders as oauthGetOAuthProviders,
 	refreshOAuthToken as oauthRefreshOAuthToken,
-} from "@oh-my-pi/pi-ai/registry/oauth";
-import "@oh-my-pi/pi-ai/providers/anthropic";
-import "@oh-my-pi/pi-ai/auth-storage";
+} from "@oh-my-striped-pi/pi-ai/registry/oauth";
+import "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import "@oh-my-striped-pi/pi-ai/auth-storage";
 
 const publicExports = [rootGetOAuthProviders, rootRefreshOAuthToken, oauthGetOAuthProviders, oauthRefreshOAuthToken];
 

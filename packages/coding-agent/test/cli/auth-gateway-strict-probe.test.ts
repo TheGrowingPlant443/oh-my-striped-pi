@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "bun:test";
-import * as ai from "@oh-my-pi/pi-ai";
-import type { CompletionProbeInput, Provider } from "@oh-my-pi/pi-ai";
-import { registerOAuthProvider, unregisterOAuthProvider } from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/oauth/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import type { CompletionProbeInput, Provider } from "@oh-my-striped-pi/pi-ai";
+import { registerOAuthProvider, unregisterOAuthProvider } from "@oh-my-striped-pi/pi-ai/oauth";
+import type { OAuthCredentials } from "@oh-my-striped-pi/pi-ai/oauth/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { createStrictCompletionProbe } from "../../src/cli/auth-gateway-cli";
 
 afterEach(() => {

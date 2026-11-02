@@ -1,4 +1,4 @@
-import { prompt } from "@oh-my-pi/pi-utils";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import type { EvalPreludeDefinition } from "../../eval/preludes";
 import { redactUrlForLog } from "../../mcp/json-rpc";
 import relayGuidance from "../../prompts/system/browser-relay.md" with { type: "text" };

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "bun:test";
-import { Agent, type AgentEvent, validateAgentToolArguments } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { convertTools } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { Model, Tool, ToolCall } from "@oh-my-pi/pi-ai/types";
-import { enforceStrictSchema } from "@oh-my-pi/pi-ai/utils/schema";
-import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { buildOutputValidator } from "@oh-my-pi/pi-coding-agent/tools/output-schema-validator";
-import { YieldTool } from "@oh-my-pi/pi-coding-agent/tools/yield";
+import { Agent, type AgentEvent, validateAgentToolArguments } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { convertTools } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { Model, Tool, ToolCall } from "@oh-my-striped-pi/pi-ai/types";
+import { enforceStrictSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
+import { validateToolArguments } from "@oh-my-striped-pi/pi-ai/utils/validation";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { buildOutputValidator } from "@oh-my-striped-pi/pi-coding-agent/tools/output-schema-validator";
+import { YieldTool } from "@oh-my-striped-pi/pi-coding-agent/tools/yield";
 import { buildWorkPoolOutputSchema } from "../../src/task/workpool-yield";
 import { yieldSectionShapes } from "../../src/task/yield-assembly";
-import { assembleYieldResult } from "@oh-my-pi/pi-tui/tools/task-yield-assembly";
+import { assembleYieldResult } from "@oh-my-striped-pi/pi-tui/tools/task-yield-assembly";
 
 function createSession(overrides: Partial<ToolSession> = {}): ToolSession {
 	return {

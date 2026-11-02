@@ -13,10 +13,10 @@
  * 4. Every emitted line respects the render width (sanitized, truncated).
  */
 import { beforeAll, describe, expect, it, spyOn } from "bun:test";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-pi/pi-tui/theme";
-import { createVibeToolRenderer, type VibeToolDetails } from "@oh-my-pi/pi-tui/tools/vibe";
-import type { VibeScreenSnapshot } from "@oh-my-pi/pi-tui/tools/vibe";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { createVibeToolRenderer, type VibeToolDetails } from "@oh-my-striped-pi/pi-tui/tools/vibe";
+import type { VibeScreenSnapshot } from "@oh-my-striped-pi/pi-tui/tools/vibe";
 
 const strip = (lines: readonly string[]): string[] =>
 	lines.map(line => line.replace(/\x1b\]8;[^\x1b\x07]*(?:\x07|\x1b\\)/g, "").replace(/\x1b\[[0-9;]*m/g, ""));

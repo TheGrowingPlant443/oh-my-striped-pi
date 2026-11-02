@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as pyKernel from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as pyKernel from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
 import {
 	resolveFirstLaunchPythonEvalWarning,
 	resolvePythonEvalWarning,
-} from "@oh-my-pi/pi-coding-agent/eval/startup-warning";
+} from "@oh-my-striped-pi/pi-coding-agent/eval/startup-warning";
 
-const FIX_HINT = "Install Python 3.8+ or set python.interpreter, then verify with `omp setup python --check`.";
+const FIX_HINT = "Install Python 3.8+ or set python.interpreter, then verify with `omsp setup python --check`.";
 const CWD = "/tmp/eval-startup-warning";
 
 let savedPiPy: string | undefined;
 let savedPiJs: string | undefined;
 
-function restoreEnv(name: "PI_PY" | "PI_JS", value: string | undefined): void {
+function restoreEnv(name: "OMSP_PY" | "OMSP_JS", value: string | undefined): void {
 	if (value === undefined) delete Bun.env[name];
 	else Bun.env[name] = value;
 }
@@ -24,16 +24,16 @@ function mockProbe(reason = "Python executable not found on PATH") {
 }
 
 beforeEach(() => {
-	savedPiPy = Bun.env.PI_PY;
-	savedPiJs = Bun.env.PI_JS;
-	delete Bun.env.PI_PY;
-	delete Bun.env.PI_JS;
+	savedPiPy = Bun.env.OMSP_PY;
+	savedPiJs = Bun.env.OMSP_JS;
+	delete Bun.env.OMSP_PY;
+	delete Bun.env.OMSP_JS;
 });
 
 afterEach(() => {
 	vi.restoreAllMocks();
-	restoreEnv("PI_PY", savedPiPy);
-	restoreEnv("PI_JS", savedPiJs);
+	restoreEnv("OMSP_PY", savedPiPy);
+	restoreEnv("OMSP_JS", savedPiJs);
 });
 
 describe("resolvePythonEvalWarning", () => {

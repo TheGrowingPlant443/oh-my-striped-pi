@@ -679,7 +679,7 @@ unsafe extern "C" fn route_key(_proxy: Ref, kind: u32, event: Ref, user: Ref) ->
 }
 
 /// Whether a key event was typed on a keyboard: no process posted it, and it
-/// does not carry omp's [`SYNTHETIC_EVENT_TAG`], as in the escape-key watch.
+/// does not carry omsp's [`SYNTHETIC_EVENT_TAG`], as in the escape-key watch.
 const fn typed_by_user(source_pid: i64, source_user_data: i64) -> bool {
 	source_pid == 0 && source_user_data != SYNTHETIC_EVENT_TAG
 }
@@ -1386,7 +1386,7 @@ mod tests {
 	#[test]
 	fn only_keys_no_process_posted_are_typed_by_the_user() {
 		assert!(typed_by_user(0, 0));
-		assert!(!typed_by_user(0, SYNTHETIC_EVENT_TAG), "omp's own HID keys");
+		assert!(!typed_by_user(0, SYNTHETIC_EVENT_TAG), "omsp's own HID keys");
 		assert!(!typed_by_user(4321, 0), "an automation tool's keys");
 		assert!(!typed_by_user(4321, SYNTHETIC_EVENT_TAG));
 	}

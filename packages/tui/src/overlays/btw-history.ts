@@ -1,4 +1,4 @@
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 
 export interface BtwHistoryTurn {
 	question: string;

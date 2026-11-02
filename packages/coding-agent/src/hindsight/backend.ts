@@ -7,8 +7,8 @@
  * owner instead of a parallel session-id registry.
  */
 
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import { memoryToolRefs } from "../memory-backend/tool-names";
 import type { MemoryBackend, MemoryBackendStartOptions, MemoryPromptPreparation } from "../memory-backend/types";

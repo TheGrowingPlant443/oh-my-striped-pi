@@ -1,5 +1,5 @@
-import { replaceTabs, TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-pi/pi-tui/render/render-utils";
-import { isRecord, prompt } from "@oh-my-pi/pi-utils";
+import { replaceTabs, TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { isRecord, prompt } from "@oh-my-striped-pi/pi-utils";
 import { findScopedSettings } from "../../../../config/settings";
 import type { CustomCommand, CustomCommandAPI } from "../../../../extensibility/custom-commands/types";
 import type { HookCommandContext } from "../../../../extensibility/hooks/types";

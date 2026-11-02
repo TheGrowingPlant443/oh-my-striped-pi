@@ -5,12 +5,12 @@
  * Unlike markdown commands which expand to prompts, custom commands can execute
  * arbitrary logic with full access to the hook context.
  */
-import type { type as ArkType } from "@oh-my-pi/omptype";
-import type * as TypeBox from "@oh-my-pi/omptype/typebox";
-import type * as zod from "@oh-my-pi/omptype/zod";
+import type { type as ArkType } from "@oh-my-striped-pi/omptype";
+import type * as TypeBox from "@oh-my-striped-pi/omptype/typebox";
+import type * as zod from "@oh-my-striped-pi/omptype/zod";
 import type { ExtensionUIContext } from "../extensions/types";
 import type { ExecOptions, ExecResult, HookCommandContext } from "../../extensibility/hooks/types";
-import type { AutocompleteItem } from "@oh-my-pi/pi-tui";
+import type { AutocompleteItem } from "@oh-my-striped-pi/pi-tui";
 import type * as PiCodingAgent from "../../index";
 
 // Re-export for custom commands to use

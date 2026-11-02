@@ -1,7 +1,7 @@
 import * as path from "node:path";
 
-import { buildPathTree, isUrlLikePath, type PathTreeInput, walkPathTree } from "@oh-my-pi/pi-utils";
-import type { TspTone } from "@oh-my-pi/pi-wire";
+import { buildPathTree, isUrlLikePath, type PathTreeInput, walkPathTree } from "@oh-my-striped-pi/pi-utils";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
 import { code, col, keyed, span, text } from "../native/describe";
 import type { NativeNode } from "../native/node";
 import { formatHashlineHeader } from "./hashline-format";
@@ -406,7 +406,7 @@ export function describeGroupedOutput(
 				: undefined;
 		const head = fileRow(current.path, { chip, key: "file" });
 		files.push(
-			keyed(col([head, ...current.children], { gap: "xs", role: "omp.tool.search.file" }), `f:${current.path}`),
+			keyed(col([head, ...current.children], { gap: "xs", role: "omsp.tool.search.file" }), `f:${current.path}`),
 		);
 		current = undefined;
 	};

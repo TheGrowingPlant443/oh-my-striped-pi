@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { isContextOverflow } from "@oh-my-pi/pi-ai/error";
-import { complete } from "@oh-my-pi/pi-ai/stream";
-import type { AssistantMessage, Context, Model, Usage } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { isContextOverflow } from "@oh-my-striped-pi/pi-ai/error";
+import { complete } from "@oh-my-striped-pi/pi-ai/stream";
+import type { AssistantMessage, Context, Model, Usage } from "@oh-my-striped-pi/pi-ai/types";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import { resolveApiKey } from "./oauth";
 
 const githubCopilotToken = await resolveApiKey("github-copilot");

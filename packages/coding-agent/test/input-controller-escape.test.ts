@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "bun:test";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InputController } from "@oh-my-pi/pi-coding-agent/modes/controllers/input-controller";
-import { SpaceHoldGesture } from "@oh-my-pi/pi-tui/space-hold";
-import type { InteractiveModeContext, SubmittedUserInput } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { vocalizer } from "@oh-my-pi/pi-coding-agent/tts/vocalizer";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import type { FileSlashCommand } from "@oh-my-pi/pi-coding-agent/extensibility/slash-commands";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InputController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/input-controller";
+import { SpaceHoldGesture } from "@oh-my-striped-pi/pi-tui/space-hold";
+import type { InteractiveModeContext, SubmittedUserInput } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { vocalizer } from "@oh-my-striped-pi/pi-coding-agent/tts/vocalizer";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import type { FileSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/extensibility/slash-commands";
 
-import { cfgDoubleEscapeAction } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { cfgDoubleEscapeAction } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
 type Spy = Mock<(...args: unknown[]) => unknown>;
 type StartPendingSubmissionSpy = Mock<InteractiveModeContext["startPendingSubmission"]>;
@@ -413,7 +413,7 @@ describe("InputController escape behavior", () => {
 			description: "Situation report",
 			content: "Situation report. Focus: $ARGUMENTS",
 			side: true,
-			source: "via OMP User",
+			source: "via OMSP User",
 		};
 		const plain: FileSlashCommand = { ...sitrep, name: "plain", side: undefined };
 

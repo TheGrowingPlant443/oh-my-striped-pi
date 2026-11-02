@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { Text, type TUI } from "@oh-my-pi/pi-tui";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { Text, type TUI } from "@oh-my-striped-pi/pi-tui";
 
 /**
  * Contract under test (tool-result render memoization):

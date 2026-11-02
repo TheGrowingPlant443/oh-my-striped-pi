@@ -5,13 +5,13 @@
  * when a woken subagent re-yields, so a parent reads the same shape (status,
  * preview, `agent://` pointer) regardless of which path delivered it.
  */
-import { prompt } from "@oh-my-pi/pi-utils";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import taskSummaryTemplate from "../prompts/tools/task-summary.md" with { type: "text" };
 import { AgentRegistry, isResumable } from "../registry/agent-registry";
 import { ASYNC_INLINE_RESULT_MAX_CHARS } from "../session/async-job-delivery";
 import { escapeHarnessTags } from "../session/harness-tags";
-import { formatBytes, formatDuration } from "@oh-my-pi/pi-tui/render/render-utils";
-import type { SingleResult } from "@oh-my-pi/pi-tui/tools/task";
+import { formatBytes, formatDuration } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import type { SingleResult } from "@oh-my-striped-pi/pi-tui/tools/task";
 
 /**
  * Largest output inlined whole. A cut output costs the parent a

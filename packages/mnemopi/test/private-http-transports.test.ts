@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import type { FetchImpl } from "@oh-my-pi/pi-ai";
-import { available, embed, embedQuery, resetEmbeddingStateForTests } from "@oh-my-pi/pi-mnemopi/core/embeddings";
-import { extractFactCategories } from "@oh-my-pi/pi-mnemopi/core/extraction";
-import { callRemoteLlm, complete } from "@oh-my-pi/pi-mnemopi/core/local-llm";
-import { Mnemopi } from "@oh-my-pi/pi-mnemopi/core/memory";
-import { withMnemopiRuntimeOptions } from "@oh-my-pi/pi-mnemopi/core/runtime-options";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai";
+import {
+	available,
+	embed,
+	embedQuery,
+	resetEmbeddingStateForTests,
+} from "@oh-my-striped-pi/pi-mnemopi/core/embeddings";
+import { extractFactCategories } from "@oh-my-striped-pi/pi-mnemopi/core/extraction";
+import { callRemoteLlm, complete } from "@oh-my-striped-pi/pi-mnemopi/core/local-llm";
+import { Mnemopi } from "@oh-my-striped-pi/pi-mnemopi/core/memory";
+import { withMnemopiRuntimeOptions } from "@oh-my-striped-pi/pi-mnemopi/core/runtime-options";
 
 const saved = new Map<string, string | undefined>();
 function env(name: string, value: string): void {

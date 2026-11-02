@@ -4,7 +4,7 @@ Native tool-calling convention of Zhipu AI / Z.ai's **GLM-4.5** family (`zai-org
 
 This document was verified against the authoritative `chat_template.jinja` from the HF repo (fetched raw and **rendered locally with Jinja2** — `trim_blocks=True, lstrip_blocks=True`, transformers' `tojson` filter — to produce the byte-exact streams below), `tokenizer_config.json` and `generation_config.json` for the exact token IDs and stop tokens, the model card, and the vLLM (`Glm4MoeModelToolParser`) and SGLang (`Glm4MoeDetector`) parser sources. The HF `resolve`/`blob` web paths redirect to the model-card API; the byte-exact source was obtained via the `resolve/main/...:raw` cache (template commit `cbb2c7cfb52fa128a9660cb1a7a78e017899e115`). The GLM-4.5 and GLM-4.6 `chat_template.jinja` files are identical (same content hash `41478957…`).
 
-The native template/server sections below provide format background. OMP implements its own decoded-text `glm` scanner and renderer in `packages/ai/src/dialect/glm.ts`, not the upstream Jinja template or Python parsers. Its different history, thinking, coercion, and recovery behavior is described under _omp / pi converter behavior_.
+The native template/server sections below provide format background. OMSP implements its own decoded-text `glm` scanner and renderer in `packages/ai/src/dialect/glm.ts`, not the upstream Jinja template or Python parsers. Its different history, thinking, coercion, and recovery behavior is described under _omsp / pi converter behavior_.
 
 ## Special tokens
 
@@ -294,14 +294,14 @@ With a server parser active (`--tool-call-parser glm45 --reasoning-parser glm45`
   structural newlines: the function name can sit directly before the first
   `<arg_key>`, zero-argument calls can be `<tool_call>func</tool_call>`, and
   parallel calls can abut. vLLM/SGLang require their distinct GLM-4.7
-  parsers for this variant. omp's repository scanner is intentionally broader:
+  parsers for this variant. omsp's repository scanner is intentionally broader:
   it accepts newline, `<arg_key>`, or `</tool_call>` as the name delimiter, so
   the same `glm` dialect scanner handles both layouts.
 
-## omp / pi converter behavior
+## omsp / pi converter behavior
 
 The repository's `glm` dialect is an **owned in-band converter**. Set
-`tools.format` to `glm` to force it. `PI_DIALECT=glm` (also `1` or `true`) is
+`tools.format` to `glm` to force it. `OMSP_DIALECT=glm` (also `1` or `true`) is
 consulted when the configured dialect resolver returns no owned dialect.
 The default `auto` uses native calls unless `supportsTools === false`, then
 selects the model-class dialect; GLM affinity and unknown-class fallback select
@@ -355,7 +355,7 @@ forwarded if the provider emits them; the first native/in-band channel wins.
 
 ## Sources
 
-- OMP implementation: `packages/ai/src/dialect/glm.ts`, `coercion.ts` (`buildArgShapes`, `decodeValue`), `history.ts`, `owned-stream.ts`, `catalog.ts`; selection: `packages/catalog/src/identity/dialect.ts`, `packages/coding-agent/src/sdk.ts` (`resolveDialect`), `packages/agent/src/agent-loop.ts` (`resolveOwnedDialectFromEnv`).
+- OMSP implementation: `packages/ai/src/dialect/glm.ts`, `coercion.ts` (`buildArgShapes`, `decodeValue`), `history.ts`, `owned-stream.ts`, `catalog.ts`; selection: `packages/catalog/src/identity/dialect.ts`, `packages/coding-agent/src/sdk.ts` (`resolveDialect`), `packages/agent/src/agent-loop.ts` (`resolveOwnedDialectFromEnv`).
 - Chat template (authoritative; rendered locally for the byte-exact streams), GLM-4.5 commit `cbb2c7c…`: https://huggingface.co/zai-org/GLM-4.5/resolve/main/chat_template.jinja — the `blob`/web path redirects to the model-card API; verified via the raw `resolve/main` cache.
 - Identical GLM-4.6 template (same content hash, confirming shared format): https://huggingface.co/zai-org/GLM-4.6/resolve/main/chat_template.jinja
 - Special-token IDs and `special` flags (`added_tokens_decoder`, `additional_special_tokens`): https://huggingface.co/zai-org/GLM-4.5/resolve/main/tokenizer_config.json

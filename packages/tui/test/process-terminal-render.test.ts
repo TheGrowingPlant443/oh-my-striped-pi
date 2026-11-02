@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 import {
 	createProcessTerminalRenderHarness,
 	type ProcessTerminalRenderHarness,

@@ -1,7 +1,7 @@
 import { centerLine, visibleWidth } from "../../utils";
 import { padToWidth } from "../../render/utils";
-import { APP_NAME, VERSION } from "@oh-my-pi/pi-utils";
-import { gradientEscape, gradientLogo, lockupNode, PI_LOGO, type ShineConfig } from "../../prompt/welcome";
+import { APP_NAME, VERSION } from "@oh-my-striped-pi/pi-utils";
+import { gradientEscape, gradientLogo, lockupNode, OMSP_LOGO, type ShineConfig } from "../../prompt/welcome";
 import { theme } from "../../theme/theme";
 import { formatKeyHint } from "../../app-keybindings";
 import { col, kbd, keyed, node, row, span, text } from "../../native/describe";
@@ -11,7 +11,7 @@ export const SETUP_SPLASH_MS = 2600;
 export const SETUP_TICK_MS = 33;
 
 /** Brand mark at 2x: every glyph doubled horizontally, every row doubled vertically. */
-const LARGE_LOGO = PI_LOGO.flatMap(line => {
+const LARGE_LOGO = OMSP_LOGO.flatMap(line => {
 	let wide = "";
 	for (const char of line) {
 		wide += char === " " ? "  " : `${char}${char}`;
@@ -158,7 +158,7 @@ function resetCells(width: number, height: number): string[][] {
 let diagonalEscapes: (string | undefined)[] = [];
 
 /**
- * Animated setup splash, in the spirit of the omp landing page: the brand π
+ * Animated setup splash, in the spirit of the omsp landing page: the brand π
  * mark rendered with the live diagonal gradient + shine sweep, rising out of a
  * rippling, gradient-lit water surface, under a faint twinkling starfield. The
  * mark and water share one continuous gradient so the sweep reads across the
@@ -251,7 +251,7 @@ export function renderSetupSplash(width: number, height: number, elapsedMs: numb
 let splashNode: NativeNode | undefined;
 
 /**
- * Native splash: omp's lockup as the welcome draws it (the builtin mark
+ * Native splash: omsp's lockup as the welcome draws it (the builtin mark
  * drawing on beside the wordmark and version), centered, and a quiet Enter
  * hint pinned to the bottom. The water and starfield are cell paintings with
  * no semantic counterpart. A click anywhere sends `skip`.
@@ -266,19 +266,19 @@ export function describeSetupSplash(): NativeNode {
 				row([text([span("Press", "muted")]), kbd("enter"), text([span("to begin", "muted")])], {
 					align: "center",
 					gap: "xs",
-					role: "omp.setup.hint",
+					role: "omsp.setup.hint",
 				}),
 				"hint",
 			),
 		],
-		{ align: "center", grow: 1, role: "omp.setup.splash", actions: { click: "skip" } },
+		{ align: "center", grow: 1, role: "omsp.setup.splash", actions: { click: "skip" } },
 	);
 	return splashNode;
 }
 
 /** Centered fallback for windows too small to hold the full scene. */
 function renderCompactSplash(width: number, height: number, phase: number, shine: ShineConfig): string[] {
-	const art = height >= 14 ? LARGE_LOGO : PI_LOGO;
+	const art = height >= 14 ? LARGE_LOGO : OMSP_LOGO;
 	const content = [...gradientLogo(art, phase, shine), "", theme.bold(APP_NAME)];
 	const start = Math.max(0, Math.floor((height - content.length) / 2));
 	const lines: string[] = [];

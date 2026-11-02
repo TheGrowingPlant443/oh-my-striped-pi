@@ -10,12 +10,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/event-controller";
-import type { AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session-events";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { resetSettingsForTest, Settings, settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EventController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/event-controller";
+import type { AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session-events";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 
 function compactionResultEvent(): AgentSessionEvent {

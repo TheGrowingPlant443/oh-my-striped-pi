@@ -12,9 +12,9 @@ import type {
 	AgentToolUpdateCallback,
 	ToolApprovalDecision,
 	ToolTier,
-} from "@oh-my-pi/pi-agent-core";
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import type { ShellFsDirEntry } from "@oh-my-pi/pi-natives";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import type { ShellFsDirEntry } from "@oh-my-striped-pi/pi-natives";
 import type { Settings } from "../config/settings";
 import type { Rule } from "../capability/rule";
 import type { Skill } from "../extensibility/skills";
@@ -22,11 +22,11 @@ import type { AgentRegistry } from "../registry/agent-registry";
 import type { LocalProtocolOptions } from "./local-protocol";
 import type { SessionEntry } from "../session/session-entries";
 import type { ToolSession } from "../tools";
-import type { CoordinationDetails } from "@oh-my-pi/pi-tui/tools/wait";
-import type { ProcReadDetails, ProcWriteDetails } from "@oh-my-pi/pi-tui/tools/proc-render";
-import type { CfgReadDetails, CfgWriteDetails } from "@oh-my-pi/pi-tui/tools/cfg-render";
-import type { XdevRenderDispatch } from "@oh-my-pi/pi-tui/tools/xdev";
-import type { SchemeWriteScope } from "@oh-my-pi/pi-tui/tools/url-scheme-host";
+import type { CoordinationDetails } from "@oh-my-striped-pi/pi-tui/tools/wait";
+import type { ProcReadDetails, ProcWriteDetails } from "@oh-my-striped-pi/pi-tui/tools/proc-render";
+import type { CfgReadDetails, CfgWriteDetails } from "@oh-my-striped-pi/pi-tui/tools/cfg-render";
+import type { XdevRenderDispatch } from "@oh-my-striped-pi/pi-tui/tools/xdev";
+import type { SchemeWriteScope } from "@oh-my-striped-pi/pi-tui/tools/url-scheme-host";
 
 /** Transcript-only render state a handler write attaches to the `write` tool result. */
 export interface InternalWriteDetails {
@@ -415,7 +415,7 @@ export interface ProtocolHandler {
 	 */
 	locateSync?(url: InternalUrl, context?: ResolveContext): string | undefined;
 	/**
-	 * Expand a virtual container URL (e.g. `omp://`) into its searchable
+	 * Expand a virtual container URL (e.g. `omsp://`) into its searchable
 	 * leaf documents for `grep`/`find`. Leaf `url`s must round-trip through `resolve`.
 	 */
 	enumerate?(url: InternalUrl, context?: ResolveContext): Promise<Array<{ url: string; content: string }>>;

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
-import type { FetchImpl } from "@oh-my-pi/pi-ai/types";
-import { type Context, type Model, OPENAI_MAX_OUTPUT_TOKENS } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai/types";
+import { type Context, type Model, OPENAI_MAX_OUTPUT_TOKENS } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 // Generic output-cap policy is exercised with explicit compatibility flags, not removed vendor catalog rows.
 

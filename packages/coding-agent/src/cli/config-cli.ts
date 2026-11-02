@@ -1,16 +1,16 @@
 /**
  * Config CLI command handlers.
  *
- * Handles `omp config <command>` subcommands for managing settings.
+ * Handles `omsp config <command>` subcommands for managing settings.
  * The settings registry (`config/registry.ts`) is the source of truth for available settings.
  */
 
-import { APP_NAME, getAgentDir, isRecord } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import { APP_NAME, getAgentDir, isRecord } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import { orderedSettings } from "../config/all-settings";
 import { type AnySetting, lookup } from "../config/registry";
 import { Settings, settings } from "../config/settings";
-import { theme } from "@oh-my-pi/pi-tui/theme";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
 import { initXdg } from "./commands/init-xdg";
 
 // =============================================================================
@@ -393,7 +393,7 @@ function shadowingSource(setting: AnySetting): { json: Record<string, string>; m
 		case "overlay":
 			return {
 				json: { overriddenBy: provenance },
-				message: "A --config / PI_CONFIG_FILES overlay overrides this value for this process.",
+				message: "A --config / OMSP_CONFIG_FILES overlay overrides this value for this process.",
 			};
 		case "runtime":
 			return {

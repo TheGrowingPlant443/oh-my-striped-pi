@@ -2,8 +2,8 @@ PI-NATIVES THIRD-PARTY NOTICES
 ==============================
 
 Third-party code, data, and fonts compiled into the pi_natives Node-API addon:
-the @oh-my-pi/pi-natives package, its per-platform @oh-my-pi/pi-natives-*
-packages, and the copy embedded in the omp executable. Each license below
+the @oh-my-striped-pi/pi-natives package, its per-platform @oh-my-striped-pi/pi-natives-*
+packages, and the copy embedded in the omsp executable. Each license below
 governs only the material it names.
 
 VENDORED SOURCE AND DATA
@@ -211,7 +211,7 @@ MIT License
 Copyright (c) 2026 Sander Land
   (measured tokenizer vocabulary data, reconstruction model, and reference
   implementation: https://github.com/sanderland/ctok)
-Copyright (c) 2026 Can Bölük and the omp contributors
+Copyright (c) 2026 Can Bölük and the omsp contributors
 Copyright (c) 2026 Stencil Labs, Inc.
   (Rust implementation and the compact binary vocabulary encoding in
   crates/pi-natives/src/utok/claude)
@@ -10820,13 +10820,13 @@ SOFTWARE.
 -------------------------------------------------------------------------------
 License: MIT License (MIT)
 Used by:
-- pi-ast 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-builtins 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-iso 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-natives 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-shell 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-voice 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-walker 18.13.3 (https://github.com/can1357/oh-my-pi)
+- pi-ast 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-builtins 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-iso 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-natives 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-shell 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-voice 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-walker 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
 
 Full license text:
 
@@ -10917,11 +10917,11 @@ SOFTWARE.
 -------------------------------------------------------------------------------
 License: MIT License (MIT)
 Used by:
-- pi-diff 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-edit 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-predict 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-vcs 18.13.3 (https://github.com/can1357/oh-my-pi)
-- pi-vfs 18.13.3 (https://github.com/can1357/oh-my-pi)
+- pi-diff 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-edit 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-predict 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-vcs 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- pi-vfs 18.13.3 (https://github.com/TheGrowingPlant443/oh-my-striped-pi)
 - brush-core 0.5.0 (https://github.com/reubeno/brush)
 - napi 3.14.2 (https://github.com/napi-rs/napi-rs)
 - ast-grep-core 0.39.9 (https://github.com/ast-grep/ast-grep)

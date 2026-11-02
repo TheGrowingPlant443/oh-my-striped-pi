@@ -2,10 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
 	isOpenAICompletionsProgressChunk,
 	streamOpenAICompletions,
-} from "@oh-my-pi/pi-ai/providers/openai-completions";
-import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import type { Context, FetchImpl, Model, ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 const openAICompletionsModel = {
 	...(getBundledModel("github-copilot", "gpt-4o") as Model<"openai-completions">),

@@ -3,7 +3,7 @@
  *
  * Uses brush-core via native bindings for shell execution.
  */
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import {
 	type MinimizerOptions,
 	type PipeStreams,
@@ -11,11 +11,15 @@ import {
 	Shell,
 	type ShellFilesystem,
 	type ShellRunResult,
-} from "@oh-my-pi/pi-natives";
-import { $env } from "@oh-my-pi/pi-utils/env";
-import { isCmdShell, isExecutable, type ShellConfig } from "@oh-my-pi/pi-utils/procmgr";
+} from "@oh-my-striped-pi/pi-natives";
+import { $env } from "@oh-my-striped-pi/pi-utils/env";
+import { isCmdShell, isExecutable, type ShellConfig } from "@oh-my-striped-pi/pi-utils/procmgr";
 import { Settings } from "../config/settings";
-import { type OutputArtifactError, OutputSink, type OutputSummary } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import {
+	type OutputArtifactError,
+	OutputSink,
+	type OutputSummary,
+} from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import {
 	resolveOutputMaxColumns,
 	resolveOutputSinkArtifactMaxBytes,
@@ -569,7 +573,7 @@ export async function executeBash(command: string, options?: BashExecutorOptions
 		options?.useUserShell === true &&
 		!bashShell &&
 		supportsAutoUserShell(shell) &&
-		$env.PI_NO_PTY !== "1" &&
+		$env.OMSP_NO_PTY !== "1" &&
 		!isPersistentShellCdCommand(command);
 	const minimizer = buildMinimizerOptions(cfgShellMinimizer.get(settings));
 
@@ -680,7 +684,7 @@ export async function executeBash(command: string, options?: BashExecutorOptions
 
 	// The embedded shell reads its builtin switches from the session env; a
 	// different env also keys a separate persistent session.
-	const sessionEnv = options?.gitGuard ? { ...shellEnv, PI_GIT_GUARD: "1" } : shellEnv;
+	const sessionEnv = options?.gitGuard ? { ...shellEnv, OMSP_GIT_GUARD: "1" } : shellEnv;
 	const shellOptions = {
 		sessionEnv,
 		snapshotPath: snapshotPath ?? undefined,

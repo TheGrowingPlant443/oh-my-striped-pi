@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from omp_rpc import (
+from omsp_rpc import (
     HostToolCompletedEvent,
     MessageUpdateEvent,
     RpcClient,
@@ -144,7 +144,7 @@ def _stage_agent_home() -> None:
     if not _AGENT_HOME_STAGE.exists():
         return
 
-    for rel in (Path(".agent"), Path(".omp/agent")):
+    for rel in (Path(".agent"), Path(".omsp/agent")):
         src = _AGENT_HOME_STAGE / rel
         if not src.exists():
             continue
@@ -167,8 +167,8 @@ def _stage_agent_home() -> None:
     chown_to_root = os.geteuid() == 0
     for root, dirs, files in os.walk(_AGENT_HOME):
         root_path = Path(root)
-        if root_path == _AGENT_HOME / ".omp":
-            # ~/.omp/run is slot-writable daemon presence state, not template
+        if root_path == _AGENT_HOME / ".omsp":
+            # ~/.omsp/run is slot-writable daemon presence state, not template
             # config; keep it out of the read-only normalization below.
             dirs[:] = [d for d in dirs if d != "run"]
         try:
@@ -198,19 +198,19 @@ def _stage_agent_home() -> None:
 
 
 def _ensure_agent_run_dir() -> None:
-    """Keep ``~/.omp/run`` writable by every sandbox slot.
+    """Keep ``~/.omsp/run`` writable by every sandbox slot.
 
-    omp registers daemon project presence under ``~/.omp/run`` at startup,
+    omsp registers daemon project presence under ``~/.omsp/run`` at startup,
     nesting per-project dirs (``daemons/<hash>/clients``) that any slot user
     must be able to create or enter regardless of which slot made them first.
-    The tree stays group ``omp``, setgid, group-writable; slot subprocesses
+    The tree stays group ``omsp``, setgid, group-writable; slot subprocesses
     spawn with umask 0002 so their entries inherit group write.
     """
     if os.geteuid() != 0:
         return
-    run_dir = _AGENT_HOME / ".omp" / "run"
+    run_dir = _AGENT_HOME / ".omsp" / "run"
     try:
-        gid = grp.getgrnam("omp").gr_gid
+        gid = grp.getgrnam("omsp").gr_gid
     except KeyError:
         return
     try:
@@ -228,9 +228,9 @@ def _ensure_agent_run_dir() -> None:
 
 
 def _build_extra_env(settings: Settings) -> dict[str, str]:
-    """Build the env overlay passed to the omp subprocess.
+    """Build the env overlay passed to the omsp subprocess.
 
-    `omp_rpc` merges this dict on top of `os.environ`, so overlaying empty
+    `omsp_rpc` merges this dict on top of `os.environ`, so overlaying empty
     strings for the sensitive keys is what actually masks them in the
     child — `del` on the parent's env would not help us here.
     """
@@ -239,9 +239,9 @@ def _build_extra_env(settings: Settings) -> dict[str, str]:
     _ensure_agent_run_dir()
     env = dict.fromkeys(_SCRUBBED_ENV_KEYS, "")
     # Usage attribution: the pi-native gateway transport forwards this label
-    # (x-omp-app) so broker-side per-client burn tracking shows `robomp`
+    # (x-omsp-app) so broker-side per-client burn tracking shows `robomp`
     # instead of an anonymous gateway client.
-    env["OMP_APP_NAME"] = "robomp"
+    env["OMSP_APP_NAME"] = "robomp"
     if _AGENT_HOME.is_dir():
         env["HOME"] = str(_AGENT_HOME)
     return env
@@ -442,7 +442,7 @@ def _drive_turn(
 
 
 def _has_prior_session(session_dir: Path) -> bool:
-    """Return True iff `session_dir` already contains an omp JSONL transcript.
+    """Return True iff `session_dir` already contains an omsp JSONL transcript.
 
     pi's `coding-agent` writes one `*.jsonl` per session into `--session-dir`.
     The presence of any such file is the signal that `--continue` will pick
@@ -561,7 +561,7 @@ def _run_rpc_blocking(
 
     def _on_tool_end(event: ToolExecutionEndEvent) -> None:
         tool_name = event.tool_name
-        # `tool_name` is transport-normalized by omp_rpc for top-level and
+        # `tool_name` is transport-normalized by omsp_rpc for top-level and
         # xd:// device dispatches, but an eval-bridged host tool only surfaces
         # as the enclosing `eval`; terminal-action detection therefore relies
         # on `_on_host_tool_completed`. A failed execution (`is_error`) does
@@ -598,7 +598,7 @@ def _run_rpc_blocking(
     rpc_env.update(_safe_directory_env(bindings.workspace.repo_dir))
     rpc_env.update(_git_identity_env(inputs.settings.resolved_author_name, inputs.settings.git_author_email))
     # Bare worktrees have no node_modules; install (idempotently) so the agent
-    # can resolve workspace packages (@oh-my-pi/pi-*) and actually run tests.
+    # can resolve workspace packages (@oh-my-striped-pi/pi-*) and actually run tests.
     host_tools.ensure_workspace_dependencies(bindings)
     resuming = _has_prior_session(bindings.workspace.session_dir)
     extra_args: tuple[str, ...] = ("--continue",) if resuming else ()
@@ -655,7 +655,7 @@ def _run_rpc_blocking(
         )
 
     with RpcClient(
-        executable=settings.omp_command,
+        executable=settings.omsp_command,
         cwd=bindings.workspace.repo_dir,
         session_dir=bindings.workspace.session_dir,
         env=rpc_env,
@@ -672,14 +672,14 @@ def _run_rpc_blocking(
         extra_args=extra_args,
         user=inputs.slot_uid,
         group=inputs.slot_uid if inputs.slot_uid is not None else None,
-        extra_groups=["omp"] if inputs.slot_uid is not None else None,
+        extra_groups=["omsp"] if inputs.slot_uid is not None else None,
     ) as client:
-        # Arm cancellation: from this point the API can kill the omp subprocess
+        # Arm cancellation: from this point the API can kill the omsp subprocess
         # out from under us, which makes `prompt_and_wait` raise an `RpcError`
         # we'll let propagate. The `with` exit calls `client.stop()` again, but
         # it's idempotent.
         #
-        # NOTE: omp_rpc.RpcClient.stop() has a bug where it sets `_stopping=True`
+        # NOTE: omsp_rpc.RpcClient.stop() has a bug where it sets `_stopping=True`
         # before the stdout reader loop notices the closed pipe, so the reader's
         # `if not self._stopping` guard skips `_mark_closed()` entirely.
         # `_wait_for_agent_end` then blocks on `_event_condition` until the hard
@@ -763,12 +763,12 @@ def _run_rpc_blocking(
             finally:
                 hard_timer.cancel()
             if hard_timeout_fired.is_set():
-                raise TimeoutError("omp task exceeded hard timeout")
+                raise TimeoutError("omsp task exceeded hard timeout")
             if turn is not None and turn.assistant_message is not None:
                 stop_reason = turn.assistant_message.get("stopReason")
                 if stop_reason == "error":
                     error_msg = turn.assistant_message.get("errorMessage") or "model returned error"
-                    raise RuntimeError(f"omp agent error (stopReason=error): {error_msg}")
+                    raise RuntimeError(f"omsp agent error (stopReason=error): {error_msg}")
             log.info(
                 "rpc_done",
                 extra={

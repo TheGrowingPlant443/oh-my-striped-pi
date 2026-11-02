@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { PROVIDER_DESCRIPTORS } from "@oh-my-pi/pi-catalog/provider-models";
-import { authProviders } from "@oh-my-pi/pi-catalog/compat/auth";
-import { providerEntries, seedModels } from "@oh-my-pi/pi-catalog/compat/providers";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
+import { PROVIDER_DESCRIPTORS } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { authProviders } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { providerEntries, seedModels } from "@oh-my-striped-pi/pi-catalog/compat/providers";
+import { modelKind } from "@oh-my-striped-pi/pi-catalog/types";
 import { buildGeneratedModel } from "../scripts/generate-models";
 
 describe("catalog provider descriptors", () => {

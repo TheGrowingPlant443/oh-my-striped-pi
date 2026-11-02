@@ -3,11 +3,11 @@ import type { GalleryFixture } from "./types";
 
 const GALLERY_DEPS = {
 	"@ai-sdk/anthropic": "^1.2.0",
-	"@oh-my-pi/pi-ai": "workspace:*",
-	"@oh-my-pi/pi-tui": "workspace:*",
+	"@oh-my-striped-pi/pi-ai": "workspace:*",
+	"@oh-my-striped-pi/pi-tui": "workspace:*",
 };
 const GALLERY_DEPS_TEXT =
-	"{'@ai-sdk/anthropic': '^1.2.0', '@oh-my-pi/pi-ai': 'workspace:*', '@oh-my-pi/pi-tui': 'workspace:*'}";
+	"{'@ai-sdk/anthropic': '^1.2.0', '@oh-my-striped-pi/pi-ai': 'workspace:*', '@oh-my-striped-pi/pi-tui': 'workspace:*'}";
 
 export const shellFixtures: Record<string, GalleryFixture> = {
 	bash: {
@@ -111,7 +111,7 @@ export const shellFixtures: Record<string, GalleryFixture> = {
 			content: [
 				{
 					type: "text",
-					text: ["@oh-my-pi/coding-agent v0.42.0", "37 dependencies", GALLERY_DEPS_TEXT].join("\n"),
+					text: ["@oh-my-striped-pi/coding-agent v0.42.0", "37 dependencies", GALLERY_DEPS_TEXT].join("\n"),
 				},
 			],
 			details: {
@@ -132,7 +132,7 @@ export const shellFixtures: Record<string, GalleryFixture> = {
 							'print(f"{len(deps)} dependencies")',
 							"print({k: deps[k] for k in sorted(deps)[:3]})",
 						].join("\n"),
-						output: ["@oh-my-pi/coding-agent v0.42.0", "37 dependencies", GALLERY_DEPS_TEXT].join("\n"),
+						output: ["@oh-my-striped-pi/coding-agent v0.42.0", "37 dependencies", GALLERY_DEPS_TEXT].join("\n"),
 						views: [{ text: GALLERY_DEPS_TEXT, view: { kind: "json", value: GALLERY_DEPS } }],
 						status: "complete",
 						durationMs: 64,

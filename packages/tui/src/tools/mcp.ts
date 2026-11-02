@@ -7,8 +7,8 @@
 import { type Component, Markdown } from "../index";
 
 import type { NativeToolHead, NativeToolView, RenderResultOptions } from "./renderer";
-import { isRecord, sanitizeText } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+import { isRecord, sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import { ansi, md, node, span } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { OwnerMemo } from "../native/memo";

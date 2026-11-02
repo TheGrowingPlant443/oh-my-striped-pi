@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "bun:test";
-import { Tokenizer } from "@oh-my-pi/pi-agent-core";
+import { Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type CompactionPreparation,
 	compact,
@@ -9,7 +9,7 @@ import {
 	NativeCompactionError,
 	prepareCompaction,
 	type SessionEntry,
-} from "@oh-my-pi/pi-agent-core/compaction";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
 import {
 	buildCompactionV2Request,
 	buildOpenAiNativeHistory,
@@ -22,15 +22,15 @@ import {
 	shouldUseCompactionV2Streaming,
 	shouldUseOpenAiRemoteCompaction,
 	trimRemoteCompactionInputToContextWindow,
-} from "@oh-my-pi/pi-agent-core/compaction/openai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { NO_AUTH_SENTINEL } from "@oh-my-pi/pi-ai/auth-retry";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import type { AssistantMessage, FetchImpl, Model, ToolResultMessage, UserMessage } from "@oh-my-pi/pi-ai/types";
-import { __resetProxyCache } from "@oh-my-pi/pi-ai/utils/proxy";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import * as piUtils from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-agent-core/compaction/openai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { NO_AUTH_SENTINEL } from "@oh-my-striped-pi/pi-ai/auth-retry";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import type { AssistantMessage, FetchImpl, Model, ToolResultMessage, UserMessage } from "@oh-my-striped-pi/pi-ai/types";
+import { __resetProxyCache } from "@oh-my-striped-pi/pi-ai/utils/proxy";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
 
 const { isRecord } = piUtils;
 
@@ -1217,7 +1217,7 @@ describe("requestRemoteCompaction wire formats", () => {
 		});
 	});
 
-	test("keeps the generic omp summarizer format for other endpoints", async () => {
+	test("keeps the generic omsp summarizer format for other endpoints", async () => {
 		let sentBody: unknown;
 		const fetchMock: FetchImpl = async (_input, init) => {
 			if (typeof init?.body !== "string") throw new Error("missing remote compaction request body");
@@ -2210,8 +2210,8 @@ describe("configured remote compaction request preparation", () => {
 			baseUrl,
 			remoteCompaction: { enabled: true, v2StreamingEnabled: true },
 		});
-		const previous = Bun.env.PI_PROXY_COMPANY_RESPONSES;
-		Bun.env.PI_PROXY_COMPANY_RESPONSES = "http://proxy.example.test:8080";
+		const previous = Bun.env.OMSP_PROXY_COMPANY_RESPONSES;
+		Bun.env.OMSP_PROXY_COMPANY_RESPONSES = "http://proxy.example.test:8080";
 		__resetProxyCache();
 		const proxies: unknown[] = [];
 		const fetchMock: FetchImpl = async (input, init) => {
@@ -2230,8 +2230,8 @@ describe("configured remote compaction request preparation", () => {
 				{ fetch: fetchMock },
 			);
 		} finally {
-			if (previous === undefined) delete Bun.env.PI_PROXY_COMPANY_RESPONSES;
-			else Bun.env.PI_PROXY_COMPANY_RESPONSES = previous;
+			if (previous === undefined) delete Bun.env.OMSP_PROXY_COMPANY_RESPONSES;
+			else Bun.env.OMSP_PROXY_COMPANY_RESPONSES = previous;
 			__resetProxyCache();
 		}
 

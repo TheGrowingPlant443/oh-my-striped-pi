@@ -9,8 +9,8 @@ import {
 	AuthStorage,
 	REMOTE_REFRESH_SENTINEL,
 	type StoredAuthCredential,
-} from "@oh-my-pi/pi-ai/auth-storage";
-import type { UsageReport } from "@oh-my-pi/pi-ai/usage";
+} from "@oh-my-striped-pi/pi-ai/auth-storage";
+import type { UsageReport } from "@oh-my-striped-pi/pi-ai/usage";
 import { fixtureUsageProvider } from "./usage-test-utils";
 
 const EMAIL = "shared@example.com";

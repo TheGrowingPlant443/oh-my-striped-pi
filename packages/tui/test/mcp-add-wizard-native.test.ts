@@ -1,11 +1,15 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { KeybindingsManager, setKeyHintPlatform } from "@oh-my-pi/pi-tui/app-keybindings";
-import { setKeybindings } from "@oh-my-pi/pi-tui";
+import { KeybindingsManager, setKeyHintPlatform } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { setKeybindings } from "@oh-my-striped-pi/pi-tui";
 import { stripVTControlCharacters } from "node:util";
-import type { DescribeContext, NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { MCPAddWizard, type MCPAddWizardConfig, type MCPAddWizardDeps } from "@oh-my-pi/pi-tui/overlays/mcp-add-wizard";
-import { getThemeByName, setThemeInstance } from "@oh-my-pi/pi-tui/theme";
+import type { DescribeContext, NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { setNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import {
+	MCPAddWizard,
+	type MCPAddWizardConfig,
+	type MCPAddWizardDeps,
+} from "@oh-my-striped-pi/pi-tui/overlays/mcp-add-wizard";
+import { getThemeByName, setThemeInstance } from "@oh-my-striped-pi/pi-tui/theme";
 
 const CX: DescribeContext = { cols: 100, reduceMotion: false, dark: true, supports: () => true, feature: () => true };
 const ENTER = "\r";
@@ -42,18 +46,18 @@ function plain(text: unknown): string {
 }
 
 function title(wizard: MCPAddWizard): string {
-	const [node] = byRole(wizard, "omp.mcpAdd.title");
+	const [node] = byRole(wizard, "omsp.mcpAdd.title");
 	return plain(prop(node, "text") ?? prop(node, "spans"));
 }
 
 /** Footer buttons by their tooltips (`Label  key`). */
 function buttons(wizard: MCPAddWizard): unknown[] {
-	return byRole(wizard, "omp.btn").map(b => prop(b, "title"));
+	return byRole(wizard, "omsp.btn").map(b => prop(b, "title"));
 }
 
 /** Phase tones of the progress strip, in order. */
 function phases(wizard: MCPAddWizard): unknown[] {
-	return byRole(wizard, "omp.mcpAdd.phase").map(p => prop(p, "tone"));
+	return byRole(wizard, "omsp.mcpAdd.phase").map(p => prop(p, "tone"));
 }
 
 function act(wizard: MCPAddWizard, name: string): void {
@@ -97,7 +101,7 @@ describe("MCP add wizard under a native surface", () => {
 		expect(phases(wizard)).toEqual(["accent", "muted", "muted", "muted", "muted", "muted"]);
 		// The first step has no Back: Esc cancels, so Cancel carries it.
 		expect(buttons(wizard)).toEqual(["Cancel  esc", "Continue  ⏎"]);
-		for (const button of byRole(wizard, "omp.btn")) {
+		for (const button of byRole(wizard, "omsp.btn")) {
 			expect((button.c ?? []).filter(isNode).map(child => child.k)).toEqual(["text", "kbd"]);
 		}
 	});
@@ -107,9 +111,9 @@ describe("MCP add wizard under a native surface", () => {
 		type(wizard, "bad name");
 		act(wizard, "next");
 		expect(title(wizard)).toBe("Name the server");
-		const [field] = byRole(wizard, "omp.mcpAdd.field");
+		const [field] = byRole(wizard, "omsp.mcpAdd.field");
 		expect(prop(field, "tone")).toBe("error");
-		expect(plain(prop(byRole(wizard, "omp.mcpAdd.note")[0], "spans"))).toContain("Use letters");
+		expect(plain(prop(byRole(wizard, "omsp.mcpAdd.note")[0], "spans"))).toContain("Use letters");
 		const input = field?.c?.[0];
 		expect(input && "getValue" in input && typeof input.getValue === "function" ? input.getValue() : "").toBe(
 			"bad name",
@@ -118,7 +122,7 @@ describe("MCP add wizard under a native surface", () => {
 		for (let i = 0; i < 8; i++) wizard.handleInput("\x7f");
 		type(wizard, "linear");
 		act(wizard, "next");
-		expect(title(wizard)).toBe("How does omp reach it?");
+		expect(title(wizard)).toBe("How does omsp reach it?");
 		expect(phases(wizard).slice(0, 2)).toEqual(["success", "accent"]);
 		expect(buttons(wizard)).toEqual(["Cancel  ⌃C", "Back  esc", "Continue  ⏎"]);
 	});
@@ -129,12 +133,12 @@ describe("MCP add wizard under a native surface", () => {
 		expect(items.map(item => plain(prop(item, "value")))).toEqual(["stdio", "http", "sse"]);
 
 		wizard.handleInput(DOWN);
-		expect(prop(byRole(wizard, "omp.mcpAdd.choices")[0], "selected")).toBe("1");
+		expect(prop(byRole(wizard, "omsp.mcpAdd.choices")[0], "selected")).toBe("1");
 		act(wizard, "next");
 		expect(title(wizard)).toBe("Server URL");
 
 		act(wizard, "back");
-		expect(title(wizard)).toBe("How does omp reach it?");
+		expect(title(wizard)).toBe("How does omsp reach it?");
 		wizard.handleNativeEvent({ type: "select", key: "sheet/choices-transport", item: "0" });
 		expect(title(wizard)).toBe("Command");
 	});
@@ -158,14 +162,14 @@ describe("MCP add wizard under a native surface", () => {
 		type(wizard, "https://mcp.linear.app/mcp");
 		wizard.handleInput(ENTER);
 		expect(title(wizard)).toBe("Trying the connection");
-		expect(byRole(wizard, "omp.mcpAdd.status")).toHaveLength(1);
+		expect(byRole(wizard, "omsp.mcpAdd.status")).toHaveLength(1);
 		expect(buttons(wizard)).toEqual(["Cancel  ⌃C", "Back  esc"]);
 
 		act(wizard, "back");
 		resolve();
 		// The wizard's continuation was queued on the test before this await's, so it has run.
 		await promise;
-		expect(title(wizard)).toBe("How does omp reach it?");
+		expect(title(wizard)).toBe("How does omsp reach it?");
 	});
 
 	it("reviews the server and saves it on Enter", () => {
@@ -182,7 +186,7 @@ describe("MCP add wizard under a native surface", () => {
 
 		expect(title(wizard)).toBe("Review and save");
 		expect(phases(wizard)).toEqual(["success", "success", "success", "neutral", "success", "accent"]);
-		const rows = prop(byRole(wizard, "omp.mcpAdd.summary")[0], "items");
+		const rows = prop(byRole(wizard, "omsp.mcpAdd.summary")[0], "items");
 		expect(
 			Array.isArray(rows) ? rows.map(row => (row && typeof row === "object" && "k" in row ? row.k : "")) : [],
 		).toEqual(["Name", "Transport", "Command", "Arguments", "Auth", "Saved in"]);

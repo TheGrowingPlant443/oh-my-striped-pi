@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { getEditStore } from "@oh-my-pi/pi-coding-agent/edit/store";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { getEditStore } from "@oh-my-striped-pi/pi-coding-agent/edit/store";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { getTestModel } from "./helpers/model-fixtures";
 
@@ -31,7 +31,7 @@ describe("sdk edit-store session reset", () => {
 		authStorage.keys.setRuntime("github-copilot", "test-key");
 		const modelRegistry = new ModelRegistry(authStorage);
 		const bundled = getTestModel("github-copilot");
-		tempDir = TempDir.createSync("@omp-edit-store-reset-");
+		tempDir = TempDir.createSync("@omsp-edit-store-reset-");
 		const settings = Settings.isolated({
 			"async.enabled": false,
 			"browser.enabled": false,
@@ -71,14 +71,14 @@ describe("sdk edit-store session reset", () => {
 		// own lazy field.
 		const toolSession: ToolSession = Reflect.get(session.getToolByName("read") ?? {}, "session");
 		const toolStore = getEditStore(toolSession);
-		const tag = toolStore.recordSnapshot("/tmp/omp-13370/a.rs", "alpha\nbeta\n", undefined);
+		const tag = toolStore.recordSnapshot("/tmp/omsp-13370/a.rs", "alpha\nbeta\n", undefined);
 		expect(tag).toBeDefined();
-		expect(toolStore.byHashText("/tmp/omp-13370/a.rs", tag)).toBe("alpha\nbeta\n");
+		expect(toolStore.byHashText("/tmp/omsp-13370/a.rs", tag)).toBe("alpha\nbeta\n");
 
 		await session.newSession();
 
 		// /new fired the session-change callbacks: the tool-side store is empty,
 		// so the stale tag can't be presented as "issued in this session".
-		expect(toolStore.byHashText("/tmp/omp-13370/a.rs", tag)).toBeNull();
+		expect(toolStore.byHashText("/tmp/omsp-13370/a.rs", tag)).toBeNull();
 	});
 });

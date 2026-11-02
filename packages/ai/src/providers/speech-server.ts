@@ -1,4 +1,4 @@
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import * as AIError from "../error";
 import type { SpeechRequest, SpeechResult } from "../speech/types";
 

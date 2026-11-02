@@ -2,16 +2,16 @@ import { describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { applyCatalogCorrections, buildModel } from "@oh-my-pi/pi-catalog/build";
-import { resolveProviderModels } from "@oh-my-pi/pi-catalog/model-manager";
+import { applyCatalogCorrections, buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { resolveProviderModels } from "@oh-my-striped-pi/pi-catalog/model-manager";
 import {
 	calculateCost,
 	calculateUncachedInputCost,
 	calculateUsageCost,
 	getNextTimeBasedPricingTransition,
 	getTimeBasedPricingPeriod,
-} from "@oh-my-pi/pi-catalog/models";
-import type { ModelCost, ModelSpec, Usage } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-catalog/models";
+import type { ModelCost, ModelSpec, Usage } from "@oh-my-striped-pi/pi-catalog/types";
 import { isTimeBasedCost, materializeTimeBasedCost } from "../src/pricing";
 
 function spec(id = "scheduled-test", provider = "pricing-test"): ModelSpec<"openai-completions"> {

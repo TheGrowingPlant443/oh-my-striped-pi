@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { Model } from "@oh-my-pi/pi-ai/types";
-import { requestBodyText } from "@oh-my-pi/pi-ai/utils/request-body";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type { Model } from "@oh-my-striped-pi/pi-ai/types";
+import { requestBodyText } from "@oh-my-striped-pi/pi-ai/utils/request-body";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const SPEC = {
 	id: "claude-sonnet-4-5",

@@ -653,7 +653,7 @@ mod tests {
 
 	/// Set on the re-executed child; carries the fixture repository it should
 	/// probe. Its presence is what tells the test body which side it is on.
-	const ENV_PROBE_REPO: &str = "PI_VCS_TEST_ENV_PROBE_REPO";
+	const ENV_PROBE_REPO: &str = "OMSP_VCS_TEST_ENV_PROBE_REPO";
 
 	/// Asks git to report the ambient variables it was started with. A `!`-alias
 	/// is the only way to make git print its own environment.

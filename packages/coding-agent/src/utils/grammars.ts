@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type WasmGrammarInfo, type WasmGrammarQuery, wasmGrammarFor } from "@oh-my-pi/pi-natives";
-import { getNativeGrammarsDir, logger, withFileLock } from "@oh-my-pi/pi-utils";
+import { type WasmGrammarInfo, type WasmGrammarQuery, wasmGrammarFor } from "@oh-my-striped-pi/pi-natives";
+import { getNativeGrammarsDir, logger, withFileLock } from "@oh-my-striped-pi/pi-utils";
 import { withDownload } from "../downloads/activity";
 import { downloadFile } from "./tools-manager";
 
@@ -12,7 +12,7 @@ import { downloadFile } from "./tools-manager";
  * use (the natives loader configures that directory), so installing is just
  * placing the verified `.wasm` there.
  *
- * Asset URL: `${PI_GRAMMARS_URL ?? GitHub releases}/<release>/<file>.zst`, a
+ * Asset URL: `${OMSP_GRAMMARS_URL ?? GitHub releases}/<release>/<file>.zst`, a
  * zstd frame whose decompressed bytes must match the pinned size and SHA-256
  * reported by `wasmGrammarFor`.
  */
@@ -35,7 +35,7 @@ async function fetchGrammar(
 	dest: string,
 	onProgress: (loaded: number, total: number | undefined) => void,
 ): Promise<void> {
-	const base = process.env.PI_GRAMMARS_URL?.trim().replace(/\/+$/, "") || DEFAULT_GRAMMARS_URL;
+	const base = process.env.OMSP_GRAMMARS_URL?.trim().replace(/\/+$/, "") || DEFAULT_GRAMMARS_URL;
 	const url = `${base}/${info.release}/${info.file}.zst`;
 	const compressed = `${dest}.zst.part`;
 	const part = `${dest}.part`;

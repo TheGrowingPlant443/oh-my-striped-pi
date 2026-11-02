@@ -1,11 +1,16 @@
-import { type Api, IMAGE_GENERATION_APIS, type ImageGenerationApi, type Model } from "@oh-my-pi/pi-catalog/types";
+import {
+	type Api,
+	IMAGE_GENERATION_APIS,
+	type ImageGenerationApi,
+	type Model,
+} from "@oh-my-striped-pi/pi-catalog/types";
 import * as AIError from "../error";
 import { generateOpenAIImage } from "./openai-images";
 import type { ImageGenerationOptions, ImageGenerationRequest, ImageGenerationResult } from "./types";
 
 export * from "./openai-images";
 export * from "./types";
-export type { ImageGenerationApi } from "@oh-my-pi/pi-catalog/types";
+export type { ImageGenerationApi } from "@oh-my-striped-pi/pi-catalog/types";
 
 export function isImageGenerationApi(api: Api): api is ImageGenerationApi {
 	return (IMAGE_GENERATION_APIS as readonly Api[]).includes(api);

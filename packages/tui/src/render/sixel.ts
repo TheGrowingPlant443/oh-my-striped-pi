@@ -1,21 +1,21 @@
-import { $env, $flag } from "@oh-my-pi/pi-utils";
+import { $env, $flag } from "@oh-my-striped-pi/pi-utils";
 
 const SIXEL_START_REGEX = /\x1bP(?:[0-9;]*)q/u;
 const SIXEL_END_SEQUENCE = "\x1b\\";
 const SIXEL_END_BELL = "\x07";
 const SIXEL_SEQUENCE_REGEX = /\x1bP(?:[0-9;]*)q[\s\S]*?(?:\x1b\\|\x07)/gu;
-const SIXEL_PLACEHOLDER_PREFIX = "__OMP_SIXEL_SEQUENCE_";
+const SIXEL_PLACEHOLDER_PREFIX = "__OMSP_SIXEL_SEQUENCE_";
 
 /**
  * Returns whether SIXEL passthrough is explicitly enabled.
  *
  * Both gates must be enabled to preserve SIXEL control sequences:
- * - PI_FORCE_IMAGE_PROTOCOL=sixel
- * - PI_ALLOW_SIXEL_PASSTHROUGH=1
+ * - OMSP_FORCE_IMAGE_PROTOCOL=sixel
+ * - OMSP_ALLOW_SIXEL_PASSTHROUGH=1
  */
 export function isSixelPassthroughEnabled(): boolean {
-	const forcedProtocol = $env.PI_FORCE_IMAGE_PROTOCOL?.trim().toLowerCase();
-	return forcedProtocol === "sixel" && $flag("PI_ALLOW_SIXEL_PASSTHROUGH");
+	const forcedProtocol = $env.OMSP_FORCE_IMAGE_PROTOCOL?.trim().toLowerCase();
+	return forcedProtocol === "sixel" && $flag("OMSP_ALLOW_SIXEL_PASSTHROUGH");
 }
 /** Returns true when the text contains a SIXEL start sequence. */
 export function containsSixelSequence(text: string): boolean {
@@ -62,7 +62,7 @@ export function sanitizeWithOptionalSixelPassthrough(text: string, sanitize: (te
 	});
 
 	const sanitized = sanitize(tokenized);
-	return sanitized.replace(/__OMP_SIXEL_SEQUENCE_(\d+)__/gu, (_, indexText: string) => {
+	return sanitized.replace(/__OMSP_SIXEL_SEQUENCE_(\d+)__/gu, (_, indexText: string) => {
 		const index = Number.parseInt(indexText, 10);
 		return preservedSequences[index] ?? "";
 	});

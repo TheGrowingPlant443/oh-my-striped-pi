@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import { TERN_KIT_SOURCE } from "@oh-my-pi/pi-coding-agent/tools/browser/tern/page-kit";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import { TERN_KIT_SOURCE } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tern/page-kit";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { chromiumAvailable } from "./chromium-probe";
 
 const CHROMIUM_AVAILABLE = await chromiumAvailable();

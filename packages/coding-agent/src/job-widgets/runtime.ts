@@ -6,7 +6,7 @@
  * involved past the spec. Work per refresh is proportional to the new text:
  * series keep bounded rings and per-refresh match buckets.
  */
-import { LineMatcher } from "@oh-my-pi/pi-natives";
+import { LineMatcher } from "@oh-my-striped-pi/pi-natives";
 import type {
 	JobWidgetBlock,
 	JobWidgetHeadline,
@@ -14,9 +14,9 @@ import type {
 	JobWidgetState,
 	JobWidgetTrend,
 	JobWidgetView,
-} from "@oh-my-pi/pi-tui/tools/job-widget";
-import type { TspTone } from "@oh-my-pi/pi-wire";
-import { sanitizeText, truncate } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui/tools/job-widget";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
+import { sanitizeText, truncate } from "@oh-my-striped-pi/pi-utils";
 import { formatWidgetNumber, formatWidgetTrend } from "./format";
 import {
 	type JobWidgetAgg,
@@ -544,7 +544,7 @@ export class JobWidgetRuntime {
 			const line = lines[lineIndex];
 			if (tools) {
 				for (; scanned <= lineIndex; scanned++) this.#scanToolCall(lines[scanned]);
-				// omp's marker of a tool call is not output of the subagent's work.
+				// omsp's marker of a tool call is not output of the subagent's work.
 				if (line.startsWith(TOOL_CALL_MARK)) continue;
 			}
 			if (matched.at(-1) !== lineIndex) matched.push(lineIndex);

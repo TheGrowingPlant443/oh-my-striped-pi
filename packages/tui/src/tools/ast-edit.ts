@@ -1,4 +1,4 @@
-import { isRecord, sanitizeText } from "@oh-my-pi/pi-utils";
+import { isRecord, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import type { Component } from "../tui";
 import { Text } from "../components/text";
 import { replaceTabs } from "../utils";
@@ -404,7 +404,7 @@ export const astEditToolRenderer = {
 		const single = fileCount === 1 && files.length === 1 ? files[0] : undefined;
 		const changes: NativeChild[] = single
 			? [astEditDiff(single)]
-			: files.map(file => fileDiffSection(file, [astEditDiff(file)], { role: "omp.tool.ast_edit.file" }));
+			: files.map(file => fileDiffSection(file, [astEditDiff(file)], { role: "omsp.tool.ast_edit.file" }));
 		// The head names the files, so a single rewrite's pattern moves to a quiet context line.
 		const pattern = args?.ops?.length === 1 ? patternPreview(args.ops[0]?.pat) : undefined;
 		return {
@@ -418,7 +418,7 @@ export const astEditToolRenderer = {
 			tone: limitReached ? "warning" : undefined,
 			body: compact<NativeChild>([
 				pattern !== undefined &&
-					text([span(pattern, "code")], { lines: 1, truncate: "end", role: "omp.tool.context" }),
+					text([span(pattern, "code")], { lines: 1, truncate: "end", role: "omsp.tool.context" }),
 				...(changes.length > 0 ? changes : [noteText(kept.join("\n"))]),
 				parseNote,
 				astEditScopeStats(details),

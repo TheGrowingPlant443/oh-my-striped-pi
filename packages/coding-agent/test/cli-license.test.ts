@@ -5,7 +5,7 @@ const repoRoot = path.resolve(import.meta.dir, "../../..");
 const cliEntry = path.join(repoRoot, "packages/coding-agent/src/cli.ts");
 const noticeOwners = ["coding-agent", "natives"];
 
-it("prints the OMP license with the CLI and native addon notices on the exact top-level flag path", async () => {
+it("prints the OMSP license with the CLI and native addon notices on the exact top-level flag path", async () => {
 	const proc = Bun.spawn([process.execPath, cliEntry, "--license"], {
 		cwd: repoRoot,
 		stdout: "pipe",
@@ -22,5 +22,5 @@ it("prints the OMP license with the CLI and native addon notices on the exact to
 	expect(exitCode).toBe(0);
 	expect(stderr).toBe("");
 	const sections = [license, ...notices].map(text => text.trimEnd());
-	expect(stdout).toBe(`OMP License and Third-Party Notices\n\n${sections.join("\n\n")}\n`);
+	expect(stdout).toBe(`OMSP License and Third-Party Notices\n\n${sections.join("\n\n")}\n`);
 });

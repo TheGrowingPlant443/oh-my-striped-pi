@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { isEnoent, logger } from "@oh-my-pi/pi-utils";
+import { isEnoent, logger } from "@oh-my-striped-pi/pi-utils";
 import { $, type Server } from "bun";
 import {
 	getCostDashboardStats,
@@ -52,15 +52,15 @@ import {
 const CLIENT_DIR = path.join(import.meta.dir, "client");
 const STATIC_DIR = path.join(import.meta.dir, "..", "dist", "client");
 const IS_BUN_COMPILED =
-	Boolean(process.env.PI_COMPILED || Bun.env.PI_COMPILED) ||
+	Boolean(process.env.OMSP_COMPILED || Bun.env.OMSP_COMPILED) ||
 	import.meta.url.includes("$bunfs") ||
 	import.meta.url.includes("~BUN") ||
 	import.meta.url.includes("%7EBUN");
 // The prepacked npm bundle (coding-agent dist/cli.js) constant-folds
-// process.env.PI_BUNDLED at build time. Like compiled binaries, it ships no
+// process.env.OMSP_BUNDLED at build time. Like compiled binaries, it ships no
 // dashboard sources or prebuilt dist/client next to the bundle, so the
 // embedded archive is the only viable asset source.
-const IS_PREBUILT = IS_BUN_COMPILED || Boolean(process.env.PI_BUNDLED || Bun.env.PI_BUNDLED);
+const IS_PREBUILT = IS_BUN_COMPILED || Boolean(process.env.OMSP_BUNDLED || Bun.env.OMSP_BUNDLED);
 // Sniff the base64 gzip magic instead of decoding: importing this module (every
 // TUI start) must not pay for a multi-megabyte archive nobody may serve.
 const USE_EMBEDDED_CLIENT = hasEmbeddedClientArchive(embeddedClientArchiveTxt) || IS_PREBUILT;
@@ -73,7 +73,7 @@ async function getEmbeddedClientFiles(): Promise<Map<string, Blob>> {
 	const archive = decodeEmbeddedClientArchive(embeddedClientArchiveTxt);
 	if (!archive) {
 		throw new Error(
-			"Embedded stats client bundle missing. Rebuild the omp binary or npm bundle with embedded stats assets.",
+			"Embedded stats client bundle missing. Rebuild the omsp binary or npm bundle with embedded stats assets.",
 		);
 	}
 
@@ -375,7 +375,7 @@ function createDashboardServer(port: number, hostname: string): Server<undefined
 			const url = new URL(req.url);
 			const path = url.pathname;
 
-			// The identity header lets another omp session's reuse probe positively
+			// The identity header lets another omsp session's reuse probe positively
 			// recognize this dashboard without allowing cross-origin API reads.
 			const dashboardHeaders: Record<string, string> = {
 				[STATS_DASHBOARD_HEADER]: STATS_DASHBOARD_SECURITY_VERSION,
@@ -502,7 +502,7 @@ export interface StartServerOptions {
  * and the dashboard binds an ephemeral port instead.
  */
 export async function startServer(
-	port = 3847,
+	port = 3848,
 	hostname = STATS_DASHBOARD_HOSTNAME,
 	options: StartServerOptions = {},
 ): Promise<StatsServerHandle> {

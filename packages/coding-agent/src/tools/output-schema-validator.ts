@@ -13,9 +13,9 @@ import {
 	type JsonSchemaValidationIssue,
 	type JsonSchemaValidationResult,
 	validateJsonSchemaValue,
-} from "@oh-my-pi/pi-ai/utils/schema";
-import { isRecord } from "@oh-my-pi/pi-utils";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+} from "@oh-my-striped-pi/pi-ai/utils/schema";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
 import { jtdToJsonSchema, normalizeSchema } from "./jtd-to-json-schema";
 
 /** A validator bound to a specific output schema. */

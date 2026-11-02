@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type AuthAccountPolicies, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import * as oauthUtils from "@oh-my-pi/pi-ai/registry/oauth";
-import type { OAuthCredentials } from "@oh-my-pi/pi-ai/registry/oauth/types";
-import type { CredentialRankingStrategy, UsageLimit, UsageProvider, UsageReport } from "@oh-my-pi/pi-ai/usage";
+import { type AuthAccountPolicies, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import * as oauthUtils from "@oh-my-striped-pi/pi-ai/registry/oauth";
+import type { OAuthCredentials } from "@oh-my-striped-pi/pi-ai/registry/oauth/types";
+import type { CredentialRankingStrategy, UsageLimit, UsageProvider, UsageReport } from "@oh-my-striped-pi/pi-ai/usage";
 
 // Running sessions with a warm automatic pin and `reclaimAbovePct` on the
 // preferred account. The clock advances in short steps so account pins stay
@@ -105,7 +105,7 @@ async function advance(auth: AuthStorage, provider: Provider, ms: number): Promi
 }
 
 beforeEach(async () => {
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-account-reclaim-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-account-reclaim-"));
 	store = await SqliteAuthCredentialStore.open(path.join(tempDir, "agent.db"));
 	usage.clear();
 	clock = 0;

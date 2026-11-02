@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { parseSessionEntries, type SessionHeader } from "@oh-my-pi/pi-coding-agent";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import { removeWithRetries, withTimeout } from "@oh-my-pi/pi-utils";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { parseSessionEntries, type SessionHeader } from "@oh-my-striped-pi/pi-coding-agent";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import { removeWithRetries, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { rejectionOf } from "./helpers/rejection";
 
 async function readSessionFile(sessionFile: string): Promise<{ header: SessionHeader; messageIds: string[] }> {
@@ -21,11 +21,11 @@ describe("RPC fork and tree navigation", () => {
 	let directory: string;
 
 	beforeEach(async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-fork-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-fork-"));
 		client = new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "fork-rpc-agent.ts"), directory],
 			cwd: directory,
-			env: { PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1" },
+			env: { OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1" },
 		});
 	});
 

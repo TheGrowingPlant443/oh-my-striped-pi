@@ -72,17 +72,17 @@ describe("--external-thinking", () => {
 	});
 });
 describe("--session-dir", () => {
-	it("uses PI_CODING_AGENT_SESSION_DIR unless the CLI flag overrides it", () => {
-		const previous = Bun.env.PI_CODING_AGENT_SESSION_DIR;
-		Bun.env.PI_CODING_AGENT_SESSION_DIR = "/env/sessions";
+	it("uses OMSP_CODING_AGENT_SESSION_DIR unless the CLI flag overrides it", () => {
+		const previous = Bun.env.OMSP_CODING_AGENT_SESSION_DIR;
+		Bun.env.OMSP_CODING_AGENT_SESSION_DIR = "/env/sessions";
 		try {
 			expect(parseArgs([]).sessionDir).toBe("/env/sessions");
 			expect(parseArgs(["--session-dir", "/cli/sessions"]).sessionDir).toBe("/cli/sessions");
 		} finally {
 			if (previous === undefined) {
-				delete Bun.env.PI_CODING_AGENT_SESSION_DIR;
+				delete Bun.env.OMSP_CODING_AGENT_SESSION_DIR;
 			} else {
-				Bun.env.PI_CODING_AGENT_SESSION_DIR = previous;
+				Bun.env.OMSP_CODING_AGENT_SESSION_DIR = previous;
 			}
 		}
 	});

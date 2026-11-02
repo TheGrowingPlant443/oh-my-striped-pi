@@ -3,18 +3,18 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { deflateSync } from "node:zlib";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 import {
 	acquireBrowser,
 	type BrowserHandle,
 	holdBrowser,
 	releaseBrowser,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import { decodePng } from "@oh-my-pi/pi-coding-agent/tools/browser/screenshot";
-import { releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import { renderPdfPageScreenshot } from "@oh-my-pi/pi-coding-agent/tools/read-pdf";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import { decodePng } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/screenshot";
+import { releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import { renderPdfPageScreenshot } from "@oh-my-striped-pi/pi-coding-agent/tools/read-pdf";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { chromiumAvailable } from "./chromium-probe";
 
 const CHROMIUM_AVAILABLE = await chromiumAvailable();

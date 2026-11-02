@@ -77,7 +77,7 @@ static CREATE_DISPLAY_INFO: LazyLock<Option<CreateDisplayInfoFn>> = LazyLock::ne
 ///
 /// xcap's `Monitor::friendly_name` reads `NSScreen.localizedName` instead. The
 /// first `NSScreen` call initializes `AppKit`, and `AppKit` registers an
-/// unbundled process like omp as a regular application, so every session
+/// unbundled process like omsp as a regular application, so every session
 /// that listed displays gained a Dock icon until it exited. `CoreDisplay`
 /// reads the same display records without `AppKit`.
 fn display_product_name(display_id: u32) -> Option<String> {

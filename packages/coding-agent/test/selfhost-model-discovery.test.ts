@@ -2,18 +2,18 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { FetchImpl } from "@oh-my-pi/pi-ai";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { ModelRegistry, kNoAuth } from "@oh-my-pi/pi-coding-agent/config/model-registry";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { ModelRegistry, kNoAuth } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
 import {
 	discoverModelsByProviderType,
 	discoveryProbeTimeoutMs,
-} from "@oh-my-pi/pi-coding-agent/config/model-discovery";
-import { resolveCliModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { ProviderDiscoverySchema } from "@oh-my-pi/pi-coding-agent/config/models-config-schema";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/config/model-discovery";
+import { resolveCliModel } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { ProviderDiscoverySchema } from "@oh-my-striped-pi/pi-coding-agent/config/models-config-schema";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 
 describe("Self-hosted model discovery", () => {
 	let tempDir: string;
@@ -159,14 +159,14 @@ describe("Self-hosted model discovery", () => {
 	});
 
 	test("keeps OLLAMA_BASE_URL precedence over OLLAMA_HOST", async () => {
-		using _baseUrl = withEnv("OLLAMA_BASE_URL", "http://omp-ollama.example:2222");
+		using _baseUrl = withEnv("OLLAMA_BASE_URL", "http://omsp-ollama.example:2222");
 		using _host = withEnv("OLLAMA_HOST", "ollama-host.example:3333");
-		const fetchMock = mockOllamaDiscovery(["phi4-mini"], "http://omp-ollama.example:2222");
+		const fetchMock = mockOllamaDiscovery(["phi4-mini"], "http://omsp-ollama.example:2222");
 		const registry = new ModelRegistry(authStorage, modelsJsonPath, { cacheDbPath, fetch: fetchMock });
 		await registry.refresh();
 
 		const model = registry.find("ollama", "phi4-mini");
-		expect(model?.baseUrl).toBe("http://omp-ollama.example:2222/v1");
+		expect(model?.baseUrl).toBe("http://omsp-ollama.example:2222/v1");
 		expect(registry.getProviderDiscoveryState("ollama")?.optional).toBe(false);
 	});
 

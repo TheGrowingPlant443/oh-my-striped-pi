@@ -1,24 +1,24 @@
 import { afterEach, beforeEach, expect, it, vi } from "bun:test";
-import type { Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import { TanCommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/tan-command-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import * as sdk from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import type { SessionHeader } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as settingsStream from "@oh-my-pi/pi-coding-agent/session/settings-stream-fn";
-import type { TerminalLaunchRequest } from "@oh-my-pi/pi-coding-agent/subprocess/terminal-launch";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import * as catalogPolicy from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import { TanCommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/tan-command-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import * as sdk from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import type { SessionHeader } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as settingsStream from "@oh-my-striped-pi/pi-coding-agent/session/settings-stream-fn";
+import type { TerminalLaunchRequest } from "@oh-my-striped-pi/pi-coding-agent/subprocess/terminal-launch";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const eligibleModel = getBundledModel("github-copilot", "gpt-5.4");
 const ineligibleModel = getBundledModel("github-copilot", "gpt-5.5");
@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 async function fixture() {
-	const dir = TempDir.createSync("@omp-task-cache-forks-");
+	const dir = TempDir.createSync("@omsp-task-cache-forks-");
 	const auth = await AuthStorage.create(dir.join("auth.db"));
 	auth.keys.setRuntime("github-copilot", "test-key");
 	const sessions: AgentSession[] = [];
@@ -153,7 +153,7 @@ it.each([false, true])(
 		const launches: TerminalLaunchRequest[] = [];
 		const controller = new CommandController(h.context(parent), {
 			environment: () => ({ TMUX: "server,1,0", TMUX_PANE: "%1" }),
-			resolveCliEntryCmd: () => ["omp-entry"],
+			resolveCliEntryCmd: () => ["omsp-entry"],
 			getActiveProfile: () => undefined,
 			argv: () => [],
 			launchTerminal: async request => {
@@ -164,7 +164,7 @@ it.each([false, true])(
 		await controller.handleForkCommand("pane");
 		expect(launches).toHaveLength(1);
 		const command = launches[0]!.command;
-		const parsed = parseArgs(command.slice(command.indexOf("omp-entry") + 1));
+		const parsed = parseArgs(command.slice(command.indexOf("omsp-entry") + 1));
 		expect(parsed.providerPromptCacheKey).toBe(explicit ? "explicit-cache" : undefined);
 		const childManager = await SessionManager.forkFrom(
 			manager.getSessionFile()!,

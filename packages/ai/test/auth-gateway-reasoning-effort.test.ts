@@ -1,19 +1,19 @@
 /**
- * Gateway clients request efforts in their own vocabulary. omp's own
+ * Gateway clients request efforts in their own vocabulary. omsp's own
  * `lowest-effort` reasoning-off sends `reasoning_effort: "minimal"` to a
  * generic OpenAI-compatible endpoint, but the gateway may resolve that id to a
  * Claude model whose ladder starts at `low`. The gateway must serve the nearest
  * supported tier instead of failing the request before it reaches upstream.
  */
 import { describe, expect, it } from "bun:test";
-import { startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import type { Api, Context, Model } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import type { ThinkingBudgets } from "@oh-my-pi/pi-catalog/types";
+import { startAuthGateway } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import type { Api, Context, Model } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import type { ThinkingBudgets } from "@oh-my-striped-pi/pi-catalog/types";
 import { withOfficialAnthropicEndpoint } from "./helpers";
-import type { FetchImpl } from "@oh-my-pi/pi-ai/types";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai/types";
 
 interface CapturedRequest {
 	body: Record<string, any>;

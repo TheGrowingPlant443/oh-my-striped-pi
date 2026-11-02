@@ -1,9 +1,9 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { RpcHostToolBridge } from "@oh-my-pi/pi-coding-agent/modes/rpc/host-tools";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { RpcHostToolBridge } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/host-tools";
 import {
 	dispatchRpcInputFrame,
 	type PendingExtensionRequest,
@@ -11,18 +11,18 @@ import {
 	type RpcInputFrameDeps,
 	RpcPendingExtensionRequests,
 	RpcShutdownCoordinator,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
 import type {
 	RpcCommand,
 	RpcExtensionUIResponse,
 	RpcHostToolCallRequest,
 	RpcHostToolCancelRequest,
 	RpcResponse,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as imageLoading from "@oh-my-pi/pi-coding-agent/utils/image-loading";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as imageLoading from "@oh-my-striped-pi/pi-coding-agent/utils/image-loading";
 import { getTestModel } from "./helpers/model-fixtures";
 
 type OutputFrame = RpcResponse | object;

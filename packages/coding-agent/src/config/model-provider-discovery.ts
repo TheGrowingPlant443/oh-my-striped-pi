@@ -1,7 +1,7 @@
-import { authProviders } from "@oh-my-pi/pi-catalog/compat/auth";
-import type { Api, Model } from "@oh-my-pi/pi-ai/types";
-import type { ModelResolutionSource } from "@oh-my-pi/pi-catalog/model-manager";
-import { PROVIDER_DESCRIPTORS } from "@oh-my-pi/pi-catalog/provider-models";
+import { authProviders } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai/types";
+import type { ModelResolutionSource } from "@oh-my-striped-pi/pi-catalog/model-manager";
+import { PROVIDER_DESCRIPTORS } from "@oh-my-striped-pi/pi-catalog/provider-models";
 import type { AuthStorage, OAuthCredential } from "../session/auth-storage";
 
 export const STARTUP_MODEL_CACHE_PROVIDER_IDS: readonly string[] = PROVIDER_DESCRIPTORS.map(

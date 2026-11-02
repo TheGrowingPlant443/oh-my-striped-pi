@@ -1,6 +1,6 @@
 /**
  * Compatibility shim for legacy extensions importing the package root of
- * `@oh-my-pi/pi-ai` (or one of its aliased scopes like `@earendil-works/pi-ai`
+ * `@oh-my-striped-pi/pi-ai` (or one of its aliased scopes like `@earendil-works/pi-ai`
  * or `@mariozechner/pi-ai`).
  *
  * pi-ai 15.1.0 removed the historical TypeBox root exports (`Type`, plus the
@@ -8,7 +8,7 @@
  * entrypoint. Legacy extensions still author parameter schemas as
  * `Type.Object({ ... })`, so this file is served by `legacy-pi-compat.ts` in
  * place of the real pi-ai entrypoint whenever a legacy extension imports the
- * bare package root. Subpath imports (`@oh-my-pi/pi-ai/oauth`, etc.)
+ * bare package root. Subpath imports (`@oh-my-striped-pi/pi-ai/oauth`, etc.)
  * continue to resolve directly against the bundled pi-ai package.
  *
  * The `Type` runtime and legacy `StringEnum()` helper are borrowed from the
@@ -27,17 +27,17 @@ import {
 	type Model,
 	type SimpleStreamOptions,
 	streamSimple,
-} from "@oh-my-pi/pi-ai";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/register-builtins";
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
+} from "@oh-my-striped-pi/pi-ai";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/register-builtins";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-striped-pi/pi-catalog/model-thinking";
 import {
 	calculateCost,
 	getBundledModel,
 	getBundledModels,
 	getBundledProviders,
 	modelsAreEqual,
-} from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-catalog/models";
 import { type TSchema, Type } from "./legacy-typebox";
 
 export interface StringEnumOptions<T extends string> {
@@ -83,7 +83,7 @@ export function StringEnum<T extends string | number>(
 	return schema;
 }
 
-/** Clamp a historical Pi thinking level against OMP's model metadata. */
+/** Clamp a historical Pi thinking level against OMSP's model metadata. */
 export function clampThinkingLevel<TApi extends Api>(model: Model<TApi>, level: Effort | "off"): Effort | "off" {
 	if (level === "off") return "off";
 	return clampThinkingLevelForModel(model, level) ?? "off";
@@ -93,7 +93,7 @@ export function clampThinkingLevel<TApi extends Api>(model: Model<TApi>, level: 
  * Enumerate the thinking levels a model supports, mirroring historical pi-ai's
  * `getSupportedThinkingLevels` (`@earendil-works/pi-ai` `models.ts`). Upstream
  * returns `["off"]` for non-reasoning models and, for reasoning models, `off`
- * followed by each selectable effort in canonical order; OMP's baked
+ * followed by each selectable effort in canonical order; OMSP's baked
  * `getSupportedEfforts` supplies that effort ladder directly. Legacy `/thinking`
  * menus (e.g. `@companion-ai/feynman`) call this to list the levels a user may
  * pick for the active model.
@@ -108,9 +108,9 @@ export function getSupportedThinkingLevels<TApi extends Api>(model: Model<TApi>)
  * (`@earendil-works/pi-ai` `utils/retry.ts`). Legacy extensions call
  * {@link isRetryableAssistantError} to decide whether to restart a failed
  * assistant turn, so the wording tables must match the upstream semantics they
- * were authored against rather than OMP's own `Error`-based classifiers.
+ * were authored against rather than OMSP's own `Error`-based classifiers.
  *
- * The transport wording also covers OMP's own network-failure sentences from
+ * The transport wording also covers OMSP's own network-failure sentences from
  * `networkFailureMessage` (offline, unreachable, refused, TLS); legacy
  * extensions must keep restarting those turns exactly as they did for the
  * bare `Connection error.` text they replaced.
@@ -135,13 +135,13 @@ export function isRetryableAssistantError(message: AssistantMessage): boolean {
 	return RETRYABLE_PROVIDER_ERROR_PATTERN.test(errorMessage);
 }
 
-export * from "@oh-my-pi/pi-ai";
+export * from "@oh-my-striped-pi/pi-ai";
 /**
  * Compatibility re-exports for catalog symbols that pi-ai historically exposed
  * from its own barrel prior to the `refactor(catalog)!: split model catalog
  * from pi-ai` change. Legacy extensions still import these from the pi-ai
  * root, so the shim bridges them through to their new home in
- * `@oh-my-pi/pi-catalog/models`. `getModel`/`getModels` are the historical
+ * `@oh-my-striped-pi/pi-catalog/models`. `getModel`/`getModels` are the historical
  * pi-ai names for `getBundledModel`/`getBundledModels`; the remaining symbols
  * kept their names across the move.
  */
@@ -157,7 +157,7 @@ const ANTHROPIC_MESSAGES_API = {
 };
 
 /**
- * Expose OMP's Anthropic transport through the legacy `/compat` provider
+ * Expose OMSP's Anthropic transport through the legacy `/compat` provider
  * factory used by extensions such as `pi-background-tasks`.
  */
 export function anthropicMessagesApi() {
@@ -172,7 +172,7 @@ export function anthropicMessagesApi() {
  *
  * Transient-failure retry (overload, rate-limit, 5xx) is the **caller's
  * responsibility**. Oneshot callers that collect the full result before acting
- * should wrap with `retryTransientCompletion` from `@oh-my-pi/pi-ai`.
+ * should wrap with `retryTransientCompletion` from `@oh-my-striped-pi/pi-ai`.
  */
 export function streamSimpleOpenAIResponses(
 	model: Model<"openai-responses">,
@@ -183,21 +183,21 @@ export function streamSimpleOpenAIResponses(
 }
 /**
  * Compatibility re-exports for runtime helpers that upstream
- * `@earendil-works/pi-ai` exposed from its package root but omp's
- * `@oh-my-pi/pi-ai` barrel no longer forwards. Each symbol still exists in the
+ * `@earendil-works/pi-ai` exposed from its package root but omsp's
+ * `@oh-my-striped-pi/pi-ai` barrel no longer forwards. Each symbol still exists in the
  * host graph — only its root re-export was dropped — so bridging it here keeps
  * legacy extensions importing it from the pi-ai root resolving through Bun's
- * static named-export check (e.g. `omp plugin install pi-blackhole`).
+ * static named-export check (e.g. `omsp plugin install pi-blackhole`).
  *
  * The error-classification predicate `isContextOverflow` (now under
- * `@oh-my-pi/pi-ai/error`) and the JSON-repair helpers (relocated to
- * `@oh-my-pi/pi-utils`) still exist in the host graph and are re-exported.
+ * `@oh-my-striped-pi/pi-ai/error`) and the JSON-repair helpers (relocated to
+ * `@oh-my-striped-pi/pi-utils`) still exist in the host graph and are re-exported.
  * Upstream pi-ai 1.x additionally exposes a transcript-replay module
- * (`src/utils/transcript.ts`, present since at least 1.0.2) that omp's fork
+ * (`src/utils/transcript.ts`, present since at least 1.0.2) that omsp's fork
  * predates and has no equivalent of anywhere; that family is ported verbatim
  * in `legacy-pi-transcript.ts` (observed consumer:
  * `pi-optchat` importing `getCurrentSystemMessage`).
  */
-export { isContextOverflow } from "@oh-my-pi/pi-ai/error";
-export { parseJsonWithRepair, parseStreamingJson, repairJson } from "@oh-my-pi/pi-utils";
+export { isContextOverflow } from "@oh-my-striped-pi/pi-ai/error";
+export { parseJsonWithRepair, parseStreamingJson, repairJson } from "@oh-my-striped-pi/pi-utils";
 export * from "./legacy-pi-transcript";

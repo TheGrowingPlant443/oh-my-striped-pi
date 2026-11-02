@@ -1,13 +1,13 @@
-import type { ToolTier } from "@oh-my-pi/pi-agent-core";
+import type { ToolTier } from "@oh-my-striped-pi/pi-agent-core";
 import { extractUriScheme } from "../internal-urls/parse";
-import { type LineRange } from "@oh-my-pi/pi-tui/tools/line-ranges";
-import { splitPathAndSel, isReadableUrlPath } from "@oh-my-pi/pi-tui/tools/read";
-import { toPathList } from "@oh-my-pi/pi-tui/render/render-utils";
+import { type LineRange } from "@oh-my-striped-pi/pi-tui/tools/line-ranges";
+import { splitPathAndSel, isReadableUrlPath } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { toPathList } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
-import { glob } from "@oh-my-pi/pi-natives";
+import { glob } from "@oh-my-striped-pi/pi-natives";
 import {
 	hasFsCode,
 	isEnoent,
@@ -16,11 +16,11 @@ import {
 	isWsl,
 	stripWindowsExtendedLengthPathPrefix,
 	windowsPathToWslMount,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import { InternalUrlRouter } from "../internal-urls";
 import { type InternalUrlFilesystem, joinUrlPath, UrlFsError } from "../internal-urls/url-filesystem";
 import { ToolAbortError } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
 
@@ -766,7 +766,7 @@ export async function splitDelimitedPathEntry(
 
 /**
  * Split a `;` list that names URLs alongside local paths
- * (`https://x;src/a.ts:1-20`, `omp://;Makefile:1-3`). Engages only when URL
+ * (`https://x;src/a.ts:1-20`, `omsp://;Makefile:1-3`). Engages only when URL
  * detection would otherwise claim the whole entry; everything else keeps the
  * normal image/sqlite/archive/literal ordering. Every part must be a URL (per
  * `isUrl`) or an existing literal path without glob characters, so a URL that

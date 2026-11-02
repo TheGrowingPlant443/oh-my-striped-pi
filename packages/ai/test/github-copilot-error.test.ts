@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { isGitHubCopilotPolicyDenial } from "@oh-my-pi/pi-ai/error";
-import { rewriteCopilotError } from "@oh-my-pi/pi-ai/utils/http-inspector";
+import { isGitHubCopilotPolicyDenial } from "@oh-my-striped-pi/pi-ai/error";
+import { rewriteCopilotError } from "@oh-my-striped-pi/pi-ai/utils/http-inspector";
 
 function errorWithStatus(
 	status: number,

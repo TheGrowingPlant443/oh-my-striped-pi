@@ -17,7 +17,7 @@
  */
 import { afterEach, vi } from "bun:test";
 import { scheduler } from "node:timers/promises";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
 
 /** Bumped after every test, so a wait started by a test that has ended stops instead of spinning into the next one. */
 let testGeneration = 0;

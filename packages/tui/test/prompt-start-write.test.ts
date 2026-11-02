@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { UserMessageComponent } from "@oh-my-pi/pi-tui/chat/user-message";
-import { TUI } from "@oh-my-pi/pi-tui";
+import { UserMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/user-message";
+import { TUI } from "@oh-my-striped-pi/pi-tui";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";
 

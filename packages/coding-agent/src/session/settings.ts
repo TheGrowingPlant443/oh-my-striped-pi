@@ -20,11 +20,15 @@ import {
 	TINY_MODEL_DTYPE_SETTING_VALUES,
 } from "../tiny/dtype";
 import { DEFAULT_WEB_SEARCH_TIMEOUT_SECONDS, MAX_WEB_SEARCH_TIMEOUT_SECONDS } from "../web/search/types";
-import { DEFAULT_USAGE_RESERVE_PCT } from "@oh-my-pi/pi-ai/auth-storage";
-import { configureProviderMaxInFlightRequests } from "@oh-my-pi/pi-ai/stream";
-import { THINKING_EFFORTS } from "@oh-my-pi/pi-catalog/effort";
-import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
-import { AUTO_THINKING, getConfiguredThinkingLevelMetadata, getThinkingLevelMetadata } from "@oh-my-pi/pi-tui/thinking";
+import { DEFAULT_USAGE_RESERVE_PCT } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { configureProviderMaxInFlightRequests } from "@oh-my-striped-pi/pi-ai/stream";
+import { THINKING_EFFORTS } from "@oh-my-striped-pi/pi-catalog/effort";
+import { formatKeyHint } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import {
+	AUTO_THINKING,
+	getConfiguredThinkingLevelMetadata,
+	getThinkingLevelMetadata,
+} from "@oh-my-striped-pi/pi-tui/thinking";
 
 const EMPTY_NUMBER_RECORD: Record<string, number> = {};
 const EMPTY_STRING_ARRAYS_RECORD: Record<string, string[]> = {};
@@ -186,7 +190,7 @@ export const cfgProvidersMaxInFlightRequests = register({
 		group: "Services",
 		label: "Max In-Flight Requests",
 		description:
-			'Maximum concurrent LLM requests per provider id (for example "openai" or "anthropic"), shared across local OMP processes with this config root. Omitted providers are unlimited.',
+			'Maximum concurrent LLM requests per provider id (for example "openai" or "anthropic"), shared across local OMSP processes with this config root. Omitted providers are unlimited.',
 	},
 });
 effect(cfgProvidersMaxInFlightRequests, limits =>
@@ -292,7 +296,7 @@ export const cfgModelLoopGuardEnabled = register({
 	type: "boolean",
 	default: true,
 	// Kill switch shared with pi-ai's stream-level guard (`utils/thinking-loop.ts`); only `1` disables.
-	env: { name: "PI_NO_THINKING_LOOP_GUARD", parse: raw => (raw === "1" ? false : undefined) },
+	env: { name: "OMSP_NO_THINKING_LOOP_GUARD", parse: raw => (raw === "1" ? false : undefined) },
 	ui: {
 		tab: "model",
 		group: "Thinking",
@@ -938,7 +942,7 @@ export const cfgProvidersTinyModelDevice = register({
 	values: TINY_MODEL_DEVICE_SETTING_VALUES,
 	default: TINY_MODEL_DEVICE_DEFAULT,
 	env: {
-		name: "PI_TINY_DEVICE",
+		name: "OMSP_TINY_DEVICE",
 		parse: raw => TINY_MODEL_DEVICE_SETTING_VALUES.find(value => value === raw.trim().toLowerCase()),
 	},
 	ui: {
@@ -946,7 +950,7 @@ export const cfgProvidersTinyModelDevice = register({
 		group: "Tiny Model",
 		label: "Tiny Model Device",
 		description:
-			"Inference backend for local tiny models (titles + memory): an ONNX execution provider, or `mlx` to download MLX weights and run them through mlx-lm on Apple silicon. Default uses CPU-only ONNX. The PI_TINY_DEVICE env var overrides this.",
+			"Inference backend for local tiny models (titles + memory): an ONNX execution provider, or `mlx` to download MLX weights and run them through mlx-lm on Apple silicon. Default uses CPU-only ONNX. The OMSP_TINY_DEVICE env var overrides this.",
 		options: TINY_MODEL_DEVICE_SETTING_OPTIONS,
 	},
 });
@@ -957,7 +961,7 @@ export const cfgProvidersTinyModelDtype = register({
 	values: TINY_MODEL_DTYPE_SETTING_VALUES,
 	default: TINY_MODEL_DTYPE_DEFAULT,
 	env: {
-		name: "PI_TINY_DTYPE",
+		name: "OMSP_TINY_DTYPE",
 		parse: raw => TINY_MODEL_DTYPE_SETTING_VALUES.find(value => value === raw.trim().toLowerCase()),
 	},
 	ui: {
@@ -965,7 +969,7 @@ export const cfgProvidersTinyModelDtype = register({
 		group: "Tiny Model",
 		label: "Tiny Model Precision",
 		description:
-			"ONNX quantization/precision for local tiny models. Default uses each model's shipped dtype (q4); lower precision is faster, higher is more faithful. Ignored by the MLX backend (its repos are pre-quantized 4-bit). The PI_TINY_DTYPE env var overrides this.",
+			"ONNX quantization/precision for local tiny models. Default uses each model's shipped dtype (q4); lower precision is faster, higher is more faithful. Ignored by the MLX backend (its repos are pre-quantized 4-bit). The OMSP_TINY_DTYPE env var overrides this.",
 		options: TINY_MODEL_DTYPE_SETTING_OPTIONS,
 	},
 });
@@ -1032,7 +1036,7 @@ export const cfgProvidersCacheRetention = register({
 				value: "auto",
 				label: "Auto",
 				description:
-					"Provider default — Anthropic OAuth subscriber sessions default to 1h, API keys use 5m; PI_CACHE_RETENTION still applies",
+					"Provider default — Anthropic OAuth subscriber sessions default to 1h, API keys use 5m; OMSP_CACHE_RETENTION still applies",
 			},
 			{
 				value: "short",
@@ -1089,7 +1093,7 @@ export const cfgProvidersStreamFirstEventTimeoutSeconds = register({
 		description:
 			"Seconds to wait for the first model stream event; -1 uses provider/env defaults, 0 disables the watchdog",
 		options: [
-			{ value: "-1", label: "Auto", description: "Use provider defaults and PI_* timeout env vars" },
+			{ value: "-1", label: "Auto", description: "Use provider defaults and OMSP_* timeout env vars" },
 			{ value: "0", label: "Off", description: "Disable first-event timeout" },
 			{ value: "300", label: "5 minutes" },
 			{ value: "600", label: "10 minutes" },
@@ -1109,7 +1113,7 @@ export const cfgProvidersStreamIdleTimeoutSeconds = register({
 		description:
 			"Seconds a model stream may stay silent between events; -1 uses provider/env defaults, 0 disables the watchdog",
 		options: [
-			{ value: "-1", label: "Auto", description: "Use provider defaults and PI_* timeout env vars" },
+			{ value: "-1", label: "Auto", description: "Use provider defaults and OMSP_* timeout env vars" },
 			{ value: "0", label: "Off", description: "Disable idle timeout" },
 			{ value: "300", label: "5 minutes" },
 			{ value: "600", label: "10 minutes" },
@@ -1191,7 +1195,7 @@ function validateCostThreshold(id: string): (raw: unknown) => void {
 	};
 }
 
-/** Session-tree spend (USD) at which omp warns once; `--warn-cost` overrides it for one run. */
+/** Session-tree spend (USD) at which omsp warns once; `--warn-cost` overrides it for one run. */
 export const cfgSessionWarnCost = register({
 	id: "session.warnCost",
 	type: "number",
@@ -1199,7 +1203,7 @@ export const cfgSessionWarnCost = register({
 	validate: validateCostThreshold("session.warnCost"),
 });
 
-/** Session-tree spend (USD) at which omp stops sending model requests; `--max-cost` overrides it for one run. */
+/** Session-tree spend (USD) at which omsp stops sending model requests; `--max-cost` overrides it for one run. */
 export const cfgSessionMaxCost = register({
 	id: "session.maxCost",
 	type: "number",

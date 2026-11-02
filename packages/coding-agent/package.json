@@ -1,5 +1,6 @@
 {
-	"name": "@oh-my-pi/pi-coding-agent",
+	"name": "@oh-my-striped-pi/pi-coding-agent",
+	"private": true,
 	"version": "18.13.3",
 	"description": "Coding agent CLI with read, bash, edit, write tools and session management",
 	"keywords": [
@@ -10,9 +11,9 @@
 		"llm",
 		"tui"
 	],
-	"homepage": "https://omp.sh",
+	"homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
 	"bugs": {
-		"url": "https://github.com/can1357/oh-my-pi/issues"
+		"url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
 	},
 	"license": "MIT",
 	"author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
@@ -21,11 +22,11 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/can1357/oh-my-pi.git",
+		"url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
 		"directory": "packages/coding-agent"
 	},
 	"bin": {
-		"omp": "src/cli.ts"
+		"omsp": "src/cli.ts"
 	},
 	"files": [
 		"src",
@@ -519,17 +520,17 @@
 	},
 	"dependencies": {
 		"@babel/parser": "catalog:",
-		"@oh-my-pi/omp-stats": "catalog:",
-		"@oh-my-pi/omptype": "catalog:",
-		"@oh-my-pi/pi-agent-core": "catalog:",
-		"@oh-my-pi/pi-ai": "catalog:",
-		"@oh-my-pi/pi-catalog": "catalog:",
-		"@oh-my-pi/pi-mnemopi": "catalog:",
-		"@oh-my-pi/pi-natives": "catalog:",
-		"@oh-my-pi/pi-tui": "catalog:",
-		"@oh-my-pi/pi-utils": "catalog:",
-		"@oh-my-pi/pi-wire": "catalog:",
-		"@oh-my-pi/snapcompact": "catalog:",
+		"@oh-my-striped-pi/omsp-stats": "catalog:",
+		"@oh-my-striped-pi/omptype": "catalog:",
+		"@oh-my-striped-pi/pi-agent-core": "catalog:",
+		"@oh-my-striped-pi/pi-ai": "catalog:",
+		"@oh-my-striped-pi/pi-catalog": "catalog:",
+		"@oh-my-striped-pi/pi-mnemopi": "catalog:",
+		"@oh-my-striped-pi/pi-natives": "catalog:",
+		"@oh-my-striped-pi/pi-tui": "catalog:",
+		"@oh-my-striped-pi/pi-utils": "catalog:",
+		"@oh-my-striped-pi/pi-wire": "catalog:",
+		"@oh-my-striped-pi/snapcompact": "catalog:",
 		"@opentelemetry/api": "catalog:",
 		"@opentelemetry/api-logs": "catalog:",
 		"@opentelemetry/context-async-hooks": "catalog:",

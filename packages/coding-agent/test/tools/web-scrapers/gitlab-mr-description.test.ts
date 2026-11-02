@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { handleGitLab } from "@oh-my-pi/pi-coding-agent/web/scrapers/gitlab";
+import { handleGitLab } from "@oh-my-striped-pi/pi-coding-agent/web/scrapers/gitlab";
 import { asGlobalFetch } from "../../helpers/fetch-mock.js";
 
 const MR = {

@@ -1,5 +1,5 @@
 /** Screen frames persisted by local session recordings. */
-import { STREAM_HISTORY_LIMIT, type StreamRow } from "@oh-my-pi/pi-wire";
+import { STREAM_HISTORY_LIMIT, type StreamRow } from "@oh-my-striped-pi/pi-wire";
 
 /** Screen-content frames stored in a recording. */
 export type StreamScreenFrame =

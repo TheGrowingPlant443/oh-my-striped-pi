@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { sessionDirForCwd } from "@oh-my-pi/pi-coding-agent/session/session-paths";
-import { resolveSeanceSource, restoreSeanceSession } from "@oh-my-pi/pi-coding-agent/task/seance";
-import { getAgentDir, getSessionsDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { CURRENT_SESSION_VERSION } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { sessionDirForCwd } from "@oh-my-striped-pi/pi-coding-agent/session/session-paths";
+import { resolveSeanceSource, restoreSeanceSession } from "@oh-my-striped-pi/pi-coding-agent/task/seance";
+import { getAgentDir, getSessionsDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "../helpers/model-fixtures";
 
 function sessionHeader(id: string, cwd: string) {
@@ -63,7 +63,7 @@ async function writeSession(file: string, id: string, cwd: string, entries: unkn
 /** Point the agent dir (and so every project's session bucket) at a temp root for one test. */
 async function withAgentDir<T>(agentDir: string, fn: () => Promise<T>): Promise<T> {
 	const originalAgentDir = getAgentDir();
-	const originalAgentDirOverride = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDirOverride = process.env.OMSP_CODING_AGENT_DIR;
 	setAgentDir(agentDir);
 	try {
 		return await fn();
@@ -72,7 +72,7 @@ async function withAgentDir<T>(agentDir: string, fn: () => Promise<T>): Promise<
 			setAgentDir(originalAgentDirOverride);
 		} else {
 			setAgentDir(originalAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 	}
 }
@@ -83,7 +83,7 @@ afterEach(() => {
 
 describe("seance source resolution", () => {
 	it("resolves paths and stored IDs to read-only source metadata with the active model and default fallback", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-source-");
+		using tempDir = TempDir.createSync("@omsp-seance-source-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		const file = path.join(sessionDir, "saved.jsonl");
@@ -108,7 +108,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("restores the model from the active branch after late usage and returns no models for a null active leaf", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-active-model-");
+		using tempDir = TempDir.createSync("@omsp-seance-active-model-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		const file = path.join(sessionDir, "late-usage.jsonl");
@@ -136,7 +136,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("fails closed for missing paths and IDs, ambiguous prefixes, and files without a session header", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-source-invalid-");
+		using tempDir = TempDir.createSync("@omsp-seance-source-invalid-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		const options = { cwd, sessionDirHint: sessionDir };
@@ -158,7 +158,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("leaves orphaned backups untouched during local source ID lookup", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-read-only-source-");
+		using tempDir = TempDir.createSync("@omsp-seance-read-only-source-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		const sourceFile = path.join(sessionDir, "source.jsonl");
@@ -177,7 +177,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("rejects ambiguous duplicate IDs among nested artifact histories", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-nested-ambiguity-");
+		using tempDir = TempDir.createSync("@omsp-seance-nested-ambiguity-");
 		const cwd = path.join(tempDir.path(), "project");
 		const artifactsDir = path.join(tempDir.path(), "artifacts");
 		await writeSession(path.join(artifactsDir, "history-one", "worker.jsonl"), "worker-id", cwd);
@@ -189,7 +189,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("prefers a direct artifact child over a nested history with the same ID", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-direct-child-");
+		using tempDir = TempDir.createSync("@omsp-seance-direct-child-");
 		const cwd = path.join(tempDir.path(), "project");
 		const artifactsDir = path.join(tempDir.path(), "artifacts");
 		const directFile = path.join(artifactsDir, "worker.jsonl");
@@ -203,7 +203,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("finds an id stored only in another project only when global lookup is requested", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-global-lookup-");
+		using tempDir = TempDir.createSync("@omsp-seance-global-lookup-");
 		await withAgentDir(path.join(tempDir.path(), "agent"), async () => {
 			const cwd = path.join(tempDir.path(), "project");
 			const otherCwd = path.join(tempDir.path(), "other-project");
@@ -221,7 +221,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("expands a home-relative source path", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-home-path-");
+		using tempDir = TempDir.createSync("@omsp-seance-home-path-");
 		const home = path.join(tempDir.path(), "home");
 		vi.spyOn(os, "homedir").mockReturnValue(home);
 		const file = path.join(home, "saved", "home-source.jsonl");
@@ -235,7 +235,7 @@ describe("seance source resolution", () => {
 	});
 
 	it("does not create a default session bucket or migrate legacy directories on unhinted lookup", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-unhinted-read-only-");
+		using tempDir = TempDir.createSync("@omsp-seance-unhinted-read-only-");
 		await withAgentDir(path.join(tempDir.path(), "agent"), async () => {
 			const cwd = path.join(tempDir.path(), "project");
 			const sessionsRoot = getSessionsDir();
@@ -279,7 +279,7 @@ describe("seance cold restore", () => {
 			const selector = `${model.provider}/${model.id}`;
 			authStorage.keys.setRuntime(model.provider, "test-key");
 			const modelRegistry = new ModelRegistry(authStorage);
-			using tempDir = TempDir.createSync("@omp-seance-restore-");
+			using tempDir = TempDir.createSync("@omsp-seance-restore-");
 			const cwd = tempDir.path();
 			const init = {
 				systemPrompt: ["restricted seance prompt"],

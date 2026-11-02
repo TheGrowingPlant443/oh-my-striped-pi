@@ -1,5 +1,5 @@
-import { untilAborted } from "@oh-my-pi/pi-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import type { ElementHandle, Page } from "puppeteer-core";
 import { isNavigatedContextError } from "./navigation";
 

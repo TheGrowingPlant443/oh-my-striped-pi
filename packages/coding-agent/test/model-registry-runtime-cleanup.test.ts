@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
-import { type AssistantMessageEventStream, clearCustomApis, getCustomApi } from "@oh-my-pi/pi-ai";
-import { getOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
-import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { type AssistantMessageEventStream, clearCustomApis, getCustomApi } from "@oh-my-striped-pi/pi-ai";
+import { getOAuthProvider, unregisterOAuthProviders } from "@oh-my-striped-pi/pi-ai/oauth";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { writeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { resolveModelCacheProviderId } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { ModelRegistry, type ProviderConfigInput } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("ModelRegistry runtime source cleanup", () => {
 	let authStorage: AuthStorage;
@@ -89,7 +89,7 @@ describe("ModelRegistry runtime source cleanup", () => {
 	});
 
 	test("extension rebinding preserves unrelated credential-scoped cached models", async () => {
-		using tempDir = TempDir.createSync("@omp-model-registry-rebind-");
+		using tempDir = TempDir.createSync("@omsp-model-registry-rebind-");
 		const provider = "github-copilot";
 		const apiKey = "copilot-test-key";
 		const cachedModel = buildModel({
@@ -137,7 +137,7 @@ describe("ModelRegistry runtime source cleanup", () => {
 	});
 
 	test("unloading an override-only extension keeps a built-in provider's hydrated discoveries", async () => {
-		using tempDir = TempDir.createSync("@omp-model-registry-override-only-");
+		using tempDir = TempDir.createSync("@omsp-model-registry-override-only-");
 		const provider = "github-copilot";
 		const apiKey = "copilot-test-key";
 		const cachedModel = buildModel({
@@ -178,7 +178,7 @@ describe("ModelRegistry runtime source cleanup", () => {
 	});
 
 	test("extension rebinding discards discoveries removed from the model config", async () => {
-		using tempDir = TempDir.createSync("@omp-model-registry-config-rebind-");
+		using tempDir = TempDir.createSync("@omsp-model-registry-config-rebind-");
 		const modelsPath = tempDir.join("models.json");
 		const provider = "github-copilot";
 		const baseUrl = "http://127.0.0.1:11435";
@@ -217,7 +217,7 @@ describe("ModelRegistry runtime source cleanup", () => {
 	});
 
 	test("extension rebinding discards discoveries whose model overrides changed", async () => {
-		using tempDir = TempDir.createSync("@omp-model-registry-override-rebind-");
+		using tempDir = TempDir.createSync("@omsp-model-registry-override-rebind-");
 		const modelsPath = tempDir.join("models.json");
 		const provider = "github-copilot";
 		const baseUrl = "http://127.0.0.1:11436";

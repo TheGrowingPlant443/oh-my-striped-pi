@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { scheduler } from "node:timers/promises";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import { createCompactionSummaryMessage } from "@oh-my-pi/pi-agent-core/compaction";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { createCompactionSummaryMessage } from "@oh-my-striped-pi/pi-agent-core/compaction";
 import {
 	type Api,
 	type AssistantMessage,
@@ -13,38 +13,44 @@ import {
 	type ModelUsageHealth,
 	type ProviderSessionState,
 	type ToolCall,
-} from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { editVariantForModel } from "@oh-my-pi/pi-coding-agent/utils/edit-mode";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
+} from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { writeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { resolveModelCacheProviderId } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { parseModelString } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { editVariantForModel } from "@oh-my-striped-pi/pi-coding-agent/utils/edit-mode";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
 import {
 	type ServingModel,
 	validateRetryFallbackChains,
-} from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { computerTurnInFlight, registerComputerController } from "@oh-my-pi/pi-coding-agent/tools/computer/supervisor";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import {
+	computerTurnInFlight,
+	registerComputerController,
+} from "@oh-my-striped-pi/pi-coding-agent/tools/computer/supervisor";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import type { ConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
 
-import { cfgRetryUsageReservePolicy } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgRetryUsageReservePolicy } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 type AutoRetryStartEvent = Extract<AgentSessionEvent, { type: "auto_retry_start" }>;
 type AutoRetryEndEvent = Extract<AgentSessionEvent, { type: "auto_retry_end" }>;
@@ -6905,7 +6911,7 @@ describe("AgentSession retry fallback", () => {
 	}
 
 	it("does not warn at startup for a cached provider whose online refresh supplies the selector", async () => {
-		using dir = TempDir.createSync("@omp-fallback-cached-pending-");
+		using dir = TempDir.createSync("@omsp-fallback-cached-pending-");
 		const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 		try {
 			const { registry, variantSelector, publishVariant } = await hydrateCopilotCacheWithoutVariant(dir, auth);
@@ -6933,7 +6939,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("warns once, after discovery settles, for a selector the cached provider never supplies", async () => {
-		using dir = TempDir.createSync("@omp-fallback-cached-unknown-");
+		using dir = TempDir.createSync("@omsp-fallback-cached-unknown-");
 		const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 		try {
 			const { registry } = await hydrateCopilotCacheWithoutVariant(dir, auth);
@@ -6966,7 +6972,7 @@ describe("AgentSession retry fallback", () => {
 	it("warns at construction for a cached provider when no background refresh will run", async () => {
 		// An embedder that passes its own registry and manages discovery itself
 		// never starts a background refresh, so nothing would ever lift a deferral.
-		using dir = TempDir.createSync("@omp-fallback-cached-embedder-");
+		using dir = TempDir.createSync("@omsp-fallback-cached-embedder-");
 		const auth = await AuthStorage.create(path.join(dir.path(), "auth.db"));
 		try {
 			const { registry } = await hydrateCopilotCacheWithoutVariant(dir, auth);
@@ -7878,7 +7884,7 @@ describe("AgentSession retry fallback", () => {
 	});
 
 	it("carries attribution across a fork, which continues the conversation under a new id", async () => {
-		using tempDir = TempDir.createSync("@omp-fallback-fork-");
+		using tempDir = TempDir.createSync("@omsp-fallback-fork-");
 		const primaryModel = getBundledModel("github-copilot", "claude-sonnet-4.5");
 		const fallbackModel = getBundledModel("github-copilot", "gpt-5.4-mini");
 		if (!primaryModel || !fallbackModel) {

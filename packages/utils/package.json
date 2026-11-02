@@ -1,5 +1,6 @@
 {
-	"name": "@oh-my-pi/pi-utils",
+	"name": "@oh-my-striped-pi/pi-utils",
+	"private": true,
 	"version": "18.13.3",
 	"description": "Shared utilities for pi packages",
 	"keywords": [
@@ -8,15 +9,15 @@
 		"streams",
 		"utilities"
 	],
-	"homepage": "https://omp.sh",
+	"homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
 	"bugs": {
-		"url": "https://github.com/can1357/oh-my-pi/issues"
+		"url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
 	},
 	"license": "MIT",
 	"author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/can1357/oh-my-pi.git",
+		"url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
 		"directory": "packages/utils"
 	},
 	"files": [
@@ -51,7 +52,7 @@
 		"fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts'"
 	},
 	"dependencies": {
-		"@oh-my-pi/pi-natives": "catalog:"
+		"@oh-my-striped-pi/pi-natives": "catalog:"
 	},
 	"devDependencies": {
 		"@types/bun": "catalog:"

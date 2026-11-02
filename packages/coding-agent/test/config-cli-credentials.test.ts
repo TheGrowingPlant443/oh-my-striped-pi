@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { runConfigCommand } from "@oh-my-pi/pi-coding-agent/cli/config-cli";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { getConfigRootDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
-import { all, lookup } from "@oh-my-pi/pi-coding-agent/config/registry";
-import { getSettingDef } from "@oh-my-pi/pi-tui/overlays/settings-defs";
+import { runConfigCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/config-cli";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { getConfigRootDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
+import { all, lookup } from "@oh-my-striped-pi/pi-coding-agent/config/registry";
+import { getSettingDef } from "@oh-my-striped-pi/pi-tui/overlays/settings-defs";
 import { createSettingsHost } from "../src/config/settings-ui";
 
 describe("credential settings", () => {
@@ -51,12 +51,12 @@ describe("credential masking reaches every surface", () => {
 describe("config list output", () => {
 	const SECRET = "credential-value-not-for-output";
 	let agentDir: TempDir | undefined;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 	const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 	beforeEach(() => {
 		resetSettingsForTest();
-		agentDir = TempDir.createSync("@omp-config-credentials-");
+		agentDir = TempDir.createSync("@omsp-config-credentials-");
 		setAgentDir(agentDir.path());
 	});
 
@@ -67,7 +67,7 @@ describe("config list output", () => {
 		if (originalAgentDir) setAgentDir(originalAgentDir);
 		else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		if (agentDir) {
 			try {

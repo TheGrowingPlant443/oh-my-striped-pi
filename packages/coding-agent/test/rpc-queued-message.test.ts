@@ -2,15 +2,19 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
 import {
 	fitAbortAndRestoreQueueResponse,
 	fitRemoveQueuedMessageResponse,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import type { RpcPromptResultFrame, RpcResponse, RpcSessionState } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { isRecord, readJsonl, removeWithRetries, withTimeout } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import type {
+	RpcPromptResultFrame,
+	RpcResponse,
+	RpcSessionState,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { isRecord, readJsonl, removeWithRetries, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { rejectionOf } from "./helpers/rejection";
 
 describe("RPC queued-message editing", () => {
@@ -22,12 +26,12 @@ describe("RPC queued-message editing", () => {
 		return new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "queued-message-rpc-agent.ts")],
 			cwd: directory,
-			env: { PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1", QUEUED_RPC_SCRIPT: script ?? "" },
+			env: { OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1", QUEUED_RPC_SCRIPT: script ?? "" },
 		});
 	}
 
 	beforeEach(async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-queued-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-queued-"));
 		client = createClient();
 	});
 
@@ -352,7 +356,7 @@ describe("RPC queued-message editing", () => {
 				[process.execPath, path.join(import.meta.dir, "fixtures", "queued-message-rpc-agent.ts")],
 				{
 					cwd: directory,
-					env: { ...Bun.env, PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1", QUEUED_RPC_SCRIPT: "hold" },
+					env: { ...Bun.env, OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1", QUEUED_RPC_SCRIPT: "hold" },
 					stdin: "pipe",
 					stdout: "pipe",
 					stderr: "ignore",

@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import { loadHindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import type { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { MemoryRecallTool } from "@oh-my-pi/pi-coding-agent/tools/memory-recall";
-import { MemoryReflectTool } from "@oh-my-pi/pi-coding-agent/tools/memory-reflect";
-import { LearnTool } from "@oh-my-pi/pi-coding-agent/tools/learn";
-import { MemoryRetainTool } from "@oh-my-pi/pi-coding-agent/tools/memory-retain";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { HindsightApi } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import { loadHindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import type { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { MemoryRecallTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-recall";
+import { MemoryReflectTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-reflect";
+import { LearnTool } from "@oh-my-striped-pi/pi-coding-agent/tools/learn";
+import { MemoryRetainTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-retain";
 
 afterEach(() => {
 	vi.restoreAllMocks();

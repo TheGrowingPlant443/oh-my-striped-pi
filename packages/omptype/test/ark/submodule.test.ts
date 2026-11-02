@@ -7,7 +7,7 @@ import {
 	scope,
 	type Type,
 	type,
-} from "@oh-my-pi/omptype/ark";
+} from "@oh-my-striped-pi/omptype/ark";
 import type { Eq } from "./type-assert";
 
 describe("submodule", () => {

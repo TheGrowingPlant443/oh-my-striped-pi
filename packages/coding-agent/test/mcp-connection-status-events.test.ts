@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import type { McpConnectionStatusEvent } from "@oh-my-pi/pi-coding-agent/mcp/startup-events";
-import type { MCPServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+import { MCPManager } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import type { McpConnectionStatusEvent } from "@oh-my-striped-pi/pi-coding-agent/mcp/startup-events";
+import type { MCPServerConfig } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const FIXTURE_PATH = path.join(import.meta.dir, "fixtures", "many-tools-mcp.ts");
 const BUN_EXEC = process.execPath;
@@ -14,7 +14,7 @@ describe("MCPManager connection status events", () => {
 	let workDir: string;
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-mcp-status-"));
+		workDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-mcp-status-"));
 	});
 
 	afterEach(() => {

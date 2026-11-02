@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import * as url from "node:url";
 import { applyHyperlinkSetting } from "../src/render/hyperlink";
-import { getThemeByName } from "@oh-my-pi/pi-tui/theme";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
-import { globToolRenderer } from "@oh-my-pi/pi-tui/tools/glob";
+import { getThemeByName } from "@oh-my-striped-pi/pi-tui/theme";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import { globToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/glob";
 
 function extractLinkUris(text: string): string[] {
 	return [...text.matchAll(/\x1b\]8;[^;]*;([^\x1b]+)\x1b\\/g)].map(match => match[1]!);

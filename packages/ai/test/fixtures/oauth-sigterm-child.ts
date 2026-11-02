@@ -1,5 +1,5 @@
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
 
 const db = process.argv[2];
 const release = process.argv[3];

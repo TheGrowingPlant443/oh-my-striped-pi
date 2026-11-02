@@ -6,32 +6,32 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import type { AssistantMessage, ToolCall } from "@oh-my-pi/pi-ai";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { resetRegisteredArtifactDirsForTests } from "@oh-my-pi/pi-coding-agent/internal-urls/registry-helpers";
-import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
-import type { LoadExtensionsResult } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import type { IrcMessage } from "@oh-my-pi/pi-tui/tools/irc";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AgentSession, AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { IrcBridge, type IrcBridgeHost } from "@oh-my-pi/pi-coding-agent/session/irc-bridge";
+import type { AssistantMessage, ToolCall } from "@oh-my-striped-pi/pi-ai";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async/job-manager";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { resetRegisteredArtifactDirsForTests } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/registry-helpers";
+import { IrcBus } from "@oh-my-striped-pi/pi-coding-agent/irc/bus";
+import type { LoadExtensionsResult } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import type { IrcMessage } from "@oh-my-striped-pi/pi-tui/tools/irc";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AgentSession, AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { IrcBridge, type IrcBridgeHost } from "@oh-my-striped-pi/pi-coding-agent/session/irc-bridge";
 import {
 	attachIrcWakeTurnMonitor,
 	runSubagentFollowUpTurn,
 	runSubprocess,
-} from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { WaitTool } from "@oh-my-pi/pi-coding-agent/tools/wait";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { AgentDefinition } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { WaitTool } from "@oh-my-striped-pi/pi-coding-agent/tools/wait";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const AGENT_ID = "accepted-result";
 
@@ -389,7 +389,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("reads the latest message-result completion after an IRC wake instead of the first result", async () => {
-		const tempDir = TempDir.createSync("@omp-latest-agent-result-");
+		const tempDir = TempDir.createSync("@omsp-latest-agent-result-");
 		const artifactsDir = tempDir.path();
 		const harness = createHarness();
 		harness.session.sessionManager.getArtifactsDir = () => artifactsDir;
@@ -455,7 +455,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("preserves the accepted message result and sidecar when a peer wakes the agent", async () => {
-		const tempDir = TempDir.createSync("@omp-peer-agent-result-");
+		const tempDir = TempDir.createSync("@omsp-peer-agent-result-");
 		const artifactsDir = tempDir.path();
 		const harness = createHarness();
 		harness.session.sessionManager.getArtifactsDir = () => artifactsDir;
@@ -496,7 +496,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("delivers a user-resumed message result when all execution slots are occupied", async () => {
-		const tempDir = TempDir.createSync("@omp-user-resumed-result-");
+		const tempDir = TempDir.createSync("@omsp-user-resumed-result-");
 		const artifactsDir = tempDir.path();
 		const manager = new AsyncJobManager({ maxRunningJobs: 1 });
 		const blocker = Promise.withResolvers<string>();
@@ -552,7 +552,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("keeps the accepted artifact and sidecar when the parent cancels its wake job before finalization", async () => {
-		const tempDir = TempDir.createSync("@omp-cancelled-wake-result-");
+		const tempDir = TempDir.createSync("@omsp-cancelled-wake-result-");
 		const artifactsDir = tempDir.path();
 		const manager = new AsyncJobManager({});
 		const harness = createHarness({ asyncJobManager: manager });
@@ -596,7 +596,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("gives a turn the owner woke a job whose widget reads the turn's tool calls and whose progress wait reads", async () => {
-		const tempDir = TempDir.createSync("@omp-wake-job-widget-");
+		const tempDir = TempDir.createSync("@omsp-wake-job-widget-");
 		const artifactsDir = tempDir.path();
 		const manager = new AsyncJobManager({});
 		const harness = createHarness({ asyncJobManager: manager });
@@ -643,7 +643,7 @@ describe("runSubprocess result acceptance", () => {
 	});
 
 	it("keeps the accepted artifact and sidecar when an unstructured follow-up starts aborted", async () => {
-		const tempDir = TempDir.createSync("@omp-aborted-agent-result-");
+		const tempDir = TempDir.createSync("@omsp-aborted-agent-result-");
 		const artifactsDir = tempDir.path();
 		const harness = createHarness();
 		registerRunning(harness.session);

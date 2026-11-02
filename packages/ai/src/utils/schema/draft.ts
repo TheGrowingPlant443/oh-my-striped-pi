@@ -1,4 +1,4 @@
-import { formatLocalRefPointer, parseLocalRefPointer } from "@oh-my-pi/omptype";
+import { formatLocalRefPointer, parseLocalRefPointer } from "@oh-my-striped-pi/omptype";
 import { areJsonValuesEqual } from "./equality";
 import { epochNext, once } from "./stamps";
 import { isJsonObject, type JsonObject } from "./types";

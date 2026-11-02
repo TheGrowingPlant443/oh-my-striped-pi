@@ -1,18 +1,18 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { TspPropNode } from "@oh-my-pi/pi-wire";
-import type { NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { JobWidgetEntry, JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { TspPropNode } from "@oh-my-striped-pi/pi-wire";
+import type { NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { JobWidgetEntry, JobWidgetView } from "@oh-my-striped-pi/pi-tui/tools/job-widget";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 function nodes(root: NativeNode): NativeNode[] {
 	const out: NativeNode[] = [root];
@@ -86,7 +86,7 @@ describe("InteractiveMode HUD pills", () => {
 	});
 
 	const jobsSegment = (): NativeNode | undefined =>
-		nodes(mode.describeHudPills()).find(node => node.key === "jobs" && prop(node, "role") === "omp.hud.seg");
+		nodes(mode.describeHudPills()).find(node => node.key === "jobs" && prop(node, "role") === "omsp.hud.seg");
 
 	it("shows the freshest headline and a mini spark, lists every widget in the title and stacks them in a hover card", () => {
 		let entries: JobWidgetEntry[] = [
@@ -97,7 +97,7 @@ describe("InteractiveMode HUD pills", () => {
 		spyOn(session, "getRunningJobWidgets").mockImplementation(() => entries);
 
 		const segment = jobsSegment()!;
-		const glance = nodes(segment).find(node => prop(node, "role") === "omp.hud.glance");
+		const glance = nodes(segment).find(node => prop(node, "role") === "omsp.hud.glance");
 		expect(prop(glance, "spans")).toEqual([
 			{ t: "186 tok/s", s: "num strong" },
 			{ t: " ▲ 15%", s: "success" },
@@ -109,9 +109,9 @@ describe("InteractiveMode HUD pills", () => {
 			"2 jobs running  /jobs\nbg_1  eval · per model — trials 7/9 trials\nbg_2  verb-bench · decode — decode 186 tok/s ▲ 15%",
 		);
 		const card = prop(segment, "hovercard") as TspPropNode;
-		expect(card).toMatchObject({ k: "col", p: { role: "omp.jobs.hovercard" } });
-		expect(card.c?.map(child => prop(child, "role"))).toEqual(["omp.job.tiles"]);
-		expect(card.c?.[0]?.c?.map(child => prop(child, "role"))).toEqual(["omp.job.tile", "omp.job.tile"]);
+		expect(card).toMatchObject({ k: "col", p: { role: "omsp.jobs.hovercard" } });
+		expect(card.c?.map(child => prop(child, "role"))).toEqual(["omsp.job.tiles"]);
+		expect(card.c?.[0]?.c?.map(child => prop(child, "role"))).toEqual(["omsp.job.tile", "omsp.job.tile"]);
 
 		// Unchanged widget data keeps the described node; moved data re-describes it.
 		expect(jobsSegment()).toBe(segment);
@@ -138,7 +138,7 @@ describe("InteractiveMode HUD pills", () => {
 		const agentsSegment = (): NativeNode | undefined => {
 			mode.syncRunningSubagentBadge({ requestRender: false });
 			return nodes(mode.describeHudPills()).find(
-				node => node.key === "agents" && prop(node, "role") === "omp.hud.seg",
+				node => node.key === "agents" && prop(node, "role") === "omsp.hud.seg",
 			);
 		};
 		try {

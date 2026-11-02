@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import type { Api, completeSimple, Model } from "@oh-my-pi/pi-ai";
-import type { ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { CostCapError, CostGate } from "@oh-my-pi/pi-coding-agent/session/cost-gate";
+import type { Api, completeSimple, Model } from "@oh-my-striped-pi/pi-ai";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { CostCapError, CostGate } from "@oh-my-striped-pi/pi-coding-agent/session/cost-gate";
 import {
 	askImageQuestion,
 	type ResolvedImageQuestionModel,
 	resolveImageQuestionModel,
-} from "@oh-my-pi/pi-coding-agent/utils/image-question";
+} from "@oh-my-striped-pi/pi-coding-agent/utils/image-question";
 import { rejectionOf } from "../helpers/rejection";
 
 function makeProxyModel(id: string, compat?: ModelSpec["compat"]): Model<Api> {

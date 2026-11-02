@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ServiceTierByFamily } from "@oh-my-pi/pi-ai";
+import type { ServiceTierByFamily } from "@oh-my-striped-pi/pi-ai";
 import {
 	resolveAgentServiceTierOverride,
 	validateAgentServiceTierOverrides,
-} from "@oh-my-pi/pi-coding-agent/config/service-tier";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { getProjectAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/config/service-tier";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { getProjectAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "./helpers/settings-test-state";
 import { getTestModel } from "./helpers/model-fixtures";
@@ -19,7 +19,7 @@ import {
 	cfgTierGoogle,
 	cfgTierOpenai,
 	cfgTierSubagent,
-} from "@oh-my-pi/pi-coding-agent/session/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 const openAIModel = {
 	...getTestModel("github-copilot", model => model.identity.class === "openai"),

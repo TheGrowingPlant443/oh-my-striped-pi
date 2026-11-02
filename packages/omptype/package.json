@@ -1,18 +1,19 @@
 {
   "type": "module",
-  "name": "@oh-my-pi/omptype",
+  "name": "@oh-my-striped-pi/omptype",
+  "private": true,
   "version": "18.13.3",
   "description": "ArkType-compatible runtime schema validation with lazy JIT compilation",
-  "homepage": "https://omp.sh",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
   "author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/can1357/oh-my-pi.git",
+    "url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
     "directory": "packages/omptype"
   },
   "bugs": {
-    "url": "https://github.com/can1357/oh-my-pi/issues"
+    "url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
   },
   "keywords": [
     "schema",

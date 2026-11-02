@@ -6,7 +6,7 @@ import {
 	AppendOnlyContextManager,
 	type StreamFn,
 	ThinkingLevel,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type Api,
 	type Context,
@@ -19,35 +19,42 @@ import {
 	type SimpleStreamOptions,
 	type TextContent,
 	type ToolCall,
-} from "@oh-my-pi/pi-ai";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
+} from "@oh-my-striped-pi/pi-ai";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
 import {
 	ExtensionRunner,
 	EXTENSION_HANDLER_TIMEOUT_MS,
 	testSetExtensionHandlerTimeoutMs,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import { RegisteredToolAdapter } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/wrapper";
-import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
-import * as memoryBackend from "@oh-my-pi/pi-coding-agent/memory-backend";
-import * as imageVisionFallback from "@oh-my-pi/pi-coding-agent/utils/image-vision-fallback";
-import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/memory-backend/recall-entry";
-import type { MemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
-import { type MnemopiSessionState, setMnemopiSessionState } from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { createAgentSession, type ExtensionContext, type ExtensionFactory } from "@oh-my-pi/pi-coding-agent/sdk";
-import { obfuscateProviderContext, SecretObfuscator } from "@oh-my-pi/pi-coding-agent/secrets";
-import { AgentSession, type AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm, wrapSteeringForModel } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { requestBodyText } from "@oh-my-pi/pi-ai/utils/request-body";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import { RegisteredToolAdapter } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/wrapper";
+import { initializeExtensions } from "@oh-my-striped-pi/pi-coding-agent/modes/runtime-init";
+import * as memoryBackend from "@oh-my-striped-pi/pi-coding-agent/memory-backend";
+import * as imageVisionFallback from "@oh-my-striped-pi/pi-coding-agent/utils/image-vision-fallback";
+import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/recall-entry";
+import type { MemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/types";
+import { type MnemopiSessionState, setMnemopiSessionState } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import {
+	createAgentSession,
+	type ExtensionContext,
+	type ExtensionFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { obfuscateProviderContext, SecretObfuscator } from "@oh-my-striped-pi/pi-coding-agent/secrets";
+import { AgentSession, type AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm, wrapSteeringForModel } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { requestBodyText } from "@oh-my-striped-pi/pi-ai/utils/request-body";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 import { getTestModel } from "./helpers/model-fixtures";
 
@@ -98,15 +105,15 @@ function getConvertedUserText(message: Message | undefined): string {
 }
 
 async function withNativeDialectEnv<T>(fn: () => Promise<T>): Promise<T> {
-	const previous = Bun.env.PI_DIALECT;
-	delete Bun.env.PI_DIALECT;
+	const previous = Bun.env.OMSP_DIALECT;
+	delete Bun.env.OMSP_DIALECT;
 	try {
 		return await fn();
 	} finally {
 		if (previous === undefined) {
-			delete Bun.env.PI_DIALECT;
+			delete Bun.env.OMSP_DIALECT;
 		} else {
-			Bun.env.PI_DIALECT = previous;
+			Bun.env.OMSP_DIALECT = previous;
 		}
 	}
 }

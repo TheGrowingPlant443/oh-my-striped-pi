@@ -2,36 +2,36 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:te
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { Effort, type Model, type ToolResultMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { Effort, type Model, type ToolResultMessage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	EXTENSION_HANDLER_TIMEOUT_MS,
 	testSetExtensionHandlerTimeoutMs,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import { ExtensionToolWrapper } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/wrapper";
-import type { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import { ExtensionToolWrapper } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/wrapper";
+import type { MCPManager } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import { initializeExtensions } from "@oh-my-striped-pi/pi-coding-agent/modes/runtime-init";
 import {
 	type CreateAgentSessionOptions,
 	type CustomTool,
 	createAgentSession,
 	discoverAuthStorage,
 	type ExtensionFactory,
-} from "@oh-my-pi/pi-coding-agent/sdk";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { VIBE_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/tools/vibe";
-import { resetYieldTurnState } from "@oh-my-pi/pi-coding-agent/tools/yield";
-import { logger, removeSyncWithRetries, Snowflake, untilAborted } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { VIBE_TOOL_NAMES } from "@oh-my-striped-pi/pi-coding-agent/tools/vibe";
+import { resetYieldTurnState } from "@oh-my-striped-pi/pi-coding-agent/tools/yield";
+import { logger, removeSyncWithRetries, Snowflake, untilAborted } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgExternalThinking } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { cfgPlanEnabled } from "@oh-my-pi/pi-coding-agent/plan-mode/settings";
-import { cfgToolsXdev } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgExternalThinking } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { cfgPlanEnabled } from "@oh-my-striped-pi/pi-coding-agent/plan-mode/settings";
+import { cfgToolsXdev } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 import { getTestModel } from "./helpers/model-fixtures";
 
 const toolActivationExtension: ExtensionFactory = pi => {

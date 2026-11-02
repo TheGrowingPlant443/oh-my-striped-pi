@@ -1,14 +1,14 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import { agentPauseGate } from "@oh-my-pi/pi-agent-core";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { TspDocument } from "@oh-my-pi/pi-tui/native/apply";
-import type { DescribeContext, NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { Reconciler } from "@oh-my-pi/pi-tui/native/reconcile";
-import type { TspNode } from "@oh-my-pi/pi-wire";
-import { BUILTIN_CONTROL_SLASH_COMMANDS } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-control";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { TuiSlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-commands/types";
+import { agentPauseGate } from "@oh-my-striped-pi/pi-agent-core";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { TspDocument } from "@oh-my-striped-pi/pi-tui/native/apply";
+import type { DescribeContext, NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { Reconciler } from "@oh-my-striped-pi/pi-tui/native/reconcile";
+import type { TspNode } from "@oh-my-striped-pi/pi-wire";
+import { BUILTIN_CONTROL_SLASH_COMMANDS } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-control";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { TuiSlashCommandRuntime } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/types";
 import { Settings } from "../../../src/config/settings";
 import {
 	PauseScreenComponent,
@@ -16,9 +16,9 @@ import {
 	type PauseWorkStatus,
 	renderPauseScreen,
 	runPauseScreen,
-} from "@oh-my-pi/pi-tui/overlays/pause-screen";
-import { setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { getThemeByName, setThemeInstance } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-tui/overlays/pause-screen";
+import { setNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { getThemeByName, setThemeInstance } from "@oh-my-striped-pi/pi-tui/theme";
 
 // Strip SGR colors so assertions see visible text only.
 const stripAnsi = (text: string): string => text.replace(/\x1b\[[0-9;]*m/g, "");
@@ -363,8 +363,8 @@ describe("pause screen", () => {
 				})
 				.join("\n");
 		const countRoles: Record<string, true> = {
-			"omp.pause.unsettled-turn-count": true,
-			"omp.pause.unfinished-job-count": true,
+			"omsp.pause.unsettled-turn-count": true,
+			"omsp.pause.unfinished-job-count": true,
 		};
 		const countNodes = (root: NativeChild): NativeNode[] =>
 			nodes(root).filter(n => countRoles[(n.p as { role?: string } | undefined)?.role ?? ""] === true);
@@ -388,13 +388,13 @@ describe("pause screen", () => {
 			expect(shown).toContain("Unsettled turns: 0");
 			expect(shown).toContain("Unfinished jobs: 2");
 
-			const buttons = all.filter(n => (n.p as { role?: string } | undefined)?.role === "omp.btn");
+			const buttons = all.filter(n => (n.p as { role?: string } | undefined)?.role === "omsp.btn");
 			expect(buttons.length).toBe(1);
 			const resume = buttons[0]!.p as { tone?: string; title?: string; actions?: { click?: string } };
 			expect(resume.tone).toBe("accent");
 			expect(resume.actions?.click).toBe("resume");
 			expect(resume.title).toStartWith("Resume  esc");
-			expect(sheet.nativeOverlay).toMatchObject({ role: "omp.overlay.pause", head: "Paused" });
+			expect(sheet.nativeOverlay).toMatchObject({ role: "omsp.overlay.pause", head: "Paused" });
 		});
 
 		it("names the whole session when it has no name", () => {
@@ -481,7 +481,7 @@ describe("pause screen", () => {
 				expect(texts(zero)).toContain("Paused — ready to suspend");
 				const zeroNodes = nodes(zero);
 				expect(zeroNodes.some(n => n.k === "elapsed")).toBe(true);
-				const zeroButtons = zeroNodes.filter(n => (n.p as { role?: string } | undefined)?.role === "omp.btn");
+				const zeroButtons = zeroNodes.filter(n => (n.p as { role?: string } | undefined)?.role === "omsp.btn");
 				expect(zeroButtons).toHaveLength(1);
 				expect(zeroButtons[0]!.p).toMatchObject({ tone: "accent", actions: { click: "resume" } });
 				expect(countNodes(zero)).toHaveLength(0);
@@ -504,11 +504,11 @@ describe("pause screen", () => {
 				expect(wireCountNodes(document.snapshot())).toHaveLength(2);
 				expect(
 					lateWorkOps.flatMap(op => (op[0] === "add" ? wireCountNodes(op[4]) : [])).map(n => n.p?.role),
-				).toEqual(expect.arrayContaining(["omp.pause.unsettled-turn-count", "omp.pause.unfinished-job-count"]));
+				).toEqual(expect.arrayContaining(["omsp.pause.unsettled-turn-count", "omsp.pause.unfinished-job-count"]));
 				expect(texts(lateWork)).toContain("Unsettled turns: 1");
 				expect(texts(lateWork)).toContain("Unfinished jobs: 0");
 				const buttons = wireNodes(document.snapshot()).filter(
-					n => (n.p as { role?: string } | undefined)?.role === "omp.btn",
+					n => (n.p as { role?: string } | undefined)?.role === "omsp.btn",
 				);
 				expect(buttons).toHaveLength(1);
 				expect(buttons[0]!.p).toMatchObject({ tone: "accent", actions: { click: "resume" } });

@@ -1,5 +1,5 @@
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolResult, ToolTier } from "@oh-my-pi/pi-agent-core";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool, AgentToolResult, ToolTier } from "@oh-my-striped-pi/pi-agent-core";
 import securityScanDescription from "../prompts/tools/security-scan.md" with { type: "text" };
 import { createSecurityEvidenceId, type SecurityEvidence, type SecurityValidationStatus } from "../security/contracts";
 import type { SecurityOperationSnapshot } from "../security/coordinator";
@@ -7,7 +7,7 @@ import { getSecurityCoordinator } from "../security/coordinator";
 import type { SecurityTargetRequest } from "../security/preflight";
 import { SecurityStore } from "../security/store";
 import type { ToolSession } from "./index";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 
 import { cfgSecurityEnabled } from "./settings";
 
@@ -81,7 +81,7 @@ export class SecurityScanTool implements AgentTool<typeof securityScanSchema, Se
 	readonly approval: ToolTier = "exec";
 	readonly label = "Security Scan";
 	readonly loadMode = "discoverable";
-	readonly summary = "Run OMP-native security scans and validate stored findings";
+	readonly summary = "Run OMSP-native security scans and validate stored findings";
 	readonly description = securityScanDescription.trim();
 	readonly parameters = securityScanSchema;
 	readonly strict = true;

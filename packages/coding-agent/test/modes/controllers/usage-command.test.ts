@@ -1,12 +1,15 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { AuthStorage, type UsageReport } from "@oh-my-pi/pi-ai";
-import { CommandController, renderUsageReports } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import { SelectorController } from "@oh-my-pi/pi-coding-agent/modes/controllers/selector-controller";
-import * as activityClient from "@oh-my-pi/pi-coding-agent/stats/activity-client";
-import { Container, visibleWidth } from "@oh-my-pi/pi-tui";
-import { UsageDashboardComponent } from "@oh-my-pi/pi-tui/overlays/usage-dashboard";
-import { getThemeByName, setThemeInstance, theme } from "@oh-my-pi/pi-tui/theme";
+import { AuthStorage, type UsageReport } from "@oh-my-striped-pi/pi-ai";
+import {
+	CommandController,
+	renderUsageReports,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import { SelectorController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/selector-controller";
+import * as activityClient from "@oh-my-striped-pi/pi-coding-agent/stats/activity-client";
+import { Container, visibleWidth } from "@oh-my-striped-pi/pi-tui";
+import { UsageDashboardComponent } from "@oh-my-striped-pi/pi-tui/overlays/usage-dashboard";
+import { getThemeByName, setThemeInstance, theme } from "@oh-my-striped-pi/pi-tui/theme";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 
 describe("renderUsageReports content", () => {

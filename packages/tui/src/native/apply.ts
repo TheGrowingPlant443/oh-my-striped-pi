@@ -7,7 +7,14 @@
  *
  * Used by tests, the debug server's `doc` op, and the TSP test harness.
  */
-import { TSP_KINDS, TSP_TEXT_KINDS, type TspFrame, type TspKind, type TspNode, type TspOp } from "@oh-my-pi/pi-wire";
+import {
+	TSP_KINDS,
+	TSP_TEXT_KINDS,
+	type TspFrame,
+	type TspKind,
+	type TspNode,
+	type TspOp,
+} from "@oh-my-striped-pi/pi-wire";
 
 /** One rejected op. */
 export interface TspApplyError {

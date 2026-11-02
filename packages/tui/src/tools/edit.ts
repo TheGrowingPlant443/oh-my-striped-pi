@@ -2,10 +2,10 @@
  * Edit tool renderer.
  */
 
-import { type EditInspection, editInspect } from "@oh-my-pi/pi-natives";
+import { type EditInspection, editInspect } from "@oh-my-striped-pi/pi-natives";
 import type { Component } from "../tui";
 import { sliceWithWidth, visibleWidth, wrapTextWithAnsi } from "../utils";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import type { NativeToolHead, NativeToolView, RenderResultOptions, ToolRenderer } from "./renderer";
 import { code, compact, node, span } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
@@ -1212,7 +1212,7 @@ export const editToolRenderer = {
 					fileDiffSection(
 						{ path: preview.path, added: stats?.added, removed: stats?.removed },
 						[preview.error ? errorText(preview.error) : editDiff(preview.diff ?? "", preview.path)],
-						{ role: "omp.tool.edit.file", tone: preview.error ? "error" : undefined },
+						{ role: "omsp.tool.edit.file", tone: preview.error ? "error" : undefined },
 					),
 				);
 			}
@@ -1277,7 +1277,7 @@ export const editToolRenderer = {
 				added += file.added;
 				removed += file.removed;
 				return fileDiffSection(file, file.body, {
-					role: "omp.tool.edit.file",
+					role: "omsp.tool.edit.file",
 					tone: file.isError ? "error" : undefined,
 				});
 			});

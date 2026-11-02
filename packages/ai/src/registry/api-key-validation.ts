@@ -1,4 +1,4 @@
-import { LEGACY_ANTHROPIC_API_VERSION } from "@oh-my-pi/pi-catalog/compat/anthropic";
+import { LEGACY_ANTHROPIC_API_VERSION } from "@oh-my-striped-pi/pi-catalog/compat/anthropic";
 import { OpenAIHttpError, ProviderHttpError } from "../error/classes";
 import { ConfigurationError } from "../error";
 import type { FetchImpl } from "../types";

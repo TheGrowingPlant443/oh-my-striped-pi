@@ -7,7 +7,7 @@ import {
 	tinyMlxSupported,
 	tinyModelDeviceLoadOrder,
 	tinyModelDeviceSettingToEnv,
-} from "@oh-my-pi/pi-coding-agent/tiny/device";
+} from "@oh-my-striped-pi/pi-coding-agent/tiny/device";
 
 describe("tiny model device selection", () => {
 	it("defaults to CPU-only inference on every platform", () => {
@@ -44,11 +44,11 @@ describe("tiny model device selection", () => {
 	});
 
 	it("rejects unknown ONNX execution providers", () => {
-		expect(() => resolveTinyModelDevicePreference("neural-magic")).toThrow("Unsupported PI_TINY_DEVICE");
+		expect(() => resolveTinyModelDevicePreference("neural-magic")).toThrow("Unsupported OMSP_TINY_DEVICE");
 	});
 });
 
-describe("tiny model device setting → PI_TINY_DEVICE mapping", () => {
+describe("tiny model device setting → OMSP_TINY_DEVICE mapping", () => {
 	it("returns undefined for the default sentinel so the worker keeps its CPU default", () => {
 		expect(tinyModelDeviceSettingToEnv(TINY_MODEL_DEVICE_DEFAULT)).toBeUndefined();
 		expect(tinyModelDeviceSettingToEnv(undefined)).toBeUndefined();

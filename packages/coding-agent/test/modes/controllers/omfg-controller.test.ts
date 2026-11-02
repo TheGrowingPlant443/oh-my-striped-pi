@@ -2,17 +2,17 @@ import { afterEach, beforeAll, describe, expect, it, type Mock, vi } from "bun:t
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
-import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
-import { OmfgController } from "@oh-my-pi/pi-coding-agent/modes/controllers/omfg-controller";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { Container, type TUI } from "@oh-my-pi/pi-tui";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
-import { clearCache, readDirEntries } from "@oh-my-pi/pi-coding-agent/capability/fs";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Usage } from "@oh-my-striped-pi/pi-ai";
+import type { Rule } from "@oh-my-striped-pi/pi-coding-agent/capability/rule";
+import { OmfgController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/omfg-controller";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { Container, type TUI } from "@oh-my-striped-pi/pi-tui";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
+import { clearCache, readDirEntries } from "@oh-my-striped-pi/pi-coding-agent/capability/fs";
 
-const PROJECT_OPTION = "This project (.omp/rules)";
+const PROJECT_OPTION = "This project (.omsp/rules)";
 
 const usage: Usage = {
 	input: 0,
@@ -175,7 +175,7 @@ describe("OmfgController", () => {
 		expect(harness.container.children).toHaveLength(0);
 		expect(signal?.aborted).toBe(true);
 		expect(controller.hasActiveRequest()).toBe(false);
-		expect(await Bun.file(path.join(harness.projectDir, ".omp", "rules", "ts-no-any.md")).exists()).toBe(false);
+		expect(await Bun.file(path.join(harness.projectDir, ".omsp", "rules", "ts-no-any.md")).exists()).toBe(false);
 	});
 
 	it("invalidates the discovery cache after saving so rediscovery observes the new rule", async () => {
@@ -195,7 +195,7 @@ describe("OmfgController", () => {
 			messages: createMatchingMessages(),
 			selectorChoice: PROJECT_OPTION,
 		});
-		const rulesDir = path.join(harness.projectDir, ".omp", "rules");
+		const rulesDir = path.join(harness.projectDir, ".omsp", "rules");
 
 		// Warm the discovery cache with the pre-save (absent) directory snapshot, the
 		// state the mid-session rule rediscovery would read on the next prompt rebuild.

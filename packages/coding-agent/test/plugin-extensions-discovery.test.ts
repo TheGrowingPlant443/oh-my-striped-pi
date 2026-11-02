@@ -2,12 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { discoverAndLoadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { __closeExtensionParseCacheForTests } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
-import { getAgentDir, getPluginsDir, removeSyncWithRetries, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { loadCapability } from "@oh-my-striped-pi/pi-coding-agent/capability";
+import type { MCPServer } from "@oh-my-striped-pi/pi-coding-agent/capability/mcp";
+import { discoverAndLoadExtensions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { __closeExtensionParseCacheForTests } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
+import { getAgentDir, getPluginsDir, removeSyncWithRetries, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
+import "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-plugins";
 
-const currentPiCodingAgentPath = Bun.resolveSync("@oh-my-pi/pi-coding-agent", import.meta.dir);
-const currentPiExtensionsPath = Bun.resolveSync("@oh-my-pi/pi-coding-agent/extensibility/extensions", import.meta.dir);
+const currentPiCodingAgentPath = Bun.resolveSync("@oh-my-striped-pi/pi-coding-agent", import.meta.dir);
+const currentPiExtensionsPath = Bun.resolveSync(
+	"@oh-my-striped-pi/pi-coding-agent/extensibility/extensions",
+	import.meta.dir,
+);
 
 describe("plugin extension discovery", () => {
 	let projectDir: TempDir;
@@ -19,12 +25,12 @@ describe("plugin extension discovery", () => {
 	beforeEach(() => {
 		projectDir = TempDir.createSync("@pi-plugin-ext-");
 		// Redirect the whole config root to an isolated temp home so plugin discovery
-		// resolves into `<tempHome>/.omp/plugins` on every platform. Two things are needed:
-		//  - mock os.homedir() so configRoot = `<tempHome>/.omp` (the previous
+		// resolves into `<tempHome>/.omsp/plugins` on every platform. Two things are needed:
+		//  - mock os.homedir() so configRoot = `<tempHome>/.omsp` (the previous
 		//    XDG_DATA_HOME redirect was a no-op on Windows, where these tests then wrote
-		//    into and rm'd the developer's real `~/.omp/plugins`);
+		//    into and rm'd the developer's real `~/.omsp/plugins`);
 		//  - clear the XDG_* vars, because on Linux/macOS the resolver prefers
-		//    `$XDG_DATA_HOME/omp` over the home config root when that dir exists, so an
+		//    `$XDG_DATA_HOME/omsp` over the home config root when that dir exists, so an
 		//    XDG-migrated environment would otherwise still resolve the real plugins dir.
 		tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "pi-plugin-home-"));
 		for (const key of xdgVars) {
@@ -32,12 +38,12 @@ describe("plugin extension discovery", () => {
 			delete process.env[key];
 		}
 		spyOn(os, "homedir").mockReturnValue(tempHome);
-		setAgentDir(path.join(tempHome, ".omp", "agent"));
+		setAgentDir(path.join(tempHome, ".omsp", "agent"));
 
 		const pluginsDir = getPluginsDir();
 		// Safety gate: never write fixtures outside the temp home. This is the exact
 		// failure mode being fixed — a resolver/mock regression that resolves to the real
-		// ~/.omp must fail loudly here instead of clobbering the developer's plugins.
+		// ~/.omsp must fail loudly here instead of clobbering the developer's plugins.
 		if (!pluginsDir.startsWith(tempHome + path.sep)) {
 			throw new Error(`plugin isolation failed: getPluginsDir() resolved outside the temp home: ${pluginsDir}`);
 		}
@@ -46,7 +52,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"@demo/plugin": "1.0.0",
@@ -58,7 +64,7 @@ describe("plugin extension discovery", () => {
 			JSON.stringify({
 				name: "@demo/plugin",
 				version: "1.0.0",
-				omp: {
+				omsp: {
 					extensions: ["./dist/extension.ts"],
 				},
 			}),
@@ -82,7 +88,7 @@ describe("plugin extension discovery", () => {
 		}
 		originalXdg.clear();
 		setAgentDir(originalAgentDir);
-		// The legacy Pi parse cache db lives under the temp home's `.omp/cache`;
+		// The legacy Pi parse cache db lives under the temp home's `.omsp/cache`;
 		// release it so Windows can delete the directory.
 		__closeExtensionParseCacheForTests();
 		removeSyncWithRetries(tempHome);
@@ -96,6 +102,62 @@ describe("plugin extension discovery", () => {
 		expect(extension).toBeDefined();
 		expect(extension?.commands.has("plugin-ext")).toBe(true);
 	});
+
+	for (const override of [false, true]) {
+		it(`loads published omp manifests from fresh .omsp state${override ? " with omsp taking precedence" : ""}`, async () => {
+			const pluginDir = path.join(getPluginsDir(), "node_modules", "@demo", "plugin");
+			const selectedEntry = override ? "override.ts" : "extension.ts";
+			fs.writeFileSync(
+				path.join(pluginDir, "package.json"),
+				JSON.stringify({
+					name: "@demo/plugin",
+					version: "1.0.0",
+					...(override ? { omsp: { extensions: ["./dist/override.ts"] } } : {}),
+					omp: { extensions: ["./dist/extension.ts"] },
+					pi: { extensions: ["./missing.ts"] },
+				}),
+			);
+			fs.writeFileSync(
+				path.join(pluginDir, "dist", "override.ts"),
+				`export default function(pi) { pi.registerCommand("fork-override", { handler: async () => {} }); }`,
+			);
+			const placeholder = "$" + "{OMP_PLUGIN_ROOT}";
+			fs.writeFileSync(
+				path.join(pluginDir, ".mcp.json"),
+				JSON.stringify({
+					mcpServers: {
+						published: {
+							command: "node",
+							args: [`${placeholder}/server.js`],
+							env: { PLUGIN_PATH: placeholder },
+						},
+					},
+				}),
+			);
+			const originalRoot = process.env.OMP_PLUGIN_ROOT;
+			process.env.OMP_PLUGIN_ROOT = "/unrelated-original-app";
+			try {
+				const result = await discoverAndLoadExtensions([], projectDir.path());
+				expect(result.errors).toHaveLength(0);
+				expect(result.extensions).toHaveLength(1);
+				const extension = result.extensions[0];
+				expect(extension.path).toBe(path.join(pluginDir, "dist", selectedEntry));
+				expect(extension.commands.has(override ? "fork-override" : "plugin-ext")).toBe(true);
+
+				const servers = await loadCapability<MCPServer>("mcps", {
+					cwd: projectDir.path(),
+					providers: ["omsp-plugins"],
+				});
+				const server = servers.items.find(item => item.name === "published");
+				expect(server?.args).toEqual([`${pluginDir}/server.js`]);
+				expect(server?.env?.PLUGIN_PATH).toBe(pluginDir);
+				expect(fs.existsSync(path.join(tempHome, ".omp"))).toBe(false);
+			} finally {
+				if (originalRoot === undefined) delete process.env.OMP_PLUGIN_ROOT;
+				else process.env.OMP_PLUGIN_ROOT = originalRoot;
+			}
+		});
+	}
 
 	it("loads installed plugin extensions that detach API methods", async () => {
 		const extensionPath = path.join(getPluginsDir(), "node_modules", "@demo", "plugin", "dist", "extension.ts");
@@ -141,7 +203,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"legacy-pi-plugin": "1.0.0",
@@ -204,7 +266,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"package-import-plugin": "1.0.0",
@@ -263,7 +325,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"conditional-import-plugin": "1.0.0",
@@ -324,7 +386,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"json-import-plugin": "1.0.0",
@@ -373,7 +435,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"null-exact-import-plugin": "1.0.0",
@@ -423,7 +485,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"null-conditional-import-plugin": "1.0.0",
@@ -475,7 +537,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"side-effect-plugin": "1.0.0",
@@ -501,7 +563,7 @@ describe("plugin extension discovery", () => {
 				// Side-effect imports — no `from`, no dynamic `import()`. The
 				// regex matchers must walk and rewrite both shapes so the legacy
 				// `@earendil-works` import inside `register.ts` resolves to the
-				// host `@oh-my-pi` package.
+				// host `@oh-my-striped-pi` package.
 				'import "#src/register";',
 				'import "./marker";',
 				"",
@@ -555,7 +617,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"dir-entry-plugin": "1.0.0",
@@ -601,7 +663,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"subdir-entry-plugin": "1.0.0",
@@ -648,7 +710,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"nested-manifest-plugin": "1.0.0",
@@ -667,7 +729,7 @@ describe("plugin extension discovery", () => {
 		// is a decoy that must NOT win (manifest takes precedence, like the -e scanner).
 		fs.writeFileSync(
 			path.join(featureDir, "package.json"),
-			JSON.stringify({ name: "feature-ext", version: "1.0.0", omp: { extensions: ["./dist/real-ext.ts"] } }),
+			JSON.stringify({ name: "feature-ext", version: "1.0.0", omsp: { extensions: ["./dist/real-ext.ts"] } }),
 		);
 		fs.writeFileSync(
 			realEntry,
@@ -706,7 +768,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"missing-decl-plugin": "1.0.0",
@@ -725,7 +787,7 @@ describe("plugin extension discovery", () => {
 		// not exist (e.g. unbuilt). The leftover index.ts must NOT be loaded as a fallback.
 		fs.writeFileSync(
 			path.join(featureDir, "package.json"),
-			JSON.stringify({ name: "feature-ext", version: "1.0.0", omp: { extensions: ["./dist/real-ext.ts"] } }),
+			JSON.stringify({ name: "feature-ext", version: "1.0.0", omsp: { extensions: ["./dist/real-ext.ts"] } }),
 		);
 		fs.writeFileSync(
 			path.join(featureDir, "index.ts"),
@@ -752,7 +814,7 @@ describe("plugin extension discovery", () => {
 		fs.writeFileSync(
 			path.join(pluginsDir, "package.json"),
 			JSON.stringify({
-				name: "omp-plugins",
+				name: "omsp-plugins",
 				private: true,
 				dependencies: {
 					"dts-plugin": "1.0.0",
@@ -764,7 +826,7 @@ describe("plugin extension discovery", () => {
 			JSON.stringify({
 				name: "dts-plugin",
 				version: "1.0.0",
-				omp: { extensions: ["./extensions"] },
+				omsp: { extensions: ["./extensions"] },
 			}),
 		);
 		fs.writeFileSync(

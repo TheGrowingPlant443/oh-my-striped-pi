@@ -1,9 +1,9 @@
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { MCPTool } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
-import type { MCPServerConnection, MCPToolDefinition } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { SessionTools, type SessionToolsHost } from "@oh-my-pi/pi-coding-agent/session/session-tools";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { MCPTool } from "@oh-my-striped-pi/pi-coding-agent/mcp/tool-bridge";
+import type { MCPServerConnection, MCPToolDefinition } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { SessionTools, type SessionToolsHost } from "@oh-my-striped-pi/pi-coding-agent/session/session-tools";
 
 interface V8HeapSnapshot {
 	snapshot: {

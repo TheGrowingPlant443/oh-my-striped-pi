@@ -6,17 +6,17 @@
  * real user messages plus that compaction item as replacement history.
  */
 
-import type { Api, FetchImpl, Model } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
+import type { Api, FetchImpl, Model } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
 import {
 	getOpenAIPromptCacheKey,
 	getOpenAIResponsesRoutingSessionId,
 	resolveOpenAIRequestSetup,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { captureOpenAIHttpError } from "@oh-my-pi/pi-ai/utils/openai-http";
-import { wrapFetchForProxy } from "@oh-my-pi/pi-ai/utils/proxy";
-import type { CatalogPolicyInputs } from "@oh-my-pi/pi-catalog/types";
-import { isUnexpectedSocketCloseMessage, logger, ptree, stringifyJson, untilAborted } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { captureOpenAIHttpError } from "@oh-my-striped-pi/pi-ai/utils/openai-http";
+import { wrapFetchForProxy } from "@oh-my-striped-pi/pi-ai/utils/proxy";
+import type { CatalogPolicyInputs } from "@oh-my-striped-pi/pi-catalog/types";
+import { isUnexpectedSocketCloseMessage, logger, ptree, stringifyJson, untilAborted } from "@oh-my-striped-pi/pi-utils";
 
 // ============================================================================
 // Types & Configuration
@@ -550,7 +550,7 @@ export function buildCompactionV2ReplacementHistory(
 }
 
 function isRetainedUserMessageForCompactionV2(item: Record<string, unknown>): boolean {
-	// Responses input messages may omit `type`: omp serializes turns as
+	// Responses input messages may omit `type`: omsp serializes turns as
 	// `{ role, content }`, which the API reads as `type: "message"`.
 	const isMessage = item.type === "message" || (item.type === undefined && typeof item.role === "string");
 	return isMessage && item.role === "user" && !isContextualUserMessage(item);

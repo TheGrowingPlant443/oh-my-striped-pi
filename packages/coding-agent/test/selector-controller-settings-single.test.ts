@@ -1,17 +1,17 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn, vi } from "bun:test";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { SelectorController } from "@oh-my-pi/pi-coding-agent/modes/controllers/selector-controller";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { Component, OverlayHandle, OverlayOptions, TUI } from "@oh-my-pi/pi-tui";
-import { SessionSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-selector";
-import { AgentsHubComponent } from "@oh-my-pi/pi-tui/overlays/agents-hub";
-import * as activityClient from "@oh-my-pi/pi-coding-agent/stats/activity-client";
-import * as sessionPins from "@oh-my-pi/pi-coding-agent/session/session-pins";
-import { cfgTaskAgentModelOverrides } from "@oh-my-pi/pi-coding-agent/task/settings";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import * as themeModule from "@oh-my-pi/pi-tui/theme";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { SelectorController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/selector-controller";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { Component, OverlayHandle, OverlayOptions, TUI } from "@oh-my-striped-pi/pi-tui";
+import { SessionSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/session-selector";
+import { AgentsHubComponent } from "@oh-my-striped-pi/pi-tui/overlays/agents-hub";
+import * as activityClient from "@oh-my-striped-pi/pi-coding-agent/stats/activity-client";
+import * as sessionPins from "@oh-my-striped-pi/pi-coding-agent/session/session-pins";
+import { cfgTaskAgentModelOverrides } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import * as themeModule from "@oh-my-striped-pi/pi-tui/theme";
 import { createInteractiveModeContext } from "./helpers/interactive-mode-context";
 
 /** The overlay members of `ui` the single-instance guard reads and drives. */
@@ -299,7 +299,7 @@ describe("single-instance menus", () => {
 
 	it("selects a seance source without resuming", async () => {
 		const session: SessionInfo = {
-			path: "/repo/.omp/sessions/source.jsonl",
+			path: "/repo/.omsp/sessions/source.jsonl",
 			id: "source",
 			cwd: "/repo",
 			created: new Date(1),
@@ -317,7 +317,7 @@ describe("single-instance menus", () => {
 			session: { switchSession: vi.fn(async () => true) },
 			sessionManager: {
 				getCwd: () => "/repo",
-				getSessionDir: () => "/repo/.omp/sessions",
+				getSessionDir: () => "/repo/.omsp/sessions",
 				getSessionFile: () => undefined,
 			},
 		});

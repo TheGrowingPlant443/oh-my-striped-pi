@@ -1,28 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import type { MockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { sessionResolveContext } from "@oh-my-pi/pi-coding-agent/internal-urls/context";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
-import { createPersistedSubagentReviverFactory } from "@oh-my-pi/pi-coding-agent/task/persisted-revive";
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-pi/pi-coding-agent/task/types";
-import type { PreparedSeanceSession } from "@oh-my-pi/pi-coding-agent/task/seance";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { getAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import type { MockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { sessionResolveContext } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/context";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { CURRENT_SESSION_VERSION } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { IrcBus } from "@oh-my-striped-pi/pi-coding-agent/irc/bus";
+import { createPersistedSubagentReviverFactory } from "@oh-my-striped-pi/pi-coding-agent/task/persisted-revive";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { getBundledAgent } from "@oh-my-striped-pi/pi-coding-agent/task/agents";
+import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import type { PreparedSeanceSession } from "@oh-my-striped-pi/pi-coding-agent/task/seance";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { getAgentDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const MOCK_API_SOURCE = "seance-artifact-lifecycle-test";
 const AGENT_ID = "SeanceArtifactLifecycle";
@@ -104,7 +104,7 @@ afterEach(() => {
 
 describe("seance artifact lifecycle", () => {
 	it("publishes the latest warm and cold yield beside sibling results", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-artifact-lifecycle-");
+		using tempDir = TempDir.createSync("@omsp-seance-artifact-lifecycle-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sourceFile = path.join(tempDir.path(), "sessions", "host.jsonl");
 		const artifactsDir = sourceFile.slice(0, -".jsonl".length);
@@ -227,7 +227,7 @@ describe("seance artifact lifecycle", () => {
 	});
 
 	it("preserves an unstructured seance result contract through fresh, warm, and cold turns", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-unstructured-lifecycle-");
+		using tempDir = TempDir.createSync("@omsp-seance-unstructured-lifecycle-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sourceFile = path.join(tempDir.path(), "sessions", "host.jsonl");
 		const artifactsDir = sourceFile.slice(0, -".jsonl".length);
@@ -353,7 +353,7 @@ describe("seance artifact lifecycle", () => {
 	});
 
 	it("allocates past the source's artifact ids and resolves inherited ids to the source, never another session", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-artifact-ids-");
+		using tempDir = TempDir.createSync("@omsp-seance-artifact-ids-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceFile = path.join(tempDir.path(), "sessions", "host.jsonl");
@@ -409,7 +409,7 @@ describe("seance artifact lifecycle", () => {
 	});
 
 	it("leaves only each seance's transcript and result in a repeatedly consulted host's artifacts", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-repeat-");
+		using tempDir = TempDir.createSync("@omsp-seance-repeat-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceFile = path.join(tempDir.path(), "sessions", "host.jsonl");

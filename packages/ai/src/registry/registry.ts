@@ -1,6 +1,6 @@
-import type { KnownProvider } from "@oh-my-pi/pi-catalog";
-import { authProviders } from "@oh-my-pi/pi-catalog/compat/auth";
-import type { AuthProviderId, LoginProviderId } from "@oh-my-pi/pi-catalog/compat/auth-ids";
+import type { KnownProvider } from "@oh-my-striped-pi/pi-catalog";
+import { authProviders } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import type { AuthProviderId, LoginProviderId } from "@oh-my-striped-pi/pi-catalog/compat/auth-ids";
 import { buildProviderDefinition } from "./build";
 import type { ProviderDefinition } from "./types";
 

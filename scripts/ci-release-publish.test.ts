@@ -146,7 +146,7 @@ describe("published legal payloads", () => {
 	});
 
 	it("stages a missing license without replacing package-local text", async () => {
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-publish-legal-"));
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-publish-legal-"));
 		const pkgDir = path.join(root, "package");
 		await fs.mkdir(pkgDir);
 		try {
@@ -164,12 +164,12 @@ describe("published legal payloads", () => {
 	});
 
 	it("lists every legal file explicitly in the native core package", async () => {
-		const pkgDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-native-core-"));
+		const pkgDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-native-core-"));
 		try {
 			await Bun.write(
 				path.join(pkgDir, "package.json"),
 				JSON.stringify({
-					name: "@oh-my-pi/pi-natives",
+					name: "@oh-my-striped-pi/pi-natives",
 					version: "15.5.15",
 					license: "MIT",
 				}),

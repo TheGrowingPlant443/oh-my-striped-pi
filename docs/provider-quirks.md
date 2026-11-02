@@ -2,7 +2,7 @@
 
 ## GitHub Copilot
 
-`github-copilot` remains the provider ID regardless of a model's upstream family. Its authentication, account entitlements, endpoint selection, and usage reporting are Copilot-specific. Use `omp login github-copilot`, `omp models`, and `omp usage` to authenticate and inspect the account.
+`github-copilot` remains the provider ID regardless of a model's upstream family. Its authentication, account entitlements, endpoint selection, and usage reporting are Copilot-specific. Use `omsp login github-copilot`, `omsp models`, and `omsp usage` to authenticate and inspect the account.
 
 Copilot serves models through retained Chat Completions, Responses, and Messages protocol adapters. Shared protocol code is not a direct login or inference route to the upstream model vendor. Model limits and compatibility follow the Copilot catalog entry rather than assumptions about an upstream product with the same name.
 

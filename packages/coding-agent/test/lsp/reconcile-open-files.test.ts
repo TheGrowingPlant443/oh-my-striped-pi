@@ -7,9 +7,9 @@ import {
 	endPendingDiskWrite,
 	reconcileOpenFilesFromDisk,
 	refreshFile,
-} from "@oh-my-pi/pi-coding-agent/lsp/client";
-import type { LspClient } from "@oh-my-pi/pi-coding-agent/lsp/types";
-import { fileToUri } from "@oh-my-pi/pi-coding-agent/lsp/utils";
+} from "@oh-my-striped-pi/pi-coding-agent/lsp/client";
+import type { LspClient } from "@oh-my-striped-pi/pi-coding-agent/lsp/types";
+import { fileToUri } from "@oh-my-striped-pi/pi-coding-agent/lsp/utils";
 
 /** Minimal client double: open files, a diagnostics map, and a frame sink. */
 function fakeClient(openFiles: Map<string, { version: number; languageId: string }>): {
@@ -37,9 +37,9 @@ function fakeClient(openFiles: Map<string, { version: number; languageId: string
 
 describe("reconcileOpenFilesFromDisk", () => {
 	test("re-syncs an open document whose disk text changed, then stays quiet once in sync", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-reconcile-open-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-reconcile-open-"));
 		try {
-			// The consumer was edited outside OMP: the server still holds the
+			// The consumer was edited outside OMSP: the server still holds the
 			// pre-edit overlay, so a project-wide rename would compute ranges
 			// against the old text (#15772).
 			const consumer = path.join(dir, "b.ts");
@@ -61,7 +61,7 @@ describe("reconcileOpenFilesFromDisk", () => {
 	});
 
 	test("leaves documents that match disk untouched", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-reconcile-open-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-reconcile-open-"));
 		try {
 			const file = path.join(dir, "a.ts");
 			await fs.writeFile(file, "export const x = 1;\n");
@@ -79,8 +79,8 @@ describe("reconcileOpenFilesFromDisk", () => {
 		}
 	});
 
-	test("closes an open document deleted outside OMP", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-reconcile-open-"));
+	test("closes an open document deleted outside OMSP", async () => {
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-reconcile-open-"));
 		try {
 			const file = path.join(dir, "consumer.py");
 			const uri = fileToUri(file);
@@ -96,10 +96,10 @@ describe("reconcileOpenFilesFromDisk", () => {
 });
 
 describe("refreshFile", () => {
-	test("keeps a missing document open while an OMP write to it is pending", async () => {
+	test("keeps a missing document open while an OMSP write to it is pending", async () => {
 		// A new file's overlay is synced before the write commits it to disk, so
 		// ENOENT here means "not written yet", not "deleted".
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-refresh-missing-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-refresh-missing-"));
 		const file = path.join(dir, "new.ts");
 		const uri = fileToUri(file);
 		const { client, frames } = fakeClient(new Map([[uri, { version: 1, languageId: "typescript" }]]));

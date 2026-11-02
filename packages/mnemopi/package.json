@@ -1,9 +1,10 @@
 {
   "type": "module",
-  "name": "@oh-my-pi/pi-mnemopi",
+  "name": "@oh-my-striped-pi/pi-mnemopi",
+  "private": true,
   "version": "18.13.3",
-  "description": "Local SQLite memory engine for omp agents",
-  "homepage": "https://omp.sh",
+  "description": "Local SQLite memory engine for omsp agents",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
   "author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
   "contributors": [
     "Abdias J"
@@ -11,11 +12,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/can1357/oh-my-pi.git",
+    "url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
     "directory": "packages/mnemopi"
   },
   "bugs": {
-    "url": "https://github.com/can1357/oh-my-pi/issues"
+    "url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
   },
   "keywords": [
     "memory",
@@ -39,9 +40,9 @@
     "fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts'"
   },
   "dependencies": {
-    "@oh-my-pi/pi-ai": "catalog:",
-    "@oh-my-pi/pi-natives": "catalog:",
-    "@oh-my-pi/pi-utils": "catalog:"
+    "@oh-my-striped-pi/pi-ai": "catalog:",
+    "@oh-my-striped-pi/pi-natives": "catalog:",
+    "@oh-my-striped-pi/pi-utils": "catalog:"
   },
   "peerDependencies": {
     "fastembed": "3.0.0",

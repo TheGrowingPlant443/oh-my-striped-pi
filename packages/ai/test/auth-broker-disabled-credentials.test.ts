@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
+import { AuthStorage, type OAuthCredential, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
 import {
 	AuthBrokerClient,
 	type AuthBrokerServerHandle,
 	RemoteAuthCredentialStore,
 	startAuthBroker,
-} from "@oh-my-pi/pi-ai/auth-broker";
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
 import { removeWithRetries } from "../../utils/src/temp";
 import { mockOAuthProvider, resetOAuthMocks } from "./oauth-test-utils";
 

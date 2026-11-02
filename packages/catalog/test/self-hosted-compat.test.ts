@@ -1,16 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { buildDiscoveredModel, buildModel } from "@oh-my-pi/pi-catalog/build";
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
-import { providerEntry, seedModels } from "@oh-my-pi/pi-catalog/compat/providers";
-import { resolveDiscoveryApi } from "@oh-my-pi/pi-catalog/compat/resolve";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+import { buildDiscoveredModel, buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { providerEntry, seedModels } from "@oh-my-striped-pi/pi-catalog/compat/providers";
+import { resolveDiscoveryApi } from "@oh-my-striped-pi/pi-catalog/compat/resolve";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 import {
 	lmStudioModelManagerOptions,
 	resolveModelCacheProviderId,
 	resolveOllamaModelCacheProviderId,
 	vllmModelManagerOptions,
-} from "@oh-my-pi/pi-catalog/provider-models";
-import { apiServesKind, runnerApiKind, type ModelSpec } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { apiServesKind, runnerApiKind, type ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 
 function spec(provider: string): ModelSpec<"openai-completions"> {
 	return {

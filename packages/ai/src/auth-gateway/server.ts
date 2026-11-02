@@ -1,12 +1,12 @@
 /**
- * omp auth-gateway router and HTTP server.
+ * omsp auth-gateway router and HTTP server.
  *
  * Accepts any provider-format request (OpenAI chat-completions, Anthropic
  * messages, OpenAI Responses) and dispatches through pi-ai's `streamSimple()`
  * — which handles credential injection, protocol headers and configured
  * transports. The gateway is
- * pure protocol translation: foreign wire → omp Context → pi-ai stream() →
- * omp events → foreign wire.
+ * pure protocol translation: foreign wire → omsp Context → pi-ai stream() →
+ * omsp events → foreign wire.
  *
  * Endpoints:
  *   GET  /healthz                          → unauth; ok + version
@@ -24,10 +24,10 @@
  * serves them over HTTP behind bearer auth, `stdio.ts` over JSON lines.
  */
 
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
-import { type ModelKind, modelKind } from "@oh-my-pi/pi-catalog/types";
-import { logger } from "@oh-my-pi/pi-utils";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { clampThinkingLevelForModel, getSupportedEfforts } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { type ModelKind, modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import { classifyGatewayError } from "../error/gateway";
 import * as AIError from "../error";
 import * as anthropicMessages from "../providers/anthropic-messages-server";
@@ -152,7 +152,7 @@ function deriveSessionId(modelId: string, context: Context, toolsJson = serializ
 	const first = context.messages?.[0];
 	if (first) {
 		// Strip timestamp / provider metadata so the hash is stable across turns
-		// of the same conversation (omp re-stamps every parsed Message). role +
+		// of the same conversation (omsp re-stamps every parsed Message). role +
 		// content is what's actually on the wire.
 		parts.push(JSON.stringify({ role: first.role, content: first.content }));
 	}
@@ -169,7 +169,7 @@ function serializeTools(context: Context): string | undefined {
 
 /**
  * Fit a client-requested effort to the resolved model. Clients speak their own
- * effort vocabulary: omp's `lowest-effort` reasoning-off sends `minimal` to a
+ * effort vocabulary: omsp's `lowest-effort` reasoning-off sends `minimal` to a
  * generic OpenAI-compatible endpoint, and Claude ladders have no `minimal`.
  * `streamSimple` throws on an effort the model cannot serve, so clamp it to the
  * nearest supported tier as in-process callers do. Efforts the model maps onto
@@ -773,7 +773,7 @@ async function handleCredentialsCheck(opts: AuthGatewayRouteOptions, signal: Abo
 /**
  * Row shape for `GET /v1/models`. Beyond the OpenAI-standard `id`/`object`/
  * `owned_by`, rows advertise the catalog metadata OpenAI-compatible clients
- * (omp's own proxy discovery, Zed's openai_compatible provider, ...) read to
+ * (omsp's own proxy discovery, Zed's openai_compatible provider, ...) read to
  * size and capability-gate discovered models: `context_length`,
  * `max_output_tokens`, `input_modalities`, and `supports_tools` (only emitted
  * when the catalog explicitly reports `false`; absent means usable). `kind` is

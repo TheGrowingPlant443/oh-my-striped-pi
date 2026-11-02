@@ -1,10 +1,10 @@
 import * as path from "node:path";
-import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils/fs-error";
 
 /** Build-time specifier resolved to bundled legacy Pi module namespaces. */
-export const LEGACY_PI_MODULES_SPECIFIER = "omp-legacy-pi-modules";
+export const LEGACY_OMSP_MODULES_SPECIFIER = "omsp-legacy-pi-modules";
 
-const VIRTUAL_NAMESPACE = "omp-legacy-pi-modules-build";
+const VIRTUAL_NAMESPACE = "omsp-legacy-pi-modules-build";
 const packageDir = path.resolve(import.meta.dir, "..");
 const repoRoot = path.resolve(packageDir, "..", "..");
 
@@ -197,7 +197,7 @@ export function __renderLegacyPiVirtualModule(entries: readonly BundledPiEntry[]
 		entry => `const ${entry.binding} = () => import(${JSON.stringify(entry.importSpecifier)});`,
 	);
 	const modules = entries.map(entry => `\t${JSON.stringify(entry.key)}: ${entry.binding},`);
-	return [...loaders, "", "export const BUNDLED_PI_MODULE_LOADERS = {", ...modules, "};", ""].join("\n");
+	return [...loaders, "", "export const BUNDLED_OMSP_MODULE_LOADERS = {", ...modules, "};", ""].join("\n");
 }
 
 /**
@@ -208,10 +208,10 @@ export function __renderLegacyPiVirtualModule(entries: readonly BundledPiEntry[]
 export async function createLegacyPiVirtualModulePlugin(): Promise<Bun.BunPlugin> {
 	const source = __renderLegacyPiVirtualModule(await collectBundledPiEntries());
 	return {
-		name: "omp:legacy-pi-modules",
+		name: "omsp:legacy-pi-modules",
 		setup(build) {
-			build.onResolve({ filter: /^omp-legacy-pi-modules$/ }, () => ({
-				path: LEGACY_PI_MODULES_SPECIFIER,
+			build.onResolve({ filter: /^omsp-legacy-pi-modules$/ }, () => ({
+				path: LEGACY_OMSP_MODULES_SPECIFIER,
 				namespace: VIRTUAL_NAMESPACE,
 			}));
 			build.onLoad({ filter: /.*/, namespace: VIRTUAL_NAMESPACE }, () => ({ contents: source, loader: "ts" }));

@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { SettingsSelectorComponent } from "@oh-my-pi/pi-tui/overlays/settings-selector";
-import { createSettingsHost } from "@oh-my-pi/pi-coding-agent/config/settings-ui";
-import { createPluginSettingsHost } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/settings-host";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { resetSettingsForTest, Settings, settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { SettingsSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/settings-selector";
+import { createSettingsHost } from "@oh-my-striped-pi/pi-coding-agent/config/settings-ui";
+import { createPluginSettingsHost } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/settings-host";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
-import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
+import { cfgMemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/settings";
 
 beforeAll(async () => {
 	await initTheme();

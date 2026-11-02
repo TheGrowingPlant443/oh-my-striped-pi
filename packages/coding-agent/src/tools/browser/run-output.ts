@@ -1,4 +1,4 @@
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
 import type { EvalDisplayOutput } from "../../eval/types";
 
 /**

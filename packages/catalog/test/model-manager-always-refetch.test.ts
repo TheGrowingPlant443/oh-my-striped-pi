@@ -6,8 +6,8 @@ import { describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createModelManager } from "@oh-my-pi/pi-catalog/model-manager";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
+import { createModelManager } from "@oh-my-striped-pi/pi-catalog/model-manager";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 
 describe("alwaysRefetchDynamicModels", () => {
 	it("replays a fresh cache under online-if-uncached without the option, refetches with it", async () => {

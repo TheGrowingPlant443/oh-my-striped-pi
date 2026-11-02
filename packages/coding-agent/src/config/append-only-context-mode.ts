@@ -1,4 +1,4 @@
-import { prefersAppendOnlyContext } from "@oh-my-pi/pi-catalog/compat/behavior";
+import { prefersAppendOnlyContext } from "@oh-my-striped-pi/pi-catalog/compat/behavior";
 
 /** Provider metadata needed to resolve append-only context mode. */
 export interface AppendOnlyContextModel {

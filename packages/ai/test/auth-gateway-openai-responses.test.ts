@@ -2,17 +2,17 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import { ValidationError } from "@oh-my-pi/pi-ai/error";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
-import { encodeResponse, encodeStream, parseRequest } from "@oh-my-pi/pi-ai/providers/openai-responses-server";
-import { buildResponsesInput } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import type { AssistantMessage, Context, ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+import { clearCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { startAuthGateway } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { ValidationError } from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { encodeResponse, encodeStream, parseRequest } from "@oh-my-striped-pi/pi-ai/providers/openai-responses-server";
+import { buildResponsesInput } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import type { AssistantMessage, Context, ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 
 function zeroUsage(): AssistantMessage["usage"] {
 	return {

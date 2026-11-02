@@ -53,8 +53,8 @@
  * re-attached to the compaction summary message on every context rebuild.
  */
 
-import type { Api, ImageContent, Message, Model, TextContent } from "@oh-my-pi/pi-ai";
-import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
+import type { Api, ImageContent, Message, Model, TextContent } from "@oh-my-striped-pi/pi-ai";
+import { resolveCatalogPolicy } from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
 import {
 	type ImageSize,
 	type ImageTokenization,
@@ -62,12 +62,15 @@ import {
 	imageTokens,
 	resolveImageMaxEdge,
 	resolveImageTokenization,
-} from "@oh-my-pi/pi-catalog/compat/image-tokenization";
-import { resolveImageCountBudget, resolveInlineImageByteBudget } from "@oh-my-pi/pi-catalog/compat/request-size";
-import { classifyModel, compareRevision, parseRevision } from "@oh-my-pi/pi-catalog/identity";
-import { renderSnapcompactPng, snapcompactSupportedChars } from "@oh-my-pi/pi-natives";
-import { formatGroupedPaths, isRecord, prompt } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-catalog/compat/image-tokenization";
+import {
+	resolveImageCountBudget,
+	resolveInlineImageByteBudget,
+} from "@oh-my-striped-pi/pi-catalog/compat/request-size";
+import { classifyModel, compareRevision, parseRevision } from "@oh-my-striped-pi/pi-catalog/identity";
+import { renderSnapcompactPng, snapcompactSupportedChars } from "@oh-my-striped-pi/pi-natives";
+import { formatGroupedPaths, isRecord, prompt } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import fileOperationsTemplate from "./prompts/file-operations.md" with { type: "text" };
 import snapcompactSummaryPrompt from "./prompts/snapcompact-summary.md" with { type: "text" };
 

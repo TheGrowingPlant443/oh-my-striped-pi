@@ -4,7 +4,7 @@
  * dialogs raised before the relay connects; the registry sees one entry per
  * process keyed by a stable instance ID with an increasing generation; a
  * session switch revokes the old room before its successor is published; and
- * the published access level caps what `omp collab link` can obtain.
+ * the published access level caps what `omsp collab link` can obtain.
  *
  * Real CollabHost/CollabSocket run over the in-memory relay; the registry's
  * real Unix-socket IPC is redirected into a temp dir via a spy on
@@ -14,51 +14,54 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn, vi } fro
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { CollabController } from "@oh-my-pi/pi-coding-agent/collab/controller";
-import { importRoomKey } from "@oh-my-pi/pi-coding-agent/collab/crypto";
-import { CollabGuestLink } from "@oh-my-pi/pi-coding-agent/collab/guest";
-import { CollabHost, CollabHostStoppedError } from "@oh-my-pi/pi-coding-agent/collab/host";
-import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-pi/pi-coding-agent/collab/protocol";
-import * as registry from "@oh-my-pi/pi-coding-agent/collab/registry";
-import { CollabSocket } from "@oh-my-pi/pi-coding-agent/collab/relay-client";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as pluginHelpers from "@oh-my-pi/pi-coding-agent/discovery/helpers";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import { Composer } from "@oh-my-pi/pi-tui/prompt/composer";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { beginStartupComposer, stopPendingStartupComposer } from "@oh-my-pi/pi-coding-agent/modes/startup-composer";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
-import { closeSessionIndex } from "@oh-my-pi/pi-coding-agent/session/session-index";
-import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import { getProjectDir, setProjectDir } from "@oh-my-pi/pi-utils";
-import * as utils from "@oh-my-pi/pi-utils";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { CollabController } from "@oh-my-striped-pi/pi-coding-agent/collab/controller";
+import { importRoomKey } from "@oh-my-striped-pi/pi-coding-agent/collab/crypto";
+import { CollabGuestLink } from "@oh-my-striped-pi/pi-coding-agent/collab/guest";
+import { CollabHost, CollabHostStoppedError } from "@oh-my-striped-pi/pi-coding-agent/collab/host";
+import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-striped-pi/pi-coding-agent/collab/protocol";
+import * as registry from "@oh-my-striped-pi/pi-coding-agent/collab/registry";
+import { CollabSocket } from "@oh-my-striped-pi/pi-coding-agent/collab/relay-client";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as pluginHelpers from "@oh-my-striped-pi/pi-coding-agent/discovery/helpers";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { Composer } from "@oh-my-striped-pi/pi-tui/prompt/composer";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import {
+	beginStartupComposer,
+	stopPendingStartupComposer,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/startup-composer";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { HistoryStorage } from "@oh-my-striped-pi/pi-coding-agent/session/history-storage";
+import { closeSessionIndex } from "@oh-my-striped-pi/pi-coding-agent/session/session-index";
+import { executeBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import { getProjectDir, setProjectDir } from "@oh-my-striped-pi/pi-utils";
+import * as utils from "@oh-my-striped-pi/pi-utils";
 import { VirtualTerminal } from "../../../tui/test/virtual-terminal";
 import { createTestSession, type TestSessionContext } from "../utilities";
 import { FakeWebSocket, installInMemoryRelay, uninstallInMemoryRelay } from "./helpers/in-memory-relay";
 
-import { cfgCollabAutoStart } from "@oh-my-pi/pi-coding-agent/collab/settings";
-import { cfgAdvisorEnabled } from "@oh-my-pi/pi-coding-agent/advisor/settings";
-import { CfgProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/cfg-protocol";
-import { parseInternalUrl } from "@oh-my-pi/pi-coding-agent/internal-urls/parse";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { cfgCollabAutoStart } from "@oh-my-striped-pi/pi-coding-agent/collab/settings";
+import { cfgAdvisorEnabled } from "@oh-my-striped-pi/pi-coding-agent/advisor/settings";
+import { CfgProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/cfg-protocol";
+import { parseInternalUrl } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/parse";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 import {
 	cfgMarketplaceAutoUpdate,
 	cfgStartupChangelogMode,
 	cfgStartupSetupWizard,
 	cfgStartupShowSplash,
-} from "@oh-my-pi/pi-coding-agent/modes/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-const originalPiProfile = process.env.PI_PROFILE;
-const originalOmpProfile = process.env.OMP_PROFILE;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+const originalPiProfile = process.env.OMSP_PROFILE;
+const originalOmpProfile = process.env.OMSP_PROFILE;
 
 function restoreEnv(key: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -189,7 +192,7 @@ function switchSession(state: ControllerContextState, sessionId: string): void {
 
 /**
  * Simulate SessionManager moving the session to a sibling file because the
- * original is open in another omp process: it re-ids, then raises a
+ * original is open in another omsp process: it re-ids, then raises a
  * persistence notice; AgentSession's session-change callbacks never run.
  */
 function moveSessionFile(state: ControllerContextState, sessionId: string): void {
@@ -237,7 +240,7 @@ const publishWaiters: (() => void)[] = [];
 let capturedSockets: FakeWebSocket[] = [];
 
 beforeEach(async () => {
-	tmp = await fs.mkdtemp(path.join(os.tmpdir(), "omp-collabctl-"));
+	tmp = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-collabctl-"));
 	utils.setAgentDir(path.join(tmp, "agent"));
 	installInMemoryRelay();
 	// Record every fake socket so a test can drive a terminal close on the host's transport.
@@ -265,9 +268,9 @@ afterEach(async () => {
 	publishSpy?.mockRestore();
 	// `runRootCommand` registers the CLI's extension roots (`--no-extensions` → explicit-only) process-wide.
 	clearOmpExtensionCliRoots();
-	restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-	restoreEnv("PI_PROFILE", originalPiProfile);
-	restoreEnv("OMP_PROFILE", originalOmpProfile);
+	restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+	restoreEnv("OMSP_PROFILE", originalPiProfile);
+	restoreEnv("OMSP_PROFILE", originalOmpProfile);
 	utils.__resetDirsFromEnvForTests();
 	// InteractiveMode and the CLI open process-wide agent.db, history.db (prompt history and
 	// session index), and models.db under tmp/agent; Windows cannot delete open files.
@@ -1010,7 +1013,7 @@ describe("CollabController", () => {
 		expect(second!.webLink).not.toBe(first.webLink);
 	});
 
-	it("rotates the room when the session moves to a new file because another omp process has it open", async () => {
+	it("rotates the room when the session moves to a new file because another omsp process has it open", async () => {
 		const { ctx, state } = makeControllerContext({ autoStart: "control" });
 		controller = new CollabController(ctx);
 		controller.autoStart();

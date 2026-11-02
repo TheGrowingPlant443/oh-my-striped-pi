@@ -1,15 +1,15 @@
 /**
- * `omp auth-gateway` command handlers.
+ * `omsp auth-gateway` command handlers.
  *
  * Boots a forward-proxy server that lets less-trusted clients (the macOS
  * usage widget, robomp containers, …) make provider API calls without ever
  * seeing the access token. The gateway is itself a broker client and
  * resolves credentials through the configured broker (via the same
- * `OMP_AUTH_BROKER_URL` / `auth.broker.url` precedence used elsewhere).
+ * `OMSP_AUTH_BROKER_URL` / `auth.broker.url` precedence used elsewhere).
  *
  * Sub-verbs:
  *   - `serve [--bind=…] [--trust-proxy-headers] [--clients=<file>]` — boots the gateway against the configured broker.
- *   - `stdio` — serves the same routes as JSON lines on stdin/stdout with this omp's own credentials
+ *   - `stdio` — serves the same routes as JSON lines on stdin/stdout with this omsp's own credentials
  *     and model roles (`auth-gateway-stdio.ts`).
  *   - `token` / `token --regenerate` — manages the gateway bearer token file.
  *   - `status` — prints the locally-stored gateway token and bind hint.
@@ -25,27 +25,27 @@ import {
 	completeSimple,
 	type Model,
 	type OAuthRequestIdentity,
-} from "@oh-my-pi/pi-ai";
-import { getOAuthProvider } from "@oh-my-pi/pi-ai/oauth";
+} from "@oh-my-striped-pi/pi-ai";
+import { getOAuthProvider } from "@oh-my-striped-pi/pi-ai/oauth";
 import {
 	AuthBrokerClient,
 	loadAuthBrokerAccountPool,
 	RemoteAuthCredentialStore,
 	type SnapshotResponse,
-} from "@oh-my-pi/pi-ai/auth-broker";
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
 import {
 	type AuthGatewayClient,
 	DEFAULT_AUTH_GATEWAY_BIND,
 	type ModelResolveOptions,
 	parseAuthGatewayClients,
 	startAuthGateway,
-} from "@oh-my-pi/pi-ai/auth-gateway";
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
-import { buildModelProviderPriorityRank } from "@oh-my-pi/pi-catalog/identity";
-import { type GeneratedProvider, getBundledModels, getEffectiveTokenCost } from "@oh-my-pi/pi-catalog/models";
-import { type ModelKind, modelKind } from "@oh-my-pi/pi-catalog/types";
-import { getConfigRootDir, logger, VERSION } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+} from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { buildModelProviderPriorityRank } from "@oh-my-striped-pi/pi-catalog/identity";
+import { type GeneratedProvider, getBundledModels, getEffectiveTokenCost } from "@oh-my-striped-pi/pi-catalog/models";
+import { type ModelKind, modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { getConfigRootDir, logger, VERSION } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import { ModelRegistry } from "../config/model-registry";
 import { cfgDisabledProviders, cfgModelProviderOrder } from "../config/model-settings";
 import type { Settings } from "../config/settings";
@@ -69,7 +69,7 @@ export interface AuthGatewayCommandArgs {
 		trustProxyHeaders?: boolean;
 		/**
 		 * Disable bearer-token auth on inbound requests. Useful when the gateway
-		 * is bound to loopback (the default `127.0.0.1:4000`) and you don't want
+		 * is bound to loopback (the default `127.0.0.1:4001`) and you don't want
 		 * to wire token-paste plumbing into every local client.
 		 */
 		noAuth?: boolean;
@@ -360,7 +360,7 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 	const brokerConfig = await resolveAuthBrokerConfig();
 	if (!brokerConfig) {
 		throw new Error(
-			"`omp auth-gateway serve` requires OMP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). The gateway is itself a broker client.",
+			"`omsp auth-gateway serve` requires OMSP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). The gateway is itself a broker client.",
 		);
 	}
 	if (flags.clients !== undefined && flags.noAuth) {
@@ -409,7 +409,7 @@ async function runServe(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 	// Build the model resolver + catalog from the ModelRegistry — the same
 	// component the TUI/CLI use — scoped to providers we hold credentials for.
 	// `getAll()` is a superset of the bundled catalog (bundled first, then
-	// cached + broker-discovered), so the discovery-only models omp itself
+	// cached + broker-discovered), so the discovery-only models omsp itself
 	// reaches become routable through the gateway instead of freezing on the
 	// compiled snapshot. `ignoreLocalModelConfig` keeps the host's `models.yml`
 	// out of the picture: client-side provider overrides (baseUrl/apiKey/headers/
@@ -581,7 +581,7 @@ async function runStatus(flags: AuthGatewayCommandArgs["flags"]): Promise<void> 
 		if (flags.json) {
 			process.stdout.write(`${JSON.stringify(status)}\n`);
 		} else {
-			process.stdout.write(`${chalk.yellow("No broker configured.")} Set OMP_AUTH_BROKER_URL.\n`);
+			process.stdout.write(`${chalk.yellow("No broker configured.")} Set OMSP_AUTH_BROKER_URL.\n`);
 			process.stdout.write(
 				`token: ${status.tokenPresent ? chalk.green("present") : chalk.red("missing")} at ${status.tokenFile}\n`,
 			);
@@ -615,7 +615,7 @@ async function runStatus(flags: AuthGatewayCommandArgs["flags"]): Promise<void> 
 			);
 			if (!tokenPresent) {
 				process.stdout.write(
-					"Run `omp auth-gateway token` or `omp auth-gateway serve` to create a bearer token.\n",
+					"Run `omsp auth-gateway token` or `omsp auth-gateway serve` to create a bearer token.\n",
 				);
 			}
 		}
@@ -837,7 +837,7 @@ function formatCompletionStatus(completion: CredentialCompletionResult | undefin
 }
 
 /**
- * `omp auth-gateway check` — probe each broker-supplied credential and print
+ * `omsp auth-gateway check` — probe each broker-supplied credential and print
  * per-credential auth health. Use this when the gateway is returning 401s and
  * you need to find which row in a multi-account pool is the bad one. The
  * aggregate `/v1/usage` endpoint silently drops failed credentials, so a
@@ -852,7 +852,7 @@ async function runCheck(flags: AuthGatewayCommandArgs["flags"]): Promise<void> {
 	const brokerConfig = await resolveAuthBrokerConfig();
 	if (!brokerConfig) {
 		throw new Error(
-			"`omp auth-gateway check` requires OMP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). It probes the same credentials the gateway would serve.",
+			"`omsp auth-gateway check` requires OMSP_AUTH_BROKER_URL (or `auth.broker.url`/`auth.broker.token` in config.yml). It probes the same credentials the gateway would serve.",
 		);
 	}
 

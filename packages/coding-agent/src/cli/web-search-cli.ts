@@ -1,14 +1,14 @@
 /**
  * Web search CLI command handlers.
  *
- * Handles `omp q`/`omp web-search` subcommands for independent search engines.
+ * Handles `omsp q`/`omsp web-search` subcommands for independent search engines.
  */
 
-import { APP_NAME, getProjectDir } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import { APP_NAME, getProjectDir } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import { Settings } from "../config/settings";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
-import { renderSearchResult } from "@oh-my-pi/pi-tui/tools/web-search";
+import { initTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { renderSearchResult } from "@oh-my-striped-pi/pi-tui/tools/web-search";
 import { runSearchQuery, type SearchQueryParams } from "../web/search/index";
 
 export interface SearchCommandArgs {

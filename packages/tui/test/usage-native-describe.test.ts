@@ -1,10 +1,10 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { UsageReport } from "@oh-my-pi/pi-ai";
-import type { NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { SessionInfoOverlay } from "@oh-my-pi/pi-tui/overlays/session-info-overlay";
-import { UsageDashboardComponent } from "@oh-my-pi/pi-tui/overlays/usage-dashboard";
-import { createUsageRowBlock } from "@oh-my-pi/pi-tui/overlays/usage-row";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
+import type { UsageReport } from "@oh-my-striped-pi/pi-ai";
+import type { NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { SessionInfoOverlay } from "@oh-my-striped-pi/pi-tui/overlays/session-info-overlay";
+import { UsageDashboardComponent } from "@oh-my-striped-pi/pi-tui/overlays/usage-dashboard";
+import { createUsageRowBlock } from "@oh-my-striped-pi/pi-tui/overlays/usage-row";
+import { initTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
 
 const cx = { cols: 100, reduceMotion: false, dark: true, supports: () => true, feature: () => true };
 /** An older terminal without the data-first kinds. */
@@ -139,7 +139,7 @@ describe("UsageDashboardComponent.describe", () => {
 			],
 		);
 		const root = component.describe(cx);
-		const tiles = findAll(root, n => n.p?.role === "omp.usage.stat").map(tile =>
+		const tiles = findAll(root, n => n.p?.role === "omsp.usage.stat").map(tile =>
 			findAll(tile, n => n.k === "text").map(plain),
 		);
 		expect(tiles).toEqual([
@@ -150,7 +150,7 @@ describe("UsageDashboardComponent.describe", () => {
 		]);
 		const spark = findAll(root, n => n.k === "chart" && n.p?.kind === "spark")[0];
 		expect(spark?.k === "chart" ? spark.p?.series?.length : 0).toBe(30);
-		const foot = findAll(root, n => n.p?.role === "omp.usage.activity.foot")[0];
+		const foot = findAll(root, n => n.p?.role === "omsp.usage.activity.foot")[0];
 		expect(foot ? findAll(foot, n => n.k === "text").map(plain)[0] : "").toBe(
 			"4 active days · longest streak 3 days",
 		);
@@ -158,14 +158,14 @@ describe("UsageDashboardComponent.describe", () => {
 
 	it("shows one empty state when nothing is used anywhere", () => {
 		const root = dashboard([report("zai", "z@test", [limit("zai", "5h", "Usage", 0, "ok")])]).describe(cx);
-		const empty = findAll(root, n => n.p?.role === "omp.usage.empty")[0];
+		const empty = findAll(root, n => n.p?.role === "omsp.usage.empty")[0];
 		expect(empty ? findAll(empty, n => n.k === "text").map(plain) : []).toEqual([
 			"No usage yet",
 			expect.stringContaining("Quotas show here"),
 			"Untouched",
 			"Zai",
 		]);
-		expect(findAll(root, n => n.p?.role === "omp.usage.stats" || n.k === "chart")).toEqual([]);
+		expect(findAll(root, n => n.p?.role === "omsp.usage.stats" || n.k === "chart")).toEqual([]);
 	});
 
 	it("re-fetches reports from the Refresh button like the r key", async () => {
@@ -185,7 +185,7 @@ describe("UsageDashboardComponent.describe", () => {
 		component.handleNativeEvent({ type: "action", key: "head/refresh", act: "refresh", mods: [] });
 		expect(calls).toBe(1);
 		const providers = (): (string | undefined)[] =>
-			findAll(component.describe(cx), n => n.p?.role === "omp.usage.provider").map(n => n.key);
+			findAll(component.describe(cx), n => n.p?.role === "omsp.usage.provider").map(n => n.key);
 		const refreshed = Promise.withResolvers<void>();
 		onRender = () => {
 			if (providers()[0] === "openai") refreshed.resolve();
@@ -233,7 +233,7 @@ describe("SessionInfoOverlay.describe", () => {
 	it("leads with the session id, then the file, each copying its own value", () => {
 		const overlay = new SessionInfoOverlay({ terminal: { rows: 20 } }, fullReport(), () => {});
 		const root = overlay.describe(cx);
-		const copies = findAll(root, n => n.p?.role === "omp.info.copy");
+		const copies = findAll(root, n => n.p?.role === "omsp.info.copy");
 		expect(copies.map(n => n.p?.title)).toEqual(["Copy session ID", "Copy /tmp/s.jsonl"]);
 		expect(JSON.stringify(copies[0])).toContain("abc-123");
 		expect(JSON.stringify(copies[1])).toContain("/tmp/s.jsonl");
@@ -243,7 +243,7 @@ describe("SessionInfoOverlay.describe", () => {
 	it("does not offer to copy an in-memory session's file", () => {
 		const overlay = new SessionInfoOverlay({ terminal: { rows: 20 } }, `${dim("File")} In-memory\n`, () => {});
 		const root = overlay.describe(cx);
-		expect(findAll(root, n => n.p?.role === "omp.info.copy")).toEqual([]);
+		expect(findAll(root, n => n.p?.role === "omsp.info.copy")).toEqual([]);
 		expect(JSON.stringify(root)).toContain("In-memory");
 	});
 
@@ -257,8 +257,8 @@ describe("SessionInfoOverlay.describe", () => {
 			"Cost",
 			"MCP servers",
 		]);
-		expect(findAll(root, n => n.p?.role === "omp.info.stats")).toHaveLength(1);
-		expect(kvItems(root, "omp.info.nums")).toEqual([
+		expect(findAll(root, n => n.p?.role === "omsp.info.stats")).toHaveLength(1);
+		expect(kvItems(root, "omsp.info.nums")).toEqual([
 			[
 				{ k: "User", v: [{ t: "6", s: "mono" }] },
 				{ k: "Tool calls", v: [{ t: "23", s: "mono" }] },
@@ -266,12 +266,12 @@ describe("SessionInfoOverlay.describe", () => {
 			[{ k: "Input", v: [{ t: "182,440", s: "mono" }] }],
 			[{ k: "Total", v: [{ t: "$0.4127", s: "mono" }] }],
 		]);
-		expect(kvItems(root, "omp.info.total")).toEqual([
+		expect(kvItems(root, "omsp.info.total")).toEqual([
 			[{ k: "Total", v: [{ t: "29", s: "mono" }] }],
 			[{ k: "Total", v: [{ t: "182,440", s: "mono" }] }],
 		]);
 		// The append-only mode is a provider setting: it leaves the message counts.
-		expect(kvItems(root, "omp.info.kv")).toEqual([
+		expect(kvItems(root, "omsp.info.kv")).toEqual([
 			[
 				{ k: "Model", v: [{ t: "claude-sonnet-4-5", s: "mono" }] },
 				{
@@ -283,7 +283,7 @@ describe("SessionInfoOverlay.describe", () => {
 				},
 			],
 		]);
-		expect(kvItems(root, "omp.info.names")).toEqual([
+		expect(kvItems(root, "omsp.info.names")).toEqual([
 			[{ k: "github", v: [{ t: "connected", s: "success" }, { t: " " }, { t: "(4 tools)", s: "dim" }] }],
 		]);
 	});
@@ -296,7 +296,7 @@ describe("SessionInfoOverlay.describe", () => {
 		expect(meter?.p).toEqual(
 			expect.objectContaining({ value: expect.closeTo(0.206, 6), title: "41,200 of 200,000 tokens" }),
 		);
-		expect(JSON.stringify(findAll(root, n => n.p?.role === "omp.info.contextHead"))).toContain("41K / 200K");
+		expect(JSON.stringify(findAll(root, n => n.p?.role === "omsp.info.contextHead"))).toContain("41K / 200K");
 		const plain = new SessionInfoOverlay({ terminal: { rows: 20 } }, fullReport(), () => {}, context).describe(
 			plainCx,
 		);

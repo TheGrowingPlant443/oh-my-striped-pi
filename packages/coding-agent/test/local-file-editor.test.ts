@@ -1,15 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { InternalUrlRouter, type LocalFileEntry, LocalProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { buildLocalFileArgumentCompletions } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-completions";
+import {
+	InternalUrlRouter,
+	type LocalFileEntry,
+	LocalProtocolHandler,
+} from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { buildLocalFileArgumentCompletions } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-completions";
 import {
 	openLocalFileInEditor,
 	resolveLocalEditorTarget,
 	revalidateLocalEditorEntry,
-} from "@oh-my-pi/pi-coding-agent/modes/local-file-editor";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/local-file-editor";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { vi } from "bun:test";
 
 describe("resolveLocalEditorTarget", () => {
@@ -24,7 +28,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("accepts bare, local:// and local:/ names for the same file", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		const planPath = path.join(tmp.path(), "local", "plan.md");
 		await Bun.write(planPath, "# plan");
@@ -36,7 +40,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("rejects missing files, directories, and paths escaping the local root", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		await Bun.write(path.join(tmp.path(), "local", "sub", "inner.md"), "x");
 		await Bun.write(path.join(tmp.path(), "escape.md"), "outside");
@@ -51,7 +55,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("opens bare names containing %, #, and ? without double-decoding an encoded local:// URL", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		// Windows filenames cannot contain `?`.
 		const names = ["100%.md", "a#b.md", "sub/a#b.md", ...(process.platform === "win32" ? [] : ["a?b.md"])];
@@ -73,7 +77,7 @@ describe("resolveLocalEditorTarget", () => {
 	it.skipIf(process.platform === "win32")(
 		"treats a literal `local:`-prefixed filename as a name, not a URL",
 		async () => {
-			using tmp = TempDir.createSync("@omp-local-editor-");
+			using tmp = TempDir.createSync("@omsp-local-editor-");
 			const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 			await Bun.write(path.join(tmp.path(), "local", "local:notes.md"), "colon");
 
@@ -83,7 +87,7 @@ describe("resolveLocalEditorTarget", () => {
 	);
 
 	it("strips control bytes from errors shown for missing control-byte names", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const editorBackup = process.env.EDITOR;
 		process.env.EDITOR = "true";
 		const showError = vi.fn();
@@ -105,7 +109,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("rejects a name whose file is a symlink to outside the local root", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		const outside = path.join(tmp.path(), "outside.md");
 		await Bun.write(outside, "secret");
@@ -116,7 +120,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("revalidates an already-picked entry without trimming filenames that start or end with spaces", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		const spaceName = " plan.md";
 		const normalName = "plan.md";
@@ -136,7 +140,7 @@ describe("resolveLocalEditorTarget", () => {
 	});
 
 	it("revalidates an already-picked entry and rejects symlink escape at use time", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		const outside = path.join(tmp.path(), "outside.md");
 		await Bun.write(outside, "secret");
@@ -186,7 +190,7 @@ describe("buildLocalFileArgumentCompletions", () => {
 		} as never);
 
 	it("inserts an encoded local:// URL so whitespace and metachar names survive trimming", async () => {
-		using tmp = TempDir.createSync("@omp-local-editor-");
+		using tmp = TempDir.createSync("@omsp-local-editor-");
 		const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 		await Bun.write(path.join(tmp.path(), "local", " plan.md"), "spaced");
 		await Bun.write(path.join(tmp.path(), "local", "a#b.md"), "hash");
@@ -206,7 +210,7 @@ describe("buildLocalFileArgumentCompletions", () => {
 	it.skipIf(process.platform === "win32")(
 		"strips ANSI/control bytes from completion labels but keeps the exact value",
 		async () => {
-			using tmp = TempDir.createSync("@omp-local-editor-");
+			using tmp = TempDir.createSync("@omsp-local-editor-");
 			const options = { getArtifactsDir: () => tmp.path(), getSessionId: () => "s" };
 			const evilName = "evil\x1b[31m.md";
 			await Bun.write(path.join(tmp.path(), "local", evilName), "x");

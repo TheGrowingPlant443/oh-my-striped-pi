@@ -4,7 +4,7 @@ A persistent per-install UUID shared across sessions and profiles. It supplies a
 
 ## API
 
-Exported from `@oh-my-pi/pi-utils` (`packages/utils/src/dirs.ts`):
+Exported from `@oh-my-striped-pi/pi-utils` (`packages/utils/src/dirs.ts`):
 
 | Symbol                                  | Purpose                                                                                                                           |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
@@ -15,10 +15,10 @@ Generated IDs are lowercase UUID v4 values. Existing persisted values are trimme
 
 ## Storage
 
-- Path: `<base-config-root>/install-id` — i.e. `~/.omp/install-id` by default, respecting `PI_CONFIG_DIR`. Resolved against the base config root (`getBaseConfigRoot()`) regardless of the active profile or XDG data/state/cache routing, so every profile using that base root shares one install ID.
+- Path: `<base-config-root>/install-id` — i.e. `~/.omsp/install-id` by default, respecting `OMSP_CONFIG_DIR`. Resolved against the base config root (`getBaseConfigRoot()`) regardless of the active profile or XDG data/state/cache routing, so every profile using that base root shares one install ID.
 - Format: a single UUID line (trailing `\n`).
 - Permissions: file is created with mode `0o600`.
-- Lifecycle: independent of `~/.omp/agent/`. Wiping agent state (sessions, settings, DB) does NOT regenerate the install ID; only deleting the `install-id` file itself does.
+- Lifecycle: independent of `~/.omsp/agent/`. Wiping agent state (sessions, settings, DB) does NOT regenerate the install ID; only deleting the `install-id` file itself does.
 
 ## Generation and lifecycle
 
@@ -34,11 +34,11 @@ Generated IDs are lowercase UUID v4 values. Existing persisted values are trimme
 | Consumer                                                                                                      | Use                                                                                                                                                                                                                        |
 | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/ai/src/auth-broker/remote-store.ts`                                                                 | Uses it in default observed-usage attribution sent to the auth broker, alongside hostname and application name; reports can instead carry an originating client's identity.                                                |
-| `packages/ai/src/providers/pi-native-client.ts` and `packages/ai/src/auth-gateway/http.ts`                    | Sends `x-omp-install-id`, `x-omp-hostname`, and `x-omp-app` to the gateway for originating-client usage attribution. The gateway falls back to its own install ID when absent and does not forward these headers upstream. |
+| `packages/ai/src/providers/pi-native-client.ts` and `packages/ai/src/auth-gateway/http.ts`                    | Sends `x-omsp-install-id`, `x-omsp-hostname`, and `x-omsp-app` to the gateway for originating-client usage attribution. The gateway falls back to its own install ID when absent and does not forward these headers upstream. |
 
 New consumers MUST treat the value as opaque. The helper contributes no PII, but a transport can still send it alongside other metadata; each consumer remains responsible for documenting and minimizing its complete payload.
 
 ## See also
 
-- [environment-variables.md](environment-variables.md) — `PI_CONFIG_DIR` controls where `install-id` lives.
+- [environment-variables.md](environment-variables.md) — `OMSP_CONFIG_DIR` controls where `install-id` lives.
 - [config-usage.md](config-usage.md) — broader config-root layout.

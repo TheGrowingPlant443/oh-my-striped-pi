@@ -1,9 +1,9 @@
-import { type } from "@oh-my-pi/omptype";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { completeSimple, Effort, type Model, retryTransientCompletion } from "@oh-my-pi/pi-ai";
-import { clampThinkingLevelForModel } from "@oh-my-pi/pi-catalog/model-thinking";
-import { getSegmenter } from "@oh-my-pi/pi-tui";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { completeSimple, Effort, type Model, retryTransientCompletion } from "@oh-my-striped-pi/pi-ai";
+import { clampThinkingLevelForModel } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { getSegmenter } from "@oh-my-striped-pi/pi-tui";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { getModelMatchPreferences, resolveModelRoleValue, resolveRoleSelection } from "../config/model-resolver";
 import type { Settings } from "../config/settings";

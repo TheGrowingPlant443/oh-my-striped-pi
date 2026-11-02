@@ -2,29 +2,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Api, AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import { unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { RetryFallbackRole, ServingModel } from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { TurnRecovery, type TurnRecoveryHost } from "@oh-my-pi/pi-coding-agent/session/turn-recovery";
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import type { AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import { unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { createMockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { RetryFallbackRole, ServingModel } from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { TurnRecovery, type TurnRecoveryHost } from "@oh-my-striped-pi/pi-coding-agent/session/turn-recovery";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { AgentDefinition } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import type { AgentProgress } from "@oh-my-striped-pi/pi-tui/tools/task";
+import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { createSessionDefaults } from "./helpers/session-defaults";
 
-import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgRetryFallbackChains } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 function model(provider: string, id: string): Model<Api> {
 	return buildModel({
@@ -694,7 +694,7 @@ describe("subagent runtime model resolution", () => {
 
 describe("subagent runtime fallback on a real provider error", () => {
 	const MOCK_API_SOURCE = "test/issue-2750-subagent-runtime-fallback";
-	const ENV_KEYS = ["HOME", "PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"] as const;
+	const ENV_KEYS = ["HOME", "OMSP_CODING_AGENT_DIR", "OMSP_PROFILE"] as const;
 	const OVERLOADED = "overloaded_error: provider returned error 503";
 	let savedEnv: Record<string, string | undefined> = {};
 	let root: string;
@@ -711,13 +711,13 @@ describe("subagent runtime fallback on a real provider error", () => {
 
 	beforeEach(async () => {
 		savedEnv = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-empty-fallback-chain-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-empty-fallback-chain-"));
 		// Project discovery walks up from cwd to os.homedir(); keep both inside the fake HOME.
 		const home = path.join(root, "home");
 		await fs.mkdir(path.join(home, "work"), { recursive: true });
 		restoreEnvValue("HOME", home);
 		vi.spyOn(os, "homedir").mockReturnValue(home);
-		setAgentDir(path.join(home, ".omp", "agent"));
+		setAgentDir(path.join(home, ".omsp", "agent"));
 		AgentRegistry.resetGlobalForTests();
 		AgentLifecycleManager.resetGlobalForTests();
 		registerMockApi(MOCK_API_SOURCE);

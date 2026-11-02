@@ -1,7 +1,7 @@
 /** Shared session-event to extension-event mapping. */
-import { logger } from "@oh-my-pi/pi-utils";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { ExtensionRunner } from "./runner";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
 import type { AgentSessionEvent } from "../../session/agent-session";
 import type {
 	AgentEndEvent,

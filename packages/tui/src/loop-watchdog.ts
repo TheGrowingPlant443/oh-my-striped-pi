@@ -1,5 +1,5 @@
 import { performance } from "node:perf_hooks";
-import { logger, resetLoopPhaseWindow, takeLoopPhaseAttribution } from "@oh-my-pi/pi-utils";
+import { logger, resetLoopPhaseWindow, takeLoopPhaseAttribution } from "@oh-my-striped-pi/pi-utils";
 
 export interface LoopWatchdogOptions {
 	/** How far ahead each probe tick is scheduled, in ms. Default 250. */

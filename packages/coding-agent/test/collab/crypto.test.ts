@@ -5,7 +5,7 @@ import {
 	importRoomKey,
 	open,
 	seal,
-} from "@oh-my-pi/pi-coding-agent/collab/crypto";
+} from "@oh-my-striped-pi/pi-coding-agent/collab/crypto";
 import {
 	type CollabFrame,
 	formatCollabLink,
@@ -15,7 +15,7 @@ import {
 	parseCollabLink,
 	rewriteEnvelopePeer,
 	unpackEnvelope,
-} from "@oh-my-pi/pi-coding-agent/collab/protocol";
+} from "@oh-my-striped-pi/pi-coding-agent/collab/protocol";
 
 const TEST_RELAY_URL = "wss://relay.company.example";
 

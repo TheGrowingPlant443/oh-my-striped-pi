@@ -4,12 +4,12 @@
  *
  * @example
  * describe() {
- *   return card({ role: "omp.tool.bash", status: "running", head: [span("Bash", "toolTitle")] }, [
+ *   return card({ role: "omsp.tool.bash", status: "running", head: [span("Bash", "toolTitle")] }, [
  *     ansi(this.#output, { follow: true, preview: { lines: 10 } }),
  *   ]);
  * }
  */
-import type { TspKind, TspPropNode, TspProps, TspSpan, TspText } from "@oh-my-pi/pi-wire";
+import type { TspKind, TspPropNode, TspProps, TspSpan, TspText } from "@oh-my-striped-pi/pi-wire";
 import type { NativeChild, NativeNode } from "./node";
 
 /** A node of any kind. */
@@ -42,7 +42,7 @@ export function card(p: TspProps<"card">, c: readonly NativeChild[]): NativeNode
 	return node("card", p, c);
 }
 
-/** Markdown source in omp's dialect. */
+/** Markdown source in omsp's dialect. */
 export function md(source: string, p?: Omit<TspProps<"md">, "text">): NativeNode {
 	return node("md", { ...p, text: source });
 }

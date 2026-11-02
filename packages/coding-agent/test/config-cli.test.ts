@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { runConfigCommand } from "@oh-my-pi/pi-coding-agent/cli/config-cli";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { getConfigRootDir, getProjectDir, setAgentDir, setProjectDir, TempDir } from "@oh-my-pi/pi-utils";
+import { runConfigCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/config-cli";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { getConfigRootDir, getProjectDir, setAgentDir, setProjectDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 let testAgentDir: TempDir | undefined;
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 const cliEntry = path.join(import.meta.dir, "..", "src", "cli.ts");
 
@@ -30,7 +30,7 @@ async function runCliProcess(args: string[], env: NodeJS.ProcessEnv): Promise<Cl
 
 beforeEach(() => {
 	resetSettingsForTest();
-	testAgentDir = TempDir.createSync("@omp-config-cli-");
+	testAgentDir = TempDir.createSync("@omsp-config-cli-");
 	setAgentDir(testAgentDir.path());
 });
 
@@ -42,7 +42,7 @@ afterEach(async () => {
 		setAgentDir(originalAgentDir);
 	} else {
 		setAgentDir(fallbackAgentDir);
-		delete process.env.PI_CODING_AGENT_DIR;
+		delete process.env.OMSP_CODING_AGENT_DIR;
 	}
 	if (testAgentDir) {
 		try {
@@ -209,7 +209,7 @@ describe("config CLI schema coverage", () => {
 	it("fully flushes JSON larger than a pipe buffer", async () => {
 		if (!testAgentDir) throw new Error("Test agent directory was not initialized");
 		const { exitCode, output, error } = await runCliProcess(["config", "list", "--json"], {
-			PI_CODING_AGENT_DIR: testAgentDir.path(),
+			OMSP_CODING_AGENT_DIR: testAgentDir.path(),
 		});
 
 		expect(exitCode).toBe(0);
@@ -222,8 +222,8 @@ describe("config CLI schema coverage", () => {
 		if (!testAgentDir) throw new Error("Test agent directory was not initialized");
 		const overlayPath = path.join(testAgentDir.path(), "overlay.yml");
 		await Bun.write(overlayPath, "compaction:\n  enabled: false\n");
-		const previousConfigFiles = process.env.PI_CONFIG_FILES;
-		process.env.PI_CONFIG_FILES = overlayPath;
+		const previousConfigFiles = process.env.OMSP_CONFIG_FILES;
+		process.env.OMSP_CONFIG_FILES = overlayPath;
 		try {
 			const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 			await runConfigCommand({ action: "set", key: "compaction.enabled", value: "true", flags: { json: true } });
@@ -233,11 +233,11 @@ describe("config CLI schema coverage", () => {
 				overriddenBy: "overlay",
 			});
 		} finally {
-			if (previousConfigFiles === undefined) delete process.env.PI_CONFIG_FILES;
-			else process.env.PI_CONFIG_FILES = previousConfigFiles;
+			if (previousConfigFiles === undefined) delete process.env.OMSP_CONFIG_FILES;
+			else process.env.OMSP_CONFIG_FILES = previousConfigFiles;
 		}
 	});
-	it("loads PI_CONFIG_FILES overlays in path-list order", async () => {
+	it("loads OMSP_CONFIG_FILES overlays in path-list order", async () => {
 		if (!testAgentDir) throw new Error("Test agent directory was not initialized");
 		const baseOverlayPath = path.join(testAgentDir.path(), "base-overlay.yml");
 		const finalOverlayPath = path.join(testAgentDir.path(), "final-overlay.yml");
@@ -246,8 +246,8 @@ describe("config CLI schema coverage", () => {
 			Bun.write(finalOverlayPath, "defaultThinkingLevel: max\n"),
 		]);
 		const { exitCode, output, error } = await runCliProcess(["config", "get", "defaultThinkingLevel", "--json"], {
-			PI_CODING_AGENT_DIR: testAgentDir.path(),
-			PI_CONFIG_FILES: [baseOverlayPath, finalOverlayPath].join(path.delimiter),
+			OMSP_CODING_AGENT_DIR: testAgentDir.path(),
+			OMSP_CONFIG_FILES: [baseOverlayPath, finalOverlayPath].join(path.delimiter),
 		});
 
 		expect(exitCode).toBe(0);
@@ -265,7 +265,7 @@ describe("config list --scope", () => {
 	const originalProjectDir = getProjectDir();
 
 	beforeEach(() => {
-		projectDir = TempDir.createSync("@omp-config-cli-project-");
+		projectDir = TempDir.createSync("@omsp-config-cli-project-");
 		setProjectDir(projectDir.path());
 	});
 
@@ -311,7 +311,7 @@ describe("config list --scope", () => {
 				"",
 			].join("\n"),
 		);
-		await Bun.write(path.join(projectDir.path(), ".omp", "config.yml"), "defaultThinkingLevel: high\n");
+		await Bun.write(path.join(projectDir.path(), ".omsp", "config.yml"), "defaultThinkingLevel: high\n");
 
 		const layer = await listLayer("global");
 
@@ -333,7 +333,7 @@ describe("config list --scope", () => {
 		if (!testAgentDir || !projectDir) throw new Error("Test directories were not initialized");
 		await Bun.write(path.join(testAgentDir.path(), "config.yml"), "compaction:\n  enabled: false\n");
 		await Bun.write(
-			path.join(projectDir.path(), ".omp", "config.yml"),
+			path.join(projectDir.path(), ".omsp", "config.yml"),
 			"defaultThinkingLevel: high\nenabledModels: [openai/gpt-5]\n",
 		);
 

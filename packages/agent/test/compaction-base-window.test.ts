@@ -3,9 +3,9 @@ import {
 	type CompactionSettings,
 	prepareCompaction,
 	resolveThresholdTokens,
-} from "@oh-my-pi/pi-agent-core/compaction/compaction";
-import type { SessionEntry } from "@oh-my-pi/pi-agent-core/compaction/entries";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-agent-core/compaction/compaction";
+import type { SessionEntry } from "@oh-my-striped-pi/pi-agent-core/compaction/entries";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 const base: CompactionSettings = { enabled: true, thresholdPercent: -1, thresholdTokens: -1, keepRecentTokens: 20000 };
 const window = 1_000_000;

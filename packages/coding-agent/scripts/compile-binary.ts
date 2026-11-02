@@ -1,6 +1,6 @@
 // Deep import: the pi-utils barrel loads the host native addon, which is
 // absent on cross-compiling release runners.
-import { USER_AGENT } from "@oh-my-pi/pi-utils/dirs";
+import { USER_AGENT } from "@oh-my-striped-pi/pi-utils/dirs";
 import { embeddedAddonFiles, type NativeEmbedTarget } from "../../natives/scripts/embed-native";
 import { buildDocsIndexPayload } from "./generate-docs-index";
 import { createJsonParsePlugin } from "./json-parse-plugin";
@@ -50,12 +50,12 @@ export async function compileCodingAgent(options: CodingAgentCompileOptions): Pr
 			external: [...COMPILED_EXTERNAL_DEPENDENCIES],
 			files: options.native ? await embeddedAddonFiles(options.native) : {},
 			define: {
-				"process.env.PI_COMPILED": JSON.stringify("true"),
-				"process.env.PI_TINY_TRANSFORMERS_VERSION": JSON.stringify(options.transformersVersion),
-				"process.env.PI_DOCS_EMBED": JSON.stringify((await buildDocsIndexPayload()).payload),
+				"process.env.OMSP_COMPILED": JSON.stringify("true"),
+				"process.env.OMSP_TINY_TRANSFORMERS_VERSION": JSON.stringify(options.transformersVersion),
+				"process.env.OMSP_DOCS_EMBED": JSON.stringify((await buildDocsIndexPayload()).payload),
 			},
 			// Precompiled bytecode skips parsing the ~20 MB bundle at boot:
-			// `omp --version` 256 ms -> 30 ms on M4 Max (+52 MB binary).
+			// `omsp --version` 256 ms -> 30 ms on M4 Max (+52 MB binary).
 			// Keep import.meta.resolve in bundled dependencies valid under bytecode.
 			format: "esm",
 			bytecode: true,

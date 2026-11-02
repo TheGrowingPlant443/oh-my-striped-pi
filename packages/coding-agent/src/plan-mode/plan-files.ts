@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { isEnoent } from "@oh-my-pi/pi-utils";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils";
 import { InternalUrlRouter, type LocalProtocolOptions, resolveLocalRoot } from "../internal-urls";
 import { resolveToCwd } from "../tools/path-utils";
 

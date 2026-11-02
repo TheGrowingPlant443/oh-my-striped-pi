@@ -1,4 +1,4 @@
-import { agentTranscriptSource } from "@oh-my-pi/pi-coding-agent/modes/agent-hub-runtime";
+import { agentTranscriptSource } from "@oh-my-striped-pi/pi-coding-agent/modes/agent-hub-runtime";
 /**
  * Regression: the fullscreen transcript viewer must align the header, body, and
  * footer on a single shared gutter. The transcript components carry their own
@@ -11,11 +11,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentTranscriptViewer } from "@oh-my-pi/pi-tui/overlays/agent-transcript-viewer";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentTranscriptViewer } from "@oh-my-striped-pi/pi-tui/overlays/agent-transcript-viewer";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { CURRENT_SESSION_VERSION } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
 import {
 	getKittyGraphics,
 	ImageBudget,
@@ -24,10 +24,10 @@ import {
 	setTerminalImageProtocol,
 	TERMINAL,
 	type TUI,
-} from "@oh-my-pi/pi-tui";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgTerminalShowImages } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { cfgTerminalShowImages } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
 const TS = new Date().toISOString();
 

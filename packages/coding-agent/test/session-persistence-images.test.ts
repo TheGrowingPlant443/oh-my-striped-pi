@@ -1,22 +1,27 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import { BlobStore, isBlobRef, lazyImageDataSync, parseBlobRef } from "@oh-my-pi/pi-coding-agent/session/blob-store";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import {
+	BlobStore,
+	isBlobRef,
+	lazyImageDataSync,
+	parseBlobRef,
+} from "@oh-my-striped-pi/pi-coding-agent/session/blob-store";
 import type {
 	CompactionEntry,
 	FileEntry,
 	SessionMessageEntry,
-} from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { resolveBlobRefsInEntries } from "@oh-my-pi/pi-coding-agent/session/session-loader";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { resolveBlobRefsInEntries } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
 import {
 	forgetExternalizedImages,
 	prepareEntryForPersistence,
-} from "@oh-my-pi/pi-coding-agent/session/session-persistence";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import type { Archive } from "@oh-my-pi/snapcompact";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-persistence";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import type { Archive } from "@oh-my-striped-pi/snapcompact";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 
 type ImagePayload = { data: string; mimeType: string; type?: "image" };
 type ToolResultMessage = Extract<AgentMessage, { role: "toolResult" }>;

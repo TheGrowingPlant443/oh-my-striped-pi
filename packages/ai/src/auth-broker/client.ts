@@ -1,14 +1,14 @@
 import { assertSupportedAuthCredential } from "../auth/provider-policy";
 /**
- * HTTP client for the omp auth-broker server.
+ * HTTP client for the omsp auth-broker server.
  *
  * Used by {@link RemoteAuthCredentialStore} (snapshot pulls) and by
- * `omp auth-broker status` (liveness checks). All endpoints except
+ * `omsp auth-broker status` (liveness checks). All endpoints except
  * `/v1/healthz` require a bearer token.
  */
 
-import { type } from "@oh-my-pi/omptype";
-import { readSseEvents } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { readSseEvents } from "@oh-my-striped-pi/pi-utils";
 import type { AuthCredential, DisabledCredentialSummary, OAuthRefreshReason } from "../auth-storage";
 import type {
 	ClientUsageReportRequest,
@@ -68,7 +68,7 @@ const RESPONSE_SCHEMAS = {
 type AuthBrokerResponseSchemaName = keyof typeof RESPONSE_SCHEMAS;
 
 export interface AuthBrokerClientOptions {
-	/** Base URL (e.g. `https://broker.tailnet:8765`). Trailing slashes are trimmed. */
+	/** Base URL (e.g. `https://broker.tailnet:8766`). Trailing slashes are trimmed. */
 	url: string;
 	/** Bearer token used for everything except `healthz`. */
 	token: string;

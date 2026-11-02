@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 function userTurn(content: string) {
 	return { role: "user" as const, content, timestamp: Date.now() };
@@ -35,7 +35,7 @@ async function reopen(sessionFile: string, tempDir: TempDir): Promise<SessionMan
 const SESSION_MANAGER_MODULE = path.join(import.meta.dir, "../src/session/session-manager.ts");
 
 /**
- * Another live omp process: it opens the session, writes (claiming the
+ * Another live omsp process: it opens the session, writes (claiming the
  * cross-process ownership lease), signals readiness, and holds the lease
  * until killed. Managers in one process share a lease per session, so only a
  * real second process contends.
@@ -84,7 +84,7 @@ async function spawnHolder(
 
 describe("SessionManager.renameSessionTitle", () => {
 	it("sticks across a fresh open and appends a title_change entry", async () => {
-		using tempDir = TempDir.createSync("@omp-rename-session-title-");
+		using tempDir = TempDir.createSync("@omsp-rename-session-title-");
 		const sessionFile = await createSession(tempDir);
 
 		expect(await SessionManager.renameSessionTitle(sessionFile, "Renamed")).toBe("Renamed");
@@ -103,7 +103,7 @@ describe("SessionManager.renameSessionTitle", () => {
 	});
 
 	it("returns the title as stored, not the input", async () => {
-		using tempDir = TempDir.createSync("@omp-rename-session-title-canonical-");
+		using tempDir = TempDir.createSync("@omsp-rename-session-title-canonical-");
 		const sessionFile = await createSession(tempDir);
 
 		// The session collapses runs of whitespace, so the caller must learn
@@ -119,7 +119,7 @@ describe("SessionManager.renameSessionTitle", () => {
 	});
 
 	it("a second manager holding the file blocks the rename", async () => {
-		using tempDir = TempDir.createSync("@omp-rename-session-title-held-");
+		using tempDir = TempDir.createSync("@omsp-rename-session-title-held-");
 		const sessionFile = await createSession(tempDir);
 
 		const { holder, ready } = await spawnHolder(tempDir, sessionFile);

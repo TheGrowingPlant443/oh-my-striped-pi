@@ -17,6 +17,12 @@ import { compareVersions } from "../packages/utils/src/version.ts";
 import { runChangelogFixer } from "./fix-changelogs";
 import { generateNixBunDeps, resolveNixBunDepsGenerator } from "./gen-nix-bun";
 
+if (import.meta.main) {
+	throw new Error(
+		"Public releases are disabled for oh-my-striped-pi. Deploy an authenticated source checkout through Nix or your company-managed release process.",
+	);
+}
+
 const changelogGlob = new Glob("packages/*/CHANGELOG.md");
 const packageJsonGlob = new Glob("packages/*/package.json");
 const cargoTomlGlob = new Glob("crates/*/Cargo.toml");
@@ -25,7 +31,7 @@ const cargoTomlGlob = new Glob("crates/*/Cargo.toml");
  * leading `v` and NO prerelease suffix. Prereleases are rejected because the
  * downstream publish (`scripts/ci-release-publish.ts`) runs `npm publish` with
  * no `--tag`, which would promote a prerelease to the npm `latest` dist-tag —
- * hitting every unqualified install and the `/latest` endpoint `omp update`
+ * hitting every unqualified install and the `/latest` endpoint `omsp update`
  * reads. Bump keywords (major/minor/patch) are handled separately and must not
  * be routed through this check.
  *
@@ -354,12 +360,12 @@ async function cmdRelease(versionOrBump: string): Promise<void> {
 	}
 	console.log();
 
-	// Update @oh-my-pi/* catalog entries in root package.json
+	// Update @oh-my-striped-pi/* catalog entries in root package.json
 	console.log("Updating root catalog versions...");
 	let rootPkgRaw = await Bun.file("package.json").text();
-	rootPkgRaw = rootPkgRaw.replace(/("@oh-my-pi\/[^"]+":\s*)"[^"]+"/g, `$1"${version}"`);
+	rootPkgRaw = rootPkgRaw.replace(/("@oh-my-striped-pi\/[^"]+":\s*)"[^"]+"/g, `$1"${version}"`);
 	await Bun.write("package.json", rootPkgRaw);
-	console.log("  Updated root catalog @oh-my-pi/* entries");
+	console.log("  Updated root catalog @oh-my-striped-pi/* entries");
 
 	// 3. Update Rust workspace version
 	console.log(`Updating Rust workspace version to ${version}…`);

@@ -13,25 +13,28 @@
  */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import * as fsp from "node:fs/promises";
-import { generateRoomKey, importRoomKey } from "@oh-my-pi/pi-coding-agent/collab/crypto";
-import { CollabGuestLink } from "@oh-my-pi/pi-coding-agent/collab/guest";
-import { CollabHost } from "@oh-my-pi/pi-coding-agent/collab/host";
+import { generateRoomKey, importRoomKey } from "@oh-my-striped-pi/pi-coding-agent/collab/crypto";
+import { CollabGuestLink } from "@oh-my-striped-pi/pi-coding-agent/collab/guest";
+import { CollabHost } from "@oh-my-striped-pi/pi-coding-agent/collab/host";
 import {
 	COLLAB_PROTO,
 	type CollabFrame,
 	type CollabSessionState,
 	formatCollabLink,
 	parseCollabLink,
-} from "@oh-my-pi/pi-coding-agent/collab/protocol";
-import { CollabSocket } from "@oh-my-pi/pi-coding-agent/collab/relay-client";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/collab/protocol";
+import { CollabSocket } from "@oh-my-striped-pi/pi-coding-agent/collab/relay-client";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import type {
 	ExtensionAskDialogQuestion,
 	ExtensionUIDialogOptions,
 	ExtensionUISelectItem,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { ExtensionUiController } from "@oh-my-pi/pi-coding-agent/modes/controllers/extension-ui-controller";
-import type { InteractiveModeContext, InteractiveSelectorDialogOptions } from "@oh-my-pi/pi-coding-agent/modes/types";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { ExtensionUiController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/extension-ui-controller";
+import type {
+	InteractiveModeContext,
+	InteractiveSelectorDialogOptions,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 import { installInMemoryRelay, uninstallInMemoryRelay } from "./helpers/in-memory-relay";
 import { instrumentRelay, waitFor } from "./helpers/throttled-host";
 

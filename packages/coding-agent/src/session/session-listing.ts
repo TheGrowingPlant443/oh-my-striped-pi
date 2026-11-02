@@ -1,13 +1,13 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message } from "@oh-my-pi/pi-ai";
-import { textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
-import { getSessionsDir } from "@oh-my-pi/pi-utils/dirs";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
-import { parseJsonlLenient } from "@oh-my-pi/pi-utils/stream";
-import { toError } from "@oh-my-pi/pi-utils/type-guards";
+import type { Message } from "@oh-my-striped-pi/pi-ai";
+import { textContent } from "@oh-my-striped-pi/pi-tui/chat/transcript-entry";
+import { getSessionsDir } from "@oh-my-striped-pi/pi-utils/dirs";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
+import { parseJsonlLenient } from "@oh-my-striped-pi/pi-utils/stream";
+import { toError } from "@oh-my-striped-pi/pi-utils/type-guards";
 import { EVAL_STATE_CONTEXT_TYPE } from "../eval/state";
 import { visitEntriesFromFile } from "./session-loader";
 import { computeDefaultSessionDir } from "./session-paths";
@@ -863,7 +863,7 @@ export interface FindSessionContinuationOptions {
  * went on in other files of the same directory; `undefined` when
  * `sessionPath` itself is the copy to resume.
  *
- * A session that cannot keep writing its file (another live omp process
+ * A session that cannot keep writing its file (another live omsp process
  * holds it, or the file changed under it) continues in a sibling whose
  * header names the old session in `continuationOf`, and that sibling can
  * move on the same way. Resuming the

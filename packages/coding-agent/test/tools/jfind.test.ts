@@ -2,32 +2,32 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Judge, JudgmentRequest, JudgmentResult, NoulAnswer, Questions } from "@oh-my-pi/pi-ai";
-import { tokenUsage } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
-import { InternalUrlFilesystem } from "@oh-my-pi/pi-coding-agent/internal-urls/url-filesystem";
-import { ChainJudge } from "@oh-my-pi/pi-coding-agent/judgment";
-import { FindTool, isFindEnabled } from "@oh-my-pi/pi-coding-agent/tools/jfind";
-import { cfgFindEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
-import { runCascade } from "@oh-my-pi/pi-coding-agent/tools/jfind/cascade";
-import { keywordsFromQuery } from "@oh-my-pi/pi-coding-agent/tools/jfind/keywords";
-import { grepIndex } from "@oh-my-pi/pi-coding-agent/tools/jfind/lexical";
+import type { Judge, JudgmentRequest, JudgmentResult, NoulAnswer, Questions } from "@oh-my-striped-pi/pi-ai";
+import { tokenUsage } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/router";
+import { InternalUrlFilesystem } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/url-filesystem";
+import { ChainJudge } from "@oh-my-striped-pi/pi-coding-agent/judgment";
+import { FindTool, isFindEnabled } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind";
+import { cfgFindEnabled } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
+import { runCascade } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/cascade";
+import { keywordsFromQuery } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/keywords";
+import { grepIndex } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/lexical";
 import {
 	mergeHeat,
 	type Passage,
 	selectWindows,
 	sketch,
 	windows,
-} from "@oh-my-pi/pi-coding-agent/tools/jfind/passages";
-import { readText, ReadTextError } from "@oh-my-pi/pi-coding-agent/tools/jfind/text";
-import { eligibleFile, renderTree, resolveSearchRoot } from "@oh-my-pi/pi-coding-agent/tools/jfind/tree";
-import { resolveSearchResultPath } from "@oh-my-pi/pi-coding-agent/tools/path-utils";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/passages";
+import { readText, ReadTextError } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/text";
+import { eligibleFile, renderTree, resolveSearchRoot } from "@oh-my-striped-pi/pi-coding-agent/tools/jfind/tree";
+import { resolveSearchResultPath } from "@oh-my-striped-pi/pi-coding-agent/tools/path-utils";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 /** Read-tier URL filesystem rooted at `cwd`, as the `find` tool builds one per call. */
 function urlFs(cwd: string): InternalUrlFilesystem {
@@ -448,25 +448,25 @@ describe("jfind cascade", () => {
 
 	it("resolves URL scopes in place and rejects unknown docs and range selectors before judging", async () => {
 		const filesystem = urlFs(process.cwd());
-		expect(await resolveSearchRoot(filesystem, "omp://", process.cwd())).toEqual({
-			path: "omp://",
+		expect(await resolveSearchRoot(filesystem, "omsp://", process.cwd())).toEqual({
+			path: "omsp://",
 			type: "directory",
 		});
-		expect(await resolveSearchRoot(filesystem, "omp://tools/read.md", process.cwd())).toMatchObject({
-			path: "omp://tools/read.md",
+		expect(await resolveSearchRoot(filesystem, "omsp://tools/read.md", process.cwd())).toMatchObject({
+			path: "omsp://tools/read.md",
 			type: "file",
 		});
-		await expect(resolveSearchRoot(filesystem, "omp://nope.md", process.cwd())).rejects.toThrow(
-			"Path not found: omp://nope.md",
+		await expect(resolveSearchRoot(filesystem, "omsp://nope.md", process.cwd())).rejects.toThrow(
+			"Path not found: omsp://nope.md",
 		);
-		await expect(resolveSearchRoot(filesystem, "omp://tools/read.md:1-10", process.cwd())).rejects.toThrow(
+		await expect(resolveSearchRoot(filesystem, "omsp://tools/read.md:1-10", process.cwd())).rejects.toThrow(
 			"line-range selectors are not supported",
 		);
 	});
 
-	it("searches a single omp doc in place and reports hits as its URL", async () => {
+	it("searches a single omsp doc in place and reports hits as its URL", async () => {
 		const filesystem = urlFs(process.cwd());
-		const root = await resolveSearchRoot(filesystem, "omp://tools/read.md", process.cwd());
+		const root = await resolveSearchRoot(filesystem, "omsp://tools/read.md", process.cwd());
 		const result = await runCascade({
 			root,
 			filesystem,
@@ -476,14 +476,14 @@ describe("jfind cascade", () => {
 			includeHidden: false,
 		});
 		expect(result.stats.listed).toBe(1);
-		expect(result.hits.map(hit => resolveSearchResultPath(root.path, hit.rel))).toEqual(["omp://tools/read.md"]);
+		expect(result.hits.map(hit => resolveSearchResultPath(root.path, hit.rel))).toEqual(["omsp://tools/read.md"]);
 	});
 
-	it("walks the omp root in place: every embedded doc is listed and hits resolve to doc URLs", async () => {
-		const completions = (await InternalUrlRouter.instance().complete("omp", "")) ?? [];
+	it("walks the omsp root in place: every embedded doc is listed and hits resolve to doc URLs", async () => {
+		const completions = (await InternalUrlRouter.instance().complete("omsp", "")) ?? [];
 		const docs = new Set(completions.map(completion => completion.value));
 		const filesystem = urlFs(process.cwd());
-		const root = await resolveSearchRoot(filesystem, "omp://", process.cwd());
+		const root = await resolveSearchRoot(filesystem, "omsp://", process.cwd());
 		const judge = new FakeJudge((request, key) => {
 			const state = stateOf(request);
 			if ("tree" in state) return String(state.tree).includes(`${key} read.md`) ? 0.9 : 0.1;
@@ -502,7 +502,7 @@ describe("jfind cascade", () => {
 			includeHidden: false,
 		});
 		expect(result.stats.listed).toBe(docs.size);
-		expect(result.hits.map(hit => resolveSearchResultPath(root.path, hit.rel))).toEqual(["omp://tools/read.md"]);
+		expect(result.hits.map(hit => resolveSearchResultPath(root.path, hit.rel))).toEqual(["omsp://tools/read.md"]);
 	});
 
 	it("rejects a missing scope path or a line selector before spending any judgment", async () => {
@@ -520,7 +520,7 @@ describe("jfind cascade", () => {
 				"Path not found: nope",
 			);
 			await expect(
-				tool.execute("x", { query: "anything", grep_keywords: [], path: "omp://tools/read.md:1-10" }),
+				tool.execute("x", { query: "anything", grep_keywords: [], path: "omsp://tools/read.md:1-10" }),
 			).rejects.toThrow("line-range selectors are not supported");
 		} finally {
 			await removeWithRetries(dir);

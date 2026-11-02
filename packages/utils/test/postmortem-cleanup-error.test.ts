@@ -3,14 +3,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 
 const postmortemModuleUrl = pathToFileURL(join(import.meta.dir, "../src/index.ts")).href;
 
 async function runPostmortemProbe(
 	source: string,
 ): Promise<{ exitCode: number | null; stdout: string; stderr: string }> {
-	const root = await mkdtemp(join(tmpdir(), "omp-postmortem-probe-"));
+	const root = await mkdtemp(join(tmpdir(), "omsp-postmortem-probe-"));
 	const probePath = join(root, "probe.ts");
 	try {
 		await Bun.write(probePath, source);
@@ -18,7 +18,7 @@ async function runPostmortemProbe(
 			cwd: process.cwd(),
 			stdout: "pipe",
 			stderr: "pipe",
-			env: { ...process.env, OMP_AGENT_DIR: join(root, "agent") },
+			env: { ...process.env, OMSP_AGENT_DIR: join(root, "agent") },
 		});
 		// Process-level regressions can hang the child; the watchdog bounds the fixture without slowing
 		// green runs (the race resolves on exit). Generous deadline: a cold bun spawn transpiling the
@@ -53,7 +53,7 @@ describe("postmortem expected cleanup errors", () => {
 		const marked = postmortem.markExpectedCleanupError(reason);
 
 		expect(marked).toBe(reason);
-		expect(Reflect.get(reason, Symbol.for("omp.expectedCleanupError"))).toBe(true);
+		expect(Reflect.get(reason, Symbol.for("omsp.expectedCleanupError"))).toBe(true);
 		expect(postmortem.isExpectedCleanupError(reason)).toBe(true);
 	});
 
@@ -172,7 +172,7 @@ describe("postmortem expected cleanup errors", () => {
 
 			let saved = false;
 			const cancelHint = postmortem.registerFatalRecoveryHint(() =>
-				saved ? { label: "Main", command: "omp --resume 019cafe0-dead-beef" } : undefined,
+				saved ? { label: "Main", command: "omsp --resume 019cafe0-dead-beef" } : undefined,
 			);
 			postmortem.register("session", async () => {
 				await Promise.resolve();
@@ -185,7 +185,7 @@ describe("postmortem expected cleanup errors", () => {
 
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("[Unhandled Rejection] Error: session crashed");
-		expect(result.stderr).toContain("[Recovery]\n  Main: omp --resume 019cafe0-dead-beef");
+		expect(result.stderr).toContain("[Recovery]\n  Main: omsp --resume 019cafe0-dead-beef");
 	});
 
 	it.skipIf(process.platform === "win32")(
@@ -196,7 +196,7 @@ describe("postmortem expected cleanup errors", () => {
 
 			let saved = false;
 			const cancelHint = postmortem.registerFatalRecoveryHint(() =>
-				saved ? { label: "Main", command: "omp --resume 019cafe0-dead-beef" } : undefined,
+				saved ? { label: "Main", command: "omsp --resume 019cafe0-dead-beef" } : undefined,
 			);
 			postmortem.register("session", async () => {
 				// postmortem's own SIGTERM listener runs first, so once this one fires the
@@ -215,7 +215,7 @@ describe("postmortem expected cleanup errors", () => {
 		`);
 
 			expect(result.exitCode).toBe(143);
-			expect(result.stderr).toContain("[Stopped by SIGTERM]\n[Recovery]\n  Main: omp --resume 019cafe0-dead-beef");
+			expect(result.stderr).toContain("[Stopped by SIGTERM]\n[Recovery]\n  Main: omsp --resume 019cafe0-dead-beef");
 			expect(result.stderr.split("[Recovery]")).toHaveLength(2);
 		},
 	);

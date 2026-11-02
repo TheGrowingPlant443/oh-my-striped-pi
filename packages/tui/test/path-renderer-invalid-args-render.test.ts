@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { editToolRenderer } from "@oh-my-pi/pi-tui/tools/edit";
-import { getThemeByName, initTheme, type Theme } from "@oh-my-pi/pi-tui/theme";
-import { readToolRenderer } from "@oh-my-pi/pi-tui/tools/read";
-import { writeToolRenderer } from "@oh-my-pi/pi-tui/tools/write";
-import type { Component } from "@oh-my-pi/pi-tui";
+import { editToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/edit";
+import { getThemeByName, initTheme, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { readToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/read";
+import { writeToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/write";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
 
 interface InvalidPathCase {
 	readonly name: string;

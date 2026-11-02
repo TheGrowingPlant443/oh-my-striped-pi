@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { shouldFilterBrowserMCPForPrelude } from "@oh-my-pi/pi-coding-agent/mcp/config";
+import { shouldFilterBrowserMCPForPrelude } from "@oh-my-striped-pi/pi-coding-agent/mcp/config";
 
 describe("browser prelude MCP filtering", () => {
 	test("filters only when unrestricted browser and Eval are all active", () => {

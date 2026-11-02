@@ -2,17 +2,17 @@
  * End-to-end exercise of the Python eval workflow helpers: parallel, pipeline,
  * and log/phase status events.
  *
- * Gated by `PI_PYTHON_INTEGRATION=1` so CI without a real Python interpreter
+ * Gated by `OMSP_PYTHON_INTEGRATION=1` so CI without a real Python interpreter
  * (or sandboxes where subprocess spawning is restricted) does not fail.
  */
 
 import { afterEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { disposeAllKernelSessions, executePythonWithKernel } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
-import { PythonKernel } from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { disposeAllKernelSessions, executePythonWithKernel } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
+import { PythonKernel } from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
-const SHOULD_RUN = Bun.env.PI_PYTHON_INTEGRATION === "1";
+const SHOULD_RUN = Bun.env.OMSP_PYTHON_INTEGRATION === "1";
 
 describe.skipIf(!SHOULD_RUN)("python eval workflow helpers", () => {
 	afterEach(async () => {

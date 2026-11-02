@@ -1,4 +1,4 @@
-# @oh-my-pi/pi-metaharness
+# @oh-my-striped-pi/pi-metaharness
 
 One manager for repository benchmarks. Harbor, TypeScript edit, and SnapCompact
 runs use the same experiment → run → trace model, SQLite store, REST/SSE API,
@@ -12,15 +12,16 @@ bun run serve --port 4700
 
 ## How Harbor runs execute
 
-1. **Local omp, not npm.** By default the runner bind-mounts the repo
-   read-only into each task container (`--install source`) and runs omp
+1. **Local omsp, not npm.** By default the runner bind-mounts the repo
+   read-only into each task container (`--install source`) and runs omsp
    straight from `packages/coding-agent/src/cli.ts` — TS edits apply to the
    next trial with no rebuild. A cached linux `node_modules` tree (built once
    per lockfile change inside `oven/bun`, stored in `<jobs-dir>/_bench/_deps/`)
    shadows the host's darwin one, and a linux `bun` binary is mounted at
-   `/opt/omp/bin` — so trial setup needs zero outbound network. Alternatives:
-   `--install local` (pack a tarball per run) or `--binary` (prebuilt
-   `dist/omp-linux-*` self-contained binaries).
+   `/opt/omsp/bin` — so trial setup needs zero outbound network. Alternatively,
+   use `--binary` with prebuilt `dist/omsp-linux-*` self-contained binaries.
+   The retained `--install local` and `--install published` modes are unavailable
+   for this private fork: both need unpublished fork-native registry packages.
 2. **Auth never enters containers.** A generated `models.yml` routes provider
    `baseUrl`s at the host pm2 auth-gateway; the gateway resolves credentials
    host-side.
@@ -83,7 +84,7 @@ stays the source of truth and historical CLI runs are auto-discovered.
 ## Native Terminal-Bench 2.1 runner
 
 `bench:tb` bypasses Harbor and Docker. It boots each task's published OCI
-image as an x86_64 KVM microVM on a Vibemon host, streams omp's `--mode rpc`
+image as an x86_64 KVM microVM on a Vibemon host, streams omsp's `--mode rpc`
 protocol through `vmon exec --pipe`, runs the verifier in the same mutated VM,
 and writes resumable epochs plus artifacts under `runs/tb`.
 
@@ -114,7 +115,7 @@ to override it. Repeat `--model provider/id` to replace the pool.
 Defaults target the workstation's `xeon.internal` KVM host and the local
 `/work/vibevmm` checkout. The runner cross-builds and caches a patched `vmon`
 binary when the remote copy lacks raw pipe support, owns a privileged TAP
-broker for its lifetime, and reverse-tunnels the loopback omp auth gateway so
+broker for its lifetime, and reverse-tunnels the loopback omsp auth gateway so
 provider credentials never enter task VMs. Trial agents use a lean terminal
 tool allowlist, `edit.mode: replace`, and the same low-cost
 `openrouter/qwen/qwen3.7-flash` vision role; general orchestration tools are
@@ -133,12 +134,12 @@ omitted from the benchmark prompt. Override infrastructure with
 | `-d, --dataset <name>`                    | `terminal-bench@2.0`               | Any Harbor dataset id                                                                                                                                                                                           |
 | `-i/-x, --include/--exclude <glob>`       | —                                  | Task filters (repeatable)                                                                                                                                                                                       |
 | `--timeout-multiplier <x>`                | —                                  | Scales task agent/verifier timeouts                                                                                                                                                                             |
-| `--agent-arg <arg>`                       | —                                  | Extra arg forwarded verbatim to the in-container omp CLI (repeatable)                                                                                                                                           |
-| `--env <KEY[=VALUE]>`                     | —                                  | Forward env into the omp container (repeatable); `KEY` alone forwards the host value                                                                                                                            |
-| `--binary <path>`                         | —                                  | Prebuilt omp binary (repeat for arm64+x64)                                                                                                                                                                      |
-| `--install <source\|local\|published>`    | `source`                           | `source` = repo bind-mount, `local` = tarball pack, `published` = npm `@oh-my-pi/pi-coding-agent`                                                                                                               |
-| `--environment <docker\|apple-container>` | `docker`                           | `apple-container` runs trials via Apple's `container` CLI (no Docker); source/deps mounts go through `harbor --mounts` and the gateway is auto-forwarded from `192.168.64.1:4000` to the loopback-bound gateway |
-| `--gateway-url <url>`                     | `http://host.docker.internal:4000` | `http://192.168.64.1:4000` under `--environment apple-container`                                                                                                                                                |
+| `--agent-arg <arg>`                       | —                                  | Extra arg forwarded verbatim to the in-container omsp CLI (repeatable)                                                                                                                                           |
+| `--env <KEY[=VALUE]>`                     | —                                  | Forward env into the omsp container (repeatable); `KEY` alone forwards the host value                                                                                                                            |
+| `--binary <path>`                         | —                                  | Prebuilt omsp binary (repeat for arm64+x64)                                                                                                                                                                      |
+| `--install <source\|local\|published>` | `source` | Use prepared source mode; retained `local` and `published` modes require unpublished fork-native packages and are unavailable. Use `--binary` for prebuilt deployment. |
+| `--environment <docker\|apple-container>` | `docker`                           | `apple-container` runs trials via Apple's `container` CLI (no Docker); source/deps mounts go through `harbor --mounts` and the gateway is auto-forwarded from `192.168.64.1:4001` to the loopback-bound gateway |
+| `--gateway-url <url>`                     | `http://host.docker.internal:4001` | `http://192.168.64.1:4001` under `--environment apple-container`                                                                                                                                                |
 | `--no-gateway`                            | off                                | Pass host provider keys into containers instead                                                                                                                                                                 |
 | `-o, --jobs-dir <path>`                   | `<repo>/runs/harbor`               | Shared with the server                                                                                                                                                                                          |
 | `--resume <name\|path>`                   | —                                  | Resume that job dir via `harbor job resume`; original flags recovered automatically                                                                                                                             |
@@ -159,7 +160,7 @@ omitted from the benchmark prompt. Override infrastructure with
 notices in place, then a Story Arc and — for failed runs — a failure analysis).
 It map/reduces the normalized trace through two cheap OpenRouter models
 (defaults: `inclusionai/ling-2.6-flash` per turn, `openai/gpt-oss-120b` for the
-arc; ~$0.001 per report). API keys resolve through omp's auth storage.
+arc; ~$0.001 per report). API keys resolve through omsp's auth storage.
 
 ```bash
 bun scripts/trace-report.ts <run> <trace> [--focus "reviewer notes"] [--out report.md]
@@ -187,12 +188,12 @@ known-correct fix for a failed task), `--concurrency` (default 8).
   `brew install container && container system start` (macOS 26+, Apple
   silicon). `--host-network` and `--cleanup*` are docker-only, and bind
   mounts are read-write (the backend ignores `read_only`).
-- **`--install local` reflects local TS changes** (inlined into `dist/cli.js`),
-  but **not** uncommitted Rust natives — rebuild `packages/natives` per target
-  first (the version sentinel must match).
-- **Agent-started services outlive omp.** The verifier runs after omp exits,
+- **Private fork installation modes:** use prepared source mode or `--binary`.
+  The retained local-tarball and published-package paths depend on unpublished
+  fork-native registry packages and cannot install this fork.
+- **Agent-started services outlive omsp.** The verifier runs after omsp exits,
   in the same container or VM, so both runners set
-  `OMP_DAEMON_IDLE_GRACE_MS` to 24 h for the omp process: services the agent
+  `OMSP_DAEMON_IDLE_GRACE_MS` to 24 h for the omsp process: services the agent
   started with the bash tool's `name` stay up until teardown instead of
-  stopping 3 s after omp exits. An explicit `--env OMP_DAEMON_IDLE_GRACE_MS=<ms>`
+  stopping 3 s after omsp exits. An explicit `--env OMSP_DAEMON_IDLE_GRACE_MS=<ms>`
   wins.

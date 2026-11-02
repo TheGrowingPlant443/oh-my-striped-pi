@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { listAllSessions, resolveResumableSession } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { computeDefaultSessionDir } from "@oh-my-pi/pi-coding-agent/session/session-paths";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import { getConfigRootDir, refreshDirsFromEnv, setAgentDir } from "@oh-my-pi/pi-utils";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { listAllSessions, resolveResumableSession } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { computeDefaultSessionDir } from "@oh-my-striped-pi/pi-coding-agent/session/session-paths";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { executeBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import { getConfigRootDir, refreshDirsFromEnv, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 let tempDir: string;
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 const storage = new FileSessionStorage();
 
 beforeEach(async () => {
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-resume-command-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-resume-command-"));
 	setAgentDir(path.join(tempDir, "agent"));
 });
 
@@ -24,7 +24,7 @@ afterEach(async () => {
 		setAgentDir(originalAgentDir);
 	} else {
 		setAgentDir(fallbackAgentDir);
-		delete process.env.PI_CODING_AGENT_DIR;
+		delete process.env.OMSP_CODING_AGENT_DIR;
 	}
 	await fs.rm(tempDir, { recursive: true, force: true });
 });
@@ -232,12 +232,12 @@ describe("/resume slash command", () => {
 
 	it.skipIf(process.platform === "win32")("lists and resumes sessions stored in XDG_DATA_HOME", async () => {
 		const xdgDataDir = path.join(tempDir, "xdg-data");
-		const xdgOmpDir = path.join(xdgDataDir, "omp");
+		const xdgOmpDir = path.join(xdgDataDir, "omsp");
 		await fs.mkdir(xdgOmpDir, { recursive: true });
 
 		const originalXdgData = process.env.XDG_DATA_HOME;
-		const originalPiCodingAgentDir = process.env.PI_CODING_AGENT_DIR;
-		delete process.env.PI_CODING_AGENT_DIR;
+		const originalPiCodingAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+		delete process.env.OMSP_CODING_AGENT_DIR;
 		process.env.XDG_DATA_HOME = xdgDataDir;
 		refreshDirsFromEnv();
 
@@ -263,7 +263,7 @@ describe("/resume slash command", () => {
 		} finally {
 			if (originalXdgData !== undefined) process.env.XDG_DATA_HOME = originalXdgData;
 			else delete process.env.XDG_DATA_HOME;
-			if (originalPiCodingAgentDir !== undefined) process.env.PI_CODING_AGENT_DIR = originalPiCodingAgentDir;
+			if (originalPiCodingAgentDir !== undefined) process.env.OMSP_CODING_AGENT_DIR = originalPiCodingAgentDir;
 			refreshDirsFromEnv();
 		}
 	});

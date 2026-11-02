@@ -2,11 +2,20 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type ContextFile, contextFileCapability } from "@oh-my-pi/pi-coding-agent/capability/context-file";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { initializeWithSettings, loadCapability, resetCapabilityForTests } from "@oh-my-pi/pi-coding-agent/discovery";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { __resetDirsFromEnvForTests, getProjectAgentDir, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { type ContextFile, contextFileCapability } from "@oh-my-striped-pi/pi-coding-agent/capability/context-file";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	initializeWithSettings,
+	loadCapability,
+	resetCapabilityForTests,
+} from "@oh-my-striped-pi/pi-coding-agent/discovery";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import {
+	__resetDirsFromEnvForTests,
+	getProjectAgentDir,
+	removeWithRetries,
+	setAgentDir,
+} from "@oh-my-striped-pi/pi-utils";
 
 function restoreEnv(key: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -44,14 +53,14 @@ describe("contextFiles.extra", () => {
 		resetCapabilityForTests();
 		originalHome = process.env.HOME;
 		originalUserProfile = process.env.USERPROFILE;
-		originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omp-extra-ctx-home-"));
+		originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-extra-ctx-home-"));
 		dirs.push(tempHome);
 		process.env.HOME = tempHome;
 		process.env.USERPROFILE = tempHome;
 		vi.spyOn(os, "homedir").mockReturnValue(tempHome);
-		setAgentDir(path.join(tempHome, ".omp", "agent"));
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-extra-ctx-"));
+		setAgentDir(path.join(tempHome, ".omsp", "agent"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-extra-ctx-"));
 		dirs.push(tempDir);
 	});
 
@@ -62,7 +71,7 @@ describe("contextFiles.extra", () => {
 		vi.restoreAllMocks();
 		restoreEnv("HOME", originalHome);
 		restoreEnv("USERPROFILE", originalUserProfile);
-		restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
+		restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
 		__resetDirsFromEnvForTests();
 		await Promise.all(dirs.splice(0).map(dir => removeWithRetries(dir)));
 	});
@@ -174,7 +183,7 @@ describe("contextFiles.extra", () => {
 	});
 
 	test("loads a user-agent-dir extra file without shadowing user AGENTS.md", async () => {
-		const agentDir = path.join(tempHome, ".omp", "agent");
+		const agentDir = path.join(tempHome, ".omsp", "agent");
 		await fs.mkdir(agentDir, { recursive: true });
 		await fs.writeFile(path.join(agentDir, "AGENTS.md"), "# user shared\n");
 		await fs.writeFile(path.join(agentDir, "AGENTS.local.md"), "# user personal\n");
@@ -191,7 +200,7 @@ describe("contextFiles.extra", () => {
 	});
 
 	test("a project-configured list does not read the user agent directory", async () => {
-		const agentDir = path.join(tempHome, ".omp", "agent");
+		const agentDir = path.join(tempHome, ".omsp", "agent");
 		await fs.mkdir(agentDir, { recursive: true });
 		await fs.writeFile(path.join(agentDir, "secrets.md"), "# user secret\n");
 		await fs.writeFile(path.join(tempDir, "secrets.md"), "# project file\n");

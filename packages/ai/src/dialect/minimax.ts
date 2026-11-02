@@ -1,4 +1,4 @@
-import { escapeXmlText } from "@oh-my-pi/pi-utils";
+import { escapeXmlText } from "@oh-my-striped-pi/pi-utils";
 import type { Message, ToolCall } from "../types";
 import {
 	ANTHROPIC_THINKING_TAG_PREFIXES,

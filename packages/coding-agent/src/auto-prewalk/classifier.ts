@@ -12,11 +12,11 @@
  * low-signal request ("ok", "thanks"). Throws on every other failure (no key,
  * malformed answer, abort, timeout); the caller treats both as "do not arm".
  */
-import type { AgentMessage, AgentTelemetryConfig } from "@oh-my-pi/pi-agent-core";
-import { type ChoiceAnswer, judgeQuestions } from "@oh-my-pi/pi-ai";
-import { titleTextFromSkillPrompt } from "@oh-my-pi/pi-tui/chat/skill-title-input";
-import { textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
-import { assistantText } from "@oh-my-pi/pi-tui/overlays/copy-targets";
+import type { AgentMessage, AgentTelemetryConfig } from "@oh-my-striped-pi/pi-agent-core";
+import { type ChoiceAnswer, judgeQuestions } from "@oh-my-striped-pi/pi-ai";
+import { titleTextFromSkillPrompt } from "@oh-my-striped-pi/pi-tui/chat/skill-title-input";
+import { textContent } from "@oh-my-striped-pi/pi-tui/chat/transcript-entry";
+import { assistantText } from "@oh-my-striped-pi/pi-tui/overlays/copy-targets";
 import type { ModelRegistry } from "../config/model-registry";
 import type { Settings } from "../config/settings";
 import { hasNativeJudge, type JudgmentUsage, resolveJudge, sharedJudgmentCache } from "../judgment";

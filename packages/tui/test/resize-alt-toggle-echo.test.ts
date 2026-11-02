@@ -5,8 +5,8 @@ import {
 	type TerminalFrameProvider,
 	TUI,
 	type ViewportSize,
-} from "@oh-my-pi/pi-tui";
-import type { RenderTimer } from "@oh-my-pi/pi-tui/tui";
+} from "@oh-my-striped-pi/pi-tui";
+import type { RenderTimer } from "@oh-my-striped-pi/pi-tui/tui";
 import { withoutTerminalMultiplexer } from "./helpers/terminal-multiplexer";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";
@@ -25,7 +25,7 @@ import { VirtualTerminal } from "./virtual-terminal";
 const ALT_ENTER = "\x1b[?1049h";
 const ALT_EXIT = "\x1b[?1049l";
 
-const TERMINAL_ENV = ["TERM_PROGRAM", "PI_TUI_RESIZE_IN_PLACE"] as const;
+const TERMINAL_ENV = ["TERM_PROGRAM", "OMSP_TUI_RESIZE_IN_PLACE"] as const;
 
 class LineComponent implements Component {
 	constructor(
@@ -115,7 +115,7 @@ describe("resize on Warp, which SIGWINCHes on alt-buffer toggle", () => {
 
 	it("borrows the alt buffer once when Warp in-place is forced off", async () => {
 		Bun.env.TERM_PROGRAM = "WarpTerminal";
-		Bun.env.PI_TUI_RESIZE_IN_PLACE = "0";
+		Bun.env.OMSP_TUI_RESIZE_IN_PLACE = "0";
 		const term = new AltToggleEchoTerminal(40, 12);
 		const scheduler = new VirtualRenderScheduler();
 		const tui = new TUI(term, undefined, { renderScheduler: scheduler });
@@ -398,7 +398,7 @@ describe("Warp echo expectation is single-shot", () => {
 
 	it("consumes the echo expectation so a later one-row resize restarts", () => {
 		Bun.env.TERM_PROGRAM = "WarpTerminal";
-		Bun.env.PI_TUI_RESIZE_IN_PLACE = "0";
+		Bun.env.OMSP_TUI_RESIZE_IN_PLACE = "0";
 		const term = new VirtualTerminal(40, 12);
 		const writes: string[] = [];
 		const originalWrite = term.write.bind(term);
@@ -440,7 +440,7 @@ describe("Warp echo expectation is single-shot", () => {
 	});
 	it("re-probes a delayed echo that arrives after its probe resolved", () => {
 		Bun.env.TERM_PROGRAM = "WarpTerminal";
-		Bun.env.PI_TUI_RESIZE_IN_PLACE = "0";
+		Bun.env.OMSP_TUI_RESIZE_IN_PLACE = "0";
 		const term = new VirtualTerminal(40, 12);
 		const writes: string[] = [];
 		const originalWrite = term.write.bind(term);
@@ -478,7 +478,7 @@ describe("Warp echo expectation is single-shot", () => {
 	});
 	it("never probes while the resize borrow owns the alt buffer", () => {
 		Bun.env.TERM_PROGRAM = "WarpTerminal";
-		Bun.env.PI_TUI_RESIZE_IN_PLACE = "0";
+		Bun.env.OMSP_TUI_RESIZE_IN_PLACE = "0";
 		const term = new VirtualTerminal(40, 12);
 		const writes: string[] = [];
 		const originalWrite = term.write.bind(term);

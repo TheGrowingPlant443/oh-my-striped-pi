@@ -27,10 +27,10 @@ import type {
 	DesktopWindow,
 	OpenedApplication,
 	PointerOptions,
-} from "@oh-my-pi/pi-natives";
-import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
-import * as postmortem from "@oh-my-pi/pi-utils/postmortem";
-import { Snowflake } from "@oh-my-pi/pi-utils/snowflake";
+} from "@oh-my-striped-pi/pi-natives";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils/fs-error";
+import * as postmortem from "@oh-my-striped-pi/pi-utils/postmortem";
+import { Snowflake } from "@oh-my-striped-pi/pi-utils/snowflake";
 import { JsRuntime, type RuntimeHooks } from "../../eval/js/shared/runtime";
 import { cloneSafe, RunOutput } from "../browser/run-output";
 import {
@@ -41,7 +41,7 @@ import {
 	waitForRun,
 } from "../run-scope";
 import { ToolAbortError, throwIfAborted } from "../tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import {
 	type ComputerEscapeScope,
 	type ComputerScreenshot,
@@ -629,7 +629,7 @@ async function emitScreenshot(
 	frame: DesktopCapture,
 	options?: ScreenshotOptions,
 ): Promise<ScreenshotResult> {
-	const destination = path.join(os.tmpdir(), `omp-computer-${Snowflake.next()}.png`);
+	const destination = path.join(os.tmpdir(), `omsp-computer-${Snowflake.next()}.png`);
 	await Bun.write(destination, frame.data);
 	throwIfAborted(context.signal);
 	const result: ScreenshotResult = {
@@ -1354,7 +1354,7 @@ export class ComputerWorkerCore {
 				// The worker must answer its readiness handshake without loading the native
 				// addon; normal CLI startup and selector pings never execute desktop code.
 				const createSession =
-					this.#createSession ?? (await import("@oh-my-pi/pi-natives/desktop")).createDesktopSession;
+					this.#createSession ?? (await import("@oh-my-striped-pi/pi-natives/desktop")).createDesktopSession;
 				const session = await createSession({ display: snapshot.display, escapeStopKey: escape.key });
 				const guarded = this.#guard(session);
 				this.#session = session;
@@ -1782,7 +1782,7 @@ export class ComputerWorkerCore {
 							"Open the containing folder with apps.open(folder) instead, which opens it behind the user's app.",
 						);
 					}
-					// A relative path names an item in the session's folder, not the omp process's.
+					// A relative path names an item in the session's folder, not the omsp process's.
 					const listed = async (value: string): Promise<boolean> =>
 						(await nativeCall(context.signal, () => session.listApplications())).some(
 							app => app.id === value || app.path === value,

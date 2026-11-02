@@ -3,19 +3,19 @@
  * Used by registry-smoke.test.ts for discovery, explicit link retrieval,
  * crash cleanup, and the real CLI path.
  *
- * argv[2]  metadata dir override; empty/absent → default `~/.omp/run/collab-hosts`.
- * argv[3]  URL marker; falls back to OMP_SMOKE_MARKER, then "smoke".
- * argv[4]  instance ID; falls back to OMP_SMOKE_INSTANCE_ID, then "smoke-host".
+ * argv[2]  metadata dir override; empty/absent → default `~/.omsp/run/collab-hosts`.
+ * argv[3]  URL marker; falls back to OMSP_SMOKE_MARKER, then "smoke".
+ * argv[4]  instance ID; falls back to OMSP_SMOKE_INSTANCE_ID, then "smoke-host".
  *
  * Emits `READY\n` once published. SIGTERM runs postmortem cleanup, which closes
- * the publication, then exits 143 like every omp process.
+ * the publication, then exits 143 like every omsp process.
  */
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 import { type CollabHostRegistrySource, publishCollabHost } from "../../../src/collab/registry";
 
 const dirArg = process.argv[2];
-const marker = process.argv[3] ?? process.env.OMP_SMOKE_MARKER ?? "smoke";
-const instanceId = process.argv[4] ?? process.env.OMP_SMOKE_INSTANCE_ID ?? "smoke-host";
+const marker = process.argv[3] ?? process.env.OMSP_SMOKE_MARKER ?? "smoke";
+const instanceId = process.argv[4] ?? process.env.OMSP_SMOKE_INSTANCE_ID ?? "smoke-host";
 const dir = dirArg && dirArg.length > 0 ? dirArg : undefined;
 const startedAt = Date.now();
 

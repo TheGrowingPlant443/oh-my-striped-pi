@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	collapseBuiltVariants,
 	collapseVariants,
@@ -12,12 +12,12 @@ import {
 	resolveBareVariantSelector,
 	resolveVariantSelector,
 	type VariantCollapseTable,
-} from "@oh-my-pi/pi-catalog/compat/collapse";
-import { stripThinkingVariantSuffix } from "@oh-my-pi/pi-catalog/compat/taxonomy";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { resolveProviderModels } from "@oh-my-pi/pi-catalog/model-manager";
-import { resolveWireModelId } from "@oh-my-pi/pi-catalog/model-thinking";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-catalog/compat/collapse";
+import { stripThinkingVariantSuffix } from "@oh-my-striped-pi/pi-catalog/compat/taxonomy";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { resolveProviderModels } from "@oh-my-striped-pi/pi-catalog/model-manager";
+import { resolveWireModelId } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 
 function memberSpec(
 	id: string,

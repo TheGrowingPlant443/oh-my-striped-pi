@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { renderHtmlToText } from "@oh-my-pi/pi-coding-agent/tools/fetch";
-import { scrapeWithFirecrawl } from "@oh-my-pi/pi-coding-agent/web/firecrawl";
-import * as toolsManager from "@oh-my-pi/pi-coding-agent/utils/tools-manager";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { renderHtmlToText } from "@oh-my-striped-pi/pi-coding-agent/tools/fetch";
+import { scrapeWithFirecrawl } from "@oh-my-striped-pi/pi-coding-agent/web/firecrawl";
+import * as toolsManager from "@oh-my-striped-pi/pi-coding-agent/utils/tools-manager";
 import { asGlobalFetch } from "../helpers/fetch-mock";
 
 const originalBaseUrl = process.env.FIRECRAWL_BASE_URL;

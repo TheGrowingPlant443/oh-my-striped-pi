@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import {
 	__resetProfileSnapshotForTests,
 	APP_NAME,
@@ -13,8 +13,8 @@ import {
 	setAgentDir,
 	setProfile,
 	VERSION,
-} from "@oh-my-pi/pi-utils/dirs";
-import { Snowflake } from "@oh-my-pi/pi-utils/snowflake";
+} from "@oh-my-striped-pi/pi-utils/dirs";
+import { Snowflake } from "@oh-my-striped-pi/pi-utils/snowflake";
 import { runCli } from "../src/cli";
 import * as profileAliasCli from "../src/cli/profile-alias";
 
@@ -42,19 +42,17 @@ describe("global --profile flag", () => {
 	let originalProfile: string | undefined;
 	let originalAgentDir = "";
 	let originalAgentDirEnv: string | undefined;
-	let originalOmpProfileEnv: string | undefined;
-	let originalPiProfileEnv: string | undefined;
+	let originalProfileEnv: string | undefined;
 	let originalConfigDir: string | undefined;
 
 	beforeEach(() => {
 		originalProfile = getActiveProfile();
 		originalAgentDir = getAgentDir();
-		originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
-		originalOmpProfileEnv = process.env.OMP_PROFILE;
-		originalPiProfileEnv = process.env.PI_PROFILE;
-		originalConfigDir = process.env.PI_CONFIG_DIR;
-		configDir = `.omp-profile-cli-test-${Snowflake.next()}`;
-		process.env.PI_CONFIG_DIR = configDir;
+		originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
+		originalProfileEnv = process.env.OMSP_PROFILE;
+		originalConfigDir = process.env.OMSP_CONFIG_DIR;
+		configDir = `.omsp-profile-cli-test-${Snowflake.next()}`;
+		process.env.OMSP_CONFIG_DIR = configDir;
 		process.exitCode = 0;
 	});
 
@@ -62,9 +60,9 @@ describe("global --profile flag", () => {
 		vi.restoreAllMocks();
 		setProfile(undefined);
 		if (originalConfigDir === undefined) {
-			delete process.env.PI_CONFIG_DIR;
+			delete process.env.OMSP_CONFIG_DIR;
 		} else {
-			process.env.PI_CONFIG_DIR = originalConfigDir;
+			process.env.OMSP_CONFIG_DIR = originalConfigDir;
 		}
 		if (originalProfile) {
 			setProfile(originalProfile);
@@ -73,20 +71,15 @@ describe("global --profile flag", () => {
 		} else {
 			setProfile(undefined);
 		}
-		if (originalOmpProfileEnv === undefined) {
-			delete process.env.OMP_PROFILE;
+		if (originalProfileEnv === undefined) {
+			delete process.env.OMSP_PROFILE;
 		} else {
-			process.env.OMP_PROFILE = originalOmpProfileEnv;
-		}
-		if (originalPiProfileEnv === undefined) {
-			delete process.env.PI_PROFILE;
-		} else {
-			process.env.PI_PROFILE = originalPiProfileEnv;
+			process.env.OMSP_PROFILE = originalProfileEnv;
 		}
 		if (originalAgentDirEnv === undefined) {
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		} else {
-			process.env.PI_CODING_AGENT_DIR = originalAgentDirEnv;
+			process.env.OMSP_CODING_AGENT_DIR = originalAgentDirEnv;
 		}
 		__resetProfileSnapshotForTests();
 		process.exitCode = 0;
@@ -104,11 +97,10 @@ describe("global --profile flag", () => {
 		expect(getAgentDir()).toBe(path.join(os.homedir(), configDir, "profiles", "work", "agent"));
 	});
 
-	it("activates a profile inherited from OMP_PROFILE at run time", async () => {
+	it("activates a profile inherited from OMSP_PROFILE at run time", async () => {
 		const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 		setProfile(undefined);
-		process.env.OMP_PROFILE = "work";
-		delete process.env.PI_PROFILE;
+		process.env.OMSP_PROFILE = "work";
 
 		await runCli(["--version"]);
 
@@ -123,24 +115,24 @@ describe("global --profile flag", () => {
 		const installSpy = vi.spyOn(profileAliasCli, "installProfileAlias").mockResolvedValue({
 			shell: "bash",
 			configPath: "/home/me/.bashrc",
-			aliasName: "omp-work",
+			aliasName: "omsp-work",
 			profile: "work",
-			command: "omp --profile=work",
+			command: "omsp --profile=work",
 			reloadedWith: ". '/home/me/.bashrc'",
 		});
 		const outSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-		await runCli(["--profile", "work", "--alias", "omp-work", "--version"]);
+		await runCli(["--profile", "work", "--alias", "omsp-work", "--version"]);
 
 		expect(process.exitCode).toBe(0);
 		expect(installSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
 				profile: "work",
-				aliasName: "omp-work",
+				aliasName: "omsp-work",
 			}),
 		);
 		const output = outSpy.mock.calls.map(call => String(call[0] ?? "")).join("\n");
-		expect(output).toContain("Created omp-work");
+		expect(output).toContain("Created omsp-work");
 		expect(output).not.toContain(`${APP_NAME}/${VERSION}`);
 	});
 
@@ -158,16 +150,16 @@ describe("global --profile flag", () => {
 	});
 
 	it("loads profile agent .env before command modules import pi-utils env", async () => {
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-profile-cli-env-"));
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-profile-cli-env-"));
 		try {
 			const home = path.join(root, "home");
-			const configDir = ".omp-profile-cli-env";
+			const configDir = ".omsp-profile-cli-env";
 			const defaultAgentDir = path.join(home, configDir, "agent");
 			const profileAgentDir = path.join(home, configDir, "profiles", "work", "agent");
 			await fs.mkdir(defaultAgentDir, { recursive: true });
 			await fs.mkdir(profileAgentDir, { recursive: true });
-			await Bun.write(path.join(defaultAgentDir, ".env"), "OMP_PROFILE_BOOTSTRAP_SENTINEL=default\n");
-			await Bun.write(path.join(profileAgentDir, ".env"), "OMP_PROFILE_BOOTSTRAP_SENTINEL=work\n");
+			await Bun.write(path.join(defaultAgentDir, ".env"), "OMSP_PROFILE_BOOTSTRAP_SENTINEL=default\n");
+			await Bun.write(path.join(profileAgentDir, ".env"), "OMSP_PROFILE_BOOTSTRAP_SENTINEL=work\n");
 
 			const probePath = path.join(root, "probe.ts");
 			await Bun.write(
@@ -175,7 +167,7 @@ describe("global --profile flag", () => {
 				[
 					`import { runCli } from ${JSON.stringify(url.pathToFileURL(cliEntry).href)};`,
 					'await runCli(["--profile", "work", "--help"]);',
-					'process.stdout.write("\\nSENTINEL=" + (Bun.env.OMP_PROFILE_BOOTSTRAP_SENTINEL ?? ""));',
+					'process.stdout.write("\\nSENTINEL=" + (Bun.env.OMSP_PROFILE_BOOTSTRAP_SENTINEL ?? ""));',
 				].join("\n"),
 			);
 
@@ -184,14 +176,13 @@ describe("global --profile flag", () => {
 				HOME: home,
 				// os.homedir() reads USERPROFILE on Windows, HOME elsewhere.
 				USERPROFILE: home,
-				PI_CONFIG_DIR: configDir,
-				PI_NO_TITLE: "1",
+				OMSP_CONFIG_DIR: configDir,
+				OMSP_NO_TITLE: "1",
 				NO_COLOR: "1",
 			};
-			delete childEnv.OMP_PROFILE;
-			delete childEnv.PI_PROFILE;
-			delete childEnv.PI_CODING_AGENT_DIR;
-			delete childEnv.OMP_PROFILE_BOOTSTRAP_SENTINEL;
+			delete childEnv.OMSP_PROFILE;
+			delete childEnv.OMSP_CODING_AGENT_DIR;
+			delete childEnv.OMSP_PROFILE_BOOTSTRAP_SENTINEL;
 
 			const proc = Bun.spawn([process.execPath, probePath], {
 				cwd: repoRoot,
@@ -215,8 +206,8 @@ describe("global --profile flag", () => {
 		// transpile of the CLI graph, not latency under test.
 	}, 30_000);
 
-	it("surfaces an invalid OMP_PROFILE env as a clean error, not an import crash", async () => {
-		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-profile-cli-env-bad-"));
+	it("surfaces an invalid OMSP_PROFILE env as a clean error, not an import crash", async () => {
+		const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-profile-cli-env-bad-"));
 		try {
 			const home = path.join(root, "home");
 			await fs.mkdir(home, { recursive: true });
@@ -238,12 +229,11 @@ describe("global --profile flag", () => {
 				...process.env,
 				HOME: home,
 				USERPROFILE: home,
-				PI_CONFIG_DIR: ".omp-profile-cli-env-bad",
-				OMP_PROFILE: "..",
+				OMSP_CONFIG_DIR: ".omsp-profile-cli-env-bad",
+				OMSP_PROFILE: "..",
 				NO_COLOR: "1",
 			};
-			delete childEnv.PI_PROFILE;
-			delete childEnv.PI_CODING_AGENT_DIR;
+			delete childEnv.OMSP_CODING_AGENT_DIR;
 
 			const proc = Bun.spawn([process.execPath, probePath], {
 				cwd: repoRoot,
@@ -258,7 +248,7 @@ describe("global --profile flag", () => {
 			]);
 
 			expect(stdout, stderr).toContain("HANDLED");
-			expect(stderr).toContain("Invalid OMP profile");
+			expect(stderr).toContain("Invalid OMSP profile");
 			expect(exitCode).toBe(1);
 		} finally {
 			await removeWithRetries(root);

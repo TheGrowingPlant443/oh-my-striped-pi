@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { Api, FetchImpl, Model } from "@oh-my-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { Api, FetchImpl, Model } from "@oh-my-striped-pi/pi-catalog/types";
 import { type ApiKey, NO_AUTH_SENTINEL } from "../src/auth-retry";
 import { embed } from "../src/embeddings";
 import { generateImage } from "../src/images";

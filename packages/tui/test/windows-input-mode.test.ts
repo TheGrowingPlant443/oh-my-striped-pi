@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Editor, type Component } from "@oh-my-pi/pi-tui";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { matchesAppFollowUp } from "@oh-my-pi/pi-tui/keybinding-matchers";
-import { setKeybindings } from "@oh-my-pi/pi-tui/keybindings";
-import { matchesKey } from "@oh-my-pi/pi-tui/keys";
-import { Win32InputModeDecoder, Win32PasteMarkerNormalizer } from "@oh-my-pi/pi-tui/windows-input-mode";
+import { Editor, type Component } from "@oh-my-striped-pi/pi-tui";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { matchesAppFollowUp } from "@oh-my-striped-pi/pi-tui/keybinding-matchers";
+import { setKeybindings } from "@oh-my-striped-pi/pi-tui/keybindings";
+import { matchesKey } from "@oh-my-striped-pi/pi-tui/keys";
+import { Win32InputModeDecoder, Win32PasteMarkerNormalizer } from "@oh-my-striped-pi/pi-tui/windows-input-mode";
 import {
 	createProcessTerminalRenderHarness,
 	type ProcessTerminalRenderHarness,

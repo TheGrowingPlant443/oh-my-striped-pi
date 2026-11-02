@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { type Component, CURSOR_MARKER } from "@oh-my-pi/pi-tui";
+import { type Component, CURSOR_MARKER } from "@oh-my-striped-pi/pi-tui";
 import {
 	createProcessTerminalRenderHarness,
 	type ProcessTerminalRenderHarness,
@@ -21,16 +21,21 @@ class PromptFrame implements Component {
 
 describe("startup capability probes", () => {
 	withoutTerminalMultiplexer();
-	const PROBE_ENV = ["PI_TUI_GLYPH_PROTOCOL_PROBE", "PI_TUI_NATIVE", "PI_NO_GLYPH_PROTOCOL", "TERM_PROGRAM"] as const;
+	const PROBE_ENV = [
+		"OMSP_TUI_GLYPH_PROTOCOL_PROBE",
+		"OMSP_TUI_NATIVE",
+		"OMSP_NO_GLYPH_PROTOCOL",
+		"TERM_PROGRAM",
+	] as const;
 	const previousEnv = new Map<string, string | undefined>();
 	let harness: ProcessTerminalRenderHarness | undefined;
 
 	beforeEach(() => {
 		for (const key of PROBE_ENV) previousEnv.set(key, Bun.env[key]);
 		// bun test skips the APC probes by default; send them as a real session does.
-		Bun.env.PI_TUI_GLYPH_PROTOCOL_PROBE = "1";
-		Bun.env.PI_TUI_NATIVE = "1";
-		delete Bun.env.PI_NO_GLYPH_PROTOCOL;
+		Bun.env.OMSP_TUI_GLYPH_PROTOCOL_PROBE = "1";
+		Bun.env.OMSP_TUI_NATIVE = "1";
+		delete Bun.env.OMSP_NO_GLYPH_PROTOCOL;
 		// `TERM_PROGRAM=tern` would start a TSP surface instead of the row renderer.
 		delete Bun.env.TERM_PROGRAM;
 	});

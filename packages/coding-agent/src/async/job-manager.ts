@@ -1,8 +1,8 @@
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import type { PipeStreams } from "@oh-my-pi/pi-natives";
-import { logger } from "@oh-my-pi/pi-utils";
-import type { StructuredSubagentOutput } from "@oh-my-pi/pi-tui/tools/task";
-import type { OutputMeta } from "@oh-my-pi/pi-tui/tools/output-meta";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import type { PipeStreams } from "@oh-my-striped-pi/pi-natives";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import type { StructuredSubagentOutput } from "@oh-my-striped-pi/pi-tui/tools/task";
+import type { OutputMeta } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
 import { IrcBus } from "../irc/bus";
 import type { JobWidgetInputs, JobWidgetRegistry } from "../job-widgets/types";
 

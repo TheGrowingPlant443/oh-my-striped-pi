@@ -1,4 +1,4 @@
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { describe, expect, it, spyOn } from "bun:test";
 import {
 	chatTextBackend,
@@ -11,9 +11,9 @@ import {
 	renderJudgmentState,
 	type TextBackend,
 	TextJudge,
-} from "@oh-my-pi/pi-ai";
-import type { ImageContent } from "@oh-my-pi/pi-ai/types";
-import { ValidationError } from "@oh-my-pi/pi-ai/error";
+} from "@oh-my-striped-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai/types";
+import { ValidationError } from "@oh-my-striped-pi/pi-ai/error";
 
 const LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
 

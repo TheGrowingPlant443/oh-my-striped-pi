@@ -4,6 +4,7 @@
 
 ### Breaking Changes
 
+- Renamed this private fork to oh-my-striped-pi: use `omsp`, `OMSP_*` environment variables, and `.omsp` configuration/state alongside an independent `omp` installation.
 - Removed built-in public SaaS model-provider integrations other than Copilot; on-device, self-hosted and explicitly configured company providers remain.
 - Custom tool loaders now resolve the injected host SDK themselves; constructors take cwd as their first argument instead of a pi namespace.
 - WebMCP now uses Chrome's native WebMCP support through WebMcpController, which accepts a Puppeteer Page. The former page-hook installation helpers, bridge constant, and page-hook types have been removed; Tern tabs no longer support WebMCP.
@@ -16,7 +17,7 @@
 - Added computer-tool approval modes: tools.approval["computer.control"] can allow unattended foreground control on dedicated machines or deny the request without prompting. The approval mode does not itself grant access.
 - Added optional task-file input (task.file=true), allowing subagent instructions to be loaded from an absolute UTF-8 file path or local:// URL with the submitted path and SHA-256 recorded.
 - Sessions can be pinned or unpinned from the resume picker with Alt+K and Alt+Shift+K, or the remappable app.session.pin and app.session.unpin actions. Pinned sessions move to the top and take priority in search results.
-- Added PI_LINK_SCHEME and optional PI_LINK_HOST, allowing file links from SSH or tmux sessions to open through a desktop protocol handler.
+- Added OMSP_LINK_SCHEME and optional OMSP_LINK_HOST, allowing file links from SSH or tmux sessions to open through a desktop protocol handler.
 - Extensions can customize assistant-text rendering and rerender individual replies through the opt-in extensionRenderers.assistantText setting, and can register interactive link schemes with extension callbacks and renderer fallbacks.
 - /debug reports now include session-logs.txt containing all log records written by the reporting session and its subagents for the current day.
 
@@ -27,7 +28,7 @@
 - Filesystem changes are detected automatically, so manual scan-cache invalidation after edits is no longer needed.
 - Model refreshes use substantially less CPU by reusing unchanged models and avoiding repeated model-cache database opens.
 - Overlapping sloppy-edit operations are now applied sequentially, with each operation matched against the result of the preceding operation.
-- PI_INTENT_PROMPT and PI_INTENT_DESC can now customize the system guidance and tool-schema description for the i intent field.
+- OMSP_INTENT_PROMPT and OMSP_INTENT_DESC can now customize the system guidance and tool-schema description for the i intent field.
 - Printed JSON values in eval, including large Python dictionaries and lists, are displayed as collapsible JSON trees.
 - The . and c continue shortcuts now simply answer an unanswered last message instead of adding a hidden continue directive.
 - With bash.gitGuard enabled, checkout, switch, restore, reset, and stash operations run safely in linked worktrees, while discarded uncommitted changes are preserved for recovery.
@@ -36,6 +37,7 @@
 
 ### Fixed
 
+- Preserved published plugin inputs (`omp`/`pi` package manifests, `.omp-plugin` markers, and `${OMP_PLUGIN_ROOT}` substitution) with fork-specific overrides first; application configuration and state remain exclusively `OMSP_*`/`.omsp`.
 - Fixed session creation replacing an extension- or host-registered `local-inference` stream handler with the bundled on-device transport.
 - Fixed live configuration reloads missing edits immediately after a symlink switches to another file in the same directory.
 - Fixed auth-gateway model routing after catalog refreshes so bare model IDs select the highest-priority credentialed provider, with wire-format compatibility used as a tie-breaker.
@@ -64,7 +66,7 @@
 - Fixed failed large-value JSON queries from displaying the rejected value instead of a useful error.
 - Fixed F5 retry reporting no retry when a background result arrived after cancellation or interruption.
 - Fixed WebMCP invocation errors being empty and timed-out page invocations continuing to run.
-- Fixed unavailable configured default or dictation models being silently replaced; omp now warns and identifies the fallback model.
+- Fixed unavailable configured default or dictation models being silently replaced; omsp now warns and identifies the fallback model.
 - Fixed LSP references for files in sibling Git worktrees by adding those checkouts to the active workspace.
 - Improved macOS computer-use behavior for applications without windows by opening the app and inspecting its returned window in one operation.
 

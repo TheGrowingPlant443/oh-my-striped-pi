@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type Api, AuthStorage, type Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { type Api, AuthStorage, type Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
+import { modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import {
 	createSerializedRebuilder,
 	gatewayRoutableModels,
@@ -45,7 +45,7 @@ function servedModel(provider: string, id: string, api: Api): Model<Api> {
 
 describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 	test("resolves a discovery-only model absent from the bundled catalog", async () => {
-		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
+		using tempDir = TempDir.createSync("@omsp-auth-gateway-catalog-");
 		const registry = new ModelRegistry(await createAuthStorage(), tempDir.join("models.yml"));
 		// Simulate a model reached via provider discovery but not compiled into
 		// the bundle (e.g. a post-release id). registerProvider merges it into
@@ -77,7 +77,7 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 	});
 
 	test("gateway registry ignores local models.yml credential and routing overrides", async () => {
-		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
+		using tempDir = TempDir.createSync("@omsp-auth-gateway-catalog-");
 		const modelsPath = tempDir.join("models.yml");
 		// Keep credential overrides and pi-native self-routes in separate company namespaces.
 		await Bun.write(
@@ -129,7 +129,7 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 	});
 
 	test("scopes the catalog to providers with credentials", async () => {
-		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
+		using tempDir = TempDir.createSync("@omsp-auth-gateway-catalog-");
 		const registry = new ModelRegistry(await createAuthStorage(), tempDir.join("models.yml"));
 		const companyModel = servedModel("company-primary", "company-chat", "openai-completions");
 		registry.registerProvider(companyModel.provider, {
@@ -170,7 +170,7 @@ describe("indexModelsByRequestId (auth-gateway catalog)", () => {
 	});
 
 	test("serves judge-kind models alongside chat and keeps unrouted kinds out", async () => {
-		using tempDir = TempDir.createSync("@omp-auth-gateway-catalog-");
+		using tempDir = TempDir.createSync("@omsp-auth-gateway-catalog-");
 		const registry = new ModelRegistry(await createAuthStorage(), tempDir.join("models.yml"));
 		const judge = buildModel({
 			...servedModel("company-judge", "judge-latest", "openai-decisions"),

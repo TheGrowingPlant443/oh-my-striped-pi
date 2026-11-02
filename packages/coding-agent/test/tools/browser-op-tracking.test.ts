@@ -3,7 +3,7 @@ import {
 	describeInflight,
 	describeScreenshot,
 	type InflightOp,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/tab-worker";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-worker";
 
 describe("browser op tracking — timeout diagnostics", () => {
 	it("labels a screenshot op by its distinguishing argument", () => {

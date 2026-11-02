@@ -6,7 +6,7 @@ Selectors use `provider/model-id`. Model families served through Copilot or a co
 
 ## GitHub Copilot
 
-Run `omp login github-copilot` or `/login github-copilot`, complete authorization, then select an available model with `/model`. `COPILOT_GITHUB_TOKEN` remains the dedicated environment credential. Existing Copilot identity selection and compatibility retries are unchanged.
+Run `omsp login github-copilot` or `/login github-copilot`, complete authorization, then select an available model with `/model`. `COPILOT_GITHUB_TOKEN` remains the dedicated environment credential. Existing Copilot identity selection and compatibility retries are unchanged.
 
 Copilot receives prompts, code and tool results included in its model context. Account entitlement and quotas remain controlled by GitHub and your organization.
 

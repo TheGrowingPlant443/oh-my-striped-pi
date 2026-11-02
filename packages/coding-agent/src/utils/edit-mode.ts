@@ -1,7 +1,7 @@
-import { classifyModel } from "@oh-my-pi/pi-catalog/identity";
-import { $flag } from "@oh-my-pi/pi-utils";
+import { classifyModel } from "@oh-my-striped-pi/pi-catalog/identity";
+import { $flag } from "@oh-my-striped-pi/pi-utils";
 
-import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
+import type { EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import type { Settings } from "../config/settings";
 import { cfgEditMode, editModelVariants } from "../edit/settings";
 
@@ -23,9 +23,9 @@ export function resolveEditMode(session: EditModeSessionLike): EditMode {
 	if (modelVariant) return modelVariant;
 
 	const mode = cfgEditMode.get(session.settings);
-	// `PI_EDIT_VARIANT` pins the mode exactly; only settings-derived hashline adapts to the model.
+	// `OMSP_EDIT_VARIANT` pins the mode exactly; only settings-derived hashline adapts to the model.
 	if (cfgEditMode.provenance(session.settings) === "env") return mode;
-	if (mode === "hashline" && !$flag("PI_STRICT_EDIT_MODE") && activeModel) {
+	if (mode === "hashline" && !$flag("OMSP_STRICT_EDIT_MODE") && activeModel) {
 		const identity = classifyModel("", activeModel, { lenient: true });
 		if (
 			identity.class === "kimi" ||

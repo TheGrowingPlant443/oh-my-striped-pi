@@ -2,11 +2,15 @@
  * CLI argument parsing and help display
  */
 import * as path from "node:path";
-import { $env, APP_NAME } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import { $env, APP_NAME } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import type { ServiceTierOpenAISettingValue } from "../config/service-tier";
 import type { ApprovalMode } from "../tools/approval";
-import { CLI_THINKING_LEVELS, type ConfiguredThinkingLevel, parseCliThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+import {
+	CLI_THINKING_LEVELS,
+	type ConfiguredThinkingLevel,
+	parseCliThinkingLevel,
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import { BUILTIN_TOOL_NAMES, normalizeToolNames } from "../tools/builtin-names";
 import {
 	OPTIONAL_FLAGS,
@@ -199,7 +203,7 @@ export function validateGoalStartup(
 /**
  * Runtime dependencies the data-driven setters need. Constructed once at
  * module load and passed to every {@link STRING_SETTERS} call so the
- * setter table itself can stay free of `@oh-my-pi/pi-utils` runtime imports
+ * setter table itself can stay free of `@oh-my-striped-pi/pi-utils` runtime imports
  * (which would otherwise trip the profile bootstrap's env-init ordering).
  */
 const PARSE_DEPS: ParseDeps = {
@@ -250,7 +254,7 @@ export function parseArgs(inputArgs: string[], extensionFlags?: Map<string, { ty
 		unknownFlags: new Map(),
 		unrecognizedFlags: [],
 		invalidFlagValues: [],
-		sessionDir: $env.PI_CODING_AGENT_SESSION_DIR || undefined,
+		sessionDir: $env.OMSP_CODING_AGENT_SESSION_DIR || undefined,
 	};
 
 	// `--` ends option parsing (POSIX end-of-options). Everything after it is

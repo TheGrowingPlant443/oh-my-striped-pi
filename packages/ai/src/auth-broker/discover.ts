@@ -15,7 +15,7 @@ import {
 	isEnoent,
 	logger,
 	MAIN_CONFIG_FILENAMES,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import {
 	type AuthAccountPolicies,
@@ -52,7 +52,7 @@ export interface DiscoverAuthStorageOptions {
 	authStorageOptions?: Omit<AuthStorageOptions, "accountPolicies" | "configValueResolver" | "sourceLabel">;
 }
 
-/** Path to the local bearer token file. Created by `omp auth-broker token`. */
+/** Path to the local bearer token file. Created by `omsp auth-broker token`. */
 export function getAuthBrokerTokenFilePath(): string {
 	return path.join(getConfigRootDir(), "auth-broker.token");
 }
@@ -268,7 +268,7 @@ export async function loadAuthAccountPolicyConfig(
 }
 
 export async function loadAuthBrokerAccountPool(): Promise<AuthBrokerAccountPool | undefined> {
-	const filePath = process.env.OMP_AUTH_BROKER_ACCOUNT_POOL_FILE?.trim();
+	const filePath = process.env.OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE?.trim();
 	if (!filePath) return undefined;
 
 	let parsed: unknown;
@@ -276,23 +276,23 @@ export async function loadAuthBrokerAccountPool(): Promise<AuthBrokerAccountPool
 		const raw = await fs.readFile(filePath, "utf8");
 		parsed = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
 	} catch (error) {
-		throw new AIError.ConfigurationError(`Unable to read OMP_AUTH_BROKER_ACCOUNT_POOL_FILE at ${filePath}`, {
+		throw new AIError.ConfigurationError(`Unable to read OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE at ${filePath}`, {
 			cause: error,
 		});
 	}
 	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new AIError.ConfigurationError("OMP_AUTH_BROKER_ACCOUNT_POOL_FILE must contain a JSON object");
+		throw new AIError.ConfigurationError("OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE must contain a JSON object");
 	}
 
 	const accountPool = new Map<string, ReadonlySet<string> | AuthBrokerProviderPool>();
 	for (const [provider, value] of Object.entries(parsed)) {
 		const normalizedProvider = provider.trim();
 		if (normalizedProvider.length === 0) {
-			throw new AIError.ConfigurationError("OMP_AUTH_BROKER_ACCOUNT_POOL_FILE contains an empty provider id");
+			throw new AIError.ConfigurationError("OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE contains an empty provider id");
 		}
 		if (provider !== normalizedProvider) {
 			throw new AIError.ConfigurationError(
-				"OMP_AUTH_BROKER_ACCOUNT_POOL_FILE contains a provider id with surrounding whitespace",
+				"OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE contains a provider id with surrounding whitespace",
 			);
 		}
 		accountPool.set(provider, parseAccountPoolEntry(provider, value));
@@ -311,7 +311,7 @@ function parseAccountPoolEntry(provider: string, value: unknown): ReadonlySet<st
 	if (value === false) return { accounts: new Set(), apiKeys: false };
 	if (value === null || typeof value !== "object") {
 		throw new AIError.ConfigurationError(
-			`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} must be an array of identity keys, a boolean, or an object with "accounts"/"apiKeys"`,
+			`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} must be an array of identity keys, a boolean, or an object with "accounts"/"apiKeys"`,
 		);
 	}
 	const rule: { accounts?: ReadonlySet<string>; apiKeys?: boolean } = {};
@@ -319,20 +319,20 @@ function parseAccountPoolEntry(provider: string, value: unknown): ReadonlySet<st
 		if (key === "accounts") {
 			if (!Array.isArray(field)) {
 				throw new AIError.ConfigurationError(
-					`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has "accounts" that is not an array of identity keys`,
+					`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has "accounts" that is not an array of identity keys`,
 				);
 			}
 			rule.accounts = parseAccountPoolIdentities(provider, field);
 		} else if (key === "apiKeys") {
 			if (typeof field !== "boolean") {
 				throw new AIError.ConfigurationError(
-					`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has "apiKeys" that is not a boolean`,
+					`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has "apiKeys" that is not a boolean`,
 				);
 			}
 			rule.apiKeys = field;
 		} else {
 			throw new AIError.ConfigurationError(
-				`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has unknown field ${JSON.stringify(key)}`,
+				`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} has unknown field ${JSON.stringify(key)}`,
 			);
 		}
 	}
@@ -344,12 +344,12 @@ function parseAccountPoolIdentities(provider: string, value: unknown[]): Set<str
 	for (const identity of value) {
 		if (typeof identity !== "string" || identity.length === 0) {
 			throw new AIError.ConfigurationError(
-				`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} contains an invalid identity key`,
+				`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} contains an invalid identity key`,
 			);
 		}
 		if (identity !== identity.trim()) {
 			throw new AIError.ConfigurationError(
-				`OMP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} contains an identity key with surrounding whitespace`,
+				`OMSP_AUTH_BROKER_ACCOUNT_POOL_FILE entry for ${provider} contains an identity key with surrounding whitespace`,
 			);
 		}
 		identities.add(identity);
@@ -358,20 +358,20 @@ function parseAccountPoolIdentities(provider: string, value: unknown[]): Set<str
 }
 
 function resolveSnapshotTtlMs(): number {
-	const raw = process.env.OMP_AUTH_BROKER_SNAPSHOT_TTL_MS;
+	const raw = process.env.OMSP_AUTH_BROKER_SNAPSHOT_TTL_MS;
 	if (raw === undefined) return DEFAULT_SNAPSHOT_CACHE_TTL_MS;
 	const value = raw.trim();
 	if (value === "") return DEFAULT_SNAPSHOT_CACHE_TTL_MS;
 	const ttlMs = Number(value);
 	if (Number.isFinite(ttlMs) && ttlMs >= 0) return ttlMs;
-	logger.warn("Invalid OMP_AUTH_BROKER_SNAPSHOT_TTL_MS; using default", { value: raw });
+	logger.warn("Invalid OMSP_AUTH_BROKER_SNAPSHOT_TTL_MS; using default", { value: raw });
 	return DEFAULT_SNAPSHOT_CACHE_TTL_MS;
 }
 
 /**
  * Resolve broker connection configuration using the same precedence as the TUI:
  *
- * 1. `OMP_AUTH_BROKER_URL` / `OMP_AUTH_BROKER_TOKEN` env vars.
+ * 1. `OMSP_AUTH_BROKER_URL` / `OMSP_AUTH_BROKER_TOKEN` env vars.
  * 2. `auth.broker.url` / `auth.broker.token` in `<agentDir>/config.yml` or `<agentDir>/config.yaml`.
  * 3. `<config-root>/auth-broker.token` file (paired with a URL from env/config).
  *
@@ -385,8 +385,8 @@ export async function resolveAuthBrokerConfig(
 	const agentDir = options.agentDir ?? getAgentDir();
 	const resolveConfig = options.configValueResolver ?? defaultResolveConfigValue;
 
-	const envUrl = process.env.OMP_AUTH_BROKER_URL;
-	const envToken = process.env.OMP_AUTH_BROKER_TOKEN;
+	const envUrl = process.env.OMSP_AUTH_BROKER_URL;
+	const envToken = process.env.OMSP_AUTH_BROKER_TOKEN;
 
 	let url = envUrl && envUrl.length > 0 ? envUrl : undefined;
 	let configToken: string | undefined;
@@ -408,8 +408,8 @@ export async function resolveAuthBrokerConfig(
 	if (!token) {
 		throw new AIError.MissingApiKeyError(
 			undefined,
-			`OMP_AUTH_BROKER_URL is set (${url}) but no bearer token is available. ` +
-				`Set OMP_AUTH_BROKER_TOKEN, the \`auth.broker.token\` config entry, or place one at ${getAuthBrokerTokenFilePath()}.`,
+			`OMSP_AUTH_BROKER_URL is set (${url}) but no bearer token is available. ` +
+				`Set OMSP_AUTH_BROKER_TOKEN, the \`auth.broker.token\` config entry, or place one at ${getAuthBrokerTokenFilePath()}.`,
 		);
 	}
 	return { url, token };

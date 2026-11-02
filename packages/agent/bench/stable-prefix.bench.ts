@@ -9,7 +9,7 @@
  *
  * Run: bun packages/agent/bench/stable-prefix.bench.ts
  */
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import { StablePrefix } from "../src/append-only-context";
 import type { AgentTool } from "../src/types";
 

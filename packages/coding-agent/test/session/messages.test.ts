@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { type AgentMessage, filterProviderReplayMessages } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
+import { type AgentMessage, filterProviderReplayMessages } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
 import {
 	buildReplanTitleContext,
 	type CustomMessage,

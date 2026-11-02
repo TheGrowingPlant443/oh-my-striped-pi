@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
-import type { AgentToolContext } from "@oh-my-pi/pi-agent-core";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { runInteractiveBashPty } from "@oh-my-pi/pi-coding-agent/tools/bash-interactive";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { initTheme, type Theme, theme } from "@oh-my-pi/pi-tui/theme";
-import { TUI } from "@oh-my-pi/pi-tui";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { AgentToolContext } from "@oh-my-striped-pi/pi-agent-core";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { runInteractiveBashPty } from "@oh-my-striped-pi/pi-coding-agent/tools/bash-interactive";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { initTheme, type Theme, theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { TUI } from "@oh-my-striped-pi/pi-tui";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { VirtualTerminal } from "../../../tui/test/virtual-terminal";
 
 type InteractiveUi = Pick<NonNullable<AgentToolContext["ui"]>, "custom">;
@@ -27,14 +27,14 @@ function headlessUi(): InteractiveUi {
 	return { custom };
 }
 
-const ptyUnavailable = process.platform === "win32" || Bun.env.PI_NO_PTY === "1" || !fs.existsSync("/bin/bash");
+const ptyUnavailable = process.platform === "win32" || Bun.env.OMSP_NO_PTY === "1" || !fs.existsSync("/bin/bash");
 
 describe("runInteractiveBashPty", () => {
 	let tempDir: TempDir;
 
 	beforeEach(async () => {
 		initTheme();
-		tempDir = TempDir.createSync("@omp-bash-pty-env-");
+		tempDir = TempDir.createSync("@omsp-bash-pty-env-");
 		resetSettingsForTest();
 		await Settings.init({ inMemory: true, cwd: tempDir.path() });
 		// The spawn env is filtered `Bun.env` plus procmgr's fixed keys. Those keys
@@ -47,7 +47,7 @@ describe("runInteractiveBashPty", () => {
 				PATH: Bun.env.PATH ?? "",
 				HOME: tempDir.path(),
 				TERM: "dumb",
-				// The spawn env carries CI (unless PI_BASH_NO_CI is set) and may carry
+				// The spawn env carries CI (unless OMSP_BASH_NO_CI is set) and may carry
 				// the launcher's NO_COLOR; either turns tools monochrome and
 				// non-interactive on a real terminal.
 				CI: "shell-ci",
@@ -56,8 +56,8 @@ describe("runInteractiveBashPty", () => {
 				// call has a user at the keyboard.
 				GIT_EDITOR: "shell-git-editor",
 				GPG_TTY: "shell-gpg-tty",
-				OMP_PTY_RUNTIME_PROBE: "from-shell-env",
-				OMP_PTY_LAYER: "shell",
+				OMSP_PTY_RUNTIME_PROBE: "from-shell-env",
+				OMSP_PTY_LAYER: "shell",
 			},
 			prefix: undefined,
 		});
@@ -72,7 +72,7 @@ describe("runInteractiveBashPty", () => {
 	/** Run the env probe on a real PTY with `direnvEnv` as the command's overrides. */
 	async function probe(direnvEnv: Record<string, string>): Promise<string> {
 		const result = await runInteractiveBashPty(headlessUi(), {
-			command: `printf 'probe=%s layer=%s term=%s ci=%s no_color=%s git_editor=%s gpg_tty=%s\\n' "\${OMP_PTY_RUNTIME_PROBE-unset}" "\${OMP_PTY_LAYER-unset}" "$TERM" "\${CI-unset}" "\${NO_COLOR-unset}" "\${GIT_EDITOR-unset}" "\${GPG_TTY-unset}"`,
+			command: `printf 'probe=%s layer=%s term=%s ci=%s no_color=%s git_editor=%s gpg_tty=%s\\n' "\${OMSP_PTY_RUNTIME_PROBE-unset}" "\${OMSP_PTY_LAYER-unset}" "$TERM" "\${CI-unset}" "\${NO_COLOR-unset}" "\${GIT_EDITOR-unset}" "\${GPG_TTY-unset}"`,
 			cwd: tempDir.path(),
 			timeoutMs: 15_000,
 			env: direnvEnv,
@@ -84,7 +84,7 @@ describe("runInteractiveBashPty", () => {
 	it.skipIf(ptyUnavailable)(
 		"runs the command with the shell spawn env minus its non-interactive guards, direnv overrides on top, and a real TERM",
 		async () => {
-			const output = await probe({ OMP_PTY_LAYER: "direnv" });
+			const output = await probe({ OMSP_PTY_LAYER: "direnv" });
 
 			expect(output).toContain("probe=from-shell-env layer=direnv term=xterm-256color");
 			// The native environ underneath may hold its own values for these

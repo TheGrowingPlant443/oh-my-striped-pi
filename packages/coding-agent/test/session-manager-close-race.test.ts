@@ -24,14 +24,14 @@
  */
 
 import { describe, expect, it } from "bun:test";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import {
 	MemorySessionStorage,
 	type SessionStorage,
 	type SessionStorageWriter,
 	type WriteTextAtomicOptions,
-} from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import type { SessionTitleUpdate } from "@oh-my-pi/pi-coding-agent/session/session-title-slot";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import type { SessionTitleUpdate } from "@oh-my-striped-pi/pi-coding-agent/session/session-title-slot";
 import { getTestModel } from "./helpers/model-fixtures";
 
 class CloseHoldingStorage implements SessionStorage {

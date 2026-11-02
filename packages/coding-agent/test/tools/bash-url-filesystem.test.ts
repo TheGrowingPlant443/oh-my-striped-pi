@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { resolveLocalRoot } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { resolveLocalRoot } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
 
 let tempDir: string;
 let localRoot: string;
@@ -148,7 +148,7 @@ describe("bash internal URLs through the shell filesystem", () => {
 	});
 
 	it("fails a redirection into a read-only scheme", async () => {
-		const { isError } = await run("printf 'x' > omp://README.md");
+		const { isError } = await run("printf 'x' > omsp://README.md");
 
 		expect(isError).toBe(true);
 	});

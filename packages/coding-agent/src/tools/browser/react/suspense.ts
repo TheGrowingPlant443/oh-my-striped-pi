@@ -1,4 +1,4 @@
-import { untilAborted } from "@oh-my-pi/pi-utils";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils";
 import type { Page } from "puppeteer-core";
 import { type ReactPageEnvelope, requireReactHookResult } from "./devtools-hook";
 

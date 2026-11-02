@@ -1,26 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import type { PreparedExtension } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { createPersistedSubagentReviverFactory } from "@oh-my-pi/pi-coding-agent/task/persisted-revive";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import type { PreparedExtension } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { IrcBus } from "@oh-my-striped-pi/pi-coding-agent/irc/bus";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { CURRENT_SESSION_VERSION } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { createPersistedSubagentReviverFactory } from "@oh-my-striped-pi/pi-coding-agent/task/persisted-revive";
+import { getBundledAgent } from "@oh-my-striped-pi/pi-coding-agent/task/agents";
 import subagentSystemPromptTemplate from "../../src/prompts/system/subagent-system-prompt.md" with { type: "text" };
 import seanceAssignmentTemplate from "../../src/prompts/system/seance-assignment.md" with { type: "text" };
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-pi/pi-coding-agent/task/types";
-import type { PreparedSeanceSession } from "@oh-my-pi/pi-coding-agent/task/seance";
-import { seanceIsolationOptions } from "@oh-my-pi/pi-coding-agent/task/seance-policy";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { getAgentDir, prompt, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import type { PreparedSeanceSession } from "@oh-my-striped-pi/pi-coding-agent/task/seance";
+import { seanceIsolationOptions } from "@oh-my-striped-pi/pi-coding-agent/task/seance-policy";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { getAgentDir, prompt, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "../helpers/model-fixtures";
 
 function preparedSourceSession(sourceFile: string, sourceSessionId: string): PreparedSeanceSession {
@@ -128,7 +128,7 @@ afterEach(() => {
 
 describe("seance startup contracts", () => {
 	it("builds a fresh SDK session with only historical tools and no extensions or outbound IRC", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-sdk-fresh-");
+		using tempDir = TempDir.createSync("@omsp-seance-sdk-fresh-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceRoot = path.join(tempDir.path(), "source-additional");
@@ -205,7 +205,7 @@ describe("seance startup contracts", () => {
 	});
 
 	it("drops a failed pre-ready source fork without loading parent extensions or changing the source", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-fresh-");
+		using tempDir = TempDir.createSync("@omsp-seance-fresh-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceFile = path.join(tempDir.path(), "source.jsonl");
@@ -285,7 +285,7 @@ describe("seance startup contracts", () => {
 	});
 
 	it("cold-revives the full persisted runtime prompt and retains restricted tools", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-cold-");
+		using tempDir = TempDir.createSync("@omsp-seance-cold-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceRoot = path.join(tempDir.path(), "source-additional");
@@ -434,7 +434,7 @@ describe("seance startup contracts", () => {
 	});
 
 	it("does not offer a cold reviver when startup failed after forking but before its restricted init", async () => {
-		using tempDir = TempDir.createSync("@omp-seance-failed-start-");
+		using tempDir = TempDir.createSync("@omsp-seance-failed-start-");
 		const cwd = path.join(tempDir.path(), "project");
 		await fs.mkdir(cwd, { recursive: true });
 		const sourceFile = path.join(tempDir.path(), "source.jsonl");

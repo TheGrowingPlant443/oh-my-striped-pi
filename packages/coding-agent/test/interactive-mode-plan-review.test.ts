@@ -1,42 +1,45 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Agent, AgentBusyError, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import { resolveLocalUrlToPath } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import type { HookSelectorSlider } from "@oh-my-pi/pi-tui/overlays/hook-selector";
-import { type PlanReviewAnnotationState, PlanReviewOverlay } from "@oh-my-pi/pi-tui/overlays/plan-review-overlay";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
+import { Agent, AgentBusyError, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Usage } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ExtensionRuntime } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import { resolveLocalUrlToPath } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import type { HookSelectorSlider } from "@oh-my-striped-pi/pi-tui/overlays/hook-selector";
+import {
+	type PlanReviewAnnotationState,
+	PlanReviewOverlay,
+} from "@oh-my-striped-pi/pi-tui/overlays/plan-review-overlay";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
 import type {
 	Extension,
 	ExtensionContext,
 	ExtensionEvent,
 	PlanReviewRequestedEvent,
 	PlanReviewResolvedEvent,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { planSaveFileName } from "@oh-my-pi/pi-coding-agent/plan-mode/plan-autosave";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { SubmittedUserInput } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { planSaveFileName } from "@oh-my-striped-pi/pi-coding-agent/plan-mode/plan-autosave";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { SubmittedUserInput } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SILENT_ABORT_MARKER, USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
-import * as clipboard from "@oh-my-pi/pi-coding-agent/utils/clipboard";
-import { setKeybindings } from "@oh-my-pi/pi-tui";
-import { formatNumber, TempDir } from "@oh-my-pi/pi-utils";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SILENT_ABORT_MARKER, USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { AUTO_THINKING } from "@oh-my-striped-pi/pi-tui/thinking";
+import * as clipboard from "@oh-my-striped-pi/pi-coding-agent/utils/clipboard";
+import { setKeybindings } from "@oh-my-striped-pi/pi-tui";
+import { formatNumber, TempDir } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgPlanAutosave, cfgPlanAutosaveDir } from "@oh-my-pi/pi-coding-agent/plan-mode/settings";
+import { cfgPlanAutosave, cfgPlanAutosaveDir } from "@oh-my-striped-pi/pi-coding-agent/plan-mode/settings";
 
 /**
  * Matches the plan-approved synthetic-prompt dispatch. `#approvePlan` calls
@@ -2415,7 +2418,7 @@ describe("InteractiveMode plan review rendering", () => {
 			title: "AUTOSAVE",
 		});
 
-		const saved = path.join(tempDir.path(), ".omp", "plans", "AUTOSAVE_PLAN.md");
+		const saved = path.join(tempDir.path(), ".omsp", "plans", "AUTOSAVE_PLAN.md");
 		expect(await Bun.file(saved).text()).toBe("# Plan\n\nAutosave me.");
 		expect(status).toHaveBeenCalledWith(expect.stringContaining("Saved plan to"));
 	});

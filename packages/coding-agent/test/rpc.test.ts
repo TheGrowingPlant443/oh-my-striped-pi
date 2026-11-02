@@ -2,17 +2,17 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentEvent, AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { type AssistantMessage, Effort, type TextContent } from "@oh-my-pi/pi-ai";
+import type { AgentEvent, AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { type AssistantMessage, Effort, type TextContent } from "@oh-my-striped-pi/pi-ai";
 import {
 	type CompactionEntry,
 	type FileEntry,
 	parseSessionEntries,
 	type SessionMessageEntry,
-} from "@oh-my-pi/pi-coding-agent";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import type { BashExecutionMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { removeSyncWithRetries, Snowflake, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { BashExecutionMessage } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { removeSyncWithRetries, Snowflake, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "./helpers/model-fixtures";
 import { rejectionOf } from "./helpers/rejection";
 import { e2eApiKey } from "./utilities";
@@ -35,12 +35,12 @@ describe.skipIf(!e2eApiKey("COPILOT_GITHUB_TOKEN"))("RPC mode", () => {
 	let sessionDir: string;
 
 	beforeEach(() => {
-		sessionDir = path.join(os.tmpdir(), `omp-rpc-test-${Snowflake.next()}`);
+		sessionDir = path.join(os.tmpdir(), `omsp-rpc-test-${Snowflake.next()}`);
 		const model = getTestModel("github-copilot", candidate => candidate.api === "anthropic-messages");
 		client = new RpcClient({
 			cliPath: path.join(import.meta.dir, "..", "dist", "cli.js"),
 			cwd: path.join(import.meta.dir, ".."),
-			env: { PI_CODING_AGENT_DIR: sessionDir },
+			env: { OMSP_CODING_AGENT_DIR: sessionDir },
 			provider: model.provider,
 			model: model.id,
 		});
@@ -332,7 +332,7 @@ test("RPC native fast mode exposes enabled and active state on a private Respons
 			XDG_CONFIG_HOME: temp.join("config"),
 			XDG_DATA_HOME: temp.join("data"),
 			XDG_CACHE_HOME: temp.join("cache"),
-			PI_CODING_AGENT_DIR: temp.path(),
+			OMSP_CODING_AGENT_DIR: temp.path(),
 		},
 		provider: "rpc-native",
 		model: "gpt-5.2",
@@ -354,7 +354,7 @@ describe("RPC fast mode with an unsupported private model", () => {
 	let sessionDir: string;
 
 	beforeEach(async () => {
-		sessionDir = path.join(os.tmpdir(), `omp-rpc-fast-mode-test-${Snowflake.next()}`);
+		sessionDir = path.join(os.tmpdir(), `omsp-rpc-fast-mode-test-${Snowflake.next()}`);
 		await Bun.write(
 			path.join(sessionDir, "models.yml"),
 			JSON.stringify({
@@ -388,7 +388,7 @@ describe("RPC fast mode with an unsupported private model", () => {
 				XDG_CONFIG_HOME: path.join(sessionDir, "config"),
 				XDG_DATA_HOME: path.join(sessionDir, "data"),
 				XDG_CACHE_HOME: path.join(sessionDir, "cache"),
-				PI_CODING_AGENT_DIR: sessionDir,
+				OMSP_CODING_AGENT_DIR: sessionDir,
 			},
 			provider: "rpc-private",
 			model: "deepseek-v4-flash",

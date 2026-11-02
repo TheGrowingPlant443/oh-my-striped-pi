@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import { mockFetch } from "../helpers/fetch-mock";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { renderHtmlToText } from "@oh-my-pi/pi-coding-agent/tools/fetch";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import * as toolsManager from "@oh-my-pi/pi-coding-agent/utils/tools-manager";
-import * as scraperUtils from "@oh-my-pi/pi-coding-agent/web/scrapers/utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { renderHtmlToText } from "@oh-my-striped-pi/pi-coding-agent/tools/fetch";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import * as toolsManager from "@oh-my-striped-pi/pi-coding-agent/utils/tools-manager";
+import * as scraperUtils from "@oh-my-striped-pi/pi-coding-agent/web/scrapers/utils";
 
 // An API reference page: its markdown is mostly short lines (table rows, code, list items), none of them navigation.
 const PARAMETERS = Array.from(

@@ -10,8 +10,8 @@ import {
 	isCached,
 	isValidVersionForCache,
 	removeCachedPlugin,
-} from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
-import { isEnoent, removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/marketplace";
+import { isEnoent, removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ describe("cachePlugin, isCached, removeCachedPlugin", () => {
 	let sourceDir: string;
 
 	beforeEach(async () => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-cache-test-"));
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-cache-test-"));
 		cacheDir = path.join(tmpDir, "cache");
 		sourceDir = path.join(tmpDir, "sources");
 		await fsp.mkdir(sourceDir, { recursive: true });
@@ -178,7 +178,7 @@ describe("cleanOrphanedCache", () => {
 	let sourceDir: string;
 
 	beforeEach(async () => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-orphan-test-"));
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-orphan-test-"));
 		cacheDir = path.join(tmpDir, "cache");
 		sourceDir = path.join(tmpDir, "sources");
 		await fsp.mkdir(sourceDir, { recursive: true });

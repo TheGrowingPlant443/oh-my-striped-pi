@@ -4,8 +4,8 @@
  * Commands are sent as JSON lines on stdin.
  * Responses and events are emitted as JSON lines on stdout.
  */
-import type { AgentMessage, AgentToolResult, ThinkingLevel, ToolLoadMode } from "@oh-my-pi/pi-agent-core";
-import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
+import type { AgentMessage, AgentToolResult, ThinkingLevel, ToolLoadMode } from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-striped-pi/pi-agent-core/compaction";
 import type {
 	AssistantMessage,
 	AssistantMessageEvent,
@@ -15,7 +15,7 @@ import type {
 	TextContent,
 	ThinkingContent,
 	ToolExample,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import type { BashResult } from "../../exec/bash-executor";
 import type { ContextUsage } from "../../extensibility/extensions/types";
 import type { AgentSessionEvent, SessionStats } from "../../session/agent-session";
@@ -23,10 +23,10 @@ import type { RestoredQueuedMessage } from "../../session/agent-session-types";
 import type { CacheWarmingMode } from "../../session/cache-warmer";
 import type { FileEntry, SessionEntry, SessionTreeNode } from "../../session/session-entries";
 import type { AvailableSlashCommandSource } from "../../slash-commands/available-commands";
-import type { AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
+import type { AgentProgress } from "@oh-my-striped-pi/pi-tui/tools/task";
 import type { SubagentEventPayload, SubagentLifecyclePayload, SubagentProgressPayload } from "../../task";
-import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
-import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
+import type { TodoPhase } from "@oh-my-striped-pi/pi-tui/tools/todo";
+import type { LogoutAccount } from "@oh-my-striped-pi/pi-tui/overlays/logout-account-selector";
 import type { RpcMessagesPage } from "./rpc-messages";
 import type { GoalModeState } from "../../goals/state";
 import type { RpcGoalOp, RpcGoalResult } from "./rpc-goal";
@@ -226,7 +226,7 @@ export type RpcPromptStatus = "completed" | "aborted" | "error";
 
 /**
  * Failure detail for a `prompt_result` with `status: "error"`. `message` is the
- * provider's error text without OMP-local diagnostics (e.g. request dump paths).
+ * provider's error text without OMSP-local diagnostics (e.g. request dump paths).
  */
 export interface RpcPromptError {
 	message: string;
@@ -234,9 +234,9 @@ export interface RpcPromptError {
 	model?: string;
 	/** HTTP status reported by the provider, when the failure came from a request. */
 	httpStatus?: number;
-	/** The failure is classified transient: resubmitting later may succeed. OMP's own retries are already exhausted. */
+	/** The failure is classified transient: resubmitting later may succeed. OMSP's own retries are already exhausted. */
 	retryable: boolean;
-	/** `cost_cap`: the session reached `session.maxCost` (`--max-cost`) and omp did not send the next request. */
+	/** `cost_cap`: the session reached `session.maxCost` (`--max-cost`) and omsp did not send the next request. */
 	code?: "cost_cap";
 }
 

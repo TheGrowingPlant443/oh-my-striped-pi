@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getRecentSessions } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { closeSessionIndex } from "@oh-my-pi/pi-coding-agent/session/session-index";
-import { getConfigRootDir, removeSyncWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { getRecentSessions } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { closeSessionIndex } from "@oh-my-striped-pi/pi-coding-agent/session/session-index";
+import { getConfigRootDir, removeSyncWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { makeAssistantMessage } from "../session-manager/helpers";
 
 /**
@@ -17,11 +17,11 @@ import { makeAssistantMessage } from "../session-manager/helpers";
 describe("recent sessions title index", () => {
 	let testAgentDir: string;
 	let cwd: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 	const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 	beforeEach(() => {
-		testAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-recent-titles-"));
+		testAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-recent-titles-"));
 		cwd = path.join(testAgentDir, "cwd");
 		fs.mkdirSync(cwd, { recursive: true });
 		setAgentDir(testAgentDir);
@@ -34,7 +34,7 @@ describe("recent sessions title index", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		removeSyncWithRetries(testAgentDir);
 	});

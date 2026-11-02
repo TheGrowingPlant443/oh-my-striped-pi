@@ -3,12 +3,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
 import { resetSettingsForTest, Settings } from "../../../src/config/settings";
-import { SkillMessageComponent } from "@oh-my-pi/pi-tui/chat/skill-message";
-import { skillChipLabel } from "@oh-my-pi/pi-tui/prompt/composer-attachments";
-import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-pi/pi-tui/theme";
+import { SkillMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/skill-message";
+import { skillChipLabel } from "@oh-my-striped-pi/pi-tui/prompt/composer-attachments";
+import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
 import type { CustomMessage, SkillPromptDetails } from "../../../src/session/messages";
 
-import { cfgTuiHyperlinks } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { cfgTuiHyperlinks } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
 // Drop SGR colors and OSC 8 hyperlink wrappers so assertions see the visible text only.
 const strip = (lines: readonly string[]): string =>

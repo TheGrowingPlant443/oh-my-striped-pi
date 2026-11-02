@@ -4,8 +4,8 @@ beforeEachOAuthFixture(() => mockOAuthApiKey());
 afterEachOAuthFixture(() => resetOAuthMocks());
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import type { OAuthLoginCallbacks, OAuthProviderInterface } from "@oh-my-pi/pi-ai/registry/oauth/types";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import type { OAuthLoginCallbacks, OAuthProviderInterface } from "@oh-my-striped-pi/pi-ai/registry/oauth/types";
 
 const TEST_SOURCE = "manual-code-gate-test";
 

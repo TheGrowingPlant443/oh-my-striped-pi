@@ -4,9 +4,9 @@
 import type * as fs1 from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import * as zod from "@oh-my-pi/omptype/zod";
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import { type } from "@oh-my-striped-pi/omptype";
+import * as zod from "@oh-my-striped-pi/omptype/zod";
+import type { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	ImageContent,
 	Model,
@@ -15,9 +15,9 @@ import type {
 	ServiceTierFamily,
 	TextContent,
 	TSchema,
-} from "@oh-my-pi/pi-ai";
-import { isBuiltinComposerStyle, type KeyId } from "@oh-my-pi/pi-tui";
-import { hasFsCode, isEacces, isEnoent, logger } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai";
+import { isBuiltinComposerStyle, type KeyId } from "@oh-my-striped-pi/pi-tui";
+import { hasFsCode, isEacces, isEnoent, logger } from "@oh-my-striped-pi/pi-utils";
 import { type ExtensionModule, extensionModuleCapability } from "../../capability/extension-module";
 import { type Hook, hookCapability } from "../../capability/hook";
 import { isServiceTierFamily, isServiceTierForFamily } from "../../config/service-tier";
@@ -38,7 +38,7 @@ import { installLegacyPiSpecifierShim, loadLegacyPiModule } from "../plugins/leg
 import { getAllPluginExtensionPaths } from "../plugins/loader";
 
 import { resolvePath, withHostGuard } from "../utils";
-import type { ComposerShapeDefinition } from "@oh-my-pi/pi-tui/overlays/composer-shape-registry";
+import type { ComposerShapeDefinition } from "@oh-my-striped-pi/pi-tui/overlays/composer-shape-registry";
 import type {
 	AssistantTextRenderer,
 	AssistantThinkingRenderer,
@@ -65,7 +65,7 @@ type LoadedExtensionModule = ExtensionFactory | { default?: ExtensionFactory };
 /** RFC 3986 scheme syntax, lowercased, two characters at least so `c` cannot capture `C:/` paths. */
 const LINK_SCHEME_PATTERN = /^[a-z][a-z0-9+.-]+$/;
 
-/** Standard schemes an extension may not claim: web, file and mail links. omp's internal URLs are refused too. */
+/** Standard schemes an extension may not claim: web, file and mail links. omsp's internal URLs are refused too. */
 const STANDARD_LINK_SCHEMES: Readonly<Record<string, true>> = {
 	about: true,
 	blob: true,
@@ -315,7 +315,7 @@ class ConcreteExtensionAPI implements ExtensionAPI, IExtensionRuntime {
 		}
 		// `=== true`: inherited keys such as `constructor` are not reserved.
 		if (STANDARD_LINK_SCHEMES[normalized] === true || InternalUrlRouter.instance().isBuiltin(normalized)) {
-			throw new Error(`registerLinkScheme: "${scheme}" is reserved for standard or omp-internal links`);
+			throw new Error(`registerLinkScheme: "${scheme}" is reserved for standard or omsp-internal links`);
 		}
 		if (!this.extension.linkSchemes.includes(normalized)) this.extension.linkSchemes.push(normalized);
 	}
@@ -613,7 +613,7 @@ async function discoverHooksInPackageRoot(root: string): Promise<string[]> {
 /**
  * Discover absolute paths of extensions to load, without importing or
  * binding factories. Hot path on session startup — the scan walks native
- * `.omp`/`.pi` extension capabilities, JS/TS hook factories, the
+ * `.omsp`/`.pi` extension capabilities, JS/TS hook factories, the
  * installed-plugin tree, and any configured paths.
  *
  * The root session imports these paths once and forwards prepared factories to
@@ -661,7 +661,7 @@ export async function discoverExtensionPaths(
 
 	const ambient = options.ambient !== false;
 	if (ambient) {
-		// 1. Discover extension modules via capability API (native .omp/.pi only).
+		// 1. Discover extension modules via capability API (native .omsp/.pi only).
 		// Scope the load to the native provider — the extension-module capability
 		// also has claude/codex/gemini/opencode providers, and their items were
 		// discarded here anyway (see #4198). The provider filter skips the walk

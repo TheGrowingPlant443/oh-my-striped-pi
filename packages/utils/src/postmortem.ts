@@ -72,7 +72,7 @@ const CLEANUP_DEADLINE_MS = 10_000;
  * terminates cleanly (#7393). `Symbol.for` so it survives duplicate module
  * instances across bundles/realms.
  */
-export const NATIVE_PROCESS_EXIT = Symbol.for("omp.postmortem.nativeProcessExit");
+export const NATIVE_PROCESS_EXIT = Symbol.for("omsp.postmortem.nativeProcessExit");
 
 type HardExitFn = (code?: number) => never;
 
@@ -421,7 +421,7 @@ function faultWorkerIpcChannels(err: Error): void {
 /**
  * Graceful shutdown driven by `process.stdout`'s own `error` event.
  *
- * A closed stdout consumer (`omp --help | head`, an ACP client dropping the
+ * A closed stdout consumer (`omsp --help | head`, an ACP client dropping the
  * pipe) delivers the broken-pipe write here — attributable to stdout by
  * construction, unlike a process-wide `syscall: "write"` match that a closed
  * subprocess stdin or socket would also satisfy — so it runs cleanup and exits
@@ -510,7 +510,7 @@ export function reportUnsettledEntry(work: Promise<unknown>, describe?: () => st
 		if (code !== 0) return;
 		const command = describe?.();
 		const subject = command ? `\`${APP_NAME} ${command}\`` : "command";
-		const message = `${subject} ended before completing: the event loop drained while it was still pending (rerun with PI_DEBUG_STARTUP=1 to see the last phase reached)`;
+		const message = `${subject} ended before completing: the event loop drained while it was still pending (rerun with OMSP_DEBUG_STARTUP=1 to see the last phase reached)`;
 		try {
 			fs.writeSync(2, `${APP_NAME}: ${message}\n`);
 		} catch {}
@@ -522,7 +522,7 @@ export function reportUnsettledEntry(work: Promise<unknown>, describe?: () => st
 // Well-known key marking an error as an *expected* teardown artifact (e.g. a
 // browser run-scope abort at normal run end). `Symbol.for` so the marker
 // survives duplicate module instances across bundles/realms.
-const EXPECTED_CLEANUP = Symbol.for("omp.expectedCleanupError");
+const EXPECTED_CLEANUP = Symbol.for("omsp.expectedCleanupError");
 
 /**
  * Mark an error as expected cleanup fallout so the global fatal handlers

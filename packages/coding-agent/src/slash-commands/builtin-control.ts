@@ -1,5 +1,5 @@
-import * as ptree from "@oh-my-pi/pi-utils/ptree";
-import { type PauseWorkStatus, runPauseScreen } from "@oh-my-pi/pi-tui/overlays/pause-screen";
+import * as ptree from "@oh-my-striped-pi/pi-utils/ptree";
+import { type PauseWorkStatus, runPauseScreen } from "@oh-my-striped-pi/pi-tui/overlays/pause-screen";
 import { AgentRegistry } from "../registry/agent-registry";
 import type { AgentSession } from "../session/agent-session";
 import { resolveCliEntryCmd } from "../subprocess/worker-client";
@@ -112,7 +112,7 @@ export const BUILTIN_CONTROL_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpec> = [
 	{
 		name: "record",
 		icon: "export",
-		description: "Start or stop recording this screen to a replayable file (omp play)",
+		description: "Start or stop recording this screen to a replayable file (omsp play)",
 		handleTui: async (_command, runtime) => {
 			clearSubmittedText(runtime);
 			await runtime.ctx.toggleRecording();

@@ -1,5 +1,5 @@
-import { isEnoent, logger } from "@oh-my-pi/pi-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { isEnoent, logger } from "@oh-my-striped-pi/pi-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import type { Settings } from "../config/settings";
 import { CwdLookupMemo } from "../utils/forge-cli";
 import { gitlab } from "../utils/gitlab";

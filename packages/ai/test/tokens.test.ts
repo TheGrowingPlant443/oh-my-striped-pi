@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Api, Context, Model, OptionsForApi } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { stream } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Api, Context, Model, OptionsForApi } from "@oh-my-striped-pi/pi-ai/types";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import { resolveApiKey } from "./oauth";
 
 const githubCopilotToken = await resolveApiKey("github-copilot");

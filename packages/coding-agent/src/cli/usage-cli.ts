@@ -1,7 +1,7 @@
 /**
  * Usage CLI command handler.
  *
- * Handles `omp usage` — fetches provider usage reports for every
+ * Handles `omsp usage` — fetches provider usage reports for every
  * authenticated account and prints a detailed per-account breakdown
  * (limits, windows, reset times, plan metadata). Accounts whose
  * credentials produced no usage report are listed too, so the output
@@ -19,18 +19,18 @@ import {
 	type UsageLimit,
 	type UsageReport,
 	type UsageUnit,
-} from "@oh-my-pi/pi-ai";
-import { AuthBrokerClient, AuthBrokerError } from "@oh-my-pi/pi-ai/auth-broker";
-import type { ClientUsageClientSummary } from "@oh-my-pi/pi-ai/usage";
-import { formatProviderName } from "@oh-my-pi/pi-tui/chrome/format";
-import { peakBuckets, renderSparkline } from "@oh-my-pi/pi-tui/components/sparkline";
-import { formatDuration, formatNumber, getProjectDir, sanitizeText } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+} from "@oh-my-striped-pi/pi-ai";
+import { AuthBrokerClient, AuthBrokerError } from "@oh-my-striped-pi/pi-ai/auth-broker";
+import type { ClientUsageClientSummary } from "@oh-my-striped-pi/pi-ai/usage";
+import { formatProviderName } from "@oh-my-striped-pi/pi-tui/chrome/format";
+import { peakBuckets, renderSparkline } from "@oh-my-striped-pi/pi-tui/components/sparkline";
+import { formatDuration, formatNumber, getProjectDir, sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import { ModelRegistry } from "../config/model-registry";
 import { Settings } from "../config/settings";
 import { discoverAuthStorage, loadCliExtensionProviders } from "../sdk";
 import { resolveAuthBrokerConfig } from "../session/auth-broker-config";
-import { collapseSharedUsageReports } from "@oh-my-pi/pi-tui/overlays/usage-display";
+import { collapseSharedUsageReports } from "@oh-my-striped-pi/pi-tui/overlays/usage-display";
 import { usageReportIdentity } from "../slash-commands/helpers/active-oauth-account";
 import {
 	accountIdentityLabel,
@@ -454,7 +454,7 @@ export function computeProviderWindowStats(reports: UsageReport[]): ProviderWind
 }
 
 /**
- * Tombstones worth a row in `omp usage`: OAuth credentials torn down
+ * Tombstones worth a row in `omsp usage`: OAuth credentials torn down
  * automatically (refresh failure, upstream invalidation). Rows the user
  * replaced or deleted deliberately are lifecycle noise, not lost capacity.
  */
@@ -555,7 +555,7 @@ function computePolicyDiagnostics(
 	const policy = options.getAccountPolicy(provider, identity);
 	const configuredReservePct = policy?.reservePct;
 	const reservePct = Math.max(0, Math.min(100, configuredReservePct ?? options.globalReservePct));
-	// `omp usage` has no model/session context, so report the conservative
+	// `omsp usage` has no model/session context, so report the conservative
 	// account-wide state from the most-consumed visible window. Actual routing
 	// still scopes limits and selection in AuthStorage.
 	// Exhaustion follows the same status-first rule as the limit rows and routing's
@@ -925,7 +925,7 @@ function formatNoProviderCredentials(provider: string, storedAccounts: UsageAcco
 	const hint =
 		stored.length > 0
 			? `Providers with stored credentials: ${stored.join(", ")}.`
-			: "Run `omp` and use /login to add accounts.";
+			: "Run `omsp` and use /login to add accounts.";
 	return `No credentials stored for provider "${provider}". ${hint}\n`;
 }
 
@@ -1038,7 +1038,7 @@ async function resolveBrokerClient(): Promise<AuthBrokerClient | undefined> {
 	return config ? new AuthBrokerClient({ url: config.url, token: config.token }) : undefined;
 }
 
-/** One OAuth account as `omp usage accounts` lists it. */
+/** One OAuth account as `omsp usage accounts` lists it. */
 interface OAuthIdentityKeyRow {
 	provider: string;
 	/** `null` when the credential carries no account identity, so no pool can name it. */
@@ -1104,7 +1104,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 			if (cmd.redact) {
 				process.stderr.write(
 					chalk.red(
-						"`omp usage accounts` prints identity keys verbatim for configuration; --redact does not apply.\n",
+						"`omsp usage accounts` prints identity keys verbatim for configuration; --redact does not apply.\n",
 					),
 				);
 				process.exitCode = 1;
@@ -1126,7 +1126,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 			if (rows.length === 0) {
 				const scope = cmd.provider ? ` for provider "${cmd.provider}"` : "";
 				process.stderr.write(
-					chalk.yellow(`No OAuth accounts found${scope}. Run \`omp\` and use /login to add accounts.\n`),
+					chalk.yellow(`No OAuth accounts found${scope}. Run \`omsp\` and use /login to add accounts.\n`),
 				);
 				process.exitCode = 1;
 				return;
@@ -1158,7 +1158,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 			if (clients.length === 0) {
 				process.stderr.write(
 					chalk.yellow(
-						"No per-client usage recorded yet. Broker-connected clients and the auth-gateway report token burn automatically; set OMP_AUTH_BROKER_URL (or run this on the broker host).\n",
+						"No per-client usage recorded yet. Broker-connected clients and the auth-gateway report token burn automatically; set OMSP_AUTH_BROKER_URL (or run this on the broker host).\n",
 					),
 				);
 				process.exitCode = 1;
@@ -1194,7 +1194,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 				const scope = cmd.provider ? ` for provider "${cmd.provider}"` : "";
 				process.stderr.write(
 					chalk.yellow(
-						`No usage history recorded${scope} yet. Snapshots accumulate whenever usage is fetched (TUI footer, /usage, omp usage).\n`,
+						`No usage history recorded${scope} yet. Snapshots accumulate whenever usage is fetched (TUI footer, /usage, omsp usage).\n`,
 					),
 				);
 				process.exitCode = 1;
@@ -1297,7 +1297,7 @@ export async function runUsageCommand(cmd: UsageCommandArgs): Promise<void> {
 			} else if (storedAccounts.length > 0) {
 				message = "No usage data. Stored credentials are for providers without a usage endpoint.\n";
 			} else {
-				message = "No credentials found. Run `omp` and use /login to add accounts.\n";
+				message = "No credentials found. Run `omsp` and use /login to add accounts.\n";
 			}
 			process.stderr.write(chalk.yellow(message));
 			process.exitCode = 1;

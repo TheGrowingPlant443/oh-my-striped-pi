@@ -7,10 +7,10 @@
  */
 
 import { beforeAll, describe, expect, it } from "bun:test";
-import { createCompactionSummaryMessage } from "@oh-my-pi/pi-agent-core/compaction";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { CompactionSummaryMessageComponent } from "@oh-my-pi/pi-tui/chat/compaction-summary-message";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { createCompactionSummaryMessage } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { CompactionSummaryMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/compaction-summary-message";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 beforeAll(() => {
 	initTheme();

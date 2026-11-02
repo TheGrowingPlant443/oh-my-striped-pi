@@ -8,14 +8,14 @@
  * This replaces the old single hardwired `onJobComplete` closure that routed
  * every completion — regardless of owner — into the first top-level session.
  */
-import { prompt } from "@oh-my-pi/pi-utils";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import type { AsyncJob, AsyncJobType } from "../async";
 import asyncResultTemplate from "../prompts/tools/async-result.md" with { type: "text" };
-import type { StructuredSubagentOutput } from "@oh-my-pi/pi-tui/tools/task";
+import type { StructuredSubagentOutput } from "@oh-my-striped-pi/pi-tui/tools/task";
 import { escapeHarnessTags } from "./harness-tags";
 import type { CustomMessage } from "./messages";
-import type { OutputMeta } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { truncateMiddle } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import type { OutputMeta } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { truncateMiddle } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 
 /**
  * `customType` of the injected async-result follow-up message. The task

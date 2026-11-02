@@ -1,10 +1,10 @@
 import { expect, it } from "bun:test";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { ResponseStreamEvent } from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
-import { processResponsesStream } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import type { AssistantMessage, Model, ModelSpec, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { createOpenAIResponsesHistoryPayload } from "@oh-my-pi/pi-ai/utils";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { ResponseStreamEvent } from "@oh-my-striped-pi/pi-ai/providers/openai-responses-wire";
+import { processResponsesStream } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import type { AssistantMessage, Model, ModelSpec, ToolResultMessage } from "@oh-my-striped-pi/pi-ai/types";
+import { createOpenAIResponsesHistoryPayload } from "@oh-my-striped-pi/pi-ai/utils";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const model: Model<"openai-responses"> = buildModel({
 	id: "anthropic/claude-sonnet-5.5",

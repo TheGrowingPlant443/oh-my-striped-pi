@@ -7,38 +7,44 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, setSystemTime, vi } from "bun:test";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Agent, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { resetHangulCompatibilityJamoWidthForTests, setHangulCompatibilityJamoWidth } from "@oh-my-pi/pi-tui";
-import type { DescribeContext } from "@oh-my-pi/pi-tui/native/node";
-import { PINNED_HUD_TOGGLE_ID } from "@oh-my-pi/pi-coding-agent/task/output-manager";
+import { Agent, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { resetHangulCompatibilityJamoWidthForTests, setHangulCompatibilityJamoWidth } from "@oh-my-striped-pi/pi-tui";
+import type { DescribeContext } from "@oh-my-striped-pi/pi-tui/native/node";
+import { PINNED_HUD_TOGGLE_ID } from "@oh-my-striped-pi/pi-coding-agent/task/output-manager";
 import {
 	InteractiveMode,
 	layoutPinnedHud,
 	nextSubagentPreviewTickMs,
 	renderSubagentHudLines,
 	SubagentHudComponent,
-} from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { type ObservableSession, SessionObserverRegistry } from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { type AgentProgress } from "@oh-my-pi/pi-tui/tools/task";
-import { type TodoPhase, todoToolRenderer } from "@oh-my-pi/pi-tui/tools/todo";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import {
+	type ObservableSession,
+	SessionObserverRegistry,
+} from "@oh-my-striped-pi/pi-tui/overlays/session-observer-registry";
+import { initTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { type AgentProgress } from "@oh-my-striped-pi/pi-tui/tools/task";
+import { type TodoPhase, todoToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/todo";
 import {
 	type SubagentLifecyclePayload,
 	type SubagentProgressPayload,
 	TASK_SUBAGENT_LIFECYCLE_CHANNEL,
 	TASK_SUBAGENT_PROGRESS_CHANNEL,
-} from "@oh-my-pi/pi-coding-agent/task";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/task";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgDisplayPinnedAgents, cfgDisplaySubagentLivePreview } from "@oh-my-pi/pi-coding-agent/modes/settings";
-import { cfgTaskShowResolvedModelBadge } from "@oh-my-pi/pi-coding-agent/task/settings";
-import { cfgTasksTodoClearDelay } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import {
+	cfgDisplayPinnedAgents,
+	cfgDisplaySubagentLivePreview,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
+import { cfgTaskShowResolvedModelBadge } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
+import { cfgTasksTodoClearDelay } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 function makeSession(overrides: Partial<ObservableSession> & { id: string }): ObservableSession {
 	return {

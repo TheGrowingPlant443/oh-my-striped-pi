@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { ReplyWriteComponent } from "@oh-my-pi/pi-tui/chat/reply-write";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { ReplyWriteComponent } from "@oh-my-striped-pi/pi-tui/chat/reply-write";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 function text(component: { render(width: number): readonly string[] }): string {
 	return Bun.stripANSI(component.render(100).join("\n"));

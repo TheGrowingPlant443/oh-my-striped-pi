@@ -1,13 +1,13 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { type Component, Text } from "@oh-my-pi/pi-tui";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { type Component, Text } from "@oh-my-striped-pi/pi-tui";
 import { Settings, settings } from "../../../src/config/settings";
-import { renderMCPResult } from "@oh-my-pi/pi-tui/tools/mcp";
-import type { MCPToolDetails } from "@oh-my-pi/pi-tui/tools/mcp";
-import { ToolExecutionComponent, type ToolExecutionUi } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { getThemeByName, setThemeInstance, theme } from "@oh-my-pi/pi-tui/theme";
+import { renderMCPResult } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import type { MCPToolDetails } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import { ToolExecutionComponent, type ToolExecutionUi } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { getThemeByName, setThemeInstance, theme } from "@oh-my-striped-pi/pi-tui/theme";
 
-import { cfgMcpRenderMarkdownResults } from "@oh-my-pi/pi-coding-agent/mcp/settings";
+import { cfgMcpRenderMarkdownResults } from "@oh-my-striped-pi/pi-coding-agent/mcp/settings";
 
 class BoldTypeErrorComponent implements Component {
 	render(_width: number): readonly string[] {

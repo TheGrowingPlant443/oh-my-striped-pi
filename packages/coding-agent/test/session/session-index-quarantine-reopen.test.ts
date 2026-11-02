@@ -3,8 +3,13 @@ import { Database } from "bun:sqlite";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { closeSessionIndex, recordSessionTitle } from "@oh-my-pi/pi-coding-agent/session/session-index";
-import { getHistoryDbPath, openSqliteDatabaseSync, removeSyncWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { closeSessionIndex, recordSessionTitle } from "@oh-my-striped-pi/pi-coding-agent/session/session-index";
+import {
+	getHistoryDbPath,
+	openSqliteDatabaseSync,
+	removeSyncWithRetries,
+	setAgentDir,
+} from "@oh-my-striped-pi/pi-utils";
 
 /**
  * Quarantining a corrupt history.db unlinks the file and its sidecars, then
@@ -16,10 +21,10 @@ import { getHistoryDbPath, openSqliteDatabaseSync, removeSyncWithRetries, setAge
  */
 describe.skipIf(process.platform === "win32")("session index across a peer's store quarantine", () => {
 	let testAgentDir: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 
 	beforeEach(() => {
-		testAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-index-quarantine-"));
+		testAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-index-quarantine-"));
 		setAgentDir(testAgentDir);
 		closeSessionIndex();
 	});
@@ -29,7 +34,7 @@ describe.skipIf(process.platform === "win32")("session index across a peer's sto
 		if (originalAgentDir) {
 			setAgentDir(originalAgentDir);
 		} else {
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		removeSyncWithRetries(testAgentDir);
 	});

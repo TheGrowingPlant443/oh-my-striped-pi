@@ -2,8 +2,8 @@ import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getProjectDir, removeSyncWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
-import type { TspProps } from "@oh-my-pi/pi-wire";
+import { getProjectDir, removeSyncWithRetries, setProjectDir } from "@oh-my-striped-pi/pi-utils";
+import type { TspProps } from "@oh-my-striped-pi/pi-wire";
 import type { NativeChild, NativeNode } from "../src/native/node";
 import { setNativeRendering } from "../src/native/state";
 import type { StatusLineComponent } from "../src/status-line/component";
@@ -75,7 +75,7 @@ describe("native composer facts", () => {
 	it("keeps the git branch by the model chip, outlasting the other facts and opening /git", () => {
 		setNativeRendering(true);
 		const originalProjectDir = getProjectDir();
-		const repo = fs.mkdtempSync(path.join(os.tmpdir(), "omp-composer-git-"));
+		const repo = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-composer-git-"));
 		try {
 			// The repository's on-disk shape, written without invoking git (no hooks, signing or user config).
 			const gitDir = path.join(repo, ".git");

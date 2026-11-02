@@ -9,7 +9,7 @@ export const cfgEvalPy = register({
 	id: "eval.py",
 	type: "boolean",
 	default: true,
-	env: "PI_PY",
+	env: "OMSP_PY",
 	ui: {
 		tab: "shell",
 		group: "Eval & Runtimes",
@@ -22,7 +22,7 @@ export const cfgEvalJs = register({
 	id: "eval.js",
 	type: "boolean",
 	default: true,
-	env: "PI_JS",
+	env: "OMSP_JS",
 	ui: {
 		tab: "shell",
 		group: "Eval & Runtimes",

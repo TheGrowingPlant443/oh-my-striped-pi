@@ -1,6 +1,6 @@
-# Developing `@oh-my-pi/pi-coding-agent`
+# Developing `@oh-my-striped-pi/pi-coding-agent`
 
-This package is the `omp` CLI. This file is a **developer's map**: where things live
+This package is the `omsp` CLI. This file is a **developer's map**: where things live
 in `src/`, how to run the local loops, and — for each subsystem — which document in
 the repo [`docs/`](../../docs/) tree is the authoritative reference.
 
@@ -25,7 +25,7 @@ Run from `packages/coding-agent/` (or add `--cwd=packages/coding-agent`):
 | Lint only                      | `bun run lint`        |
 | Tests                          | `bun run test`        |
 | Autofix: lint + format prompts | `bun run fix`         |
-| Build the `dist/omp` binary    | `bun run build`       |
+| Build the `dist/omsp` binary    | `bun run build`       |
 
 Never invoke `tsc`/`npx tsc` directly — `bun run check` is the typecheck gate. After
 changing export HTML/CSS/JS, web themes, or the shared tool/trace renderers, run
@@ -44,10 +44,10 @@ Scope fake timers to the deadline a test exercises, then restore real timers
 before real socket listeners are started. Bun's mocked clock can defer
 `server.listen` callbacks, leaving registry publication and teardown waiting.
 
-Tests that call `setAgentDir()` must snapshot and restore `PI_CODING_AGENT_DIR`,
-`OMP_PROFILE`, and `PI_PROFILE` for each test, then call
+Tests that call `setAgentDir()` must snapshot and restore `OMSP_CODING_AGENT_DIR`,
+`OMSP_PROFILE`, and `OMSP_PROFILE` for each test, then call
 `__resetDirsFromEnvForTests()` after restoration. Home-directory discovery fixtures
-must clear and restore `PI_CODING_AGENT_DIR` so inherited overrides cannot bypass
+must clear and restore `OMSP_CODING_AGENT_DIR` so inherited overrides cannot bypass
 the fixture. Reuse `restoreEnvValue()` from `test/helpers/settings-test-state.ts`
 to preserve unset values.
 
@@ -74,7 +74,7 @@ createAgentSession(...)        ── src/sdk.ts → AgentSession
 ```
 
 `cli.ts` doubles as the worker host: it declares itself via `declareWorkerHostEntry()`
-and dispatches the hidden `__omp_worker_*` argv selectors before loading the command
+and dispatches the hidden `__omsp_worker_*` argv selectors before loading the command
 registry (see `AGENTS.md` → _Worker scripts_).
 
 ## Source layout (`src/`)
@@ -183,7 +183,7 @@ Top-level entry modules: `cli.ts`, `main.ts`, `sdk.ts`, `index.ts` (SDK barrel),
 - [macos-signing-notarization.md](../../docs/macos-signing-notarization.md)
 - [porting-from-pi-mono.md](../../docs/porting-from-pi-mono.md)
 
-## Extending omp
+## Extending omsp
 
 | To add…                     | Start here                                                                                                                                                                                                                                                                                       |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
 
 /**
  * Safety hook: blocks bash tool calls matching `rm -rf` followed by an absolute path.

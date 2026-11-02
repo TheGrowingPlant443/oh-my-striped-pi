@@ -7,32 +7,39 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { resolveThresholdTokens, shouldCompact } from "@oh-my-pi/pi-agent-core/compaction";
-import type { Model, ServiceTierByFamily } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort, THINKING_EFFORTS } from "@oh-my-pi/pi-catalog/effort";
-import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
-import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { cfgCompaction } from "@oh-my-pi/pi-coding-agent/session/context-settings";
-import { parseAgentFields } from "@oh-my-pi/pi-coding-agent/discovery/helpers";
-import type { ToolPathWithSource } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools";
-import type { CustomTool } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import type { LoadExtensionsResult, PreparedExtension } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import type { MCPStdioServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession, AgentSessionEvent, PromptOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { resolveThresholdTokens, shouldCompact } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { Model, ServiceTierByFamily } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort, THINKING_EFFORTS } from "@oh-my-striped-pi/pi-catalog/effort";
+import type { Rule } from "@oh-my-striped-pi/pi-coding-agent/capability/rule";
+import type { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { cfgCompaction } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
+import { parseAgentFields } from "@oh-my-striped-pi/pi-coding-agent/discovery/helpers";
+import type { ToolPathWithSource } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools";
+import type { CustomTool } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/types";
+import type {
+	LoadExtensionsResult,
+	PreparedExtension,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { MCPManager } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import type { MCPStdioServerConfig } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import type { CreateAgentSessionOptions, CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type {
+	AgentSession,
+	AgentSessionEvent,
+	PromptOptions,
+} from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { runSubprocess } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import type { AgentDefinition } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
 import { createSessionDefaults } from "../helpers/session-defaults";
 import { manyToolName } from "../fixtures/many-tools-mcp";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgTierAnthropic, cfgTierGoogle, cfgTierOpenai } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgTierAnthropic, cfgTierGoogle, cfgTierOpenai } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 const companyResponsesModel = buildModel({
 	provider: "company-responses",
@@ -159,7 +166,7 @@ describe("runSubprocess parent-discovery pass-through (issue #2190)", () => {
 		const spy = vi.spyOn(sdkModule, "createAgentSession").mockResolvedValue(createSessionResult(session));
 
 		const rules: Rule[] = [{ name: "rule-a" } as unknown as Rule];
-		const preloadedExtensionPaths = ["/abs/parent/.omp/extensions/foo.ts"];
+		const preloadedExtensionPaths = ["/abs/parent/.omsp/extensions/foo.ts"];
 		const preloadedPreparedExtensions: PreparedExtension[] = [
 			{
 				path: preloadedExtensionPaths[0]!,
@@ -811,7 +818,7 @@ describe("runSubprocess follows the parent's MCP manager", () => {
 	};
 
 	beforeEach(() => {
-		workDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-subagent-mcp-follow-"));
+		workDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-subagent-mcp-follow-"));
 		manager = new MCPManager(workDir);
 	});
 

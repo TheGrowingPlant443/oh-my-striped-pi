@@ -3,19 +3,19 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { cleanupEmptyMoveSession, SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getConfigRootDir, setAgentDir } from "@oh-my-pi/pi-utils";
+import { cleanupEmptyMoveSession, SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getConfigRootDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 import { makeAssistantMessage } from "./helpers";
 
 describe("move-session cleanup tracking", () => {
 	let testAgentDir: string;
 	let cwd: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 	const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 	beforeEach(async () => {
-		testAgentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-move-cleanup-"));
+		testAgentDir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-move-cleanup-"));
 		setAgentDir(testAgentDir);
 		cwd = path.join(testAgentDir, "project");
 		fs.mkdirSync(cwd, { recursive: true });
@@ -25,7 +25,7 @@ describe("move-session cleanup tracking", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await fsp.rm(testAgentDir, { recursive: true, force: true });
 	});

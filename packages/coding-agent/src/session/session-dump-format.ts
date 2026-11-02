@@ -7,13 +7,13 @@
  * args), `### Tool Result: <name>`, and the execution/summary sections.
  * `/dump all` renders each persisted subagent as its own `# Subagent: <path>` document.
  */
-import type { AgentMessage, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Model, ToolExample, TSchema } from "@oh-my-pi/pi-ai";
-import { renderDelimitedThinking, renderToolInventory } from "@oh-my-pi/pi-ai/dialect";
-import { formatDuration } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+import type { AgentMessage, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Model, ToolExample, TSchema } from "@oh-my-striped-pi/pi-ai";
+import { renderDelimitedThinking, renderToolInventory } from "@oh-my-striped-pi/pi-ai/dialect";
+import { formatDuration } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import { YAML } from "bun";
-import { canonicalizeMessage } from "@oh-my-pi/pi-tui/chat/thinking-display";
+import { canonicalizeMessage } from "@oh-my-striped-pi/pi-tui/chat/thinking-display";
 import {
 	type BashExecutionMessage,
 	type BranchSummaryMessage,

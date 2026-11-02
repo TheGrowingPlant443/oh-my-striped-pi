@@ -6,7 +6,7 @@ import { chatTranscriptDisplayPreferences } from "./display-preferences";
 import { formatBadge, replaceTabs, type ToolUIColor, wrapTextWithAnsi } from "../render/render-utils";
 import { Ellipsis, truncateToWidth } from "../render";
 import type { Theme } from "../theme";
-import type { TspSpan, TspTone } from "@oh-my-pi/pi-wire";
+import type { TspSpan, TspTone } from "@oh-my-striped-pi/pi-wire";
 import { card, node, span, text } from "../native/describe";
 import { type NativeNode, type NativeUiEvent, rootToggleExpanded } from "../native/node";
 import { plainText } from "../native/spans";
@@ -236,29 +236,29 @@ export function createAdvisorMessageCard(
 		const [sole] = sources;
 		const head = node(
 			"row",
-			{ gap: "sm", align: "center", role: "omp.advisor.head" },
+			{ gap: "sm", align: "center", role: "omsp.advisor.head" },
 			[
 				node("icon", { name: look.icon, tone: look.tone }),
 				text(tallySpans(notes), { grow: 1 }),
-				text([span(sources.size === 1 && sole ? sole : "Advisor", "dim")], { role: "omp.advisor.source" }),
+				text([span(sources.size === 1 && sole ? sole : "Advisor", "dim")], { role: "omsp.advisor.source" }),
 			],
 			"head",
 		);
 		const attribute = sources.size > 1;
 		const body = notes.map((entry, index) => {
 			const spans = noteSpans(entry, attribute);
-			if (notes.length === 1) return text(spans, { wrap: "word", role: "omp.advisor.note", key: `n${index}` });
+			if (notes.length === 1) return text(spans, { wrap: "word", role: "omsp.advisor.note", key: `n${index}` });
 			const { tone, icon, label } = RANK_LOOK[rankOf(entry)];
 			return node(
 				"row",
-				{ gap: "sm", align: "start", role: "omp.advisor.note", tone },
+				{ gap: "sm", align: "start", role: "omsp.advisor.note", tone },
 				[node("icon", { name: icon, tone, aria: label }), text(spans, { wrap: "word", grow: 1, shrink: 1 })],
 				`n${index}`,
 			);
 		});
 		return card(
 			{
-				role: "omp.advisor",
+				role: "omsp.advisor",
 				tone: look.tone,
 				collapsible: notes.length > COLLAPSED_NOTES,
 				collapsed: notes.length > COLLAPSED_NOTES ? !isExpanded : undefined,

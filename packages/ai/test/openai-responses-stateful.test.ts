@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import * as utils from "@oh-my-pi/pi-utils";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { stream } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import * as utils from "@oh-my-striped-pi/pi-utils";
 
 const model = getBundledModel("github-copilot", "gpt-5-mini") as Model<"openai-responses">;
 
@@ -782,7 +782,7 @@ describe("openai-responses stateful chaining", () => {
 	] as const)("%s", async (_name, compatValue, envValue, callValue, enabled) => {
 		const originalFlag = utils.$flag;
 		vi.spyOn(utils, "$flag").mockImplementation((name, fallback) =>
-			name === "PI_OPENAI_STATEFUL" ? utils.parseFlag(envValue, fallback) : originalFlag(name, fallback),
+			name === "OMSP_OPENAI_STATEFUL" ? utils.parseFlag(envValue, fallback) : originalFlag(name, fallback),
 		);
 		const endpointModel = buildModel({
 			...model,

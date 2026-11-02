@@ -2,14 +2,14 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { FetchImpl, Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { imageGenTool } from "@oh-my-pi/pi-coding-agent/tools/image-gen";
+import type { FetchImpl, Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { CustomToolContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/types";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { imageGenTool } from "@oh-my-striped-pi/pi-coding-agent/tools/image-gen";
 
 const imageData = Buffer.from("company image").toString("base64");
 const paths: string[] = [];
@@ -116,7 +116,7 @@ describe("configured company image generation tool", () => {
 	it.skipIf(process.platform === "win32")(
 		"rejects a FIFO image input before reading or contacting the provider",
 		async () => {
-			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-image-special-file-"));
+			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-image-special-file-"));
 			const fifo = path.join(dir, "input.png");
 			try {
 				expect(Bun.spawnSync(["mkfifo", fifo]).exitCode).toBe(0);

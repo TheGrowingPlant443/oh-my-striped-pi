@@ -4,11 +4,11 @@
 #
 # Used by both the orchestrator (CMD: `python -m robomp serve`) and the
 # sibling gh-proxy (compose command: `python -m robomp.proxy serve`). The
-# proxy role does NOT need a $PI_ROOT pi checkout — it never runs omp.
+# proxy role does NOT need a $OMSP_ROOT pi checkout — it never runs omsp.
 set -euo pipefail
 
 # Shared git metadata under /data/workspaces/_pool is intentionally group
-# writable by the `omp` group so interrupted work can resume on a different
+# writable by the `omsp` group so interrupted work can resume on a different
 # slot user. Keep new files and directories compatible with that model.
 umask 0002
 
@@ -22,24 +22,24 @@ elif [[ "${1:-}" == *"robomp.proxy"* ]]; then
     is_proxy_role=1
 fi
 
-/usr/sbin/groupadd -f -g 2000 omp
+/usr/sbin/groupadd -f -g 2000 omsp
 max_slots="${ROBOMP_MAX_CONCURRENCY:-8}"
 for i in $(seq 1 "$max_slots"); do
-    user="omp-$i"
-    slot_group="omp-$i"
+    user="omsp-$i"
+    slot_group="omsp-$i"
     slot_id=$((2000 + i))
     /usr/sbin/groupadd -f -g "$slot_id" "$slot_group"
-    id -u "$user" >/dev/null 2>&1 || /usr/sbin/useradd -u "$slot_id" -g "$slot_group" -G omp -M -N -s /usr/sbin/nologin "$user"
-    /usr/sbin/usermod -g "$slot_group" -a -G omp "$user"
+    id -u "$user" >/dev/null 2>&1 || /usr/sbin/useradd -u "$slot_id" -g "$slot_group" -G omsp -M -N -s /usr/sbin/nologin "$user"
+    /usr/sbin/usermod -g "$slot_group" -a -G omsp "$user"
 done
 
 if [ "$is_proxy_role" -eq 1 ]; then
     exec "$@"
 fi
 
-: "${PI_ROOT:=/work/pi}"
-if [ ! -d "$PI_ROOT/packages/coding-agent" ]; then
-    echo "roboomp: PI_ROOT=$PI_ROOT does not look like a pi checkout (no packages/coding-agent/)" >&2
+: "${OMSP_ROOT:=/work/pi}"
+if [ ! -d "$OMSP_ROOT/packages/coding-agent" ]; then
+    echo "roboomp: OMSP_ROOT=$OMSP_ROOT does not look like a pi checkout (no packages/coding-agent/)" >&2
     exit 1
 fi
 
@@ -52,35 +52,35 @@ mkdir -p /data/workspaces /data/workspaces/_pool /data/logs
 mkdir -p /data/cache/cargo /data/cache/cargo-target /data/cache/rustup /data/natives-cache
 chown root:root /data/natives-cache
 chmod 0700 /data/natives-cache
-chown -R root:omp /data/cache /data/workspaces/_pool
+chown -R root:omsp /data/cache /data/workspaces/_pool
 find /data/cache /data/workspaces/_pool -type d -exec chmod 2770 {} +
 find /data/cache /data/workspaces/_pool -type f -perm /111 -exec chmod 0770 {} +
 find /data/cache /data/workspaces/_pool -type f ! -perm /111 -exec chmod 0660 {} +
 chmod 0700 /data/logs
 
 
-rm -rf /srv/agent-home/.agent /srv/agent-home/.omp/agent
-mkdir -p /srv/agent-home/.agent /srv/agent-home/.omp/agent
+rm -rf /srv/agent-home/.agent /srv/agent-home/.omsp/agent
+mkdir -p /srv/agent-home/.agent /srv/agent-home/.omsp/agent
 if [ -e /srv/agent-home-stage/.agent ]; then
     cp -a /srv/agent-home-stage/.agent/. /srv/agent-home/.agent/
 fi
-if [ -e /srv/agent-home-stage/.omp/agent ]; then
-    cp -a /srv/agent-home-stage/.omp/agent/. /srv/agent-home/.omp/agent/
+if [ -e /srv/agent-home-stage/.omsp/agent ]; then
+    cp -a /srv/agent-home-stage/.omsp/agent/. /srv/agent-home/.omsp/agent/
 fi
 chown -R root:root /srv/agent-home || true
 find /srv/agent-home -type d -exec chmod 0755 {} +
 find /srv/agent-home -type f -exec chmod 0644 {} +
 
-# omp registers daemon project presence under ~/.omp/run at startup, nesting
+# omsp registers daemon project presence under ~/.omsp/run at startup, nesting
 # per-project dirs (daemons/<hash>/clients) that any slot user must be able to
 # create and enter regardless of which slot first made them: setgid + group
-# omp keeps the whole tree group-writable (entrypoint umask 0002 carries into
+# omsp keeps the whole tree group-writable (entrypoint umask 0002 carries into
 # slot processes, so new entries stay group-writable too).
-mkdir -p /srv/agent-home/.omp/run
-chgrp -R omp /srv/agent-home/.omp/run
-chmod -R g+rwX /srv/agent-home/.omp/run
-find /srv/agent-home/.omp/run -type d -exec chmod g+s {} +
-chmod 2770 /srv/agent-home/.omp/run
+mkdir -p /srv/agent-home/.omsp/run
+chgrp -R omsp /srv/agent-home/.omsp/run
+chmod -R g+rwX /srv/agent-home/.omsp/run
+find /srv/agent-home/.omsp/run -type d -exec chmod g+s {} +
+chmod 2770 /srv/agent-home/.omsp/run
 
 touch /data/robomp.sqlite
 chown root:root /data/robomp.sqlite

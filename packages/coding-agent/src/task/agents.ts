@@ -3,8 +3,8 @@
  *
  * Agents are embedded at build time via Bun's import with { type: "text" }.
  */
-import { Effort } from "@oh-my-pi/pi-ai";
-import { parseFrontmatter, prompt } from "@oh-my-pi/pi-utils";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { parseFrontmatter, prompt } from "@oh-my-striped-pi/pi-utils";
 import { parseAgentFields } from "../discovery/helpers";
 // Embed agent markdown files at build time
 import agentFrontmatterTemplate from "../prompts/agents/frontmatter.md" with { type: "text" };
@@ -13,9 +13,9 @@ import scoutMd from "../prompts/agents/scout.md" with { type: "text" };
 import securityReviewerMd from "../prompts/agents/security-reviewer.md" with { type: "text" };
 import seanceMd from "../prompts/agents/seance.md" with { type: "text" };
 import taskMd from "../prompts/agents/task.md" with { type: "text" };
-import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
+import { AUTO_THINKING } from "@oh-my-striped-pi/pi-tui/thinking";
 
-import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
+import type { AgentSource } from "@oh-my-striped-pi/pi-tui/tools/task";
 import type { AgentDefinition } from "./types";
 
 interface AgentFrontmatter {

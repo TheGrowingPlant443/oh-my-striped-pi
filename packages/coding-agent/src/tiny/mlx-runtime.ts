@@ -1,7 +1,13 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { $ } from "bun";
-import { $which, getTinyModelsCacheDir, isEnoent, type RuntimeInstallPhase, withFileLock } from "@oh-my-pi/pi-utils";
+import {
+	$which,
+	getTinyModelsCacheDir,
+	isEnoent,
+	type RuntimeInstallPhase,
+	withFileLock,
+} from "@oh-my-striped-pi/pi-utils";
 
 /**
  * Side-installed Python runtime for the MLX tiny-model backend: a private venv
@@ -14,7 +20,7 @@ import { $which, getTinyModelsCacheDir, isEnoent, type RuntimeInstallPhase, with
 export const MLX_LM_VERSION = "0.31.3";
 /** Python range accepted for the venv; mlx publishes Metal wheels for these. */
 const MLX_PYTHON_SPEC = ">=3.10,<3.14";
-const READY_MARKER = ".omp-mlx-lm";
+const READY_MARKER = ".omsp-mlx-lm";
 
 /** Directory of the `mlx-lm` venv for {@link MLX_LM_VERSION}. */
 export function getTinyMlxRuntimeDir(): string {

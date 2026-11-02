@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { resolvedApiKeyBearer, withAuth } from "@oh-my-pi/pi-ai";
-import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import type { CredentialRankingStrategy, UsageProvider } from "@oh-my-pi/pi-ai/usage";
+import { resolvedApiKeyBearer, withAuth } from "@oh-my-striped-pi/pi-ai";
+import { type AuthCredentialStore, AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import type { CredentialRankingStrategy, UsageProvider } from "@oh-my-striped-pi/pi-ai/usage";
 import { removeWithRetries } from "../../utils/src/temp";
 import { OAuthRefresher } from "../src/auth/refresh";
 

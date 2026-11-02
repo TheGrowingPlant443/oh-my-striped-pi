@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { raceAbortSignal } from "@oh-my-pi/pi-coding-agent/mcp/oauth-reauth";
+import { raceAbortSignal } from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-reauth";
 
 const unhandled: unknown[] = [];
 const onUnhandled = (reason: unknown): void => {

@@ -1,5 +1,5 @@
-import { completeSimple } from "@oh-my-pi/pi-ai";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { completeSimple } from "@oh-my-striped-pi/pi-ai";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import type { CustomCommandContext } from "../../../../extensibility/custom-commands/types";
 import summaryPrompt from "./prompts/text-summary.md" with { type: "text" };
 import { normalizeTextReviewContextSummary } from "./text-review";

@@ -1,10 +1,10 @@
 # Model and Provider Configuration (`models.yml` / `models.yaml`)
 
-OMP retains Copilot, on-device workers and self-hosted inference integrations. Company-operated providers can be configured explicitly; built-in public model-provider integrations other than Copilot are removed.
+OMSP retains Copilot, on-device workers and self-hosted inference integrations. Company-operated providers can be configured explicitly; built-in public model-provider integrations other than Copilot are removed.
 
 ## Model selection
 
-Use `provider/model-id` selectors. Inspect the retained catalog with `omp models` and choose a session model with `/model`.
+Use `provider/model-id` selectors. Inspect the retained catalog with `omsp models` and choose a session model with `/model`.
 
 ```yaml
 modelRoles:
@@ -29,7 +29,7 @@ Unknown explicit provider/model selectors are not silently redirected to Copilot
 
 ## Config file location
 
-The registry reads `models.yml` or `models.yaml` in the active agent directory (default `~/.omp/agent/`). Named profiles use their own agent directory. `PI_CODING_AGENT_DIR` can override the default-profile directory. A programmatic `ModelRegistry` path overrides the directory-derived location.
+The registry reads `models.yml` or `models.yaml` in the active agent directory (default `~/.omsp/agent/`). Named profiles use their own agent directory. `OMSP_CODING_AGENT_DIR` can override the default-profile directory. A programmatic `ModelRegistry` path overrides the directory-derived location.
 
 ## Provider configuration
 
@@ -67,7 +67,7 @@ Select `company/code-model`, or assign it to `modelRoles.default`. Replace the e
 
 ## Authentication and extensions
 
-Authenticate Copilot with `omp login github-copilot` or `/login github-copilot`. On-device workers are keyless; self-hosted services follow their configured/declared optional-key policy. See [Providers](./providers.md).
+Authenticate Copilot with `omsp login github-copilot` or `/login github-copilot`. On-device workers are keyless; self-hosted services follow their configured/declared optional-key policy. See [Providers](./providers.md).
 
 Trusted extensions retain custom provider, API-handler and OAuth registration. Register a handler before executing a custom API name; declaring a name alone does not implement its transport.
 

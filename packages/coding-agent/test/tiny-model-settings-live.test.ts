@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { TinyTitleClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
-import type { TinyWorkerRequest, TinyWorkerResponse } from "@oh-my-pi/pi-coding-agent/tiny/title-protocol";
+import { resetSettingsForTest, Settings, settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { TinyTitleClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
+import type { TinyWorkerRequest, TinyWorkerResponse } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-protocol";
 
-import { cfgProvidersTinyModelDtype } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgProvidersTinyModelDtype } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 /** Minimal worker that answers every chat with a fixed reply. */
 class ReplyingWorker {
@@ -36,18 +36,18 @@ class ReplyingWorker {
 }
 
 describe("providers.tinyModelDtype live change", () => {
-	const savedEnv = { device: Bun.env.PI_TINY_DEVICE, dtype: Bun.env.PI_TINY_DTYPE };
+	const savedEnv = { device: Bun.env.OMSP_TINY_DEVICE, dtype: Bun.env.OMSP_TINY_DTYPE };
 
 	beforeEach(async () => {
-		delete Bun.env.PI_TINY_DEVICE;
-		delete Bun.env.PI_TINY_DTYPE;
+		delete Bun.env.OMSP_TINY_DEVICE;
+		delete Bun.env.OMSP_TINY_DTYPE;
 		await Settings.init({ inMemory: true });
 	});
 
 	afterEach(() => {
 		resetSettingsForTest();
-		if (savedEnv.device !== undefined) Bun.env.PI_TINY_DEVICE = savedEnv.device;
-		if (savedEnv.dtype !== undefined) Bun.env.PI_TINY_DTYPE = savedEnv.dtype;
+		if (savedEnv.device !== undefined) Bun.env.OMSP_TINY_DEVICE = savedEnv.device;
+		if (savedEnv.dtype !== undefined) Bun.env.OMSP_TINY_DTYPE = savedEnv.dtype;
 	});
 
 	it("serves the next call from a fresh worker after the dtype changes", async () => {

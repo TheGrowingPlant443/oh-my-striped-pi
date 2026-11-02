@@ -1,9 +1,9 @@
 {
 	const call = async (flow, action, params) => {
 		const defined = Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined));
-		const response = await globalThis.__omp_prelude__("ratchet", { ...defined, flow, action });
+		const response = await globalThis.__omsp_prelude__("ratchet", { ...defined, flow, action });
 		if (response && typeof response.text === "string" && response.text.length > 0) {
-			globalThis.__omp_log__("log", response.text);
+			globalThis.__omsp_log__("log", response.text);
 		}
 		return response && typeof response === "object" ? response.details : undefined;
 	};

@@ -22,18 +22,18 @@ import {
 	type Tool,
 	type Usage,
 	withAuth,
-} from "@oh-my-pi/pi-ai";
-import type { Dialect } from "@oh-my-pi/pi-ai/dialect";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { convertTools } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { buildResponsesInput, resolveOpenAICompatPolicy } from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { isSurvivingAssistant } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { stripOpenAIResponsesOutputOnlyStatusesForReplay } from "@oh-my-pi/pi-ai/utils";
-import { resolveCatalogPolicy } from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { preferredDialect } from "@oh-my-pi/pi-catalog/identity";
-import { clampThinkingLevelForModel } from "@oh-my-pi/pi-catalog/model-thinking";
-import { isRecord, logger, prompt } from "@oh-my-pi/pi-utils";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-ai";
+import type { Dialect } from "@oh-my-striped-pi/pi-ai/dialect";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { convertTools } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { buildResponsesInput, resolveOpenAICompatPolicy } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { isSurvivingAssistant } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { stripOpenAIResponsesOutputOnlyStatusesForReplay } from "@oh-my-striped-pi/pi-ai/utils";
+import { resolveCatalogPolicy } from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { preferredDialect } from "@oh-my-striped-pi/pi-catalog/identity";
+import { clampThinkingLevelForModel } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { isRecord, logger, prompt } from "@oh-my-striped-pi/pi-utils";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { type AgentTelemetry, instrumentedCompleteSimple } from "../telemetry";
 import { ThinkingLevel } from "../thinking";
 import { Tokenizer } from "../tokenizer";
@@ -715,7 +715,7 @@ export interface SummaryOptions {
 	/**
 	 * Optional telemetry handle. When provided, every LLM call emitted during
 	 * compaction is wrapped in an OTEL chat span tagged with
-	 * `omp.gen_ai.oneshot.kind` (`compaction_summary`, `compaction_short_summary`,
+	 * `omsp.gen_ai.oneshot.kind` (`compaction_summary`, `compaction_short_summary`,
 	 * or `compaction_turn_prefix`). `undefined` keeps the call paths zero-cost.
 	 */
 	telemetry?: AgentTelemetry;
@@ -1075,7 +1075,7 @@ export interface HandoffOptions {
 	metadata?: Record<string, unknown>;
 	/**
 	 * Optional telemetry handle. When provided, the handoff LLM call is
-	 * wrapped in an OTEL chat span tagged with `omp.gen_ai.oneshot.kind = "handoff"`.
+	 * wrapped in an OTEL chat span tagged with `omsp.gen_ai.oneshot.kind = "handoff"`.
 	 */
 	telemetry?: AgentTelemetry;
 	/**

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import * as piUtils from "@oh-my-pi/pi-utils";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
 import type { SegmentContext } from "../src/status-line/segments";
 import { describeSegment, renderSegment } from "../src/status-line/segments";
 import { initTheme, theme } from "../src/theme";
@@ -59,10 +59,10 @@ function createContext(overrides: Partial<SegmentContext> = {}): SegmentContext 
 describe("status line pi segment profile tag", () => {
 	it("tags the brand with a named profile and leaves the default profile bare", () => {
 		const activeProfile = vi.spyOn(piUtils, "getActiveProfile").mockReturnValue(undefined);
-		expect(Bun.stripANSI(renderSegment("pi", createContext()).content)).toBe(theme.icon.omp);
+		expect(Bun.stripANSI(renderSegment("pi", createContext()).content)).toBe(theme.icon.omsp);
 
 		activeProfile.mockReturnValue("work");
-		expect(Bun.stripANSI(renderSegment("pi", createContext()).content)).toBe(`${theme.icon.omp}-work`);
+		expect(Bun.stripANSI(renderSegment("pi", createContext()).content)).toBe(`${theme.icon.omsp}-work`);
 	});
 
 	it("keeps the tag beside the spinner while a turn runs", () => {
@@ -83,7 +83,7 @@ describe("status line pi segment profile tag", () => {
 		vi.spyOn(piUtils, "getActiveProfile").mockReturnValue("work");
 		const options = { pi: { showProfile: false } };
 
-		expect(Bun.stripANSI(renderSegment("pi", createContext({ options })).content)).toBe(theme.icon.omp);
+		expect(Bun.stripANSI(renderSegment("pi", createContext({ options })).content)).toBe(theme.icon.omsp);
 		const active = renderSegment("pi", createContext({ options, now: new Date(0), turnElapsedMs: 92_000 }));
 		expect(Bun.stripANSI(active.content)).toBe(`${theme.getSpinnerFrames("activity")[0]} 1m`);
 		expect(describeSegment("pi", createContext({ options }))?.spans).toEqual([]);

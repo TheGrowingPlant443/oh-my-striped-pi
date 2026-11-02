@@ -89,7 +89,7 @@ build:ci --keep_going=false
 build:ci --reuse_sandbox_directories
 
 # --- Remote cache ------------------------------------------------------------
-# .github/actions/bazel-cache points vmon `omp-ci` runners at their node's
+# .github/actions/bazel-cache points vmon `omsp-ci` runners at their node's
 # Bazel HTTP cache ($VMON_CACHE_URL/bazel) and picks one of these policies.
 # GitHub-hosted runners never use a remote cache and run no Bazel builds.
 # These configs carry only the policy bits; the endpoint comes from the

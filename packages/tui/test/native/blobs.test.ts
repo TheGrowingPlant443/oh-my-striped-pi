@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils/temp";
-import { registerNativeBlob } from "@oh-my-pi/pi-tui/native/blobs";
-import { node } from "@oh-my-pi/pi-tui/native/describe";
-import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import type { Component } from "@oh-my-pi/pi-tui/tui";
+import { TempDir } from "@oh-my-striped-pi/pi-utils/temp";
+import { registerNativeBlob } from "@oh-my-striped-pi/pi-tui/native/blobs";
+import { node } from "@oh-my-striped-pi/pi-tui/native/describe";
+import type { NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import type { Component } from "@oh-my-striped-pi/pi-tui/tui";
 import { TspHarness } from "./tsp-harness";
 
 describe("native image blob lifetime", () => {
@@ -39,22 +39,22 @@ describe("native image blob lifetime", () => {
 		it(
 			name,
 			async () => {
-				await using root = await TempDir.create("@omp-native-blobs-");
+				await using root = await TempDir.create("@omsp-native-blobs-");
 				const env: NodeJS.ProcessEnv = {
 					...process.env,
-					PI_CONFIG_DIR: path.relative(os.homedir(), root.join("config")),
-					PI_CODING_AGENT_DIR: root.join("agent"),
-					PI_TEST_SESSION_OWNERS_DIR: root.join("session-owners"),
+					OMSP_CONFIG_DIR: path.relative(os.homedir(), root.join("config")),
+					OMSP_CODING_AGENT_DIR: root.join("agent"),
+					OMSP_TEST_SESSION_OWNERS_DIR: root.join("session-owners"),
 					XDG_CONFIG_HOME: root.join("xdg-config"),
 					XDG_DATA_HOME: root.join("data"),
 					XDG_STATE_HOME: root.join("state"),
 					XDG_CACHE_HOME: root.join("cache"),
-					PI_TUI_NATIVE: "1",
+					OMSP_TUI_NATIVE: "1",
 				};
-				delete env.OMP_PROFILE;
-				delete env.PI_PROFILE;
+				delete env.OMSP_PROFILE;
+				delete env.OMSP_PROFILE;
 				await Promise.all(
-					["config", "agent", "session-owners", "xdg-config", "data/omp", "state/omp", "cache/omp"].map(dir =>
+					["config", "agent", "session-owners", "xdg-config", "data/omsp", "state/omsp", "cache/omsp"].map(dir =>
 						fs.promises.mkdir(root.join(dir), { recursive: true }),
 					),
 				);
@@ -160,14 +160,14 @@ describe("native blob delivery", () => {
 	it("records a blob the terminal already held with its full body, after the query", async () => {
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "tsp-record-"));
 		const record = path.join(tempDir, "tsp.jsonl");
-		const before = Bun.env.PI_TUI_TSP_RECORD;
-		Bun.env.PI_TUI_TSP_RECORD = record;
+		const before = Bun.env.OMSP_TUI_TSP_RECORD;
+		Bun.env.OMSP_TUI_TSP_RECORD = record;
 		const pic = image();
 		try {
 			harness = await TspHarness.start(tui => tui.addChild(pic.probe()), { heldBlobs: [pic.bytes] });
 		} finally {
-			if (before === undefined) delete Bun.env.PI_TUI_TSP_RECORD;
-			else Bun.env.PI_TUI_TSP_RECORD = before;
+			if (before === undefined) delete Bun.env.OMSP_TUI_TSP_RECORD;
+			else Bun.env.OMSP_TUI_TSP_RECORD = before;
 		}
 		const lines = fs
 			.readFileSync(record, "utf8")

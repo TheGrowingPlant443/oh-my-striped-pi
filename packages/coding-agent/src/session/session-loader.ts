@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import {
@@ -11,8 +11,8 @@ import {
 	parseJsonlLenient,
 	peekFile,
 	tryParseJson,
-} from "@oh-my-pi/pi-utils";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-utils";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { Semaphore } from "../task/parallel";
 import {
 	BlobStore,

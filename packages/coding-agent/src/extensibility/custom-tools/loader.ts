@@ -1,16 +1,16 @@
 /**
  * Custom tool loader - loads TypeScript tool modules through the same loader
- * as extensions, so `@oh-my-pi/*` imports resolve to the host's bundled copy
+ * as extensions, so `@oh-my-striped-pi/*` imports resolve to the host's bundled copy
  * (in the compiled binary there is no other copy to resolve).
  *
  * Dependencies are also injected through CustomToolAPI so tools loaded from
  * user directories need no workspace module resolution.
  */
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import * as zod from "@oh-my-pi/omptype/zod";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { logger } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import * as zod from "@oh-my-striped-pi/omptype/zod";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import { toolCapability } from "../../capability/tool";
 import { type CustomTool, loadCapability } from "../../discovery";
 import type { ExecOptions } from "../../exec/exec";
@@ -248,7 +248,7 @@ export async function loadCustomTools(
 /**
  * Collect the absolute tool-source paths to load, without importing or
  * binding factories. Hot path on session startup — the scan walks
- * `.omp/tools/`, `.claude/tools/`, the plugin tree, and any configured paths.
+ * `.omsp/tools/`, `.claude/tools/`, the plugin tree, and any configured paths.
  *
  * Subagents reuse the parent's collected paths via the SDK's
  * `preloadedCustomToolPaths` option, then call `loadCustomTools` themselves
@@ -291,7 +291,7 @@ export async function discoverCustomToolPaths(
 		});
 	}
 
-	// 2. Plugin tools: ~/.omp/plugins/node_modules/*/
+	// 2. Plugin tools: ~/.omsp/plugins/node_modules/*/
 	for (const pluginPath of await getAllPluginToolPaths(cwd)) {
 		addPath(pluginPath, { provider: "plugin", providerName: "Plugin", level: "user" });
 	}
@@ -307,7 +307,7 @@ export async function discoverCustomToolPaths(
 /**
  * Discover and load tools from standard locations via capability system:
  * 1. User and project tools discovered by capability providers
- * 2. Installed plugins (~/.omp/plugins/node_modules/*)
+ * 2. Installed plugins (~/.omsp/plugins/node_modules/*)
  * 3. Explicitly configured paths from settings or CLI
  *
  * Composed of {@link discoverCustomToolPaths} (FS scan) + {@link loadCustomTools}

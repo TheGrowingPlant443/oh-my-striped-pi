@@ -2,20 +2,20 @@ import { describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
-import { encodeStream, formatError, parseRequest } from "@oh-my-pi/pi-ai/providers/pi-native-server";
+import { clearCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { startAuthGateway } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { createMockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { encodeStream, formatError, parseRequest } from "@oh-my-striped-pi/pi-ai/providers/pi-native-server";
 import type {
 	AssistantMessage,
 	AssistantMessageEvent,
 	AssistantMessageEventStream,
 	Context,
 	Usage,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 
 function makeEventStream(events: AssistantMessageEvent[], final: AssistantMessage): AssistantMessageEventStream {
 	async function* iter() {
@@ -356,7 +356,7 @@ describe("pi-native gateway reasoning flags", () => {
 });
 
 describe("pi-native gateway usage attribution", () => {
-	it("records observed usage under the caller's x-omp-* identity, host-fallback when absent", async () => {
+	it("records observed usage under the caller's x-omsp-* identity, host-fallback when absent", async () => {
 		registerMockApi();
 		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "gw-pi-native-usage-"));
 		const storage = await AuthStorage.create(path.join(dir, "auth.db"));
@@ -388,9 +388,9 @@ describe("pi-native gateway usage attribution", () => {
 				headers: {
 					Authorization: "Bearer test-token",
 					"Content-Type": "application/json",
-					"x-omp-install-id": "robomp-install",
-					"x-omp-hostname": "robomp-box",
-					"x-omp-app": "robomp",
+					"x-omsp-install-id": "robomp-install",
+					"x-omsp-hostname": "robomp-box",
+					"x-omsp-app": "robomp",
 				},
 				body: JSON.stringify({ modelId: "pi-native-usage", context: baseContext, stream: false }),
 			});
@@ -441,7 +441,7 @@ describe("pi-native gateway usage attribution", () => {
 
 describe("pi-native encodeStream", () => {
 	it("ships every AssistantMessageEvent verbatim, terminated by [DONE]", async () => {
-		// Pi-native is omp-talks-to-omp: the client feeds parsed events directly
+		// Pi-native is omsp-talks-to-omsp: the client feeds parsed events directly
 		// into `AssistantMessageEventStream.push()`, so the wire IS the canonical
 		// event type. No partial-stripping, no per-event re-shaping.
 		const finalMessage = baseAssistant({

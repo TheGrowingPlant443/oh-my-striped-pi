@@ -1,4 +1,4 @@
-# @oh-my-pi/pi-tui
+# @oh-my-striped-pi/pi-tui
 
 Minimal terminal UI framework with differential rendering and synchronized output for flicker-free interactive CLI applications.
 
@@ -16,7 +16,7 @@ Minimal terminal UI framework with differential rendering and synchronized outpu
 ## Quick Start
 
 ```typescript
-import { TUI, Text, Editor, ProcessTerminal } from "@oh-my-pi/pi-tui";
+import { TUI, Text, Editor, ProcessTerminal } from "@oh-my-striped-pi/pi-tui";
 
 // Create terminal
 const terminal = new ProcessTerminal();
@@ -40,7 +40,7 @@ tui.start();
 
 ## SIXEL transparency and terminal backgrounds
 
-SIXEL has binary transparency, not fractional alpha. omp blends partially
+SIXEL has binary transparency, not fractional alpha. omsp blends partially
 transparent image pixels against the terminal's reported OSC 11 background
 before quantization, preserving antialiased text and translucent details.
 Images with alpha are resized in premultiplied form before background compositing
@@ -59,7 +59,7 @@ scrollback.
 Cached RGB is cleared when terminal ownership starts or ends, so a restarted
 session without an OSC 11 response cannot inherit the previous terminal's RGB.
 If the terminal cannot report its RGB, or an active multiplexer marks background
-queries as unreliable on the current platform, omp approximates the background
+queries as unreliable on the current platform, omsp approximates the background
 with black for detected dark appearance or white for light. Untrusted reports
 do not override the existing appearance fallback. Exact edge-color matching is
 not guaranteed with that fallback, transparent terminal windows, or graphics
@@ -138,7 +138,7 @@ The status line's `record` segment displays `● REC` during local screen record
 Local recording and transcript playback do not include live collaboration, relay links, or network viewer status.
 
 ```typescript
-import { Disclosure, SplitPane, Text } from "@oh-my-pi/pi-tui";
+import { Disclosure, SplitPane, Text } from "@oh-my-striped-pi/pi-tui";
 
 const diagnostics = new Disclosure({
 	summary: new Text("2 build diagnostics", 0, 0),
@@ -531,8 +531,8 @@ Supported formats: PNG, JPEG, GIF, WebP. Dimensions are parsed from the image he
 Supports both slash commands and file paths.
 
 ```typescript
-import { CombinedAutocompleteProvider } from "@oh-my-pi/pi-tui";
-import { getProjectDir } from "@oh-my-pi/pi-utils";
+import { CombinedAutocompleteProvider } from "@oh-my-striped-pi/pi-tui";
+import { getProjectDir } from "@oh-my-striped-pi/pi-utils";
 
 const provider = new CombinedAutocompleteProvider(
 	[
@@ -587,7 +587,7 @@ import {
 	isHome,
 	isEnd,
 	// ... and more
-} from "@oh-my-pi/pi-tui";
+} from "@oh-my-striped-pi/pi-tui";
 
 if (isCtrlC(data)) {
 	process.exit(0);
@@ -602,7 +602,7 @@ The TUI uses three rendering strategies:
 2. **Width Changed or Change Above Viewport**: Clear screen and full re-render
 3. **Normal Update**: Move cursor to first changed line, clear to end, render changed lines
 
-All updates are wrapped in **synchronized output** (`\x1b[?2026h` ... `\x1b[?2026l`) for atomic, flicker-free rendering unless `PI_NO_SYNC_OUTPUT=1` is set. The opt-out removes only the DEC 2026 wrapper; paint writes still guard terminal autowrap to avoid pending-wrap cursor artifacts.
+All updates are wrapped in **synchronized output** (`\x1b[?2026h` ... `\x1b[?2026l`) for atomic, flicker-free rendering unless `OMSP_NO_SYNC_OUTPUT=1` is set. The opt-out removes only the DEC 2026 wrapper; paint writes still guard terminal autowrap to avoid pending-wrap cursor artifacts.
 
 ## Terminal Interface
 
@@ -632,7 +632,7 @@ interface Terminal {
 ## Utilities
 
 ```typescript
-import { Ellipsis, visibleWidth, truncateToWidth, wrapTextWithAnsi } from "@oh-my-pi/pi-tui";
+import { Ellipsis, visibleWidth, truncateToWidth, wrapTextWithAnsi } from "@oh-my-striped-pi/pi-tui";
 
 // Get visible width of string (ignoring ANSI codes, uses Bun.stringWidth)
 const width = visibleWidth("\x1b[31mHello\x1b[0m"); // 5
@@ -657,8 +657,8 @@ When creating custom components, **each line returned by `render()` must not exc
 Use the key detection utilities to handle keyboard input:
 
 ```typescript
-import { isEnter, isEscape, isArrowUp, isArrowDown, isCtrlC, isTab, isBackspace } from "@oh-my-pi/pi-tui";
-import type { Component } from "@oh-my-pi/pi-tui";
+import { isEnter, isEscape, isArrowUp, isArrowDown, isCtrlC, isTab, isBackspace } from "@oh-my-striped-pi/pi-tui";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
 
 class MyInteractiveComponent implements Component {
 	private selectedIndex = 0;
@@ -693,8 +693,8 @@ class MyInteractiveComponent implements Component {
 Use the provided utilities to ensure lines fit:
 
 ```typescript
-import { visibleWidth, truncateToWidth } from "@oh-my-pi/pi-tui";
-import type { Component } from "@oh-my-pi/pi-tui";
+import { visibleWidth, truncateToWidth } from "@oh-my-striped-pi/pi-tui";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
 
 class MyComponent implements Component {
 	private text: string;
@@ -728,7 +728,7 @@ class MyComponent implements Component {
 - `wrapTextWithAnsi()` preserves ANSI codes while word-wrapping and trimming line ends
 
 ```typescript
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 
 const styled = chalk.red("Hello") + " " + chalk.blue("World");
 const width = visibleWidth(styled); // 11 (not counting ANSI codes)

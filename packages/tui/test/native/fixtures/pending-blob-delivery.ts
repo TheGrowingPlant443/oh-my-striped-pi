@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
-import { TempDir } from "@oh-my-pi/pi-utils/temp";
+import { TempDir } from "@oh-my-striped-pi/pi-utils/temp";
 import { becomesCollectible, collectGarbage } from "../../gc";
 import { base64ImageNode, getNativeBlob } from "../../../src/native/blobs";
 import type { NativeNode } from "../../../src/native/node";
@@ -38,11 +38,11 @@ async function expectReleased(reference: WeakRef<Uint8Array>): Promise<void> {
 }
 
 await initTheme(false);
-await using root = await TempDir.create("@omp-pending-blobs-");
+await using root = await TempDir.create("@omsp-pending-blobs-");
 const cache = mode.startsWith("cache-") ? root.join("blobs") : undefined;
 if (cache) await fs.mkdir(cache);
 const record = mode === "cache-held" ? root.join("record.jsonl") : undefined;
-if (record) Bun.env.PI_TUI_TSP_RECORD = record;
+if (record) Bun.env.OMSP_TUI_TSP_RECORD = record;
 const component = new EphemeralImage();
 settleNative(component);
 const harness = await TspHarness.start(tui => tui.addChild(component), { answerBlobs: false, blobDir: cache });

@@ -6,27 +6,27 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentTool, AgentToolContext, ToolTier } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { ExtensionUIContext } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { ExtensionToolWrapper } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/wrapper";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import type { AgentTool, AgentToolContext, ToolTier } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ExtensionRuntime } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { ExtensionUIContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { ExtensionToolWrapper } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/wrapper";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import {
 	type ApprovalRestrictions,
 	resolveApproval,
 	sessionApprovalScope,
-} from "@oh-my-pi/pi-coding-agent/tools/approval";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
 import {
 	approvalDirectoryKey,
 	approvalGrantKey,
 	getApprovalGrants,
-} from "@oh-my-pi/pi-coding-agent/tools/approval-cache";
-import { approvalTargetKey, approvalTreeSearchKey } from "@oh-my-pi/pi-coding-agent/tools/approval-targets";
-import { getAgentDir, isRecord, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/approval-cache";
+import { approvalTargetKey, approvalTreeSearchKey } from "@oh-my-striped-pi/pi-coding-agent/tools/approval-targets";
+import { getAgentDir, isRecord, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 /** Tool whose targets come from `args.path`, like read/write/edit. */
 function pathTool(name: string, tier: ToolTier, cwd: string): AgentTool {
@@ -57,7 +57,7 @@ let cwd: string;
 let restricted: string;
 
 beforeEach(() => {
-	temp = TempDir.createSync("@omp-restricted-folders-");
+	temp = TempDir.createSync("@omsp-restricted-folders-");
 	cwd = temp.path();
 	restricted = path.join(cwd, "restricted");
 	fs.mkdirSync(path.join(restricted, "nested"), { recursive: true });
@@ -147,10 +147,10 @@ describe("restricted folder resolution", () => {
 
 	it("names a folder through ~, a symlink, or (on Windows) different case", () => {
 		const read = pathTool("read", "read", cwd);
-		const home = path.join(os.homedir(), ".omp-restricted-probe", "file.txt");
+		const home = path.join(os.homedir(), ".omsp-restricted-probe", "file.txt");
 		const probe: AgentTool = { ...read, approvalCacheTargets: () => [approvalTargetKey(cwd, home)!] };
 		expect(
-			resolveApproval(probe, {}, "yolo", {}, undefined, { restrictedFolders: ["~/.omp-restricted-probe"], cwd })
+			resolveApproval(probe, {}, "yolo", {}, undefined, { restrictedFolders: ["~/.omsp-restricted-probe"], cwd })
 				.policy,
 		).toBe("prompt");
 
@@ -180,7 +180,7 @@ describe("restricted folder wrapper gate", () => {
 	let originalAgentDir: string;
 
 	beforeAll(async () => {
-		root = TempDir.createSync("@omp-restricted-wrapper-");
+		root = TempDir.createSync("@omsp-restricted-wrapper-");
 		authStorage = await AuthStorage.create(path.join(root.path(), "testauth.db"));
 		modelRegistry = new ModelRegistry(authStorage);
 	});

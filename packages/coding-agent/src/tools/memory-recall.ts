@@ -1,6 +1,6 @@
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { logger, prompt, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { isHindsightConfigured, loadHindsightConfig } from "../hindsight/config";
 import { formatCurrentTime, formatMemories } from "../memory-backend/content";
 import recallDescription from "../prompts/tools/recall.md" with { type: "text" };

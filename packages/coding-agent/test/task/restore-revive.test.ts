@@ -1,5 +1,5 @@
 /**
- * `omp --restore` end to end for a subagent: a transcript a crash cut off mid tool
+ * `omsp --restore` end to end for a subagent: a transcript a crash cut off mid tool
  * call is revived from disk, its cut-off call runs again, the agent answers, and the
  * parent receives the answer as the subagent's job.
  */
@@ -7,26 +7,26 @@ import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, MOCK_API } from "@oh-my-pi/pi-ai/providers/mock";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async/job-manager";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry, MAIN_AGENT_ID } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { createPersistedSubagentReviverFactory } from "@oh-my-pi/pi-coding-agent/task/persisted-revive";
-import { restoreSession } from "@oh-my-pi/pi-coding-agent/task/restore";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import { createMockModel, MOCK_API } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async/job-manager";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry, MAIN_AGENT_ID } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { createPersistedSubagentReviverFactory } from "@oh-my-striped-pi/pi-coding-agent/task/persisted-revive";
+import { restoreSession } from "@oh-my-striped-pi/pi-coding-agent/task/restore";
+import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 
 const AGENT_ID = "Restored";
 const MOCK_API_SOURCE = "test/restore-revive";
-const ENV_KEYS = ["HOME", "PI_CODING_AGENT_DIR", "OMP_PROFILE", "PI_PROFILE"] as const;
+const ENV_KEYS = ["HOME", "OMSP_CODING_AGENT_DIR", "OMSP_PROFILE"] as const;
 
 let savedEnv: Record<string, string | undefined> = {};
 let root: string;
@@ -44,12 +44,12 @@ function restoreEnvValue(key: string, value: string | undefined): void {
 
 beforeEach(async () => {
 	savedEnv = Object.fromEntries(ENV_KEYS.map(key => [key, process.env[key]]));
-	root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-restore-revive-"));
+	root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-restore-revive-"));
 	const home = path.join(root, "home");
 	await fs.mkdir(home, { recursive: true });
 	restoreEnvValue("HOME", home);
 	vi.spyOn(os, "homedir").mockReturnValue(home);
-	setAgentDir(path.join(home, ".omp", "agent"));
+	setAgentDir(path.join(home, ".omsp", "agent"));
 	AgentRegistry.resetGlobalForTests();
 	AgentLifecycleManager.resetGlobalForTests();
 	manager = new AsyncJobManager({ maxRunningJobs: 4 });

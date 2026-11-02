@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omsp-rpc"
+version = "0.1.0"
+description = "Typed Python client for the omsp coding-agent RPC protocol"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Stencil Labs, Inc." }]
+keywords = ["omsp", "rpc", "agent", "coding-agent", "jsonl", "stdio"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/TheGrowingPlant443/oh-my-striped-pi/"
+Repository = "https://github.com/TheGrowingPlant443/oh-my-striped-pi"
+Documentation = "https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/docs/rpc.md"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+omsp_rpc = ["py.typed"]

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { resolveEquivalentPath } from "@oh-my-pi/pi-utils/dirs";
+import { resolveEquivalentPath } from "@oh-my-striped-pi/pi-utils/dirs";
 
 describe("issue #935 path equivalence", () => {
 	afterEach(() => {
@@ -22,7 +22,7 @@ describe("issue #935 path equivalence", () => {
 	});
 
 	it("resolves a missing path through its deepest existing ancestor only when asked", () => {
-		const temp = fs.mkdtempSync(path.join(os.tmpdir(), "omp-through-missing-"));
+		const temp = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-through-missing-"));
 		try {
 			const real = path.join(temp, "real");
 			const link = path.join(temp, "link");

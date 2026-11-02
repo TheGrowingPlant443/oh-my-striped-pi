@@ -18,7 +18,7 @@ describe("JSON modifier-only selectors", () => {
 	let tool: ReadTool;
 
 	beforeAll(async () => {
-		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-json-modifier-"));
+		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-json-modifier-"));
 		await Bun.write(path.join(dir, "array.json"), "[1,2,3]");
 		await Bun.write(path.join(dir, "events.jsonl"), '{"n":1}\n{"n":2}\n{"n":3}\n');
 		await Bun.write(path.join(dir, "events.ndjson"), '"a"\n"b"\n"c"\n');

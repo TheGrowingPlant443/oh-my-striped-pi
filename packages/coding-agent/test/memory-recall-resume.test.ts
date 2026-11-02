@@ -9,21 +9,21 @@
  * another memory store, a context reset, or a branch that edits the first prompt.
  */
 import { afterEach, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "@oh-my-pi/pi-coding-agent/memory-backend/recall-entry";
-import type { MemoryPromptPreparation } from "@oh-my-pi/pi-coding-agent/memory-backend/types";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import { loadMnemopiConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { MEMORY_RECALL_CHANGES_MESSAGE_TYPE } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/recall-entry";
+import type { MemoryPromptPreparation } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/types";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import { loadMnemopiConfig } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/config";
 import {
 	getMnemopiSessionState,
 	loadMnemopi,
 	loadMnemopiCore,
 	MnemopiSessionState,
 	setMnemopiSessionState,
-} from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { clipRecallContent } from "@oh-my-pi/pi-mnemopi";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { clipRecallContent } from "@oh-my-striped-pi/pi-mnemopi";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 // Mnemopi is lazy-loaded at runtime; preload it for synchronous state construction.
 await Promise.all([loadMnemopi(), loadMnemopiCore()]);
@@ -43,7 +43,7 @@ function tempDir(): TempDir {
 	return dir;
 }
 
-/** One omp process: a session over `sessionManager` with its own Mnemopi state on the store in `storeDir`. */
+/** One omsp process: a session over `sessionManager` with its own Mnemopi state on the store in `storeDir`. */
 function startProcess(
 	storeDir: TempDir,
 	sessionManager: SessionManager,

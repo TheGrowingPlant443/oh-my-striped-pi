@@ -12,9 +12,9 @@ import {
 	type BeforeToolCallContext,
 	type BeforeToolCallResult,
 	createToolScopedAbortReason,
-} from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Judge, ToolCall } from "@oh-my-pi/pi-ai";
-import { logger, prompt, relativePathWithinRoot, withTimeout } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Judge, ToolCall } from "@oh-my-striped-pi/pi-ai";
+import { logger, prompt, relativePathWithinRoot, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { BUILTIN_DEFAULTS_PROVIDER_ID, type Rule } from "../capability/rule";
 import type { Settings } from "../config/settings";
 import {

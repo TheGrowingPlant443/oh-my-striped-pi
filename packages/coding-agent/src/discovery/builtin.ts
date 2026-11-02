@@ -1,10 +1,16 @@
 /**
- * Builtin Provider (.omp)
+ * Builtin Provider (.omsp)
  *
- * Primary provider for OMP native configs. Supports all capabilities.
+ * Primary provider for OMSP native configs. Supports all capabilities.
  */
 import * as path from "node:path";
-import { getAgentDir, logger, normalizePathForComparison, parseFrontmatter, tryParseJson } from "@oh-my-pi/pi-utils";
+import {
+	getAgentDir,
+	logger,
+	normalizePathForComparison,
+	parseFrontmatter,
+	tryParseJson,
+} from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import { getManagedSkillsDir, MANAGED_SKILLS_PROVIDER_ID } from "../autolearn/managed-skills";
 import { registerProvider } from "../capability";
@@ -40,8 +46,8 @@ import {
 } from "./helpers";
 
 const PROVIDER_ID = "native";
-const DISPLAY_NAME = "OMP";
-const DESCRIPTION = "Native OMP configuration from ~/.omp and .omp/";
+const DISPLAY_NAME = "OMSP";
+const DESCRIPTION = "Native OMSP configuration from ~/.omsp and .omsp/";
 const PRIORITY = 100;
 
 const PATHS = SOURCE_PATHS.native;
@@ -67,7 +73,7 @@ async function getConfigDirs(ctx: LoadContext): Promise<Array<{ dir: string; lev
 			: await ifNonEmptyDir(ctx.cwd, PATHS.projectDir);
 	if (projectDir) result.push({ dir: projectDir, level: "project" });
 	// Native user config is profile-scoped: getAgentDir() points at the active
-	// profile's agent dir (~/.omp/profiles/<name>/agent), like sessions and MCP.
+	// profile's agent dir (~/.omsp/profiles/<name>/agent), like sessions and MCP.
 	// A load that carries its own agentDir (an SDK session created with one) reads that dir.
 	const userDir = await ifNonEmptyDir(ctx.agentDir ?? getAgentDir());
 	if (userDir) {
@@ -108,8 +114,8 @@ export async function* getProjectAncestorDirs(ctx: LoadContext): AsyncGenerator<
 }
 
 /**
- * Nearest `.omp/` between cwd and the repo root. The home directory is never a
- * project: `~/.omp` is the user config root, so a cwd under home (temp dirs on
+ * Nearest `.omsp/` between cwd and the repo root. The home directory is never a
+ * project: `~/.omsp` is the user config root, so a cwd under home (temp dirs on
  * Windows, scratch folders) must not load its SYSTEM.md/RULES.md/AGENTS.md as
  * project config — that also bypasses an overridden agent dir or profile.
  */
@@ -307,7 +313,7 @@ registerProvider<SystemPrompt>(systemPromptCapability.id, {
 
 // Skills
 async function loadSkills(ctx: LoadContext): Promise<LoadResult<Skill>> {
-	// Walk up from cwd finding .omp/skills/ in ancestors (closest first). Home is
+	// Walk up from cwd finding .omsp/skills/ in ancestors (closest first). Home is
 	// the user config root, never a project (see findNearestProjectConfigDir).
 	const projectScans: Promise<LoadResult<Skill>>[] = [];
 	for await (const { dir } of getProjectAncestorDirs(ctx)) {
@@ -321,7 +327,7 @@ async function loadSkills(ctx: LoadContext): Promise<LoadResult<Skill>> {
 		);
 	}
 
-	// User-level scan from ~/.omp/agent/skills/
+	// User-level scan from ~/.omsp/agent/skills/
 	const userScan = scanSkillsFromDir(ctx, {
 		dir: path.join(getAgentDir(), "skills"),
 		providerId: PROVIDER_ID,
@@ -361,7 +367,7 @@ registerProvider<Skill>(skillCapability.id, {
 registerProvider<Skill>(skillCapability.id, {
 	id: MANAGED_SKILLS_PROVIDER_ID,
 	displayName: "Managed Skills (auto-learn)",
-	description: "Auto-generated managed skills from ~/.omp/agent/managed-skills",
+	description: "Auto-generated managed skills from ~/.omsp/agent/managed-skills",
 	priority: MANAGED_SKILLS_PRIORITY,
 	load: loadManagedSkills,
 });
@@ -415,11 +421,11 @@ async function loadRules(ctx: LoadContext): Promise<LoadResult<Rule>> {
 	}
 
 	// Top-level RULES.md is a sticky always-apply rule. Documented in
-	// https://omp.sh/docs/context-files: its full body is carried on every
+	// https://github.com/TheGrowingPlant443/oh-my-striped-pi/docs/context-files: its full body is carried on every
 	// request (system-prompt text, or image frames under snapcompact
 	// system-prompt imaging) so it keeps its hold across long sessions.
-	// User scope:    <agentDir>/RULES.md (~/.omp/agent/RULES.md by default)
-	// Project scope: nearest .omp/RULES.md walking up from cwd to repoRoot
+	// User scope:    <agentDir>/RULES.md (~/.omsp/agent/RULES.md by default)
+	// Project scope: nearest .omsp/RULES.md walking up from cwd to repoRoot
 	const userRulesFile = path.join(ctx.agentDir ?? getAgentDir(), "RULES.md");
 	const userRule = await loadStickyRulesFile(userRulesFile, "user");
 	if (userRule) items.push(userRule);
@@ -975,7 +981,7 @@ async function loadContextFiles(ctx: LoadContext): Promise<LoadResult<ContextFil
 registerProvider<ContextFile>(contextFileCapability.id, {
 	id: PROVIDER_ID,
 	displayName: DISPLAY_NAME,
-	description: "Load AGENTS.md from .omp/ directories",
+	description: "Load AGENTS.md from .omsp/ directories",
 	priority: PRIORITY,
 	load: loadContextFiles,
 });

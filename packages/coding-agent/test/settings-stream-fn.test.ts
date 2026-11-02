@@ -1,12 +1,12 @@
 /** Contract: live stream, cache, guard, and Responses settings preserve caller overrides. */
 import { describe, expect, it } from "bun:test";
-import type { StreamFn } from "@oh-my-pi/pi-agent-core";
-import type { Context, Model, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createSettingsAwareStreamFn } from "@oh-my-pi/pi-coding-agent/session/settings-stream-fn";
+import type { StreamFn } from "@oh-my-striped-pi/pi-agent-core";
+import type { Context, Model, SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createSettingsAwareStreamFn } from "@oh-my-striped-pi/pi-coding-agent/session/settings-stream-fn";
 
 function captureBase(): { fn: StreamFn; calls: Array<{ options?: SimpleStreamOptions }> } {
 	const calls: Array<{ options?: SimpleStreamOptions }> = [];
@@ -160,7 +160,7 @@ describe("createSettingsAwareStreamFn", () => {
 	it("forwards configured cache retention, leaves auto unset, and lets callers override", () => {
 		const auto = captureBase();
 		createSettingsAwareStreamFn(Settings.isolated({}), auto.fn)(stubModel, stubContext, undefined);
-		// auto must stay unset so provider defaults and PI_CACHE_RETENTION apply
+		// auto must stay unset so provider defaults and OMSP_CACHE_RETENTION apply
 		expect(auto.calls[0]?.options?.cacheRetention).toBeUndefined();
 
 		const long = captureBase();

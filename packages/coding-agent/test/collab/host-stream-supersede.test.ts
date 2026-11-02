@@ -10,14 +10,14 @@
  * Drives the production `CollabHost` over the in-memory relay.
  */
 import { afterEach, expect, it } from "bun:test";
-import { importRoomKey } from "@oh-my-pi/pi-coding-agent/collab/crypto";
-import { CollabHost } from "@oh-my-pi/pi-coding-agent/collab/host";
-import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-pi/pi-coding-agent/collab/protocol";
-import { CollabSocket } from "@oh-my-pi/pi-coding-agent/collab/relay-client";
+import { importRoomKey } from "@oh-my-striped-pi/pi-coding-agent/collab/crypto";
+import { CollabHost } from "@oh-my-striped-pi/pi-coding-agent/collab/host";
+import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-striped-pi/pi-coding-agent/collab/protocol";
+import { CollabSocket } from "@oh-my-striped-pi/pi-coding-agent/collab/relay-client";
 import type {
 	AgentSessionEvent,
 	AgentSessionEventListener,
-} from "@oh-my-pi/pi-coding-agent/session/agent-session-events";
+} from "@oh-my-striped-pi/pi-coding-agent/session/agent-session-events";
 import { installInMemoryRelay, uninstallInMemoryRelay } from "./helpers/in-memory-relay";
 import {
 	type HostObservations,

@@ -1,5 +1,5 @@
 /**
- * Descriptors omp holds for its own lifetime — session/advisor transcripts and
+ * Descriptors omsp holds for its own lifetime — session/advisor transcripts and
  * the rotating log — must not reach the commands the bash tool runs.
  *
  * The bash tool executes through the natives brush shell, which `fork`/`exec`s
@@ -10,7 +10,7 @@
  * session it was launched from for its whole life.
  *
  * Oracle: list the child's descriptor table. `sh -c` is required — a bare `ls`
- * resolves to an in-process builtin, whose `$$` is omp itself. The scenario runs
+ * resolves to an in-process builtin, whose `$$` is omsp itself. The scenario runs
  * in a spawned bun that receives a control descriptor as fd 3 the way a
  * launcher passes one: an extra stdio entry, `dup2`'d in without close-on-exec
  * whatever the Bun version's `fs.open` defaults are. It must reach the listed
@@ -22,7 +22,7 @@ import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const sessionStorageUrl = pathToFileURL(path.join(import.meta.dir, "../src/session/session-storage.ts")).href;
 
@@ -33,14 +33,14 @@ afterAll(async () => {
 });
 
 test.skipIf(process.platform !== "linux")("bash tool children never inherit session or log descriptors", async () => {
-	const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-fd-"));
+	const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-fd-"));
 	ROOTS.push(root);
 	const transcript = path.join(root, "session.jsonl");
 	const logsDir = path.join(root, "logs");
 	const control = path.join(root, "control.jsonl");
 
-	const script = `import { Shell } from "@oh-my-pi/pi-natives";
-import { RotatingFileSink } from "@oh-my-pi/pi-utils/logger/rotating-file";
+	const script = `import { Shell } from "@oh-my-striped-pi/pi-natives";
+import { RotatingFileSink } from "@oh-my-striped-pi/pi-utils/logger/rotating-file";
 import * as fsp from "node:fs/promises";
 import { FileSessionStorage } from ${JSON.stringify(sessionStorageUrl)};
 
@@ -49,7 +49,7 @@ await writer.append('{"type":"session_start"}\\n');
 await fsp.mkdir(${JSON.stringify(logsDir)}, { recursive: true });
 const logSink = new RotatingFileSink({
 	directory: ${JSON.stringify(logsDir)},
-	filenamePrefix: "omp",
+	filenamePrefix: "omsp",
 	filenameSuffix: String(process.pid),
 	maxBytes: 1 << 20,
 	maxFiles: 2,
@@ -95,5 +95,5 @@ process.stdout.write(output);
 		.join("\n");
 	expect(inherited, `control: an inheritable descriptor must reach the child\n${stdout}`).toContain(control);
 	expect(inherited).not.toContain(transcript);
-	expect(inherited).not.toMatch(/omp\.[\d-]+\.\d+\.log/);
+	expect(inherited).not.toMatch(/omsp\.[\d-]+\.\d+\.log/);
 });

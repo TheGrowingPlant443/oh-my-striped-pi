@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentEvent, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { Process } from "@oh-my-pi/pi-natives";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import { isRecord, ptree, readLines, removeWithRetries } from "@oh-my-pi/pi-utils";
+import type { AgentEvent, AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { Process } from "@oh-my-striped-pi/pi-natives";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import { isRecord, ptree, readLines, removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const device = "mcp__stub_regression_announce";
 const deviceUri = `xd://${device}`;
@@ -53,9 +53,9 @@ function isAlive(pid: number): boolean {
 describe("CLI RPC MCP discovery", () => {
 	for (const mode of ["rpc", "rpc-ui"] as const) {
 		test(`${mode}: mounted MCP survives session switches; user denylist prevents spawn until restart restores it`, async () => {
-			const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-mcp-"));
+			const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-mcp-"));
 			const home = path.join(root, "home");
-			const agentDir = path.join(home, ".omp/agent");
+			const agentDir = path.join(home, ".omsp/agent");
 			const project = path.join(root, "project");
 			await fs.mkdir(agentDir, { recursive: true });
 			await fs.mkdir(project);
@@ -65,9 +65,9 @@ describe("CLI RPC MCP discovery", () => {
 				HOME: home,
 				USERPROFILE: home,
 				XDG_CONFIG_HOME: path.join(home, ".config"),
-				PI_CONFIG_DIR: ".omp",
-				PI_CODING_AGENT_DIR: agentDir,
-				PI_NO_TITLE: "1",
+				OMSP_CONFIG_DIR: ".omsp",
+				OMSP_CODING_AGENT_DIR: agentDir,
+				OMSP_NO_TITLE: "1",
 			};
 			using model = ptree.spawn([process.execPath, fakeModel, agentDir], {
 				cwd: project,

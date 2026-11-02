@@ -1,10 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { resetSettingsForTest } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { stopSharedSpinnerTicker, ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { SPINNER_ADVANCE_MS } from "@oh-my-pi/pi-tui/components/loader";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { TUI } from "@oh-my-pi/pi-tui";
+import { resetSettingsForTest } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { stopSharedSpinnerTicker, ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { SPINNER_ADVANCE_MS } from "@oh-my-striped-pi/pi-tui/components/loader";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { TUI } from "@oh-my-striped-pi/pi-tui";
 
 // Contract under test: live tool previews that render a pending/running status
 // must keep the spinner glyph tied to the shared tool-frame ticker. This covers

@@ -3,12 +3,18 @@ import {
 	buildParams,
 	type OpenAIResponsesOptions,
 	streamOpenAIResponses,
-} from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
-import type { Context, FetchImpl, Model, ProviderSessionState, SimpleStreamOptions } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
-import { classifyModel } from "@oh-my-pi/pi-catalog/compat/taxonomy";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import type {
+	Context,
+	FetchImpl,
+	Model,
+	ProviderSessionState,
+	SimpleStreamOptions,
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { resolveModelPolicy } from "@oh-my-striped-pi/pi-catalog/compat/resolve";
+import { classifyModel } from "@oh-my-striped-pi/pi-catalog/compat/taxonomy";
 
 import { withEnv } from "./helpers";
 
@@ -453,7 +459,7 @@ describe("OpenAI Responses explicit prompt cache policy", () => {
 			}),
 		};
 
-		await withEnv({ PI_CACHE_RETENTION: "none" }, async () => {
+		await withEnv({ OMSP_CACHE_RETENTION: "none" }, async () => {
 			const body = await captureSimpleOpenAIResponseBody({ promptCache: { mode: "explicit" } }, unsupportedModel);
 
 			if (body === null) throw new Error("Expected disabled prompt-cache request to reach the provider");
@@ -461,7 +467,7 @@ describe("OpenAI Responses explicit prompt cache policy", () => {
 		});
 
 		for (const retention of ["short", "long"] as const) {
-			await withEnv({ PI_CACHE_RETENTION: retention }, () => {
+			await withEnv({ OMSP_CACHE_RETENTION: retention }, () => {
 				expect(() =>
 					streamSimple(
 						unsupportedModel,

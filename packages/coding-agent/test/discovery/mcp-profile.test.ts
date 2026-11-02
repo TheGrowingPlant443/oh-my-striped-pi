@@ -1,14 +1,14 @@
 /**
  * Regression: user-level MCP discovery must follow the active profile.
  *
- * A named profile relocates the agent directory to ~/.omp/profiles/<name>/agent.
+ * A named profile relocates the agent directory to ~/.omsp/profiles/<name>/agent.
  * The native config provider used to read user-scope mcp.json from the literal
- * home (~/.omp/agent/mcp.json) via `ctx.home`, so a profile never saw its own
+ * home (~/.omsp/agent/mcp.json) via `ctx.home`, so a profile never saw its own
  * user-level servers while the default profile's servers leaked into every
  * profile. Discovery now resolves the user scope through getAgentDir(), matching
  * the /mcp config writer and getMCPConfigPath("user").
  *
- * `os.homedir()` is mocked so the *old* code path (ctx.home + ".omp/agent")
+ * `os.homedir()` is mocked so the *old* code path (ctx.home + ".omsp/agent")
  * points at the tempdir decoy below; without the fix the profile case fails
  * because it would load the decoy default server instead of the profile server.
  */
@@ -16,12 +16,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
-import { type MCPServer, mcpCapability } from "@oh-my-pi/pi-coding-agent/capability/mcp";
-import { loadCapability } from "@oh-my-pi/pi-coding-agent/discovery";
-import { getConfigRootDir, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { clearCache as clearFsCache } from "@oh-my-striped-pi/pi-coding-agent/capability/fs";
+import { type MCPServer, mcpCapability } from "@oh-my-striped-pi/pi-coding-agent/capability/mcp";
+import { loadCapability } from "@oh-my-striped-pi/pi-coding-agent/discovery";
+import { getConfigRootDir, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
-const originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 async function writeMcpJson(dir: string, servers: Record<string, unknown>): Promise<void> {
@@ -42,8 +42,8 @@ describe("native user-level MCP discovery follows the active profile", () => {
 
 	beforeEach(async () => {
 		originalHome = process.env.HOME;
-		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-profile-home-"));
-		projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-profile-project-"));
+		tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-profile-home-"));
+		projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-profile-project-"));
 		process.env.HOME = tempHome;
 		vi.spyOn(os, "homedir").mockReturnValue(tempHome);
 		clearFsCache();
@@ -56,7 +56,7 @@ describe("native user-level MCP discovery follows the active profile", () => {
 			setAgentDir(originalAgentDirEnv);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		if (originalHome === undefined) delete process.env.HOME;
 		else process.env.HOME = originalHome;
@@ -65,13 +65,13 @@ describe("native user-level MCP discovery follows the active profile", () => {
 	});
 
 	test("active profile loads its own user server, not the default profile's", async () => {
-		// Active profile's agent dir (stand-in for ~/.omp/profiles/<name>/agent).
-		const profileAgentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-profile-agent-"));
+		// Active profile's agent dir (stand-in for ~/.omsp/profiles/<name>/agent).
+		const profileAgentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-profile-agent-"));
 		setAgentDir(profileAgentDir);
 
 		// Decoy: the default profile's user file at the literal-home path the old
 		// (buggy) loader read. It must NOT leak into the active profile.
-		await writeMcpJson(path.join(tempHome, ".omp", "agent"), {
+		await writeMcpJson(path.join(tempHome, ".omsp", "agent"), {
 			"default-only": { command: "default-cmd" },
 		});
 		await writeMcpJson(profileAgentDir, {
@@ -92,8 +92,8 @@ describe("native user-level MCP discovery follows the active profile", () => {
 		await removeWithRetries(profileAgentDir);
 	});
 
-	test("default profile loads the user server from ~/.omp/agent", async () => {
-		const defaultAgentDir = path.join(tempHome, ".omp", "agent");
+	test("default profile loads the user server from ~/.omsp/agent", async () => {
+		const defaultAgentDir = path.join(tempHome, ".omsp", "agent");
 		setAgentDir(defaultAgentDir);
 		await writeMcpJson(defaultAgentDir, {
 			"default-only": { command: "default-cmd" },

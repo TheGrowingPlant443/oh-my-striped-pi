@@ -22,11 +22,11 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { $which } from "@oh-my-pi/pi-utils";
+import { $which } from "@oh-my-striped-pi/pi-utils";
 import type { TerminalId, TerminalNotification } from "./terminal-capabilities";
 
 /** Application name surfaced as the notification source. */
-const APP_NAME = "omp";
+const APP_NAME = "omsp";
 
 /** Resolved notifier binary used to fan a notification out to D-Bus. */
 export type DesktopNotifierKind = "notify-send" | "gdbus";
@@ -58,7 +58,7 @@ export function hasLinuxDesktopSession(
  * Whether `sendNotification` should also dispatch a D-Bus toast for this
  * terminal. Returns true only when (1) the chosen `notifyProtocol` is BEL,
  * which cannot carry arbitrary toast text, (2) the host exposes a Linux desktop
- * session, and (3) the user has not opted out via `PI_NO_DESKTOP_NOTIFY=1`.
+ * session, and (3) the user has not opted out via `OMSP_NO_DESKTOP_NOTIFY=1`.
  * Terminals that genuinely speak OSC 9 / OSC 99 pass
  * `notifyProtocolIsBell=false` and are filtered before the D-Bus fallback can
  * run. Pure helper for tests and the singleton path.
@@ -71,7 +71,7 @@ export function shouldDeliverDesktopNotification(
 ): boolean {
 	if (!notifyProtocolIsBell) return false;
 	if (!hasLinuxDesktopSession(platform, env)) return false;
-	if (env.PI_NO_DESKTOP_NOTIFY === "1") return false;
+	if (env.OMSP_NO_DESKTOP_NOTIFY === "1") return false;
 	return true;
 }
 
@@ -176,7 +176,7 @@ export function sendDesktopNotification(message: string | TerminalNotification):
 	try {
 		// `.unref()` lets the event loop exit while the notifier is still running.
 		// Without it, an unresponsive D-Bus activation (slow `notify-send`, hung
-		// `gdbus` waiting on a stalled session bus) would keep `omp` alive past
+		// `gdbus` waiting on a stalled session bus) would keep `omsp` alive past
 		// the renderer's shutdown — a completion toast must never delay process
 		// exit. Ignored stdio alone does not detach the child from the parent's
 		// reference count.

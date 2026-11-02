@@ -1,21 +1,26 @@
-import type { AstEditToolDetails } from "@oh-my-pi/pi-tui/tools/ast-edit";
-import { type } from "@oh-my-pi/omptype";
+import type { AstEditToolDetails } from "@oh-my-striped-pi/pi-tui/tools/ast-edit";
+import { type } from "@oh-my-striped-pi/omptype";
 import type {
 	AgentTool,
 	AgentToolContext,
 	AgentToolResult,
 	AgentToolUpdateCallback,
 	ToolApprovalDecision,
-} from "@oh-my-pi/pi-agent-core";
-import type { ToolExample } from "@oh-my-pi/pi-ai";
-import { type AstReplaceChange, type AstReplaceFileChange, astEdit, type ShellFilesystem } from "@oh-my-pi/pi-natives";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { ToolExample } from "@oh-my-striped-pi/pi-ai";
+import {
+	type AstReplaceChange,
+	type AstReplaceFileChange,
+	astEdit,
+	type ShellFilesystem,
+} from "@oh-my-striped-pi/pi-natives";
 
-import { $envpos, isRecord, prompt, untilAborted } from "@oh-my-pi/pi-utils";
+import { $envpos, isRecord, prompt, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { getEditStore } from "../edit/store";
 import { normalizeToLF } from "../edit/normalize";
 import { InternalUrlRouter, sessionResolveContext } from "../internal-urls";
 import { InternalUrlFilesystem } from "../internal-urls/url-filesystem";
-import { formatHashlineHeader } from "@oh-my-pi/pi-tui/tools/hashline-format";
+import { formatHashlineHeader } from "@oh-my-striped-pi/pi-tui/tools/hashline-format";
 
 import astEditDescription from "../prompts/tools/ast-edit.md" with { type: "text" };
 
@@ -25,7 +30,7 @@ import type { ToolSession } from ".";
 import { resolveToolTier, strictestApproval, truncateForPrompt } from "./approval";
 import { parseReadUrlTarget } from "./fetch";
 import { createFileRecorder, formatResultPath, resultSnapshotPath } from "./file-recorder";
-import { formatGroupedFiles } from "@oh-my-pi/pi-tui/tools/grouped-file-output";
+import { formatGroupedFiles } from "@oh-my-striped-pi/pi-tui/tools/grouped-file-output";
 
 import { relativeSearchResultPath, resolveSearchResultPath, resolveToolSearchScope } from "./path-utils";
 import {
@@ -33,9 +38,9 @@ import {
 	formatCodeFrameLine,
 	formatCount,
 	formatParseErrors,
-} from "@oh-my-pi/pi-tui/render/render-utils";
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { PREVIEW_PENDING_NOTICE, queueResolveHandler } from "./resolve";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 
 const astEditOpSchema = type({
@@ -266,7 +271,7 @@ export class AstEditTool implements AgentTool<typeof astEditSchema, AstEditToolD
 				seenPatterns.add(pat);
 			}
 			const normalizedRewrites = Object.fromEntries(ops);
-			const maxFiles = $envpos("PI_MAX_AST_FILES", 1000);
+			const maxFiles = $envpos("OMSP_MAX_AST_FILES", 1000);
 
 			const resolveContext = sessionResolveContext(this.session, { signal });
 			// Internal URLs resolve inside the native rewrite, bounded by the tier this call was approved at.

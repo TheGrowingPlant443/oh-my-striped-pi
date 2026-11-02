@@ -19,7 +19,7 @@ describe("native addon embedding", () => {
 
 				await expect(
 					embeddedAddonFiles({ platform: "win32", arch: "arm64", nativeDir, version: "18.1.1" }),
-				).rejects.toThrow("does not carry the @oh-my-pi/pi-natives@18.1.1 version stamp");
+				).rejects.toThrow("does not carry the @oh-my-striped-pi/pi-natives@18.1.1 version stamp");
 			} finally {
 				await fs.rm(nativeDir, { recursive: true, force: true });
 			}
@@ -126,7 +126,7 @@ describe("native addon embedding", () => {
 			for (const variant of ["baseline", "modern"]) {
 				const cache = path.join(root, variant);
 				const child = Bun.spawn([binary], {
-					env: { ...process.env, PI_NATIVES_DIR: cache, PI_NATIVE_VARIANT: variant },
+					env: { ...process.env, OMSP_NATIVES_DIR: cache, OMSP_NATIVE_VARIANT: variant },
 					stdout: "ignore",
 					stderr: "ignore",
 				});

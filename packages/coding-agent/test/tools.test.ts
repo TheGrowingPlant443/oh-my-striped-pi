@@ -4,25 +4,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
 import * as zlib from "node:zlib";
-import type { AgentTool, AgentToolContext } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
-import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import * as toolTimeouts from "@oh-my-pi/pi-coding-agent/tools/tool-timeouts";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import { $which, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
-import { openArchive, readArchiveEntries } from "@oh-my-pi/pi-utils/ar";
+import type { AgentTool, AgentToolContext } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EditTool } from "@oh-my-striped-pi/pi-coding-agent/edit";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
+import { wrapToolWithMetaNotice } from "@oh-my-striped-pi/pi-coding-agent/tools/output-meta";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import * as toolTimeouts from "@oh-my-striped-pi/pi-coding-agent/tools/tool-timeouts";
+import { WriteTool } from "@oh-my-striped-pi/pi-coding-agent/tools/write";
+import { $which, removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
+import { openArchive, readArchiveEntries } from "@oh-my-striped-pi/pi-utils/ar";
 import { GlobTool } from "../src/tools/glob";
 import { DEFAULT_FILE_LIMIT, GrepTool, MULTI_FILE_PER_FILE_MATCHES } from "../src/tools/grep";
 
-import { cfgEditFuzzyMatch, cfgEditFuzzyThreshold } from "@oh-my-pi/pi-coding-agent/edit/settings";
-import { cfgReadDefaultLimit } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgEditFuzzyMatch, cfgEditFuzzyThreshold } from "@oh-my-striped-pi/pi-coding-agent/edit/settings";
+import { cfgReadDefaultLimit } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 // Helper to extract text from content blocks
 function getTextOutput(result: any): string {
@@ -197,7 +197,7 @@ function createBase256TarArchive(entry: Base256TarEntry): Buffer {
 }
 
 function createPaxHeader(typeFlag: "g" | "x", body: Buffer): Buffer {
-	return tarRecord(createTarHeader("./PaxHeaders/omp", body.byteLength, typeFlag), body);
+	return tarRecord(createTarHeader("./PaxHeaders/omsp", body.byteLength, typeFlag), body);
 }
 
 function paxRecord(key: string, value: string): Buffer {
@@ -558,8 +558,8 @@ describe("Coding Agent Tools", () => {
 
 	beforeEach(() => {
 		// Force replace mode for edit tool tests using old_string/new_string
-		originalEditVariant = Bun.env.PI_EDIT_VARIANT;
-		Bun.env.PI_EDIT_VARIANT = "replace";
+		originalEditVariant = Bun.env.OMSP_EDIT_VARIANT;
+		Bun.env.OMSP_EDIT_VARIANT = "replace";
 
 		// Create a unique temporary directory for each test
 		testDir = path.join(os.tmpdir(), `coding-agent-test-${Snowflake.next()}`);
@@ -583,9 +583,9 @@ describe("Coding Agent Tools", () => {
 
 		// Restore original edit variant
 		if (originalEditVariant === undefined) {
-			delete Bun.env.PI_EDIT_VARIANT;
+			delete Bun.env.OMSP_EDIT_VARIANT;
 		} else {
-			Bun.env.PI_EDIT_VARIANT = originalEditVariant;
+			Bun.env.OMSP_EDIT_VARIANT = originalEditVariant;
 		}
 		AsyncJobManager.resetForTests();
 	});
@@ -975,7 +975,7 @@ describe("Coding Agent Tools", () => {
 		});
 
 		it("does not claim a suppressed hashline preview was shown", async () => {
-			Bun.env.PI_EDIT_VARIANT = "hashline";
+			Bun.env.OMSP_EDIT_VARIANT = "hashline";
 			const testFile = path.join(testDir, "hashline-preview-large.txt");
 			const firstLine = "x".repeat(70_000);
 			const tail = Array.from({ length: 9_000 }, () => "y".repeat(500)).join("\n");
@@ -2521,12 +2521,12 @@ function b() {
 		});
 
 		it("should persist environment variables between commands", async () => {
-			if (process.platform === "win32" || Bun.env.PI_SHELL_PERSIST !== "1") {
+			if (process.platform === "win32" || Bun.env.OMSP_SHELL_PERSIST !== "1") {
 				return;
 			}
 
-			await bashTool.execute("test-call-8-env-set", { command: "export PI_TEST_VAR=hello" });
-			const result = await bashTool.execute("test-call-8-env-get", { command: "echo $PI_TEST_VAR" });
+			await bashTool.execute("test-call-8-env-set", { command: "export OMSP_TEST_VAR=hello" });
+			const result = await bashTool.execute("test-call-8-env-get", { command: "echo $OMSP_TEST_VAR" });
 			expect(getTextOutput(result)).toContain("hello");
 		});
 
@@ -2865,7 +2865,7 @@ function b() {
 
 			const output = getTextOutput(result);
 			expect(output).not.toContain("# example.txt");
-			// PI_EDIT_VARIANT=replace in beforeEach disables hashlines; expect line-number mode
+			// OMSP_EDIT_VARIANT=replace in beforeEach disables hashlines; expect line-number mode
 			expect(output).toMatch(/\*2\|match line/);
 		});
 
@@ -3403,8 +3403,8 @@ describe("edit tool CRLF handling", () => {
 
 	beforeEach(() => {
 		// Force replace mode for edit tool tests using old_string/new_string
-		originalEditVariant = Bun.env.PI_EDIT_VARIANT;
-		Bun.env.PI_EDIT_VARIANT = "replace";
+		originalEditVariant = Bun.env.OMSP_EDIT_VARIANT;
+		Bun.env.OMSP_EDIT_VARIANT = "replace";
 
 		testDir = path.join(os.tmpdir(), `coding-agent-crlf-test-${Snowflake.next()}`);
 		fs.mkdirSync(testDir, { recursive: true });
@@ -3416,9 +3416,9 @@ describe("edit tool CRLF handling", () => {
 
 		// Restore original edit variant
 		if (originalEditVariant === undefined) {
-			delete Bun.env.PI_EDIT_VARIANT;
+			delete Bun.env.OMSP_EDIT_VARIANT;
 		} else {
-			Bun.env.PI_EDIT_VARIANT = originalEditVariant;
+			Bun.env.OMSP_EDIT_VARIANT = originalEditVariant;
 		}
 	});
 

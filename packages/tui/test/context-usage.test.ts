@@ -6,10 +6,10 @@
  * internals, which massively overcounts.
  */
 import { describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Tokenizer } from "@oh-my-pi/pi-agent-core";
-import { normalizeTools } from "@oh-my-pi/pi-agent-core/agent-loop";
-import { arkToWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Tokenizer } from "@oh-my-striped-pi/pi-agent-core";
+import { normalizeTools } from "@oh-my-striped-pi/pi-agent-core/agent-loop";
+import { arkToWireSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
 import {
 	type NonMessageTokenSource,
 	computeNonMessageBreakdown,

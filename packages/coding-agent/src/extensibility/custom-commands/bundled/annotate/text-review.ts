@@ -1,7 +1,7 @@
-import { prompt } from "@oh-my-pi/pi-utils";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import { markdownFenceFor } from "../../../../utils/markdown-fence";
 import textReviewTemplate from "./prompts/text-review.md" with { type: "text" };
-import type { TextReviewAnnotation, TextReviewSource } from "@oh-my-pi/pi-tui/overlays/annotation-types";
+import type { TextReviewAnnotation, TextReviewSource } from "@oh-my-striped-pi/pi-tui/overlays/annotation-types";
 
 const SHORT_SOURCE_CHARACTER_LIMIT = 1000;
 
@@ -44,9 +44,9 @@ interface RenderedTextAnnotation {
 
 function exactPlaceholder(label: string, index: number, values: readonly string[]): string {
 	let suffix = 0;
-	let placeholder = `__OMP_ANNOTATE_${label}_${index}_${suffix}__`;
+	let placeholder = `__OMSP_ANNOTATE_${label}_${index}_${suffix}__`;
 	while (values.some(value => value.includes(placeholder))) {
-		placeholder = `__OMP_ANNOTATE_${label}_${index}_${++suffix}__`;
+		placeholder = `__OMSP_ANNOTATE_${label}_${index}_${++suffix}__`;
 	}
 	return placeholder;
 }

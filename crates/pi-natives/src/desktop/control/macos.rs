@@ -274,7 +274,7 @@ const fn monitor_mask() -> u64 {
 static SEEN: [AtomicU32; 5] = [const { AtomicU32::new(0) }; 5];
 
 /// Where an event the tap sees goes in [`SEEN`]: only hardware input (no
-/// source pid) and omp's own tagged events, which omp posts only to the HID
+/// source pid) and omsp's own tagged events, which omsp posts only to the HID
 /// event tap, so every seen event is one the HID counters count too. Another
 /// process's event may have been posted to the session, which the tap sees
 /// but the HID counters skip; counting it would let it stand in for a user
@@ -598,7 +598,7 @@ impl TapThread {
 			let _ = worker.join();
 			return Err(DesktopError::permission_denied(format!(
 				"cannot start the {label} monitor: macOS refused its event tap, so no input was sent; \
-				 check Accessibility for the app that launched omp"
+				 check Accessibility for the app that launched omsp"
 			)));
 		};
 		Ok(Self { thread: Some(worker), run_loop, stop_source })
@@ -809,7 +809,7 @@ mod tests {
 		assert_eq!(user_input(KEY_DOWN, 0, 0x2_0000, 0, 0), Some(UserInput::Typing));
 		assert_eq!(user_input(KEY_DOWN, 0, 0, 0, 0), Some(UserInput::Typing));
 		assert_eq!(user_input(FLAGS_CHANGED, 56, 0x2_0000, 0, 0), Some(UserInput::Typing));
-		// omp's own keys and those another process posts are not the user's.
+		// omsp's own keys and those another process posts are not the user's.
 		assert_eq!(user_input(KEY_DOWN, 48, COMMAND_FLAG, 0, SYNTHETIC_EVENT_TAG), None);
 		assert_eq!(user_input(KEY_DOWN, 0, 0, 42, 0), None);
 		// Releases mean nothing on their own.
@@ -873,7 +873,7 @@ mod tests {
 	#[test]
 	fn the_monitor_counts_only_events_the_hid_counters_count() {
 		for kind in [LEFT_MOUSE_DOWN, RIGHT_MOUSE_DOWN, OTHER_MOUSE_DOWN, 10, 12] {
-			// Hardware input and omp's own HID-tap posts.
+			// Hardware input and omsp's own HID-tap posts.
 			let index = seen_index(kind, 0, 0);
 			assert!(index.is_some(), "{kind}");
 			assert_eq!(seen_index(kind, 4242, SYNTHETIC_EVENT_TAG), index);

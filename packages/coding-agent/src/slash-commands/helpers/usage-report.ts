@@ -1,10 +1,10 @@
-import type { UsageLimit, UsageReport } from "@oh-my-pi/pi-ai";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import type { UsageLimit, UsageReport } from "@oh-my-striped-pi/pi-ai";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import type { OAuthAccountIdentity } from "../../session/auth-storage";
-import { collapseSharedUsageReports } from "@oh-my-pi/pi-tui/overlays/usage-display";
+import { collapseSharedUsageReports } from "@oh-my-striped-pi/pi-tui/overlays/usage-display";
 import type { SlashCommandRuntime } from "../types";
 import { reportMatchesActiveAccount } from "./active-oauth-account";
-import { formatCoarseDuration, formatProviderName, renderAsciiBar } from "@oh-my-pi/pi-tui/chrome/format";
+import { formatCoarseDuration, formatProviderName, renderAsciiBar } from "@oh-my-striped-pi/pi-tui/chrome/format";
 
 function formatWindowSuffix(label: string, windowLabel: string | undefined): string {
 	if (!windowLabel) return "";

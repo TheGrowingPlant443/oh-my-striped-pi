@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { resolveApproval } from "@oh-my-pi/pi-coding-agent/tools/approval";
-import { approvalGrantKey, SessionApprovals } from "@oh-my-pi/pi-coding-agent/tools/approval-cache";
-import { approvalTargetKey } from "@oh-my-pi/pi-coding-agent/tools/approval-targets";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { resolveApproval } from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
+import { approvalGrantKey, SessionApprovals } from "@oh-my-striped-pi/pi-coding-agent/tools/approval-cache";
+import { approvalTargetKey } from "@oh-my-striped-pi/pi-coding-agent/tools/approval-targets";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
 
 function textOf(result: { content: ReadonlyArray<{ type: string; text?: string }> }): string {
 	return result.content.flatMap(block => (block.type === "text" ? [block.text ?? ""] : [])).join("\n");
@@ -21,7 +21,7 @@ describe("artifact reads through session approval", () => {
 	let session: AgentSession | undefined;
 
 	beforeEach(async () => {
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-artifact-approval-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-artifact-approval-"));
 	});
 
 	afterEach(async () => {

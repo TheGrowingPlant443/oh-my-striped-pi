@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { BashExecutionComponent } from "@oh-my-pi/pi-tui/chat/bash-execution";
-import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-pi/pi-tui/theme";
-import { sanitizeWithOptionalSixelPassthrough } from "@oh-my-pi/pi-tui/render/sixel";
-import type { TUI } from "@oh-my-pi/pi-tui";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import { BashExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/bash-execution";
+import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { sanitizeWithOptionalSixelPassthrough } from "@oh-my-striped-pi/pi-tui/render/sixel";
+import type { TUI } from "@oh-my-striped-pi/pi-tui";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 
 const SIXEL = "\x1bPqabc\x1b\\";
 let darkTheme: Theme;
@@ -15,23 +15,23 @@ beforeAll(async () => {
 });
 
 describe("BashExecutionComponent SIXEL sanitization", () => {
-	const originalForceProtocol = Bun.env.PI_FORCE_IMAGE_PROTOCOL;
-	const originalAllowPassthrough = Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH;
+	const originalForceProtocol = Bun.env.OMSP_FORCE_IMAGE_PROTOCOL;
+	const originalAllowPassthrough = Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH;
 	const ui = { requestRender: () => {}, requestComponentRender: () => {} } as unknown as TUI;
 
 	beforeEach(() => {
 		setThemeInstance(darkTheme);
 	});
 	afterEach(() => {
-		if (originalForceProtocol === undefined) delete Bun.env.PI_FORCE_IMAGE_PROTOCOL;
-		else Bun.env.PI_FORCE_IMAGE_PROTOCOL = originalForceProtocol;
-		if (originalAllowPassthrough === undefined) delete Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH;
-		else Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH = originalAllowPassthrough;
+		if (originalForceProtocol === undefined) delete Bun.env.OMSP_FORCE_IMAGE_PROTOCOL;
+		else Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = originalForceProtocol;
+		if (originalAllowPassthrough === undefined) delete Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH;
+		else Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH = originalAllowPassthrough;
 	});
 
 	it("preserves SIXEL output when passthrough gates are enabled", () => {
-		Bun.env.PI_FORCE_IMAGE_PROTOCOL = "sixel";
-		Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH = "1";
+		Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = "sixel";
+		Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH = "1";
 
 		const component = new BashExecutionComponent("echo sixel", ui, false);
 		component.appendOutput(SIXEL);
@@ -41,8 +41,8 @@ describe("BashExecutionComponent SIXEL sanitization", () => {
 	});
 
 	it("does not truncate long SIXEL payload lines", () => {
-		Bun.env.PI_FORCE_IMAGE_PROTOCOL = "sixel";
-		Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH = "1";
+		Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = "sixel";
+		Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH = "1";
 
 		const payload = `\x1bPq${"A".repeat(5000)}\x1b\\`;
 		const component = new BashExecutionComponent("echo sixel", ui, false);
@@ -56,8 +56,8 @@ describe("BashExecutionComponent SIXEL sanitization", () => {
 	});
 
 	it("still truncates long non-SIXEL lines", () => {
-		Bun.env.PI_FORCE_IMAGE_PROTOCOL = "sixel";
-		Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH = "1";
+		Bun.env.OMSP_FORCE_IMAGE_PROTOCOL = "sixel";
+		Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH = "1";
 
 		const longText = "x".repeat(5000);
 		const component = new BashExecutionComponent("echo text", ui, false);
@@ -70,8 +70,8 @@ describe("BashExecutionComponent SIXEL sanitization", () => {
 	});
 
 	it("strips SIXEL control escapes when passthrough gates are disabled", () => {
-		delete Bun.env.PI_FORCE_IMAGE_PROTOCOL;
-		delete Bun.env.PI_ALLOW_SIXEL_PASSTHROUGH;
+		delete Bun.env.OMSP_FORCE_IMAGE_PROTOCOL;
+		delete Bun.env.OMSP_ALLOW_SIXEL_PASSTHROUGH;
 
 		// appendOutput receives pre-sanitized chunks from OutputSink.
 		// Simulate that: sanitize before passing to the component.

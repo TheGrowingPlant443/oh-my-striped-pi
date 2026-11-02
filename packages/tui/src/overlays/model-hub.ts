@@ -10,7 +10,7 @@ import { parseModelString, splitUpstreamRouting, formatModelSelectorValue } from
  * Fully mouse-navigable (hover, wheel, click). Session-only switching lives
  * in the compact alt+p picker ({@link ./model-picker}).
  */
-import { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	TspPickerAction,
 	TspPickerColumn,
@@ -19,12 +19,12 @@ import type {
 	TspPickerProps,
 	TspPickerScope,
 	TspSpan,
-} from "@oh-my-pi/pi-wire";
-import type { KeysApi, Model } from "@oh-my-pi/pi-ai";
-import { getOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
-import { providerEntry } from "@oh-my-pi/pi-catalog/compat/providers";
-import { MODEL_KINDS, modelKind, type ModelKind } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-wire";
+import type { KeysApi, Model } from "@oh-my-striped-pi/pi-ai";
+import { getOAuthProviders } from "@oh-my-striped-pi/pi-ai/oauth";
+import { getSupportedEfforts } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { providerEntry } from "@oh-my-striped-pi/pi-catalog/compat/providers";
+import { MODEL_KINDS, modelKind, type ModelKind } from "@oh-my-striped-pi/pi-catalog/types";
 import type { Component, TUI } from "../tui";
 import { extractPrintableText, matchesKey } from "../keys";
 import { FuzzyCorpus } from "../fuzzy";
@@ -542,7 +542,7 @@ export class ModelHubComponent implements Component {
 		}
 
 		// Reconcile catalogs in the background. This is online discovery only —
-		// it must not re-run `!command` credential helpers (F5 / `omp models
+		// it must not re-run `!command` credential helpers (F5 / `omsp models
 		// refresh` pass refreshCommandCredentials for that). A --models scope is
 		// registry-independent, so the reload would only repeat the hydration
 		// above.
@@ -2953,7 +2953,7 @@ export class ModelHubComponent implements Component {
 		if (strip) footer.push(strip);
 		footer.push(hintsRow(this.#footerHints()));
 		const described = describeHubFrame(
-			"omp.overlay.model-hub",
+			"omsp.overlay.model-hub",
 			"Models",
 			describeHubSidebar(this.#entries, this.#activeEntryId, this.#nativeSidebarStyle, "scopes"),
 			this.#describeBody(),
@@ -3843,7 +3843,7 @@ export class ModelHubComponent implements Component {
 					);
 				} else {
 					children.push(
-						text(info.name, { role: "omp.picker.title" }),
+						text(info.name, { role: "omsp.picker.title" }),
 						text([span("Not assigned; no available model fits this role.", "muted")], { wrap: "word" }),
 					);
 				}
@@ -3854,26 +3854,26 @@ export class ModelHubComponent implements Component {
 			case "fallback": {
 				const resolved = this.#resolveFallbackEntry(row.role, row.chainIndex);
 				if (resolved) children.push(...this.#browser.modelPreview(resolved.item, "full", this.#currentSelector));
-				else children.push(text([span(row.selector, "mono")], { role: "omp.picker.title" }));
+				else children.push(text([span(row.selector, "mono")], { role: "omsp.picker.title" }));
 				const chain = chainList(row.role);
 				if (chain) children.push(chain);
 				break;
 			}
 			case "chainKey": {
-				children.push(text([span(row.role, "mono")], { role: "omp.picker.title" }));
+				children.push(text([span(row.role, "mono")], { role: "omsp.picker.title" }));
 				const chain = chainList(row.role);
 				if (chain) children.push(chain);
 				break;
 			}
 			case "newRole":
 				children.push(
-					text("New role", { role: "omp.picker.title" }),
+					text("New role", { role: "omsp.picker.title" }),
 					text([span("Name a custom role, then pick the model it runs on.", "muted")], { wrap: "word" }),
 				);
 				break;
 			case "newFallback":
 				children.push(
-					text("New fallback chain", { role: "omp.picker.title" }),
+					text("New fallback chain", { role: "omsp.picker.title" }),
 					text([span("Pick the model (or provider) a new retry fallback chain protects.", "muted")], {
 						wrap: "word",
 					}),
@@ -3896,7 +3896,7 @@ export class ModelHubComponent implements Component {
 	/** A signed-out provider's preview: how to sign in and what its catalog holds. */
 	#lockedPreview(entry: SidebarEntry): readonly NativeChild[] {
 		const children: NativeChild[] = [
-			text(entry.label, { role: "omp.picker.title" }),
+			text(entry.label, { role: "omsp.picker.title" }),
 			text([span(this.#lockedMessage(entry), "muted")], { wrap: "word" }),
 		];
 		const catalogCount = entry.catalogCount ?? 0;

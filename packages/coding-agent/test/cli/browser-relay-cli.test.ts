@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { VERSION } from "@oh-my-pi/pi-utils/dirs";
-import { runBrowserRelayCommand } from "@oh-my-pi/pi-coding-agent/cli/browser-relay-cli";
-import { relayExtensionFiles } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/extension-files";
-import { findFreeCdpPort } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
-import { relayExtensionNotice } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/probe";
-import { type RelayServer, startRelayServer } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/server";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { VERSION } from "@oh-my-striped-pi/pi-utils/dirs";
+import { runBrowserRelayCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/browser-relay-cli";
+import { relayExtensionFiles } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/extension-files";
+import { findFreeCdpPort } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
+import { relayExtensionNotice } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/probe";
+import { type RelayServer, startRelayServer } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/server";
 
 /**
  * Run an installed `background.js` as Chrome would, against the relay on `port`, with `manifest` as what
@@ -52,13 +52,13 @@ function runExtensionWorker(script: string, port: number, manifest: object): () 
 	};
 }
 
-describe("omp browser-relay install", () => {
+describe("omsp browser-relay install", () => {
 	let dir: TempDir;
 	let relay: RelayServer | undefined;
 	let stopWorker: (() => void) | undefined;
 
 	beforeEach(async () => {
-		dir = await TempDir.create("@omp-relay-install-");
+		dir = await TempDir.create("@omsp-relay-install-");
 		spyOn(console, "log").mockImplementation(() => {});
 	});
 
@@ -71,14 +71,14 @@ describe("omp browser-relay install", () => {
 		await dir.remove();
 	});
 
-	it("stamps the installing omp's version into the extension manifest", async () => {
+	it("stamps the installing omsp's version into the extension manifest", async () => {
 		await runBrowserRelayCommand({ action: "install", port: 0, dir: dir.path() });
 		const manifest = await Bun.file(dir.join("manifest.json")).json();
 		expect(manifest.version_name).toBe(VERSION);
 		expect(manifest.manifest_version).toBe(3);
 	});
 
-	it("reports the omp that installed the running script when Chrome restarts onto a newer manifest", async () => {
+	it("reports the omsp that installed the running script when Chrome restarts onto a newer manifest", async () => {
 		// After reinstalling, a Chrome restart re-reads manifest.json but keeps running the old service worker.
 		const port = await findFreeCdpPort();
 		const hello = Promise.withResolvers<void>();
@@ -94,7 +94,7 @@ describe("omp browser-relay install", () => {
 		stopWorker = runExtensionWorker(runningScript, port, manifestOnDisk);
 		await hello.promise;
 		expect(await relayExtensionNotice(`http://127.0.0.1:${port}`)).toContain(
-			`installed by omp 18.6.1; this is omp ${VERSION}`,
+			`installed by omsp 18.6.1; this is omsp ${VERSION}`,
 		);
 	});
 });

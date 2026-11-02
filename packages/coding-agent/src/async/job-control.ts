@@ -4,26 +4,26 @@
  * running-agents roster for activity with no job entry.
  */
 
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
 
 import type { AsyncJob, AsyncJobDetails, AsyncJobManager, AsyncJobType } from "./job-manager";
 
 import { renderStructuredJson, structuredStatusLabel, taskAgentHandles } from "../session/async-job-delivery";
 import { USER_INTERRUPT_LABEL } from "../session/messages";
-import type { StructuredSubagentOutput } from "@oh-my-pi/pi-tui/tools/task";
-import { parseConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+import type { StructuredSubagentOutput } from "@oh-my-striped-pi/pi-tui/tools/task";
+import { parseConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
 
 import type { ToolSession } from "../tools";
 
-import { formatDuration, formatNumber } from "@oh-my-pi/pi-tui/render/render-utils";
+import { formatDuration, formatNumber } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import type {
 	AgentActivitySnapshot,
 	CancelOutcome,
 	CoordinationDetails,
 	JobSnapshot,
-} from "@oh-my-pi/pi-tui/tools/wait";
+} from "@oh-my-striped-pi/pi-tui/tools/wait";
 
-import { isWaitingPollDetails } from "@oh-my-pi/pi-tui/tools/wait";
+import { isWaitingPollDetails } from "@oh-my-striped-pi/pi-tui/tools/wait";
 
 /**
  * Resolve a list of job ids to job records visible to the calling agent.

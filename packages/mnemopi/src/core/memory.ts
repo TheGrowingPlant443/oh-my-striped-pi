@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
-import type { Api, ApiKey, Model } from "@oh-my-pi/pi-ai";
-import { popLoopPhase, pushLoopPhase, withLoopPhase } from "@oh-my-pi/pi-utils";
+import type { Api, ApiKey, Model } from "@oh-my-striped-pi/pi-ai";
+import { popLoopPhase, pushLoopPhase, withLoopPhase } from "@oh-my-striped-pi/pi-utils";
 
 import { dbPath as configuredDbPath } from "../config";
 import { closeQuietly } from "../db";

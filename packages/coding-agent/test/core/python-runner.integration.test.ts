@@ -1,23 +1,23 @@
 /**
  * End-to-end exercise of the new subprocess-backed Python runner.
  *
- * Gated by `PI_PYTHON_INTEGRATION=1` so CI without a real Python interpreter
+ * Gated by `OMSP_PYTHON_INTEGRATION=1` so CI without a real Python interpreter
  * (or sandboxes where subprocess spawning is restricted) does not fail.
  */
 import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	disposeAllKernelSessions,
 	executePython,
 	executePythonWithKernel,
-} from "@oh-my-pi/pi-coding-agent/eval/py/executor";
-import { PythonKernel } from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { filterEnv, resolvePythonRuntime } from "@oh-my-pi/pi-coding-agent/eval/py/runtime";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
+import { PythonKernel } from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { filterEnv, resolvePythonRuntime } from "@oh-my-striped-pi/pi-coding-agent/eval/py/runtime";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
-const SHOULD_RUN = Bun.env.PI_PYTHON_INTEGRATION === "1";
+const SHOULD_RUN = Bun.env.OMSP_PYTHON_INTEGRATION === "1";
 const MATPLOTLIB_TEST_CWD = process.cwd();
 
 async function hasModule(cwd: string, module: string): Promise<boolean> {
@@ -244,7 +244,7 @@ describe.skipIf(!SHOULD_RUN)("python runner subprocess", () => {
 			expect(failed.output).toContain(filename);
 			expect(failed.output).toContain("raise RuntimeError('from loaded file')");
 
-			const missing = await executePythonWithKernel(kernel, "import omp_definitely_missing_module");
+			const missing = await executePythonWithKernel(kernel, "import omsp_definitely_missing_module");
 			expect(missing.exitCode).toBe(1);
 			expect(missing.output).toContain("Distribution names can differ");
 			expect(missing.output).toContain("%pip install <distribution-name>");

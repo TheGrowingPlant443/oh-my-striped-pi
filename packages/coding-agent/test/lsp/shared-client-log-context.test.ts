@@ -1,8 +1,8 @@
 import { afterEach, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getOrCreateClient, sendRequest, shutdownAll } from "@oh-my-pi/pi-coding-agent/lsp/client";
-import { logger, TempDir } from "@oh-my-pi/pi-utils";
+import { getOrCreateClient, sendRequest, shutdownAll } from "@oh-my-striped-pi/pi-coding-agent/lsp/client";
+import { logger, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const fixturePath = path.join(import.meta.dir, "..", "fixtures", "fake-lsp-server.ts");
 const dir = TempDir.createSync("@pi-lsp-log-context-");

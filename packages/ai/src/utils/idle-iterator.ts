@@ -1,4 +1,4 @@
-import { $env } from "@oh-my-pi/pi-utils";
+import { $env } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../error";
 import type { LocalWorkSource } from "./event-stream";
 
@@ -18,28 +18,34 @@ function normalizeIdleTimeoutMs(value: string | undefined, fallback: number): nu
 /**
  * Returns the idle timeout used for provider streaming transports.
  *
- * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` is accepted as a backward-compatible alias.
- * Set `PI_STREAM_IDLE_TIMEOUT_MS=0` to disable the watchdog.
+ * `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS` is accepted as a backward-compatible alias.
+ * Set `OMSP_STREAM_IDLE_TIMEOUT_MS=0` to disable the watchdog.
  *
  * Providers that legitimately stream much slower than the global default can pass
  * `fallbackMs` to widen the floor used when neither env var nor caller option is set.
  * Caller options still take precedence; env overrides still trump the fallback.
  */
 export function getStreamIdleTimeoutMs(fallbackMs: number = DEFAULT_STREAM_IDLE_TIMEOUT_MS): number | undefined {
-	return normalizeIdleTimeoutMs($env.PI_STREAM_IDLE_TIMEOUT_MS ?? $env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS, fallbackMs);
+	return normalizeIdleTimeoutMs(
+		$env.OMSP_STREAM_IDLE_TIMEOUT_MS ?? $env.OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS,
+		fallbackMs,
+	);
 }
 
 /**
  * Returns the idle timeout used for OpenAI-family streaming transports.
  *
- * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` takes precedence over the generic
- * `PI_STREAM_IDLE_TIMEOUT_MS` because some deployments tune OpenAI-compatible
+ * `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS` takes precedence over the generic
+ * `OMSP_STREAM_IDLE_TIMEOUT_MS` because some deployments tune OpenAI-compatible
  * backends separately from Anthropic/Gemini-style transports.
  *
- * Set `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS=0` to disable the watchdog.
+ * Set `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS=0` to disable the watchdog.
  */
 export function getOpenAIStreamIdleTimeoutMs(fallbackMs: number = DEFAULT_STREAM_IDLE_TIMEOUT_MS): number | undefined {
-	return normalizeIdleTimeoutMs($env.PI_OPENAI_STREAM_IDLE_TIMEOUT_MS ?? $env.PI_STREAM_IDLE_TIMEOUT_MS, fallbackMs);
+	return normalizeIdleTimeoutMs(
+		$env.OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS ?? $env.OMSP_STREAM_IDLE_TIMEOUT_MS,
+		fallbackMs,
+	);
 }
 
 /**
@@ -47,7 +53,7 @@ export function getOpenAIStreamIdleTimeoutMs(fallbackMs: number = DEFAULT_STREAM
  * The first token can legitimately take longer than later inter-event gaps,
  * so the default never undershoots the steady-state idle timeout.
  *
- * Set `PI_STREAM_FIRST_EVENT_TIMEOUT_MS=0` to disable the watchdog.
+ * Set `OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS=0` to disable the watchdog.
  *
  * Providers whose first response can legitimately take longer (heavy reasoning,
  * slow cold-start proxies) can pass `fallbackMs` to widen the floor used when
@@ -59,18 +65,18 @@ export function getStreamFirstEventTimeoutMs(
 	fallbackMs: number = DEFAULT_STREAM_FIRST_EVENT_TIMEOUT_MS,
 ): number | undefined {
 	const fallback = idleTimeoutMs === undefined ? fallbackMs : Math.max(fallbackMs, idleTimeoutMs);
-	return normalizeIdleTimeoutMs($env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS, fallback);
+	return normalizeIdleTimeoutMs($env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS, fallback);
 }
 
 /**
  * Returns the first-event timeout used for OpenAI-family streaming transports.
  *
- * Precedence: explicit `PI_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS` (including a
+ * Precedence: explicit `OMSP_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS` (including a
  * `"0"` disable) wins outright. Otherwise the resolved idle (caller-supplied
  * `idleTimeoutMs` — which itself already encompasses per-call
- * `streamIdleTimeoutMs` or `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` resolved
+ * `streamIdleTimeoutMs` or `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS` resolved
  * upstream) floors the first-event budget so slow OpenAI-compatible servers
- * are not undercut by a shorter `PI_STREAM_FIRST_EVENT_TIMEOUT_MS` or the
+ * are not undercut by a shorter `OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS` or the
  * global default during prompt processing. A zero per-provider fallback
  * disables the first-event watchdog unless an environment override is set.
  *
@@ -81,11 +87,11 @@ export function getOpenAIStreamFirstEventTimeoutMs(
 	idleTimeoutMs?: number,
 	fallbackMs: number = DEFAULT_STREAM_FIRST_EVENT_TIMEOUT_MS,
 ): number | undefined {
-	const openAIFirstEventRaw = $env.PI_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS;
+	const openAIFirstEventRaw = $env.OMSP_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS;
 	if (openAIFirstEventRaw !== undefined) {
 		return normalizeIdleTimeoutMs(openAIFirstEventRaw, fallbackMs) ?? 0;
 	}
-	const base = normalizeIdleTimeoutMs($env.PI_STREAM_FIRST_EVENT_TIMEOUT_MS, fallbackMs);
+	const base = normalizeIdleTimeoutMs($env.OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS, fallbackMs);
 	if (base === undefined || base <= 0) return 0;
 	if (idleTimeoutMs === undefined || idleTimeoutMs <= 0) return base;
 	return Math.max(base, idleTimeoutMs);

@@ -1,6 +1,6 @@
 # AI tool-schema normalization
 
-`@oh-my-pi/pi-ai` exposes shared schema normalization helpers that providers
+`@oh-my-striped-pi/pi-ai` exposes shared schema normalization helpers that providers
 consume before tools are sent on the wire. The shared walkers live in
 `packages/ai/src/utils/schema/normalize.ts`; native Anthropic tool normalization
 remains in `packages/ai/src/providers/anthropic.ts`. The operational contract is
@@ -15,7 +15,7 @@ Apple Foundation Models lowering lives in `foundation-models.ts`.
 
 ## Entry points
 
-All exports live under `@oh-my-pi/pi-ai/utils/schema`:
+All exports live under `@oh-my-striped-pi/pi-ai/utils/schema`:
 
 - `normalizeSchema(value, options)` — generic option-driven walker.
 - `normalizeSchemaForGoogle(value)` — Gemini / Vertex / Gemini CLI.
@@ -34,7 +34,7 @@ All exports live under `@oh-my-pi/pi-ai/utils/schema`:
 - `adaptSchemaForStrict(schema, strict)` from `./adapt` — thin composer that
   upgrades draft-07 inputs to 2020-12 and wraps `tryEnforceStrictSchema` for
   provider call sites. `./adapt` also exports the `NO_STRICT` global-bypass
-  flag (env `PI_NO_STRICT`) honored by every provider that emits `strict: true`.
+  flag (env `OMSP_NO_STRICT`) honored by every provider that emits `strict: true`.
 - `normalizeSchemaForMoonshot(value)` — Moonshot/Kimi's MFJS subset.
 - `sanitizeSchemaForOllama(schema)` — rewrites boolean subschemas, type
   arrays, and boolean object-openness keywords for Ollama's Go schema parser.

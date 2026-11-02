@@ -1,23 +1,23 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { loadAdvisorTranscriptCosts } from "@oh-my-pi/pi-coding-agent/advisor/transcript-recorder";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { __resetDirsFromEnvForTests, getProjectAgentDir, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import * as compactionModule from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { loadAdvisorTranscriptCosts } from "@oh-my-striped-pi/pi-coding-agent/advisor/transcript-recorder";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { __resetDirsFromEnvForTests, getProjectAgentDir, setAgentDir, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 
 function restoreEnv(key: string, value: string | undefined): void {
@@ -30,8 +30,8 @@ function restoreEnv(key: string, value: string | undefined): void {
 import * as advisorModule from "../src/advisor";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgAdvisorEnabled, cfgAdvisorMaxNotesPerUpdate } from "@oh-my-pi/pi-coding-agent/advisor/settings";
-import { cfgCompactionKeepRecentTokens } from "@oh-my-pi/pi-coding-agent/session/context-settings";
+import { cfgAdvisorEnabled, cfgAdvisorMaxNotesPerUpdate } from "@oh-my-striped-pi/pi-coding-agent/advisor/settings";
+import { cfgCompactionKeepRecentTokens } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 describe("AgentSession advisor toggle", () => {
 	let authStorage: AuthStorage;
@@ -39,9 +39,9 @@ describe("AgentSession advisor toggle", () => {
 	let model: Model;
 	let replacementModel: Model;
 
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	const originalPiProfile = process.env.PI_PROFILE;
-	const originalOmpProfile = process.env.OMP_PROFILE;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+	const originalPiProfile = process.env.OMSP_PROFILE;
+	const originalOmpProfile = process.env.OMSP_PROFILE;
 
 	beforeAll(() => {
 		authStorage = createInMemoryAuthStorage();
@@ -73,9 +73,9 @@ describe("AgentSession advisor toggle", () => {
 
 	afterAll(() => {
 		authStorage.close();
-		restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-		restoreEnv("PI_PROFILE", originalPiProfile);
-		restoreEnv("OMP_PROFILE", originalOmpProfile);
+		restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+		restoreEnv("OMSP_PROFILE", originalPiProfile);
+		restoreEnv("OMSP_PROFILE", originalOmpProfile);
 		__resetDirsFromEnvForTests();
 	});
 
@@ -111,9 +111,9 @@ describe("AgentSession advisor toggle", () => {
 		try {
 			await session?.dispose();
 		} finally {
-			restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-			restoreEnv("PI_PROFILE", originalPiProfile);
-			restoreEnv("OMP_PROFILE", originalOmpProfile);
+			restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+			restoreEnv("OMSP_PROFILE", originalPiProfile);
+			restoreEnv("OMSP_PROFILE", originalOmpProfile);
 			__resetDirsFromEnvForTests();
 			try {
 				await tempDir?.remove();

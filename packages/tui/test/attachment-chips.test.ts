@@ -1,13 +1,18 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import { AttachmentChipsBand } from "@oh-my-pi/pi-tui/prompt/attachment-chips";
-import { CustomEditor } from "@oh-my-pi/pi-tui/prompt/custom-editor";
-import { chipLabel } from "@oh-my-pi/pi-tui/prompt/composer-attachments";
-import { getEditorTheme, initTheme } from "@oh-my-pi/pi-tui/theme";
-import { ImageBudget } from "@oh-my-pi/pi-tui";
-import { setKittyGraphics } from "@oh-my-pi/pi-tui/kitty-graphics";
-import { getCellDimensions, ImageProtocol, setCellDimensions, TERMINAL } from "@oh-my-pi/pi-tui/terminal-capabilities";
-import { getAvailableSymbolPresets, SYMBOL_PRESETS } from "@oh-my-pi/pi-tui/theme/symbols";
-import { visibleWidth } from "@oh-my-pi/pi-tui/utils";
+import { AttachmentChipsBand } from "@oh-my-striped-pi/pi-tui/prompt/attachment-chips";
+import { CustomEditor } from "@oh-my-striped-pi/pi-tui/prompt/custom-editor";
+import { chipLabel } from "@oh-my-striped-pi/pi-tui/prompt/composer-attachments";
+import { getEditorTheme, initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { ImageBudget } from "@oh-my-striped-pi/pi-tui";
+import { setKittyGraphics } from "@oh-my-striped-pi/pi-tui/kitty-graphics";
+import {
+	getCellDimensions,
+	ImageProtocol,
+	setCellDimensions,
+	TERMINAL,
+} from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
+import { getAvailableSymbolPresets, SYMBOL_PRESETS } from "@oh-my-striped-pi/pi-tui/theme/symbols";
+import { visibleWidth } from "@oh-my-striped-pi/pi-tui/utils";
 
 // 2x2 red PNG — real header so the band's dimension probe decodes 2x2.
 const TINY_PNG =

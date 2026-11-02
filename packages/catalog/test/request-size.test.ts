@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	resolveImageCountBudget,
 	resolveInlineImageByteBudget,
 	resolveRequestBodyByteLimit,
-} from "@oh-my-pi/pi-catalog/compat/request-size";
+} from "@oh-my-striped-pi/pi-catalog/compat/request-size";
 
 function imageModel(imageCountBudget?: number) {
 	return buildModel({

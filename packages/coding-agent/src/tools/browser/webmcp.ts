@@ -1,6 +1,6 @@
-import { truncateHeadBytes } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
-import { untilAborted } from "@oh-my-pi/pi-utils";
+import { truncateHeadBytes } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils";
 import type { Protocol } from "devtools-protocol";
 import type { CDPSession, Frame, Page } from "puppeteer-core";
 
@@ -527,7 +527,7 @@ export class WebMcpController {
 		}
 		this.#catalog = next;
 		if (next.size > 0) return undefined;
-		// omp's Puppeteer evaluates in its isolated world, where `in` sees the platform API without creating the
+		// omsp's Puppeteer evaluates in its isolated world, where `in` sees the platform API without creating the
 		// page's context or reading anything the page defined.
 		const exposed = await untilAborted(signal, () =>
 			page.mainFrame().evaluate(() => "modelContext" in document || "modelContext" in navigator),

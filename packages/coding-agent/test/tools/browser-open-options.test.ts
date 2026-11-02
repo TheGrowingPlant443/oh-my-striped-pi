@@ -3,20 +3,20 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, describe, expect, it, spyOn } from "bun:test";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { resolveInitScriptSources } from "@oh-my-pi/pi-coding-agent/tools/browser/open-options";
-import { DownloadManager } from "@oh-my-pi/pi-coding-agent/tools/browser/downloads";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { resolveInitScriptSources } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/open-options";
+import { DownloadManager } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/downloads";
 import {
 	buildHeadlessLaunchArgs,
 	launchHeadlessBrowser,
 	removeUserDataDir,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
-import { getTab, releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { ToolAbortError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
+import { getTab, releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { ToolAbortError } from "@oh-my-striped-pi/pi-coding-agent/tools/tool-errors";
 import { TEST_TLS_CERT, TEST_TLS_KEY } from "../helpers/tls-certificate";
 import type { Browser, Page } from "puppeteer-core";
 import { rejectionOf } from "../helpers/rejection";
@@ -85,7 +85,7 @@ describe("browser open options CDP helpers", () => {
 	});
 
 	it("loads existing init-script files and preserves inline source", async () => {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-init-test-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-init-test-"));
 		tempDirs.push(directory);
 		await Bun.write(path.join(directory, "init.js"), "globalThis.fromFile = true;");
 		expect(await resolveInitScriptSources(["init.js", "globalThis.inline = true;"], directory)).toEqual([
@@ -98,8 +98,8 @@ describe("browser open options CDP helpers", () => {
 		send: (method: string, params: unknown) => Promise<unknown> = async () => undefined,
 		perTab = true,
 	) {
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
-		const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
+		const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
 		tempDirs.push(directory, elsewhere);
 		const listeners = new Map<string, (event: unknown) => void>();
 		const session = {
@@ -303,14 +303,14 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 			action: "open",
 			name,
 			url: "data:text/html,<title>first</title>",
-			init_scripts: ["globalThis.__omp_init = (globalThis.__omp_init || 0) + 1"],
+			init_scripts: ["globalThis.__omsp_init = (globalThis.__omsp_init || 0) + 1"],
 		});
 		expect(
 			returnedValue(
 				await invoke({
 					action: "run",
 					name,
-					code: "return await tab.evaluate(() => globalThis.__omp_init);",
+					code: "return await tab.evaluate(() => globalThis.__omsp_init);",
 				}),
 			),
 		).toBe(1);
@@ -319,7 +319,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 				await invoke({
 					action: "run",
 					name,
-					code: "await tab.goto('data:text/html,<title>second</title>'); return await tab.evaluate(() => globalThis.__omp_init);",
+					code: "await tab.goto('data:text/html,<title>second</title>'); return await tab.evaluate(() => globalThis.__omsp_init);",
 				}),
 			),
 		).toBe(1);
@@ -327,7 +327,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 			await invoke({
 				action: "call",
 				name,
-				chain: [{ method: "addInitScript", args: ["globalThis.__omp_runtime = 42"] }],
+				chain: [{ method: "addInitScript", args: ["globalThis.__omsp_runtime = 42"] }],
 			}),
 		) as { id: string };
 		expect(typeof added.id).toBe("string");
@@ -336,7 +336,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 				await invoke({
 					action: "run",
 					name,
-					code: "await tab.goto('data:text/html,<title>third</title>'); return await tab.evaluate(() => globalThis.__omp_runtime);",
+					code: "await tab.goto('data:text/html,<title>third</title>'); return await tab.evaluate(() => globalThis.__omsp_runtime);",
 				}),
 			),
 		).toBe(42);
@@ -344,7 +344,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 			returnedValue(await invoke({ action: "call", name, chain: [{ method: "initScripts", args: [] }] })),
 		).toEqual(
 			expect.arrayContaining([
-				expect.objectContaining({ id: added.id, source: expect.stringContaining("__omp_runtime") }),
+				expect.objectContaining({ id: added.id, source: expect.stringContaining("__omsp_runtime") }),
 			]),
 		);
 		await invoke({
@@ -357,7 +357,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 				await invoke({
 					action: "run",
 					name,
-					code: "await tab.goto('data:text/html,<title>fourth</title>'); return await tab.evaluate(() => globalThis.__omp_runtime);",
+					code: "await tab.goto('data:text/html,<title>fourth</title>'); return await tab.evaluate(() => globalThis.__omsp_runtime);",
 				}),
 			),
 		).toBeUndefined();
@@ -375,7 +375,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 		try {
 			const invoke = browserHost();
 			const name = `ua-${crypto.randomUUID()}`;
-			await invoke({ action: "open", name, url: server.url.href, user_agent: "omp-open-options/1.0" });
+			await invoke({ action: "open", name, url: server.url.href, user_agent: "omsp-open-options/1.0" });
 			expect(
 				returnedValue(
 					await invoke({
@@ -384,8 +384,8 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("browser open options", () => {
 						code: "return await tab.evaluate(() => navigator.userAgent);",
 					}),
 				),
-			).toBe("omp-open-options/1.0");
-			expect(await seen.promise).toBe("omp-open-options/1.0");
+			).toBe("omsp-open-options/1.0");
+			expect(await seen.promise).toBe("omsp-open-options/1.0");
 		} finally {
 			server.stop(true);
 		}
@@ -549,8 +549,8 @@ await Promise.withResolvers().promise;`;
 				});
 			},
 		});
-		const first = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
-		const second = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
+		const first = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
+		const second = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
 		tempDirs.push(first, second);
 		try {
 			const invoke = browserHost();
@@ -613,7 +613,7 @@ await Promise.withResolvers().promise;`;
 				return new Response(body, { headers: { "content-type": "text/html" } });
 			},
 		});
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
 		tempDirs.push(directory);
 		try {
 			const invoke = browserHost();
@@ -655,7 +655,7 @@ await Promise.withResolvers().promise;`;
 				});
 			},
 		});
-		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-browser-download-test-"));
+		const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-browser-download-test-"));
 		tempDirs.push(directory);
 		try {
 			const invoke = browserHost();
@@ -719,7 +719,7 @@ await Promise.withResolvers().promise;`;
 				}),
 			) as { path: string; bytes: number };
 			tempDirs.push(path.dirname(download.path));
-			expect(path.dirname(download.path)).toStartWith(path.join(os.tmpdir(), "omp-downloads-"));
+			expect(path.dirname(download.path)).toStartWith(path.join(os.tmpdir(), "omsp-downloads-"));
 			expect(download.bytes).toBe(payload.byteLength);
 			expect(new Uint8Array(await Bun.file(download.path).arrayBuffer())).toEqual(payload);
 		} finally {

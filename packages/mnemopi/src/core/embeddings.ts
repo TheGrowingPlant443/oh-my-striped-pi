@@ -1,10 +1,10 @@
 import { mkdirSync } from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as nodePath from "node:path";
-import { type ApiKey, withAuth } from "@oh-my-pi/pi-ai";
-import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { $env, $flag, fetchWithRetry, getFastembedCacheDir, logger, withLoopPhase } from "@oh-my-pi/pi-utils";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+import { type ApiKey, withAuth } from "@oh-my-striped-pi/pi-ai";
+import { ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import { $env, $flag, fetchWithRetry, getFastembedCacheDir, logger, withLoopPhase } from "@oh-my-striped-pi/pi-utils";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
 import type { EmbeddingModel } from "fastembed";
 import { loadFastembed, withEmbedSessionBudget } from "./fastembed-runtime";
 import {

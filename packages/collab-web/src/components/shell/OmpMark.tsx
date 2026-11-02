@@ -1,8 +1,8 @@
 import { type ReactNode, useId } from "react";
 
-/** The omp π mark (same glyph as the OAuth page), filled with the brand gradient. */
+/** The omsp π mark (same glyph as the OAuth page), filled with the brand gradient. */
 export function OmpMark({ size = 22 }: { size?: number }): ReactNode {
-	const gradient = `omp-mark-${useId().replace(/:/g, "")}`;
+	const gradient = `omsp-mark-${useId().replace(/:/g, "")}`;
 	return (
 		<svg className="sh-mark" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
 			<defs>

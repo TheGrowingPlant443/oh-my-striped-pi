@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
 import type {
 	AssistantMessage,
 	Message,
@@ -7,8 +7,8 @@ import type {
 	ModelSpec,
 	ToolResultMessage,
 	UserMessage,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** Explicit thinking-presence and unsigned-wire overrides pad only the active tool loop. */
 const PLACEHOLDER = "(no reasoning was returned for this turn)";

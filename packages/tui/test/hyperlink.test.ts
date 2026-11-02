@@ -2,8 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn, vi } fro
 import * as os from "node:os";
 import * as path from "node:path";
 import * as url from "node:url";
-import { logger } from "@oh-my-pi/pi-utils";
-import { getMarkdownTheme, initTheme } from "@oh-my-pi/pi-tui/theme";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import { getMarkdownTheme, initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import {
 	applyFileLinkSetting,
 	applyHyperlinkSetting,
@@ -15,8 +15,8 @@ import {
 	uriHyperlink,
 	urlHyperlink,
 	urlHyperlinkAlways,
-} from "@oh-my-pi/pi-tui/render/hyperlink";
-import * as terminalCaps from "@oh-my-pi/pi-tui";
+} from "@oh-my-striped-pi/pi-tui/render/hyperlink";
+import * as terminalCaps from "@oh-my-striped-pi/pi-tui";
 import { SkillMessageComponent } from "../src/chat/skill-message";
 import { openableImageProps } from "../src/native/blobs";
 import { fileHref } from "../src/tools/native-view";
@@ -218,27 +218,27 @@ describe("fileHyperlink", () => {
 		},
 	);
 
-	it("defaults host to os.hostname() when only PI_LINK_SCHEME is set", () => {
+	it("defaults host to os.hostname() when only OMSP_LINK_SCHEME is set", () => {
 		applyFileLinkSetting({ scheme: "ompfile" });
 		const filePath = path.resolve("/Users/foo/bar.ts");
 		const expectedPathname = url.pathToFileURL(filePath).pathname;
 		expect(fileUriForTerminal(filePath, undefined, "kitty")).toBe(`ompfile://${os.hostname()}${expectedPathname}`);
 	});
 
-	it("overrides vscode terminal target when PI_LINK_SCHEME is set", () => {
+	it("overrides vscode terminal target when OMSP_LINK_SCHEME is set", () => {
 		applyFileLinkSetting({ scheme: "ompfile", host: "beelink" });
 		const filePath = path.resolve("/Users/foo/bar.ts");
 		const expectedPathname = url.pathToFileURL(filePath).pathname;
 		expect(fileUriForTerminal(filePath, { line: 10 }, "vscode")).toBe(`ompfile://beelink${expectedPathname}?line=10`);
 	});
 
-	it("leaves URIs unchanged when only PI_LINK_HOST is set without PI_LINK_SCHEME", () => {
+	it("leaves URIs unchanged when only OMSP_LINK_HOST is set without OMSP_LINK_SCHEME", () => {
 		applyFileLinkSetting({ host: "remote-server" });
 		const filePath = path.resolve("/Users/foo/bar.ts");
 		expect(fileUriForTerminal(filePath, undefined, "base")).toBe(url.pathToFileURL(filePath).href);
 	});
 
-	it("leaves file and vscode URIs unchanged when PI_LINK_SCHEME and PI_LINK_HOST are unset", () => {
+	it("leaves file and vscode URIs unchanged when OMSP_LINK_SCHEME and OMSP_LINK_HOST are unset", () => {
 		applyFileLinkSetting({});
 		const filePath = path.resolve("/Users/foo/bar.ts");
 		const expectedFileUri = url.pathToFileURL(filePath).href;
@@ -351,9 +351,9 @@ describe("fileHyperlink", () => {
 	});
 
 	it("accepts extended scheme characters case-insensitively", () => {
-		applyFileLinkSetting({ scheme: "OMP+File.v2-remote", host: "beelink" });
+		applyFileLinkSetting({ scheme: "OMSP+File.v2-remote", host: "beelink" });
 		const filePath = path.resolve("/tmp/a.ts");
-		expect(tryFileUri(filePath)).toBe(`omp+file.v2-remote://beelink${url.pathToFileURL(filePath).pathname}`);
+		expect(tryFileUri(filePath)).toBe(`omsp+file.v2-remote://beelink${url.pathToFileURL(filePath).pathname}`);
 	});
 
 	it("produces a stable id for the same path", () => {

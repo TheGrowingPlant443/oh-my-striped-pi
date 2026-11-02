@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { RpcClient, RpcCommandError } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import type { BtwHistoryRecord } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import { isRecord, readJsonl, removeWithRetries } from "@oh-my-pi/pi-utils";
+import { RpcClient, RpcCommandError } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { BtwHistoryRecord } from "@oh-my-striped-pi/pi-coding-agent/session/btw-history";
+import { isRecord, readJsonl, removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 /** Settle a request before `expect` sees it (see rpc-goal.test.ts). */
 async function rejectionOf(request: Promise<unknown>): Promise<Error> {
@@ -26,11 +26,11 @@ describe("RPC /btw", () => {
 	});
 
 	async function start() {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-btw-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-btw-"));
 		const rpc = new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "btw-rpc-agent.ts")],
 			cwd: directory,
-			env: { PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1" },
+			env: { OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1" },
 		});
 		client = rpc;
 		const deltas: string[] = [];
@@ -253,10 +253,10 @@ describe("RPC /btw", () => {
 	}, 30_000);
 
 	test("over raw stdio: the response precedes the turn's frames, and EOF saves a running question", async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-btw-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-btw-"));
 		const child = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixtures", "btw-rpc-agent.ts")], {
 			cwd: directory,
-			env: { ...process.env, PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1" },
+			env: { ...process.env, OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1" },
 			stdin: "pipe",
 			stdout: "pipe",
 			stderr: "ignore",

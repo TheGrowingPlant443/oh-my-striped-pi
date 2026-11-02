@@ -1,5 +1,5 @@
-import type { AssistantMessage, Model, Usage, UserMessage } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { AssistantMessage, Model, Usage, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** Creates a Copilot model with explicit generic Harmony leak mitigation. */
 export function createHarmonyMitigationModel(): Model<"openai-responses"> {

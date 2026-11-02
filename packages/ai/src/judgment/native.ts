@@ -1,8 +1,11 @@
 /** Native configured-endpoint judgments, with validated images, batching and credential rotation. */
-import { resolveJudgmentImageInput, type JudgmentImageInput } from "@oh-my-pi/pi-catalog/compat/judgment-images";
-import { resolveJudgmentQuestionsMax } from "@oh-my-pi/pi-catalog/compat/judgment-questions";
-import type { Api, FetchImpl } from "@oh-my-pi/pi-catalog/types";
-import { isRecord, parseImageMetadata } from "@oh-my-pi/pi-utils";
+import {
+	resolveJudgmentImageInput,
+	type JudgmentImageInput,
+} from "@oh-my-striped-pi/pi-catalog/compat/judgment-images";
+import { resolveJudgmentQuestionsMax } from "@oh-my-striped-pi/pi-catalog/compat/judgment-questions";
+import type { Api, FetchImpl } from "@oh-my-striped-pi/pi-catalog/types";
+import { isRecord, parseImageMetadata } from "@oh-my-striped-pi/pi-utils";
 import { type ApiKey, NO_AUTH_SENTINEL, withAuth } from "../auth-retry";
 import * as AIError from "../error";
 import { validateImageInput } from "../images/shared";

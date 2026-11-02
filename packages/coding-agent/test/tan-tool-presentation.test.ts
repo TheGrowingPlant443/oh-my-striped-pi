@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { type CustomTool, createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { createSubagentSettings } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { type CustomTool, createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { createSubagentSettings } from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { getTestModel } from "./helpers/model-fixtures";
 
@@ -25,7 +25,7 @@ const mcpTool: CustomTool = {
 describe("/tan prompt-cache tool presentation", () => {
 	for (const xdev of [true, false]) {
 		it(`preserves the parent's request tools with xd:// ${xdev ? "enabled" : "disabled"}`, async () => {
-			using dir = TempDir.createSync("@omp-tan-tools-");
+			using dir = TempDir.createSync("@omsp-tan-tools-");
 			const cwd = dir.path();
 			const settings = Settings.isolated({ "tools.xdev": xdev, "marketplace.autoUpdate": "off" });
 			const auth = createInMemoryAuthStorage();

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { registerArtifactsDir, sessionFilesFromDisk } from "@oh-my-pi/pi-coding-agent/internal-urls/registry-helpers";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import {
+	registerArtifactsDir,
+	sessionFilesFromDisk,
+} from "@oh-my-striped-pi/pi-coding-agent/internal-urls/registry-helpers";
 
 const cleanups: Array<() => void> = [];
 

@@ -1,22 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { cfgEditFuzzyMatch } from "@oh-my-pi/pi-coding-agent/edit/settings";
-import { type EditMode } from "@oh-my-pi/pi-tui/tools/edit";
-import { type EditModeSessionLike, resolveEditMode } from "@oh-my-pi/pi-coding-agent/utils/edit-mode";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { cfgEditFuzzyMatch } from "@oh-my-striped-pi/pi-coding-agent/edit/settings";
+import { type EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
+import { type EditModeSessionLike, resolveEditMode } from "@oh-my-striped-pi/pi-coding-agent/utils/edit-mode";
 
-const originalEditVariant = Bun.env.PI_EDIT_VARIANT;
-const originalStrictEditMode = Bun.env.PI_STRICT_EDIT_MODE;
+const originalEditVariant = Bun.env.OMSP_EDIT_VARIANT;
+const originalStrictEditMode = Bun.env.OMSP_STRICT_EDIT_MODE;
 
 function restoreEnv(): void {
 	if (originalEditVariant === undefined) {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 	} else {
-		Bun.env.PI_EDIT_VARIANT = originalEditVariant;
+		Bun.env.OMSP_EDIT_VARIANT = originalEditVariant;
 	}
 	if (originalStrictEditMode === undefined) {
-		delete Bun.env.PI_STRICT_EDIT_MODE;
+		delete Bun.env.OMSP_STRICT_EDIT_MODE;
 	} else {
-		Bun.env.PI_STRICT_EDIT_MODE = originalStrictEditMode;
+		Bun.env.OMSP_STRICT_EDIT_MODE = originalStrictEditMode;
 	}
 }
 
@@ -37,8 +37,8 @@ function createSession(args: {
 
 describe("resolveEditMode", () => {
 	beforeEach(() => {
-		delete Bun.env.PI_EDIT_VARIANT;
-		delete Bun.env.PI_STRICT_EDIT_MODE;
+		delete Bun.env.OMSP_EDIT_VARIANT;
+		delete Bun.env.OMSP_STRICT_EDIT_MODE;
 	});
 
 	afterEach(() => {
@@ -46,7 +46,7 @@ describe("resolveEditMode", () => {
 	});
 
 	test("falls back from hashline to replace for Kimi models", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(resolveEditMode(createSession({ activeModel: "openrouter/moonshotai/Kimi-K2-Instruct" }))).toBe("replace");
 	});
@@ -73,24 +73,24 @@ describe("resolveEditMode", () => {
 			expect(resolveEditMode(createSession({ activeModel, modelVariant: "hashline" }))).toBe("hashline");
 			expect(resolveEditMode(createSession({ activeModel, settingsMode: "apply_patch" }))).toBe("apply_patch");
 
-			Bun.env.PI_EDIT_VARIANT = "hashline";
+			Bun.env.OMSP_EDIT_VARIANT = "hashline";
 			expect(resolveEditMode(createSession({ activeModel }))).toBe("hashline");
-			delete Bun.env.PI_EDIT_VARIANT;
+			delete Bun.env.OMSP_EDIT_VARIANT;
 
-			Bun.env.PI_STRICT_EDIT_MODE = "1";
+			Bun.env.OMSP_STRICT_EDIT_MODE = "1";
 			expect(resolveEditMode(createSession({ activeModel }))).toBe("hashline");
-			delete Bun.env.PI_STRICT_EDIT_MODE;
+			delete Bun.env.OMSP_STRICT_EDIT_MODE;
 		}
 	});
 
 	test("falls back from hashline to replace for MiMo models", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(resolveEditMode(createSession({ activeModel: "xiaomi/MiMo-V2.5-Pro" }))).toBe("replace");
 	});
 
 	test("falls back from hashline to replace for DeepSeek models", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(resolveEditMode(createSession({ activeModel: "tensormesh/deepseek-ai/DeepSeek-V4-Flash" }))).toBe(
 			"replace",
@@ -100,7 +100,7 @@ describe("resolveEditMode", () => {
 	});
 
 	test("falls back from hashline to replace for Step 3.7 Flash models", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(resolveEditMode(createSession({ activeModel: "kilo/stepfun/step-3.7-flash:free" }))).toBe("replace");
 	});
@@ -130,13 +130,13 @@ describe("resolveEditMode", () => {
 	});
 
 	test("does not exclude non-Kimi Moonshot models", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(resolveEditMode(createSession({ activeModel: "moonshot/moonshot-v1-128k" }))).toBe("hashline");
 	});
 
 	test("keeps explicit model variants ahead of the Kimi fallback", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(
 			resolveEditMode(
@@ -145,8 +145,8 @@ describe("resolveEditMode", () => {
 		).toBe("hashline");
 	});
 
-	test("keeps PI_EDIT_VARIANT ahead of the Kimi fallback", () => {
-		Bun.env.PI_EDIT_VARIANT = "hashline";
+	test("keeps OMSP_EDIT_VARIANT ahead of the Kimi fallback", () => {
+		Bun.env.OMSP_EDIT_VARIANT = "hashline";
 
 		expect(resolveEditMode(createSession({ activeModel: "openrouter/moonshotai/Kimi-K2-Instruct" }))).toBe(
 			"hashline",
@@ -154,7 +154,7 @@ describe("resolveEditMode", () => {
 	});
 
 	test("only falls back when the resolved mode is hashline", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
+		delete Bun.env.OMSP_EDIT_VARIANT;
 
 		expect(
 			resolveEditMode(
@@ -164,8 +164,8 @@ describe("resolveEditMode", () => {
 	});
 
 	test("keeps strict edit mode ahead of the Kimi fallback", () => {
-		delete Bun.env.PI_EDIT_VARIANT;
-		Bun.env.PI_STRICT_EDIT_MODE = "1";
+		delete Bun.env.OMSP_EDIT_VARIANT;
+		Bun.env.OMSP_STRICT_EDIT_MODE = "1";
 
 		expect(resolveEditMode(createSession({ activeModel: "openrouter/moonshotai/Kimi-K2-Instruct" }))).toBe(
 			"hashline",
@@ -173,17 +173,17 @@ describe("resolveEditMode", () => {
 	});
 });
 
-describe("PI_EDIT_FUZZY", () => {
-	const originalEditFuzzy = Bun.env.PI_EDIT_FUZZY;
+describe("OMSP_EDIT_FUZZY", () => {
+	const originalEditFuzzy = Bun.env.OMSP_EDIT_FUZZY;
 
 	afterEach(() => {
-		if (originalEditFuzzy === undefined) delete Bun.env.PI_EDIT_FUZZY;
-		else Bun.env.PI_EDIT_FUZZY = originalEditFuzzy;
+		if (originalEditFuzzy === undefined) delete Bun.env.OMSP_EDIT_FUZZY;
+		else Bun.env.OMSP_EDIT_FUZZY = originalEditFuzzy;
 	});
 
 	test("forces fuzzy matching with 1/true and 0/false, deferring to edit.fuzzyMatch for auto or other text", () => {
 		const fuzzyWith = (raw: string, configured: boolean) => {
-			Bun.env.PI_EDIT_FUZZY = raw;
+			Bun.env.OMSP_EDIT_FUZZY = raw;
 			return cfgEditFuzzyMatch.get(Settings.isolated({ "edit.fuzzyMatch": configured }));
 		};
 		expect(fuzzyWith("1", false)).toBe(true);

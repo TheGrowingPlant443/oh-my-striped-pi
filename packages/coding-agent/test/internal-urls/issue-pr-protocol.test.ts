@@ -1,7 +1,7 @@
 /**
  * `issue://` / `pr://` protocol handler tests.
  *
- * Every test isolates `OMP_GITHUB_CACHE_DB` to a temp file and resets the
+ * Every test isolates `OMSP_GITHUB_CACHE_DB` to a temp file and resets the
  * cache + router singletons. `github.json` / `github.text` are spied
  * per-test and restored in `afterEach`.
  */
@@ -9,18 +9,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { parsePrUnifiedDiff, retainPrDiffGeneration } from "@oh-my-pi/pi-coding-agent/tools/gh-pr-diff";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { parsePrUnifiedDiff, retainPrDiffGeneration } from "@oh-my-striped-pi/pi-coding-agent/tools/gh-pr-diff";
 import {
 	getCached,
 	getCachedGeneration,
 	putCached,
 	resetForTests as resetCacheForTests,
 	resolveGithubCacheAuthKey,
-} from "@oh-my-pi/pi-coding-agent/tools/github-cache";
-import { github } from "@oh-my-pi/pi-coding-agent/utils/github";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/github-cache";
+import { github } from "@oh-my-striped-pi/pi-coding-agent/utils/github";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 let tempDir: string;
 let originalEnv: string | undefined;
@@ -28,8 +28,8 @@ let originalEnv: string | undefined;
 let originalGhToken: string | undefined;
 beforeEach(async () => {
 	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "issue-pr-protocol-"));
-	originalEnv = process.env.OMP_GITHUB_CACHE_DB;
-	process.env.OMP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
+	originalEnv = process.env.OMSP_GITHUB_CACHE_DB;
+	process.env.OMSP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
 	originalGhToken = process.env.GH_TOKEN;
 	process.env.GH_TOKEN = "test-token";
 	resetCacheForTests();
@@ -40,9 +40,9 @@ afterEach(async () => {
 	resetCacheForTests();
 	InternalUrlRouter.resetForTests();
 	if (originalEnv === undefined) {
-		delete process.env.OMP_GITHUB_CACHE_DB;
+		delete process.env.OMSP_GITHUB_CACHE_DB;
 	} else {
-		process.env.OMP_GITHUB_CACHE_DB = originalEnv;
+		process.env.OMSP_GITHUB_CACHE_DB = originalEnv;
 	}
 	if (originalGhToken === undefined) {
 		delete process.env.GH_TOKEN;

@@ -9,7 +9,7 @@ import {
 	type StreamFn,
 	TERMINAL_TOOL_RESULT_ABORT_REASON,
 	ThinkingLevel,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import {
 	canReplayRemoteCompaction,
 	type CompactionResult,
@@ -24,7 +24,7 @@ import {
 	type SessionMessageEntry,
 	shouldCompact,
 	shouldUseProviderNativeCompaction,
-} from "@oh-my-pi/pi-agent-core/compaction";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
 import type {
 	AssistantMessage,
 	Context,
@@ -33,13 +33,13 @@ import type {
 	ProviderSessionState,
 	ServiceTier,
 	SimpleStreamOptions,
-} from "@oh-my-pi/pi-ai";
-import { isUsageLimitOutcome, resolveModelServiceTier, streamSimple } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { extractProviderRetryHint } from "@oh-my-pi/pi-ai/utils/retry-after";
-import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { extractHttpStatusFromError, logger, prompt } from "@oh-my-pi/pi-utils";
-import type { AdvisorConfig } from "@oh-my-pi/pi-tui/overlays/advisor-config";
+} from "@oh-my-striped-pi/pi-ai";
+import { isUsageLimitOutcome, resolveModelServiceTier, streamSimple } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { extractProviderRetryHint } from "@oh-my-striped-pi/pi-ai/utils/retry-after";
+import { modelsAreEqual } from "@oh-my-striped-pi/pi-catalog/models";
+import { extractHttpStatusFromError, logger, prompt } from "@oh-my-striped-pi/pi-utils";
+import type { AdvisorConfig } from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 import {
 	ADVISOR_DEFAULT_BUDGET_PER_UPDATE,
 	ADVISOR_DEFAULT_TOOL_NAMES,
@@ -82,7 +82,7 @@ import {
 import { MODEL_ROLES } from "../config/model-roles";
 import { serviceTierForAllFamilies, serviceTierSettingToTier } from "../config/service-tier";
 import type { Settings } from "../config/settings";
-import { estimateContextToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
+import { estimateContextToolSchemaTokens } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
 import type { PlanModeState } from "../plan-mode/state";
 import advisorBoundaryGuidance from "../prompts/advisor/boundary-guidance.md" with { type: "text" };
 import advisorSystemPrompt from "../prompts/advisor/system.md" with { type: "text" };
@@ -94,7 +94,7 @@ import {
 	shouldDisableReasoning,
 	toReasoningEffort,
 	automaticThinkingLevel,
-} from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import type { AgentSessionEvent } from "./agent-session-events";
 import type { ClientBridge } from "./client-bridge";
 import { resolveCompactionMethodOrder, resolveMethodSettings } from "./compaction-methods";

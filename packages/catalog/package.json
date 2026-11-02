@@ -1,7 +1,8 @@
 {
-	"name": "@oh-my-pi/pi-catalog",
+	"name": "@oh-my-striped-pi/pi-catalog",
+	"private": true,
 	"version": "18.13.3",
-	"description": "Model catalog for omp: bundled model database, provider discovery descriptors, model identity, classification, and equivalence",
+	"description": "Model catalog for omsp: bundled model database, provider discovery descriptors, model identity, classification, and equivalence",
 	"keywords": [
 		"ai",
 		"catalog",
@@ -9,15 +10,15 @@
 		"llm",
 		"models"
 	],
-	"homepage": "https://omp.sh",
+	"homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
 	"bugs": {
-		"url": "https://github.com/can1357/oh-my-pi/issues"
+		"url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
 	},
 	"license": "MIT",
 	"author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/can1357/oh-my-pi.git",
+		"url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
 		"directory": "packages/catalog"
 	},
 	"files": [
@@ -82,8 +83,8 @@
 		"gen:compat": "bun scripts/compile-compat.ts"
 	},
 	"dependencies": {
-		"@oh-my-pi/omptype": "catalog:",
-		"@oh-my-pi/pi-utils": "catalog:"
+		"@oh-my-striped-pi/omptype": "catalog:",
+		"@oh-my-striped-pi/pi-utils": "catalog:"
 	},
 	"devDependencies": {
 		"@bgotink/kdl": "0.4.0",

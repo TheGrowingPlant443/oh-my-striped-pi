@@ -4,7 +4,7 @@
  * its strongest verified line ranges with a verbatim snippet.
  */
 import * as path from "node:path";
-import { formatDuration, formatNumber } from "@oh-my-pi/pi-utils";
+import { formatDuration, formatNumber } from "@oh-my-striped-pi/pi-utils";
 import { renderProgressBar } from "../components/progress-bar";
 import { Text } from "../components/text";
 import { fileHyperlink, getTreeBranch, renderStatusLine, renderTreeList, uriHyperlink } from "../render";
@@ -27,7 +27,7 @@ import type {
 	RenderResultOptions,
 	ToolRenderer,
 } from "./renderer";
-import type { TspTone } from "@oh-my-pi/pi-wire";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
 import { code, col, compact, keyed, node, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { fileHref, fileRow, inlineErrorView } from "./native-view";
@@ -217,7 +217,7 @@ function describeHit(hit: FindHit, rangeLimit: number, cwd: string | undefined, 
 			`${range.start}-${range.end}`,
 		),
 	);
-	return keyed(col([head, ...snippets], { gap: "xs", role: "omp.tool.find.hit" }), hit.rel);
+	return keyed(col([head, ...snippets], { gap: "xs", role: "omsp.tool.find.hit" }), hit.rel);
 }
 
 /** Native find head: the query, then `meta` (result counts), or the call's keywords and scope. */
@@ -398,7 +398,7 @@ export const findToolRenderer = {
 			formatDuration(details.elapsedMs),
 		].join(" · ");
 		const failures = stats.failures.map((failure, i) =>
-			keyed(text([span(failure, "warning")], { wrap: "word", role: "omp.tool.notice" }), `fail${i}`),
+			keyed(text([span(failure, "warning")], { wrap: "word", role: "omsp.tool.notice" }), `fail${i}`),
 		);
 		if (hits.length === 0) {
 			return {
@@ -417,7 +417,7 @@ export const findToolRenderer = {
 		]);
 		// One quiet last line; the accounting ANSI prints in the head rides its tooltip.
 		const foot = keyed(
-			text([span(footParts.join(" · "), "muted")], { wrap: "word", role: "omp.tool.stats", title: accounting }),
+			text([span(footParts.join(" · "), "muted")], { wrap: "word", role: "omsp.tool.stats", title: accounting }),
 			"foot",
 		);
 		return {

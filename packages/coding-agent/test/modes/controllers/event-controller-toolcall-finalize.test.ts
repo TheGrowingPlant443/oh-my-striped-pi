@@ -9,17 +9,17 @@
  * transcript reads as cut off for the whole args stream.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { resetSettingsForTest, Settings, settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/event-controller";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { Component } from "@oh-my-pi/pi-tui";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { resetSettingsForTest, Settings, settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { EventController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/event-controller";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 
-import { cfgDisplayShowTokenUsage } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { cfgDisplayShowTokenUsage } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
 beforeAll(async () => {
 	await initTheme();

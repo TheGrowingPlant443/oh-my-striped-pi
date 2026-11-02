@@ -12,7 +12,7 @@
  * changed module is never deferred on stale knowledge.
  */
 import * as fs from "node:fs/promises";
-import { isRecord, logger } from "@oh-my-pi/pi-utils";
+import { isRecord, logger } from "@oh-my-striped-pi/pi-utils";
 import type { AgentStorage } from "../../session/agent-storage";
 import { resolvePath } from "../utils";
 import type { Extension } from "./types";

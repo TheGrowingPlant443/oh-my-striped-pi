@@ -1,4 +1,4 @@
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 import {
 	$flag,
 	cloneJsonTree,
@@ -6,7 +6,7 @@ import {
 	logger,
 	type ServerSentEvent,
 	structuredCloneJSON,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../error";
 import { getEnvApiKey } from "../env-api-key";
 import type {
@@ -128,7 +128,7 @@ export interface OpenAIResponsesOptions extends StreamOptions {
 	 * Stateful turns: chain via `previous_response_id` + delta input instead of
 	 * replaying the full transcript. Forces `store: true` (the platform only
 	 * resolves stored responses). Precedence: this option, then
-	 * `PI_OPENAI_STATEFUL`, then `compat.statefulResponses`, then ON against the
+	 * `OMSP_OPENAI_STATEFUL`, then `compat.statefulResponses`, then ON against the
 	 * official OpenAI API and OFF elsewhere. Requires `sessionId` +
 	 * `providerSessionState`. Falls back to a full replay whenever history
 	 * mutates or the server reports a stale id.
@@ -511,7 +511,7 @@ function isOpenAIResponsesStatefulEnabled(
 	if (model.compat.storeResponses === true && !storesResponsesServerSide(model, options)) return false;
 	if (options?.statefulResponses === false) return false;
 	if (options?.statefulResponses === true) return true;
-	return $flag("PI_OPENAI_STATEFUL", model.compat.statefulResponses ?? false);
+	return $flag("OMSP_OPENAI_STATEFUL", model.compat.statefulResponses ?? false);
 }
 
 function getOpenAIResponsesChainState(

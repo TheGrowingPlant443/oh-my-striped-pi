@@ -4269,7 +4269,7 @@ const ROW_BEFORE =
 	/\b(?:before|old|baseline|original|previous|prev|stock|unpatched|default|main|master|current|cold)\b/i;
 /** Row names marking the after side of a comparison, narrower than {@link AFTER} for the same reason. */
 const ROW_AFTER = /\b(?:after|new|patched|fixed|optimi[sz]ed|proposed|pr|branch|head|ours|warm)\b/i;
-/** Row names that are code identifiers (`` `PI_CHUNK_LINES` ``, `MAX_OP_RETURN_LEN`): settings, not metrics. */
+/** Row names that are code identifiers (`` `OMSP_CHUNK_LINES` ``, `MAX_OP_RETURN_LEN`): settings, not metrics. */
 const IDENTIFIER = /^`|^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/;
 /** Row names of the two settings of one switch (`on` / `off`, `with` / `without`). */
 const SWITCH = /^(?:on|off|enabled|disabled|with|without|yes|no)\b/i;
@@ -4691,7 +4691,7 @@ function nestNames(names: readonly string[]): ChartGroup[] | undefined {
 
 /**
  * Shorter names that still tell `names` apart, for labels: a path-like name
- * (`~/.omp/agent/history.db`, `openai/gpt-5.5:xhi`) by its last segment; among
+ * (`~/.omsp/agent/history.db`, `openai/gpt-5.5:xhi`) by its last segment; among
  * such single-token names, a prefix or suffix all share at a separator
  * (`/vs/…`, `…:xhi`) dropped, unless only numbers or dates would remain; and
  * when most names past {@link MAX_LABEL} overflow with a description, every

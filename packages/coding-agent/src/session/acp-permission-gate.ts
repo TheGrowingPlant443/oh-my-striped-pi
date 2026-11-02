@@ -1,5 +1,5 @@
-import { editInspect } from "@oh-my-pi/pi-natives";
-import { isRecord, stringProperty } from "@oh-my-pi/pi-utils";
+import { editInspect } from "@oh-my-striped-pi/pi-natives";
+import { isRecord, stringProperty } from "@oh-my-striped-pi/pi-utils";
 import { resolveToCwd } from "../tools/path-utils";
 import type { ClientBridgePermissionOption } from "./client-bridge";
 

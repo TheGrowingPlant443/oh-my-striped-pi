@@ -8,7 +8,7 @@
  * every gateway client's 30-day sticky row resident.
  */
 import * as os from "node:os";
-import { getAppName, getInstallId, logger, postmortem } from "@oh-my-pi/pi-utils";
+import { getAppName, getInstallId, logger, postmortem } from "@oh-my-striped-pi/pi-utils";
 import type { AuthCredentialStore } from "../auth/store";
 import {
 	type AuthCredential,

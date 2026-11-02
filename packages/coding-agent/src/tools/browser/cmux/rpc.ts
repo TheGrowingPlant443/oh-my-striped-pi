@@ -1,5 +1,5 @@
-import { parseFlag } from "@oh-my-pi/pi-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { parseFlag } from "@oh-my-striped-pi/pi-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import type { Observation, ObservationEntry } from "../tab-protocol";
 
 export interface CmuxKind {
@@ -184,7 +184,7 @@ export function resolveCmuxKind(
 	options?: ResolveCmuxKindOptions | null,
 	env: Record<string, string | undefined> = process.env,
 ): CmuxKind | null {
-	if (!parseFlag(env.PI_BROWSER_CMUX, options?.settingEnabled ?? true)) {
+	if (!parseFlag(env.OMSP_BROWSER_CMUX, options?.settingEnabled ?? true)) {
 		return null;
 	}
 	const socketPath = env.CMUX_SOCKET_PATH;

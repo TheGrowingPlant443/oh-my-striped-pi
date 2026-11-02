@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { glob } from "@oh-my-pi/pi-natives";
+import { glob } from "@oh-my-striped-pi/pi-natives";
 import { Settings } from "../../src/config/settings";
 import { InternalUrlFilesystem } from "../../src/internal-urls/url-filesystem";
 import type { ToolSession } from "../../src/tools";

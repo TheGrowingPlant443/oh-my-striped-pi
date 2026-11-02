@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { $which, logger } from "@oh-my-pi/pi-utils";
+import { $which, logger } from "@oh-my-striped-pi/pi-utils";
 import { $ } from "bun";
 
 /**
@@ -12,7 +12,7 @@ import { $ } from "bun";
 const STATS_PROBE_TIMEOUT_MS = 3_000;
 const PROCESS_EXIT_POLL_MS = 50;
 const PROCESS_EXIT_POLLS = 10;
-const STATS_RUNTIME_IMAGES: Record<string, true> = { bun: true, node: true, omp: true, "omp-stats": true };
+const STATS_RUNTIME_IMAGES: Record<string, true> = { bun: true, node: true, omsp: true, "omsp-stats": true };
 
 interface PortHolder {
 	pid: number;
@@ -21,9 +21,9 @@ interface PortHolder {
 }
 
 /** Header stamped on every dashboard response so reuse probes can identify us. */
-export const STATS_DASHBOARD_HEADER = "x-omp-stats-dashboard";
+export const STATS_DASHBOARD_HEADER = "x-omsp-stats-dashboard";
 /** Header recording the server's requested bind host so reuse cannot change its exposure scope. */
-export const STATS_DASHBOARD_HOSTNAME_HEADER = "x-omp-stats-hostname";
+export const STATS_DASHBOARD_HOSTNAME_HEADER = "x-omsp-stats-hostname";
 
 /** Identity-header value for dashboards enforcing an explicit bind host and same-origin access. */
 export const STATS_DASHBOARD_SECURITY_VERSION = "3";
@@ -248,7 +248,7 @@ async function terminatePortHolder(holder: PortHolder): Promise<void> {
 
 /**
  * Stop the stats dashboard answering `probe` on `port` so it can be rebound.
- * Holders that cannot be positively identified as an omp stats dashboard, or
+ * Holders that cannot be positively identified as an omsp stats dashboard, or
  * that refuse to stop, are left running and yield `"fallback"`.
  */
 async function reclaimStatsPort(port: number, probe: "replaceable" | "occupied"): Promise<StatsPortClaim> {
@@ -264,11 +264,10 @@ async function reclaimStatsPort(port: number, probe: "replaceable" | "occupied")
 		.replace(/ \(deleted\)$/, "");
 	const normalizedCommand = holder.commandLine.toLowerCase().replaceAll("\\", "/");
 	const hasStatsIdentity =
-		normalizedImage === "omp-stats" ||
-		/(?:^|[/"'\s])omp-stats(?:\.exe)?(?:["'\s]|$)/.test(normalizedCommand) ||
-		/\/packages\/stats\/src\/index\.ts(?:["'\s]|$)/.test(normalizedCommand) ||
-		(normalizedImage === "omp" && /(?:^|\s)stats(?:\s|$)/.test(normalizedCommand)) ||
-		/(?:^|\/)omp(?:\.exe)?["'\s]+stats(?:["'\s]|$)/.test(normalizedCommand);
+		normalizedImage === "omsp-stats" ||
+		/(?:^|[/"'\s])omsp-stats(?:\.exe)?(?:["'\s]|$)/.test(normalizedCommand) ||
+		(normalizedImage === "omsp" && /(?:^|\s)stats(?:\s|$)/.test(normalizedCommand)) ||
+		/(?:^|\/)omsp(?:\.exe)?["'\s]+stats(?:["'\s]|$)/.test(normalizedCommand);
 	const hasDashboardIdentity = probe === "replaceable";
 	if (!STATS_RUNTIME_IMAGES[normalizedImage] || (!hasStatsIdentity && !hasDashboardIdentity)) {
 		logger.debug("Stats dashboard port held by an unidentified process", { port, holder });

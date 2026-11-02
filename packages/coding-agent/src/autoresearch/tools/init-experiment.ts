@@ -2,11 +2,11 @@ import {
 	HARNESS_FILENAME,
 	DEFAULT_HARNESS_COMMAND,
 	type InitExperimentDetails,
-} from "@oh-my-pi/pi-tui/tools/autoresearch";
-import { initExperimentToolRenderer } from "@oh-my-pi/pi-tui/tools/autoresearch";
+} from "@oh-my-striped-pi/pi-tui/tools/autoresearch";
+import { initExperimentToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/autoresearch";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
+import { type } from "@oh-my-striped-pi/omptype";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
 
 import type { ToolDefinition } from "../../extensibility/extensions";
 

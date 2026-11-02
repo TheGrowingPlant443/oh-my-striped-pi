@@ -5,12 +5,12 @@
  * the stream's tool-call events, a gateway client, or the next request.
  */
 import { describe, expect, it } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { encodeStream } from "@oh-my-pi/pi-ai/providers/anthropic-messages-server";
-import type { AnthropicOptions } from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { MessageParam } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import type { AssistantMessageEvent, FetchImpl, Model, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { encodeStream } from "@oh-my-striped-pi/pi-ai/providers/anthropic-messages-server";
+import type { AnthropicOptions } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type { MessageParam } from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
+import type { AssistantMessageEvent, FetchImpl, Model, ToolResultMessage } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const model: Model<"anthropic-messages"> = buildModel({
 	id: "claude-fable-5",
@@ -87,7 +87,7 @@ const plainTurnEvents: WireEvent[] = [
 	{ type: "message_stop" },
 ];
 
-/** Serves each request the next scripted turn and records the bodies omp sends. */
+/** Serves each request the next scripted turn and records the bodies omsp sends. */
 function scriptedAnthropic(turns: WireEvent[][]) {
 	const requests: Array<{ messages: MessageParam[] }> = [];
 	let served = 0;

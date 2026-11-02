@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { renderHtmlToText } from "@oh-my-pi/pi-coding-agent/tools/fetch";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { renderHtmlToText } from "@oh-my-striped-pi/pi-coding-agent/tools/fetch";
 
 describe("renderHtmlToText: collapsed sections", () => {
 	it("keeps rows of a collapsed panel but not template or script text", async () => {

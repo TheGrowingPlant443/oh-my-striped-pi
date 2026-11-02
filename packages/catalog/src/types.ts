@@ -1,9 +1,9 @@
 import type { ModelIdentity } from "./compat/types";
 import type { Effort } from "./effort";
 
-// Re-exported from @oh-my-pi/pi-utils so the whole workspace shares one
+// Re-exported from @oh-my-striped-pi/pi-utils so the whole workspace shares one
 // `fetch`-compatible signature (tls-fetch's wrappers produce/accept it).
-export type { FetchImpl } from "@oh-my-pi/pi-utils";
+export type { FetchImpl } from "@oh-my-striped-pi/pi-utils";
 export type { KnownProvider } from "./provider-models/descriptors";
 
 export type KnownApi =
@@ -581,8 +581,8 @@ export interface AnthropicCompat {
 	 * Set to 0 to disable the inter-event idle watchdog entirely, matching
 	 * `OpenAICompat.streamIdleTimeoutMs`.
 	 *
-	 * When unset, direct Anthropic streams use `PI_STREAM_IDLE_TIMEOUT_MS`,
-	 * then the legacy `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then 300s.
+	 * When unset, direct Anthropic streams use `OMSP_STREAM_IDLE_TIMEOUT_MS`,
+	 * then the legacy `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then 300s.
 	 */
 	streamIdleTimeoutMs?: number;
 	/**
@@ -951,7 +951,7 @@ export interface ResolvedOpenAIResponsesCompat extends ResolvedOpenAISharedCompa
 	 * Rule-owned: hosts that keep generating after a client disconnect so a
 	 * dropped stream can resume via `GET /responses/{id}`. Storage is opt-in
 	 * per request (`storeResponses` stream option, else
-	 * `PI_MUSE_STORE_RESPONSES`); stored runs retain prompts and outputs on the provider.
+	 * `OMSP_MUSE_STORE_RESPONSES`); stored runs retain prompts and outputs on the provider.
 	 */
 	storeResponses: boolean;
 	/**
@@ -1011,8 +1011,8 @@ export type ResolvedAnthropicCompat = Required<
 	thinkingLoopGuard?: AnthropicCompat["thinkingLoopGuard"];
 	/**
 	 * Stream-watchdog idle-timeout fallback in ms for slow reasoning hosts; 0 disables the idle watchdog.
-	 * Undefined defers to `PI_STREAM_IDLE_TIMEOUT_MS`, then the legacy
-	 * `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then 300s.
+	 * Undefined defers to `OMSP_STREAM_IDLE_TIMEOUT_MS`, then the legacy
+	 * `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS` alias, then 300s.
 	 */
 	streamIdleTimeoutMs?: number;
 };
@@ -1216,7 +1216,7 @@ export interface Model<TApi extends Api = Api> {
 	input: ("text" | "image")[];
 	/**
 	 * Decoder family used for image inputs when it has narrower format support
-	 * than OMP's general image pipeline. `stb` local backends reject WebP.
+	 * than OMSP's general image pipeline. `stb` local backends reject WebP.
 	 */
 	imageInputDecoder?: "stb";
 	/**
@@ -1274,7 +1274,7 @@ export interface Model<TApi extends Api = Api> {
 	 * the wire field is suppressed.
 	 *
 	 * Use this for proxies (notably Ollama) that forward to a backend whose true
-	 * output limit OMP cannot discover — sending the wrong value triggers 400s
+	 * output limit OMSP cannot discover — sending the wrong value triggers 400s
 	 * from the upstream provider.
 	 */
 	omitMaxOutputTokens?: boolean;
@@ -1289,11 +1289,11 @@ export interface Model<TApi extends Api = Api> {
 	 * Streaming transport override. When `"pi-native"`, `streamSimple` routes
 	 * the request to the model's `baseUrl` via the auth-gateway's
 	 * `POST /v1/pi/stream` endpoint instead of dispatching the per-API
-	 * provider client. The `baseUrl` must point at an `omp auth-gateway`
+	 * provider client. The `baseUrl` must point at an `omsp auth-gateway`
 	 * (or compatible) host; `headers.Authorization` (or `apiKey` resolved by
 	 * the registry) carries the gateway bearer.
 	 *
-	 * Used by containerized omp installs (e.g. robomp slots) to route every
+	 * Used by containerized omsp installs (e.g. robomp slots) to route every
 	 * LLM call through a sidecar gateway that holds the real provider
 	 * credentials. The model's other metadata (pricing, context window,
 	 * thinking config, …) still resolves locally; only the streaming

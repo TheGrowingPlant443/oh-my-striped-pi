@@ -14,21 +14,25 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, AgentBusyError, type AgentMessage, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import { createMockModel, type MockHandler, type MockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import type { PromptTemplate } from "@oh-my-pi/pi-coding-agent/config/prompt-templates";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { tryRunRpcSkillCommand } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import { cfgMagicKeyword, cfgMagicKeywordsEnabled } from "@oh-my-pi/pi-coding-agent/modes/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm, type CustomMessage, USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { tagImageAttachmentSource } from "@oh-my-pi/pi-tui/prompt/image-source";
-import { removeSyncWithRetries, Snowflake, withTimeout } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, AgentBusyError, type AgentMessage, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel, type MockHandler, type MockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import type { PromptTemplate } from "@oh-my-striped-pi/pi-coding-agent/config/prompt-templates";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { tryRunRpcSkillCommand } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import { cfgMagicKeyword, cfgMagicKeywordsEnabled } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import {
+	convertToLlm,
+	type CustomMessage,
+	USER_INTERRUPT_LABEL,
+} from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { tagImageAttachmentSource } from "@oh-my-striped-pi/pi-tui/prompt/image-source";
+import { removeSyncWithRetries, Snowflake, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import manualContinuePrompt from "../src/prompts/system/manual-continue.md" with { type: "text" };
 
 const TEST_PROMPT_TYPE = "test-custom-prompt";

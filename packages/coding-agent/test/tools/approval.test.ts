@@ -1,6 +1,6 @@
 import { describe, expect, it, spyOn } from "bun:test";
-import { customToolToDefinition } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentTool, ToolApproval } from "@oh-my-pi/pi-agent-core";
+import { customToolToDefinition } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentTool, ToolApproval } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type ApprovalMode,
 	denyError,
@@ -10,9 +10,9 @@ import {
 	resolveApproval,
 	resolveApprovalFromContext,
 	truncateForPrompt,
-} from "@oh-my-pi/pi-coding-agent/tools/approval";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
+import { WriteTool } from "@oh-my-striped-pi/pi-coding-agent/tools/write";
 import { DeferredMCPTool, MCPTool } from "../../src/mcp/tool-bridge";
 import type { MCPServerConnection, MCPToolDefinition } from "../../src/mcp/types";
 import { Settings } from "../../src/config/settings";

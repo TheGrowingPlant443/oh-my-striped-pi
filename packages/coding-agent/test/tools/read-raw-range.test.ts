@@ -2,17 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
-import type { ProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/types";
-import type { ClientBridge } from "@oh-my-pi/pi-coding-agent/session/client-bridge";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { getConflictHistory } from "@oh-my-pi/pi-coding-agent/tools/conflict-detect";
-import { wrapToolWithMetaNotice } from "@oh-my-pi/pi-coding-agent/tools/output-meta";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { formatTruncationMetaNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { DEFAULT_MAX_BYTES } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import { writeArchive } from "@oh-my-pi/pi-utils/ar";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/router";
+import type { ProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/types";
+import type { ClientBridge } from "@oh-my-striped-pi/pi-coding-agent/session/client-bridge";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { getConflictHistory } from "@oh-my-striped-pi/pi-coding-agent/tools/conflict-detect";
+import { wrapToolWithMetaNotice } from "@oh-my-striped-pi/pi-coding-agent/tools/output-meta";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { formatTruncationMetaNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { DEFAULT_MAX_BYTES } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import { writeArchive } from "@oh-my-striped-pi/pi-utils/ar";
 
 function getTextOutput(result: { content: Array<{ type: string; text?: string }> }): string {
 	return result.content

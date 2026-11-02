@@ -1,14 +1,14 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "bun:test";
-import type { AgentToolContext } from "@oh-my-pi/pi-agent-core";
+import type { AgentToolContext } from "@oh-my-striped-pi/pi-agent-core";
 import * as path from "node:path";
 import { inspect } from "node:util";
 import { createContext, runInContext } from "node:vm";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { EvalPreludeDefinition } from "@oh-my-pi/pi-coding-agent/eval/preludes";
-import { disposeAllKernelSessions, executePython } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { computerApproval, createComputerPrelude } from "@oh-my-pi/pi-coding-agent/tools/computer";
-import { isReadOnlyComputerCall, renderComputerCall } from "@oh-my-pi/pi-coding-agent/tools/computer/call";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { EvalPreludeDefinition } from "@oh-my-striped-pi/pi-coding-agent/eval/preludes";
+import { disposeAllKernelSessions, executePython } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { computerApproval, createComputerPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/computer";
+import { isReadOnlyComputerCall, renderComputerCall } from "@oh-my-striped-pi/pi-coding-agent/tools/computer/call";
 import {
 	type ComputerSessionSnapshot,
 	type ComputerWorkerInbound,
@@ -17,7 +17,7 @@ import {
 	ESCAPE_AFTER_CALL_MESSAGE,
 	ESCAPE_STOPPED_MESSAGE,
 	SCREEN_LOCKED_CAPTURE_NOTE,
-} from "@oh-my-pi/pi-coding-agent/tools/computer/protocol";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/computer/protocol";
 import {
 	beginComputerTurnForOwner,
 	type ComputerController,
@@ -27,9 +27,9 @@ import {
 	endComputerTurnForOwner,
 	registerComputerController,
 	resumeComputerUseForOwner,
-} from "@oh-my-pi/pi-coding-agent/tools/computer/supervisor";
-import { ComputerWorkerCore, type NativeDesktopSession } from "@oh-my-pi/pi-coding-agent/tools/computer/worker";
-import * as clipboard from "@oh-my-pi/pi-coding-agent/utils/clipboard";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/computer/supervisor";
+import { ComputerWorkerCore, type NativeDesktopSession } from "@oh-my-striped-pi/pi-coding-agent/tools/computer/worker";
+import * as clipboard from "@oh-my-striped-pi/pi-coding-agent/utils/clipboard";
 import type {
 	ApplicationOpenOptions,
 	AxNode,
@@ -47,9 +47,9 @@ import type {
 	DesktopWindow,
 	HoldOptions as NativeHoldOptions,
 	PointerOptions,
-} from "@oh-my-pi/pi-natives";
+} from "@oh-my-striped-pi/pi-natives";
 
-import { cfgComputerEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgComputerEnabled } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 /** Method name of the last step in a facade call chain, or "" when the chain is malformed. */
 function terminalMethod(chain: unknown): string {
@@ -671,8 +671,8 @@ describe("computer prelude", () => {
 			"clipboard.read": "copied",
 		};
 		const realm = createContext({
-			__omp_log__: (_level: string, value: unknown) => displays.push(value),
-			__omp_prelude__: async (name: unknown, parameters: unknown) => {
+			__omsp_log__: (_level: string, value: unknown) => displays.push(value),
+			__omsp_prelude__: async (name: unknown, parameters: unknown) => {
 				expect(name).toBe("computer");
 				calls.push(parameters);
 				if (parameters === null || typeof parameters !== "object" || !("action" in parameters)) return undefined;
@@ -728,7 +728,7 @@ describe("computer prelude", () => {
 			{
 				action: "run",
 				fn: String(fn),
-				args: [7, { __omp_re: { source: "save", flags: "gi" } }, { __omp_fn: String(argFn) }],
+				args: [7, { __omsp_re: { source: "save", flags: "gi" } }, { __omsp_fn: String(argFn) }],
 				read_only: true,
 				timeout: 5,
 			},
@@ -813,8 +813,8 @@ describe("computer prelude", () => {
 		}));
 		const calls: unknown[] = [];
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: unknown, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: unknown, parameters: unknown) => {
 				calls.push(parameters);
 				return { text: "", details: { value: "ran" } };
 			},
@@ -849,8 +849,8 @@ describe("computer prelude", () => {
 		const prelude = workerPrelude(session, new GatedSession());
 		const context = { session, toolCallId: "parallel-direct-js" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -1013,8 +1013,8 @@ describe("computer prelude", () => {
 		const emitted: unknown[] = [];
 		const context = { session, toolCallId: "zoom-js" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				emitted.push(...result.content);
 				return {
@@ -1049,7 +1049,7 @@ describe("computer prelude", () => {
 				realm,
 			);
 			for (const zoom of zooms) {
-				expect(zoom.path).toMatch(/omp-computer-.*\.png$/);
+				expect(zoom.path).toMatch(/omsp-computer-.*\.png$/);
 				expect(zoom).toMatchObject({
 					width: 128,
 					height: 64,
@@ -1165,8 +1165,8 @@ describe("computer prelude", () => {
 		const prelude = workerPrelude(session, native);
 		const context = { session, toolCallId: "ref-chain-js" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -1214,8 +1214,8 @@ describe("computer prelude", () => {
 		const prelude = workerPrelude(session, native);
 		const context = { session, toolCallId: "element-keys-js" };
 		const realm = createContext({
-			__omp_display__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_display__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -1288,8 +1288,8 @@ describe("computer prelude", () => {
 		const prelude = workerPrelude(session, native);
 		const context = { session, toolCallId: "element-shape-js" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -1471,12 +1471,12 @@ describe("computer worker round trips", () => {
 		const images = result.payload.displays.filter(block => block.type === "image");
 		expect(texts).toHaveLength(1);
 		expect(texts[0]?.text).toMatch(
-			/^screenshot desktop 64×32; coordinateWidth=64 coordinateHeight=32 → .*omp-computer-.*\.png$/,
+			/^screenshot desktop 64×32; coordinateWidth=64 coordinateHeight=32 → .*omsp-computer-.*\.png$/,
 		);
 		expect(images).toEqual([{ type: "image", data: "iVBORw==", mimeType: "image/png", detail: "original" }]);
 		expect(result.payload.screenshots).toHaveLength(1);
 		expect(result.payload.screenshots[0]).toMatchObject({ width: 64, height: 32, target: "desktop" });
-		expect(result.payload.screenshots[0]?.path).toMatch(/omp-computer-.*\.png$/);
+		expect(result.payload.screenshots[0]?.path).toMatch(/omsp-computer-.*\.png$/);
 	});
 
 	it("reports source dimensions when a screenshot is scaled", async () => {
@@ -1493,7 +1493,7 @@ describe("computer worker round trips", () => {
 			expect.objectContaining({
 				type: "text",
 				text: expect.stringMatching(
-					/^screenshot desktop 64×32 \(scaled from 128×64\); coordinateWidth=64 coordinateHeight=32 → .*omp-computer-.*\.png$/,
+					/^screenshot desktop 64×32 \(scaled from 128×64\); coordinateWidth=64 coordinateHeight=32 → .*omsp-computer-.*\.png$/,
 				),
 			}),
 		);
@@ -3076,7 +3076,7 @@ describe("expanded computer APIs", () => {
 			{
 				read: () => {
 					// The stale-addon stub `desktopEscapeStops` falls back to.
-					if (unreadable) throw new Error("@oh-my-pi/pi-natives export `desktopEscapeStops` is missing");
+					if (unreadable) throw new Error("@oh-my-striped-pi/pi-natives export `desktopEscapeStops` is missing");
 					return stops;
 				},
 				forget: () => {},
@@ -3118,7 +3118,7 @@ describe("expanded computer APIs", () => {
 			{
 				read: () => 0,
 				forget: () => {
-					throw new Error("@oh-my-pi/pi-natives export `forgetDesktopEscapeStops` is missing");
+					throw new Error("@oh-my-striped-pi/pi-natives export `forgetDesktopEscapeStops` is missing");
 				},
 			},
 		);
@@ -3134,8 +3134,8 @@ describe("expanded computer APIs", () => {
 		const context = { session, toolCallId: "expanded-js" };
 		const images: unknown[] = [];
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				images.push(...result.content.filter(block => block.type === "image"));
 				return { details: result.details };
@@ -3245,8 +3245,8 @@ describe("expanded computer APIs", () => {
 		const prelude = workerPrelude(session, native);
 		const context = { session, toolCallId: "menu-path-js" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -3397,8 +3397,8 @@ describe("expanded computer APIs", () => {
 		const prelude = workerPrelude(session, native);
 		const context = { session, toolCallId: "argument-facade" };
 		const realm = createContext({
-			__omp_log__: () => {},
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: () => {},
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				return { text: "", details: result.details };
 			},
@@ -3427,8 +3427,8 @@ describe("expanded computer APIs", () => {
 		const context = { session, toolCallId: "observe-once-js" };
 		const printed: string[] = [];
 		const realm = createContext({
-			__omp_log__: (_level: string, text: string) => printed.push(text),
-			__omp_prelude__: async (_name: string, parameters: unknown) => {
+			__omsp_log__: (_level: string, text: string) => printed.push(text),
+			__omsp_prelude__: async (_name: string, parameters: unknown) => {
 				const result = await prelude.invoke(parameters, context);
 				const text = result.content.flatMap(block => (block.type === "text" ? [block.text] : [])).join("\n");
 				return { text, details: result.details };

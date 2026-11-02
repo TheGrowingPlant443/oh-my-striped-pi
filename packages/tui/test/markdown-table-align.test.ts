@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { stripVTControlCharacters } from "node:util";
-import { Markdown } from "@oh-my-pi/pi-tui/components/markdown";
+import { Markdown } from "@oh-my-striped-pi/pi-tui/components/markdown";
 import { defaultMarkdownTheme } from "./test-themes.js";
 
 // GFM alignment markers (`:---`, `---:`, `:---:`) tell the renderer where each

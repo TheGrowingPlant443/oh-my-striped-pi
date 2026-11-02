@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "bun:test";
-import type { ToolCall } from "@oh-my-pi/pi-ai";
-import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
-import { TtsrManager, type TtsrMatchContext } from "@oh-my-pi/pi-coding-agent/export/ttsr";
-import { type TtsrTool, TtsrToolInspector } from "@oh-my-pi/pi-coding-agent/session/ttsr-outputs";
+import type { ToolCall } from "@oh-my-striped-pi/pi-ai";
+import type { Rule } from "@oh-my-striped-pi/pi-coding-agent/capability/rule";
+import { TtsrManager, type TtsrMatchContext } from "@oh-my-striped-pi/pi-coding-agent/export/ttsr";
+import { type TtsrTool, TtsrToolInspector } from "@oh-my-striped-pi/pi-coding-agent/session/ttsr-outputs";
 
 function rule(name: string, condition: string): Rule {
 	return {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { Usage } from "@oh-my-pi/pi-ai";
-import { isSyntheticToolResultMessage } from "@oh-my-pi/pi-agent-core";
+import type { Usage } from "@oh-my-striped-pi/pi-ai";
+import { isSyntheticToolResultMessage } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	collectPendingToolCalls,
 	createInterruptedToolResults,
@@ -10,19 +10,25 @@ import {
 	describePendingToolCalls,
 	SESSION_EXIT_CUSTOM_TYPE,
 	TOOL_EXECUTION_START_CUSTOM_TYPE,
-} from "@oh-my-pi/pi-coding-agent/session/exit-diagnostics";
+} from "@oh-my-striped-pi/pi-coding-agent/session/exit-diagnostics";
 import {
 	CURRENT_SESSION_VERSION,
 	type SessionEntry,
 	type SessionHeader,
 	type SessionMessageEntry,
-} from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { loadEntriesFromFile } from "@oh-my-pi/pi-coding-agent/session/session-loader";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { FileSessionStorage, MemorySessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { getTerminalId } from "@oh-my-pi/pi-tui";
-import { isTaskToolDetails, type TaskToolDetails } from "@oh-my-pi/pi-tui/tools/task";
-import { getAgentDir, getTerminalSessionsDir, removeWithRetries, setAgentDir, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { loadEntriesFromFile } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { FileSessionStorage, MemorySessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { getTerminalId } from "@oh-my-striped-pi/pi-tui";
+import { isTaskToolDetails, type TaskToolDetails } from "@oh-my-striped-pi/pi-tui/tools/task";
+import {
+	getAgentDir,
+	getTerminalSessionsDir,
+	removeWithRetries,
+	setAgentDir,
+	TempDir,
+} from "@oh-my-striped-pi/pi-utils";
 
 interface JsonlMessageEntry {
 	type: "message";
@@ -68,11 +74,11 @@ async function loadHistory(file: string): Promise<SessionEntry[]> {
 
 describe("SessionManager.forkFrom", () => {
 	it("suppresses terminal breadcrumbs while preserving source history under a new parented session", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-");
 		const previousAgentDir = getAgentDir();
 		const previousTermSessionId = process.env.TERM_SESSION_ID;
 		setAgentDir(path.join(tempDir.path(), "agent"));
-		process.env.TERM_SESSION_ID = "omp-fork-test";
+		process.env.TERM_SESSION_ID = "omsp-fork-test";
 		try {
 			const cwd = path.join(tempDir.path(), "project");
 			const sessionDir = path.join(tempDir.path(), "sessions");
@@ -132,7 +138,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("copies source artifacts recursively into the fork by default", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-artifacts-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-artifacts-");
 		const { cwd, sessionDir, sourceFile, sourceArtifactsDir } = await createSessionWithArtifacts(tempDir.path());
 
 		const forked = await SessionManager.forkFrom(sourceFile, cwd, sessionDir, undefined, {
@@ -148,7 +154,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("forks a seance in place: source untouched, history kept, startup contracts inert, artifacts not copied", async () => {
-		using tempDir = TempDir.createSync("@omp-session-seance-fork-");
+		using tempDir = TempDir.createSync("@omsp-session-seance-fork-");
 		const { cwd, sourceFile, sourceArtifactsDir } = await createSessionWithArtifacts(tempDir.path());
 		const timestamp = new Date().toISOString();
 		const sourceHeader: SessionHeader = {
@@ -226,7 +232,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("does not copy artifacts when the caller opts out", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-no-artifacts-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-no-artifacts-");
 		const { cwd, sessionDir, sourceFile } = await createSessionWithArtifacts(tempDir.path());
 
 		const forked = await SessionManager.forkFrom(sourceFile, cwd, sessionDir, undefined, {
@@ -241,7 +247,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("does not treat an extensionless source's parent directory as artifacts", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-extensionless-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-extensionless-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		const forkDir = path.join(tempDir.path(), "forks");
@@ -270,7 +276,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("zeroes inherited cost while preserving token counts only when reset is requested", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-cost-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-cost-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });
@@ -594,7 +600,7 @@ describe("SessionManager.forkFrom", () => {
 		{ name: "memory", createStorage: () => new MemorySessionStorage(), padding: "" },
 	]) {
 		it(`keeps independently loaded ${name} entries unchanged when the fork migrates and branches`, async () => {
-			using tempDir = TempDir.createSync("@omp-session-fork-ownership-");
+			using tempDir = TempDir.createSync("@omsp-session-fork-ownership-");
 			const cwd = tempDir.path();
 			const sessionDir = path.join(cwd, "sessions");
 			const sourceFile = path.join(sessionDir, "source.jsonl");
@@ -649,7 +655,7 @@ describe("SessionManager.forkFrom", () => {
 	}
 
 	it("pairs an unresolved tool call with an unknown-outcome result only when repair is requested", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-repair-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-repair-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });
@@ -728,7 +734,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("leaves an exited source's interrupted tail to resume recovery", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-exited-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-exited-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });
@@ -781,12 +787,12 @@ describe("SessionManager.forkFrom", () => {
 		const [result] = createInterruptedToolResults(branch);
 		expect(result?.toolCallId).toBe("toolu_crashed");
 		expect(
-			result?.content.some(block => block.type === "text" && block.text.includes("Previous OMP process exited")),
+			result?.content.some(block => block.type === "text" && block.text.includes("Previous OMSP process exited")),
 		).toBe(true);
 	});
 
 	it("retains the length-stop guard only when a call has no start marker", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-length-repair-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-length-repair-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });
@@ -898,7 +904,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("repairs only the active branch when sibling paths contain assistants and results", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-branch-repair-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-branch-repair-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });
@@ -1009,7 +1015,7 @@ describe("SessionManager.forkFrom", () => {
 	});
 
 	it("leaves an already-terminal tail with a completed tool call untouched when repair is requested", async () => {
-		using tempDir = TempDir.createSync("@omp-session-fork-terminal-");
+		using tempDir = TempDir.createSync("@omsp-session-fork-terminal-");
 		const cwd = path.join(tempDir.path(), "project");
 		const sessionDir = path.join(tempDir.path(), "sessions");
 		await fs.mkdir(sessionDir, { recursive: true });

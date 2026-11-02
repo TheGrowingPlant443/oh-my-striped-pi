@@ -1,5 +1,10 @@
-import { sanitizeText } from "@oh-my-pi/pi-utils";
-import { replaceTabs, shortenPath, TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-pi/pi-tui/render/render-utils";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import {
+	replaceTabs,
+	shortenPath,
+	TRUNCATE_LENGTHS,
+	truncateToWidth,
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import type { SessionContinuation } from "../session/session-listing";
 import type { SessionPersistenceNotice } from "../session/session-manager";
 
@@ -36,7 +41,7 @@ export function formatPersistenceNotice(notice: SessionPersistenceNotice): strin
 	let message: string;
 	switch (notice.reason) {
 		case "open-elsewhere":
-			message = `Session ${from} is open for writing in another omp process, so this session now saves to ${to} instead of mixing its entries into that file.`;
+			message = `Session ${from} is open for writing in another omsp process, so this session now saves to ${to} instead of mixing its entries into that file.`;
 			break;
 		case "replaced":
 			message = `Session ${from} changed on disk and no longer reads as this session; it is left untouched and this session now saves to ${to}.`;

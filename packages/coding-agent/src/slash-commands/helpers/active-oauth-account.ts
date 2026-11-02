@@ -1,4 +1,4 @@
-import type { UsageLimit, UsageReport } from "@oh-my-pi/pi-ai";
+import type { UsageLimit, UsageReport } from "@oh-my-striped-pi/pi-ai";
 import type { OAuthAccountIdentity } from "../../session/auth-storage";
 
 /** OAuth identity a usage report is attributed to, from its metadata or its limits' scopes. */

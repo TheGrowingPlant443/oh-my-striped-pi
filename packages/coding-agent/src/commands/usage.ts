@@ -2,7 +2,7 @@
  * Show provider usage limits for every authenticated account.
  */
 
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
 import { usageHelp as commandHelp } from "../cli/command-help";
 import { runUsageCommand } from "../cli/usage-cli";
 
@@ -43,15 +43,15 @@ export default class Usage extends Command {
 	};
 
 	static examples = [
-		"# Detailed per-account usage breakdown across all providers\n  omp usage",
-		"# Only GitHub Copilot accounts\n  omp usage --provider github-copilot",
-		"# Redact account identifiers for screenshots\n  omp usage --redact",
-		"# Machine-readable output\n  omp usage --json",
-		"# Usage-limit trend over the last 30 days\n  omp usage --history --days 30",
-		"# Per-client token burn (which machine/app spent what) over the last 30 days\n  omp usage clients --days 30",
-		"# OAuth identity keys for task.agentAccountPools (no tokens)\n  omp usage accounts",
-		"# Invalidate cached usage reports for all providers\n  omp usage invalidate",
-		"# Invalidate cached usage reports for GitHub Copilot\n  omp usage invalidate --provider github-copilot",
+		"# Detailed per-account usage breakdown across all providers\n  omsp usage",
+		"# Only GitHub Copilot accounts\n  omsp usage --provider github-copilot",
+		"# Redact account identifiers for screenshots\n  omsp usage --redact",
+		"# Machine-readable output\n  omsp usage --json",
+		"# Usage-limit trend over the last 30 days\n  omsp usage --history --days 30",
+		"# Per-client token burn (which machine/app spent what) over the last 30 days\n  omsp usage clients --days 30",
+		"# OAuth identity keys for task.agentAccountPools (no tokens)\n  omsp usage accounts",
+		"# Invalidate cached usage reports for all providers\n  omsp usage invalidate",
+		"# Invalidate cached usage reports for GitHub Copilot\n  omsp usage invalidate --provider github-copilot",
 	];
 
 	async run(): Promise<void> {

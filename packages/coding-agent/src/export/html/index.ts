@@ -1,9 +1,9 @@
 import * as path from "node:path";
-import { buildSessionTraceFromSnapshots } from "@oh-my-pi/omp-stats/trace";
-import type { SessionTrace } from "@oh-my-pi/omp-stats/types";
-import type { AgentState } from "@oh-my-pi/pi-agent-core";
-import { APP_NAME, isEnoent } from "@oh-my-pi/pi-utils";
-import { getResolvedThemeColors, getThemeExportColors } from "@oh-my-pi/pi-tui/theme";
+import { buildSessionTraceFromSnapshots } from "@oh-my-striped-pi/omsp-stats/trace";
+import type { SessionTrace } from "@oh-my-striped-pi/omsp-stats/types";
+import type { AgentState } from "@oh-my-striped-pi/pi-agent-core";
+import { APP_NAME, isEnoent } from "@oh-my-striped-pi/pi-utils";
+import { getResolvedThemeColors, getThemeExportColors } from "@oh-my-striped-pi/pi-tui/theme";
 import type { SessionEntry, SessionHeader } from "../../session/session-entries";
 import { SessionManager } from "../../session/session-manager";
 import { collectSubSessions, type SubSession } from "../../session/sub-sessions";

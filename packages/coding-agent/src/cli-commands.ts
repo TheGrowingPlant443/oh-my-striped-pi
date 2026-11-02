@@ -8,7 +8,7 @@
  * `launch` — see #1496 for the original "args silently leak to the LLM"
  * regression that motivated the split.
  */
-import type { CommandEntry } from "@oh-my-pi/pi-utils/cli";
+import type { CommandEntry } from "@oh-my-striped-pi/pi-utils/cli";
 import * as commandHelp from "./cli/command-help";
 import {
 	EXTENSION_SHADOWABLE_STRING_FLAGS,
@@ -293,35 +293,35 @@ export function isSubcommand(first: string | undefined): boolean {
 }
 
 // Documented-looking plugin/marketplace verbs that are NOT registered top-level
-// commands. Without a guard `resolveCliArgv` rewrites e.g. `omp marketplace add
-// xyz` to `omp launch marketplace add xyz`, silently forwarding the argv to the
+// commands. Without a guard `resolveCliArgv` rewrites e.g. `omsp marketplace add
+// xyz` to `omsp launch marketplace add xyz`, silently forwarding the argv to the
 // model as a prompt instead of managing plugins (#4845; same class as the
 // `list`/`remove` leak fixed in #2935 and the `install` leak in #1496/#1498).
-// The real commands live under `omp plugin <action>`; each entry maps a verb to
+// The real commands live under `omsp plugin <action>`; each entry maps a verb to
 // a hint pointing there. See {@link reservedTopLevelWordMessage} for when a hint
 // fires vs. when the argv still falls through to `launch`.
 const RESERVED_TOP_LEVEL_WORDS: Record<string, string> = {
 	extensions:
-		'`omp extensions` is not a management command. Use `omp plugin list` / `omp plugin install`, or run `omp launch extensions` if you meant to send "extensions" as a prompt.',
-	list: '`omp list` is not a top-level command. Use `omp plugin list` to list installed plugins, or run `omp launch list` if you meant to send "list" as a prompt.',
+		'`omsp extensions` is not a management command. Use `omsp plugin list` / `omsp plugin install`, or run `omsp launch extensions` if you meant to send "extensions" as a prompt.',
+	list: '`omsp list` is not a top-level command. Use `omsp plugin list` to list installed plugins, or run `omsp launch list` if you meant to send "list" as a prompt.',
 	remove:
-		'`omp remove` is not a top-level command. Use `omp plugin uninstall <name>` to remove a plugin, or run `omp launch remove` if you meant to send "remove" as a prompt.',
+		'`omsp remove` is not a top-level command. Use `omsp plugin uninstall <name>` to remove a plugin, or run `omsp launch remove` if you meant to send "remove" as a prompt.',
 	uninstall:
-		'`omp uninstall` is not a top-level command. Use `omp plugin uninstall <name@marketplace>` to remove a plugin, or run `omp launch uninstall` if you meant to send "uninstall" as a prompt.',
+		'`omsp uninstall` is not a top-level command. Use `omsp plugin uninstall <name@marketplace>` to remove a plugin, or run `omsp launch uninstall` if you meant to send "uninstall" as a prompt.',
 	marketplace:
-		'`omp marketplace` is not a top-level command. Use `omp plugin marketplace <add|remove|update|list>` to manage marketplaces, or run `omp launch marketplace` if you meant to send "marketplace" as a prompt.',
+		'`omsp marketplace` is not a top-level command. Use `omsp plugin marketplace <add|remove|update|list>` to manage marketplaces, or run `omsp launch marketplace` if you meant to send "marketplace" as a prompt.',
 	discover:
-		'`omp discover` is not a top-level command. Use `omp plugin discover [marketplace]` to browse available plugins, or run `omp launch discover` if you meant to send "discover" as a prompt.',
+		'`omsp discover` is not a top-level command. Use `omsp plugin discover [marketplace]` to browse available plugins, or run `omsp launch discover` if you meant to send "discover" as a prompt.',
 	upgrade:
-		'`omp upgrade` is not a top-level command. Use `omp plugin upgrade [name]` to upgrade plugins, or run `omp launch upgrade` if you meant to send "upgrade" as a prompt.',
+		'`omsp upgrade` is not a top-level command. Use `omsp plugin upgrade [name]` to upgrade plugins, or run `omsp launch upgrade` if you meant to send "upgrade" as a prompt.',
 	enable:
-		'`omp enable` is not a top-level command. Use `omp plugin enable <name@marketplace>` to enable a plugin, or run `omp launch enable` if you meant to send "enable" as a prompt.',
+		'`omsp enable` is not a top-level command. Use `omsp plugin enable <name@marketplace>` to enable a plugin, or run `omsp launch enable` if you meant to send "enable" as a prompt.',
 	disable:
-		'`omp disable` is not a top-level command. Use `omp plugin disable <name@marketplace>` to disable a plugin, or run `omp launch disable` if you meant to send "disable" as a prompt.',
+		'`omsp disable` is not a top-level command. Use `omsp plugin disable <name@marketplace>` to disable a plugin, or run `omsp launch disable` if you meant to send "disable" as a prompt.',
 };
 
-// Sub-actions that make `omp marketplace <sub>` unambiguously a management
-// command even when multi-word (the reporter's `omp marketplace add xyz`,
+// Sub-actions that make `omsp marketplace <sub>` unambiguously a management
+// command even when multi-word (the reporter's `omsp marketplace add xyz`,
 // #4845). Mirrors the switch in `handleMarketplace` (cli/plugin-cli.ts).
 const MARKETPLACE_SUBCOMMANDS: Record<string, true> = { add: true, remove: true, rm: true, update: true, list: true };
 
@@ -329,11 +329,11 @@ const MARKETPLACE_SUBCOMMANDS: Record<string, true> = { add: true, remove: true,
  * Hint for a reserved plugin/marketplace verb used as a top-level command, or
  * `undefined` when the argv should fall through to `launch`.
  *
- * A bare verb (`omp marketplace`) always hints. A multi-word invocation only
+ * A bare verb (`omsp marketplace`) always hints. A multi-word invocation only
  * hints when the arguments follow the documented plugin grammar — a marketplace
- * sub-action (`omp marketplace add …`) or a `name@marketplace` plugin id
- * (`omp uninstall foo@bar`) — so genuine prompts that merely begin with one of
- * these words (`omp list all my files`, `omp upgrade the deps`) still launch.
+ * sub-action (`omsp marketplace add …`) or a `name@marketplace` plugin id
+ * (`omsp uninstall foo@bar`) — so genuine prompts that merely begin with one of
+ * these words (`omsp list all my files`, `omsp upgrade the deps`) still launch.
  *
  * Flags (`-…`) and `@file` arguments in the verb slot are never management
  * commands; those fall through to the default `launch` command.
@@ -422,11 +422,11 @@ export function resolveCliArgv(argv: string[]): ResolvedCliArgv {
 	}
 	if (isSubcommand(first)) return { argv };
 	// A subcommand can hide behind leading global option flags
-	// (`omp --approval-mode=yolo acp`). `run` dispatches strictly on argv[0], so
+	// (`omsp --approval-mode=yolo acp`). `run` dispatches strictly on argv[0], so
 	// hoist the subcommand to the front. Launch-shaped commands share the launch
 	// flag surface, so their leading flags are forwarded and applied; every other
 	// subcommand parses only its own flags, so launch-global flags placed before
-	// it (`omp --cwd <dir> update`) are stripped rather than forwarded into a
+	// it (`omsp --cwd <dir> update`) are stripped rather than forwarded into a
 	// crash (#8891). Genuine launch prompts (no trailing subcommand) are untouched.
 	const subIndex = leadingSubcommandIndex(argv);
 	if (subIndex >= 0) {

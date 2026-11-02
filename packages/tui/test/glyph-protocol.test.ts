@@ -7,10 +7,10 @@ import {
 	GLYPH_CONFIRMATION_CODEPOINT,
 	isPrivateUseCodepoint,
 	parseGlyphProtocolReply,
-} from "@oh-my-pi/pi-tui/glyph-protocol";
-import { ProcessTerminal } from "@oh-my-pi/pi-tui/terminal";
-import { setTerminalGlyphProtocol, TERMINAL } from "@oh-my-pi/pi-tui/terminal-capabilities";
-import { setTerminalHeadless } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui/glyph-protocol";
+import { ProcessTerminal } from "@oh-my-striped-pi/pi-tui/terminal";
+import { setTerminalGlyphProtocol, TERMINAL } from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
+import { setTerminalHeadless } from "@oh-my-striped-pi/pi-utils";
 
 const SUPPORT_QUERY = "\x1b_25a1;s\x1b\\";
 const DA1_REPLY = "\x1b[?1;2c";
@@ -95,8 +95,8 @@ describe("glyph bundle", () => {
 const stdinIsTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const stdoutIsTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
 const stdinSetRawModeDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "setRawMode");
-const originalProbeEnv = Bun.env.PI_TUI_GLYPH_PROTOCOL_PROBE;
-const originalKillSwitch = Bun.env.PI_NO_GLYPH_PROTOCOL;
+const originalProbeEnv = Bun.env.OMSP_TUI_GLYPH_PROTOCOL_PROBE;
+const originalKillSwitch = Bun.env.OMSP_NO_GLYPH_PROTOCOL;
 const originalTmux = Bun.env.TMUX;
 
 function restoreProperty(target: object, key: string, descriptor: PropertyDescriptor | undefined): void {
@@ -147,8 +147,8 @@ describe("glyph protocol probe", () => {
 	beforeEach(() => {
 		setTerminalGlyphProtocol(false);
 		previousHeadless = setTerminalHeadless(false);
-		Bun.env.PI_TUI_GLYPH_PROTOCOL_PROBE = "1";
-		delete Bun.env.PI_NO_GLYPH_PROTOCOL;
+		Bun.env.OMSP_TUI_GLYPH_PROTOCOL_PROBE = "1";
+		delete Bun.env.OMSP_NO_GLYPH_PROTOCOL;
 		delete Bun.env.TMUX;
 	});
 
@@ -156,8 +156,8 @@ describe("glyph protocol probe", () => {
 		vi.restoreAllMocks();
 		setTerminalHeadless(previousHeadless);
 		setTerminalGlyphProtocol(false);
-		restoreEnv("PI_TUI_GLYPH_PROTOCOL_PROBE", originalProbeEnv);
-		restoreEnv("PI_NO_GLYPH_PROTOCOL", originalKillSwitch);
+		restoreEnv("OMSP_TUI_GLYPH_PROTOCOL_PROBE", originalProbeEnv);
+		restoreEnv("OMSP_NO_GLYPH_PROTOCOL", originalKillSwitch);
 		restoreEnv("TMUX", originalTmux);
 		restoreProperty(process.stdin, "isTTY", stdinIsTtyDescriptor);
 		restoreProperty(process.stdout, "isTTY", stdoutIsTtyDescriptor);
@@ -289,7 +289,7 @@ describe("glyph protocol probe", () => {
 		}
 
 		delete Bun.env.TMUX;
-		Bun.env.PI_NO_GLYPH_PROTOCOL = "1";
+		Bun.env.OMSP_NO_GLYPH_PROTOCOL = "1";
 		const killed = setupProcessTerminal();
 		try {
 			expect(killed.writes.some(w => w.includes(SUPPORT_QUERY))).toBe(false);

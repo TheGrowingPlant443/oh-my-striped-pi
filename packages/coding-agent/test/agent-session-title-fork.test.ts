@@ -1,31 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import * as ai from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { USER_INTERRUPT_LABEL } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TodoTool, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { USER_INTERRUPT_LABEL } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TodoTool, type ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 
 let session: AgentSession | undefined;
 let authStorage: AuthStorage | undefined;
-// Full-suite files that boot main() in ACP/RPC mode leave PI_NO_TITLE=1 behind,
+// Full-suite files that boot main() in ACP/RPC mode leave OMSP_NO_TITLE=1 behind,
 // which gates titling off.
 let previousNoTitle: string | undefined;
 
 beforeEach(() => {
-	previousNoTitle = Bun.env.PI_NO_TITLE;
-	delete Bun.env.PI_NO_TITLE;
+	previousNoTitle = Bun.env.OMSP_NO_TITLE;
+	delete Bun.env.OMSP_NO_TITLE;
 });
 
 afterEach(async () => {
-	if (previousNoTitle === undefined) delete Bun.env.PI_NO_TITLE;
-	else Bun.env.PI_NO_TITLE = previousNoTitle;
+	if (previousNoTitle === undefined) delete Bun.env.OMSP_NO_TITLE;
+	else Bun.env.OMSP_NO_TITLE = previousNoTitle;
 	vi.restoreAllMocks();
 	await session?.dispose();
 	authStorage?.close();

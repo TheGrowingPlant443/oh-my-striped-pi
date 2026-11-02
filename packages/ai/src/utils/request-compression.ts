@@ -4,8 +4,8 @@ import {
 	type RequestBodyEncoding,
 	type RequestCompressionPolicy,
 	resolveRequestCompression,
-} from "@oh-my-pi/pi-catalog/compat/request-compression";
-import { $flag, logger } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-catalog/compat/request-compression";
+import { $flag, logger } from "@oh-my-striped-pi/pi-utils";
 import type { FetchImpl, Model } from "../types";
 
 const gzip = promisify(zlib.gzip);
@@ -124,7 +124,7 @@ async function suspectEncodingRejection(
  *
  * Install it beneath any body rewriter or signer (e.g. the cch attestation
  * patch): those must see the uncompressed bytes. Other hosts, small bodies,
- * bodies that already carry `Content-Encoding`, and `PI_REQUEST_COMPRESSION=0`
+ * bodies that already carry `Content-Encoding`, and `OMSP_REQUEST_COMPRESSION=0`
  * pass through untouched. A possible rejection — the host's decode error, or a
  * non-JSON 400/403/415 from a proxy in front of it — is resent uncompressed
  * once; only when that resend succeeds is the encoding latched off for the
@@ -142,7 +142,7 @@ export function wrapFetchForRequestCompression(base: FetchImpl, model: Model): F
 			// UTF-16 length undercounts UTF-8 bytes — fine for a size floor.
 			(typeof body === "string" ? body.length : body.byteLength) < MIN_COMPRESSED_BODY_BYTES ||
 			hasContentEncoding(init?.headers) ||
-			!$flag("PI_REQUEST_COMPRESSION", true)
+			!$flag("OMSP_REQUEST_COMPRESSION", true)
 		) {
 			return base(input, init);
 		}

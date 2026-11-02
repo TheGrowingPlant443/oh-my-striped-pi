@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
-import { ShellFsFileType } from "@oh-my-pi/pi-natives";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { ShellFsFileType } from "@oh-my-striped-pi/pi-natives";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import * as capability from "../../src/capability";
 import type { CapabilityResult } from "../../src/capability/types";
 import { Settings } from "../../src/config/settings";
@@ -65,7 +65,7 @@ describe("JSON selectors over SSH resources", () => {
 		expect(textOf(result)).toContain("second");
 		expect(textOf(result)).not.toContain("first");
 		expect(textOf(result)).not.toContain("third");
-		expect(JSON.stringify(result)).not.toContain("omp-read-json-");
+		expect(JSON.stringify(result)).not.toContain("omsp-read-json-");
 	});
 
 	it("decodes literal %3F in a remote filename without passing filter text to SSH", async () => {
@@ -112,7 +112,7 @@ describe("JSON selectors over SSH resources", () => {
 			bytes: new TextEncoder().encode('{"ok":'),
 			truncated: false,
 		});
-		await using scratch = await TempDir.create("@omp-json-error-test-");
+		await using scratch = await TempDir.create("@omsp-json-error-test-");
 		vi.spyOn(TempDir, "create").mockResolvedValue(scratch);
 		await expect(tool.execute("ssh-invalid-json", { path: "ssh://HOST/tmp/a.json?q=." })).rejects.toThrow(
 			/Failed to execute JSON query:.*failed to parse/i,

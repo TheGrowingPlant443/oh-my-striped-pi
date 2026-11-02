@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { resolveBrowserKind, resolveTernKind, type TernKind } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { resolveBrowserKind, resolveTernKind, type TernKind } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 
 const TERN_ENV = { TERN_PANE_SOCKET: "/tmp/tern.sock", TERN_PANE: "42" };
 const TERN: TernKind = { kind: "tern", socketPath: "/tmp/tern.sock", pane: 42 };
@@ -23,10 +23,10 @@ describe("resolveTernKind", () => {
 		expect(resolveTernKind(null, { ...TERN_ENV, TERN_PANE: "pane-1" })).toBeNull();
 	});
 
-	it("lets PI_BROWSER_TERN override the setting in both directions", () => {
-		expect(resolveTernKind({ settingEnabled: true }, { ...TERN_ENV, PI_BROWSER_TERN: "0" })).toBeNull();
+	it("lets OMSP_BROWSER_TERN override the setting in both directions", () => {
+		expect(resolveTernKind({ settingEnabled: true }, { ...TERN_ENV, OMSP_BROWSER_TERN: "0" })).toBeNull();
 		expect(resolveTernKind({ settingEnabled: false }, TERN_ENV)).toBeNull();
-		expect(resolveTernKind({ settingEnabled: false }, { ...TERN_ENV, PI_BROWSER_TERN: "1" })).toEqual(TERN);
+		expect(resolveTernKind({ settingEnabled: false }, { ...TERN_ENV, OMSP_BROWSER_TERN: "1" })).toEqual(TERN);
 	});
 });
 

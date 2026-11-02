@@ -41,7 +41,7 @@ const OPTION_STATE: u32 = 0x08;
 const KEY_ACTION_DOWN: u16 = 0;
 
 /// Writes the current layout's keyboard type and `uchr` data to a file.
-const HELPER: &[u8] = include_bytes!(env!("OMP_KEYMAP_DARWIN_HELPER"));
+const HELPER: &[u8] = include_bytes!(env!("OMSP_KEYMAP_DARWIN_HELPER"));
 /// The helper's exit status for a layout without Unicode key layout data.
 const NO_LAYOUT_DATA: i32 = 3;
 const HELPER_TIMEOUT: Duration = Duration::from_secs(5);
@@ -168,8 +168,8 @@ fn current_layout() -> CoreResult<Option<(u32, Vec<u32>)>> {
 	let failed = |error: &dyn std::fmt::Display| {
 		DesktopError::input_failed(format!("cannot read the keyboard layout: {error}"))
 	};
-	let directory = HelperDirectory::create("omp-keymap")?;
-	let executable = directory.write("omp-keymap-helper", HELPER, 0o700)?;
+	let directory = HelperDirectory::create("omsp-keymap")?;
+	let executable = directory.write("omsp-keymap-helper", HELPER, 0o700)?;
 	let output = directory.write("layout", &[], 0o600)?;
 	let mut child = Command::new(executable)
 		.arg(&output)

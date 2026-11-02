@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
-import type { HighlightStream } from "@oh-my-pi/pi-natives";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import type { HighlightStream } from "@oh-my-striped-pi/pi-natives";
 import type { Component } from "../tui";
 import { fencedCode } from "../components/markdown";
 import { Text } from "../components/text";
@@ -34,7 +34,7 @@ import {
 	type ProcWriteAction,
 	type ProcWriteDetails,
 } from "./proc-render";
-import type { TspTone } from "@oh-my-pi/pi-wire";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
 import { code, compact, md, node, span } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { diagnosticsBadge, diagnosticsSection, displayPath, errorText, fileHref, resultText } from "./native-view";
@@ -156,7 +156,7 @@ function writeFigure(
 function describeFigure(figure: ToolFigure | undefined): NativeNode | undefined {
 	if (!figure || (figure.lang === "mermaid" && !figure.closed)) return undefined;
 	const text = fencedCode(figure.lang, figure.source, { open: !figure.closed });
-	return { ...md(text, { role: "omp.tool.write.figure", stream: !figure.closed }), key: "figure" };
+	return { ...md(text, { role: "omsp.tool.write.figure", stream: !figure.closed }), key: "figure" };
 }
 
 /**

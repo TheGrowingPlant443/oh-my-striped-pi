@@ -6,14 +6,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { readArchiveEntries } from "@oh-my-pi/pi-utils/ar";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { readArchiveEntries } from "@oh-my-striped-pi/pi-utils/ar";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 import { getTestModel } from "../helpers/model-fixtures";
 
@@ -67,7 +67,7 @@ describe("AgentSession.dumpSessionArchiveToTmpDir", () => {
 	}
 
 	beforeEach(() => {
-		tempDir = TempDir.createSync("@omp-dump-all-");
+		tempDir = TempDir.createSync("@omsp-dump-all-");
 		session = createSession("main prompt");
 	});
 

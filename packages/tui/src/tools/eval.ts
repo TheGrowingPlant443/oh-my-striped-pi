@@ -1,6 +1,6 @@
 import type { Component } from "../index";
 import { Markdown, Text } from "../index";
-import { sanitizeText } from "@oh-my-pi/pi-utils";
+import { sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import type {
 	NativeToolHead,
 	NativeToolView,
@@ -8,7 +8,7 @@ import type {
 	RenderResultOptions,
 	ToolRenderer,
 } from "./renderer";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { code, compact, keyed, md, node, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { plainText } from "../native/spans";
@@ -50,7 +50,7 @@ import {
 	truncateToWidth,
 	wrapBrackets,
 } from "../render/render-utils";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import type { OutputMeta } from "./output-meta";
 import { type ConfiguredThinkingLevel, expandKeyHint } from "../render/render-utils";
 
@@ -725,16 +725,16 @@ function describeStatusEvent(event: EvalStatusEvent, expanded: boolean): NativeN
 		}
 	}
 	if (mcpProgress) spans.push(span(` ${formatMCPProgress(mcpProgress, STATUS_VALUE_WIDTH)}`));
-	const line = text(spans, { truncate: "end", role: "omp.tool.eval.status" });
+	const line = text(spans, { truncate: "end", role: "omsp.tool.eval.status" });
 	const preview = expanded ? eventString(event.preview)?.trimEnd() : undefined;
 	if (!preview) return line;
 	const head = cappedHeadLines(sanitizeDisplayLines(preview), PREVIEW_LIMITS.OUTPUT_EXPANDED).lines;
 	const path = eventString(event.path);
-	return node("col", { role: "omp.tool.eval.status.event", gap: "none" }, [
+	return node("col", { role: "omsp.tool.eval.status.event", gap: "none" }, [
 		keyed(line, "line"),
 		keyed(
 			code(head.join("\n"), {
-				role: "omp.tool.eval.status.preview",
+				role: "omsp.tool.eval.status.preview",
 				path: path ? splitPathAndSel(path).path : undefined,
 				wrap: false,
 				preview: { lines: PREVIEW_LIMITS.COLLAPSED_LINES },
@@ -810,7 +810,7 @@ function evalTableNode(view: Extract<EvalView, { kind: "table" }>, key: string):
 				id: `r${r}`,
 				cells: Object.fromEntries(cells.map((cell, c) => [`c${c}`, cell])),
 			})),
-			role: "omp.tool.eval.table",
+			role: "omsp.tool.eval.table",
 		},
 		undefined,
 		key,
@@ -833,7 +833,7 @@ function evalOutputNodes(
 	return splitEvalOutput(output, views).map((part, i) => {
 		if (part.kind === "text") {
 			return runOutput(part.text, {
-				role: "omp.tool.eval.output",
+				role: "omsp.tool.eval.output",
 				previewLines,
 				key: i === 0 ? "output" : `output-${i}`,
 			});
@@ -851,7 +851,7 @@ function evalOutputNodes(
 const RUN_STATUS_TAIL = 8;
 
 /**
- * A status log's events (`omp.run.status`): all kept ones when expanded, else
+ * A status log's events (`omsp.run.status`): all kept ones when expanded, else
  * the newest {@link RUN_STATUS_TAIL}, after a muted `N earlier` line that also
  * counts events already dropped from the log's front.
  */
@@ -866,7 +866,7 @@ function evalStatusSection(log: StatusEventLog, expanded: boolean): NativeNode |
 		.map((event, i) => keyed(describeStatusEvent(event, expanded), `s${hidden + i}`));
 	return node(
 		"col",
-		{ role: "omp.run.status", gap: "none" },
+		{ role: "omsp.run.status", gap: "none" },
 		compact<NativeNode>([hidden > 0 && keyed(text([span(`${hidden} earlier`, "muted")]), "earlier"), ...lines]),
 		"status",
 	);
@@ -907,14 +907,14 @@ function evalCellBox(cell: EvalCellRun, index: number, total: number): NativeNod
 		const spans: TspSpan[] = [span(`${index + 1}/${total}`, "muted")];
 		const title = plainText(cell.title ?? "").trim();
 		if (title) spans.push(span(` ${title}`, "toolTitle"));
-		caption = keyed(text(spans, { role: "omp.run.caption" }), "caption");
+		caption = keyed(text(spans, { role: "omsp.run.caption" }), "caption");
 	}
 	return runBox(
 		[
 			caption,
 			cell.code.trim().length > 0 &&
 				runInput(cell.code, {
-					role: "omp.tool.eval.input",
+					role: "omsp.tool.eval.input",
 					lang: languageForHighlighter(cell.language),
 					wrap: false,
 				}),

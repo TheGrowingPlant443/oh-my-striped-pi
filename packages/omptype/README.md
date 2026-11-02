@@ -1,25 +1,21 @@
-# @oh-my-pi/omptype
+# @oh-my-striped-pi/omptype
 
 Fast, ArkType-compatible schema validation for JavaScript and TypeScript.
 Schemas start with a small interpreter and lazily compile after repeated use,
 keeping construction cheap without giving up hot-path validation speed.
 
-## Installation
+## Workspace setup
 
-```sh
-npm install @oh-my-pi/omptype
-# or
-bun add @oh-my-pi/omptype
-```
-
-Runs on Node 20+ (published as compiled ESM with bundled type declarations)
-and Bun 1.4.4+ (which resolves the TypeScript source directly via the `bun`
-export condition). No runtime dependencies.
+This is a private source workspace, not a published npm release. Use it from an
+authenticated monorepo or company workspace with managed dependencies prepared.
+Bun 1.4.4+ resolves TypeScript source directly through the `bun` export condition.
+The manifest retains Node 20+ and compiled ESM/type-declaration build metadata;
+that metadata does not mean a compiled npm release is available. No runtime dependencies.
 
 ## Usage
 
 ```ts
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 
 const Config = type({
 	name: "string",
@@ -74,8 +70,8 @@ options.
 TypeBox-style and Zod-style builders produce native omptype schemas:
 
 ```ts
-import { Type, type Static } from "@oh-my-pi/omptype/typebox";
-import { z } from "@oh-my-pi/omptype/zod";
+import { Type, type Static } from "@oh-my-striped-pi/omptype/typebox";
+import { z } from "@oh-my-striped-pi/omptype/zod";
 
 const TypeBoxUser = Type.Object({ name: Type.String() });
 type TypeBoxUser = Static<typeof TypeBoxUser>;
@@ -84,7 +80,7 @@ const ZodUser = z.object({ name: z.string() });
 const user = ZodUser.parse({ name: "Ada" });
 ```
 
-`@oh-my-pi/omptype/ark` provides the repository's ArkType compatibility facade
+`@oh-my-striped-pi/omptype/ark` provides the repository's ArkType compatibility facade
 and re-exports the same `type` and `scope` implementations.
 
 ## Performance

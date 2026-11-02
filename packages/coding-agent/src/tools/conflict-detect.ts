@@ -1,4 +1,4 @@
-import type { ConflictBlock, ConflictEntry, ConflictScope } from "@oh-my-pi/pi-tui/tools/conflict-detect";
+import type { ConflictBlock, ConflictEntry, ConflictScope } from "@oh-my-striped-pi/pi-tui/tools/conflict-detect";
 /**
  * Detect and resolve unresolved git merge conflicts that surface in `read`
  * output.
@@ -20,8 +20,8 @@ import type { ConflictBlock, ConflictEntry, ConflictScope } from "@oh-my-pi/pi-t
  */
 
 import type { ToolSession } from "./index";
-import { hasFsCode, isEnoent } from "@oh-my-pi/pi-utils";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { hasFsCode, isEnoent } from "@oh-my-striped-pi/pi-utils";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 
 const OURS_PREFIX = "<<<<<<<";
 const BASE_PREFIX = "|||||||";

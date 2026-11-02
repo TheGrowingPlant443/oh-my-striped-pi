@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { Context, FetchImpl, Model } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { streamOpenAICompletions } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { Context, FetchImpl, Model } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 
 // End-to-end guard for the first-class `max` reasoning tier: a user-requested
 // `reasoning: "max"` on a model whose ladder natively includes `Effort.Max`

@@ -2,18 +2,18 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { RenderResultOptions } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import { InternalUrlFilesystem } from "@oh-my-pi/pi-coding-agent/internal-urls/url-filesystem";
-import { getThemeByName, initTheme, type Theme } from "@oh-my-pi/pi-tui/theme";
+import type { RenderResultOptions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/types";
+import { InternalUrlFilesystem } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/url-filesystem";
+import { getThemeByName, initTheme, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
 import {
 	expandDelimitedPathEntries,
 	parseFindPattern,
 	resolveToolSearchScope,
 	splitDelimitedPathEntry,
-} from "@oh-my-pi/pi-coding-agent/tools/path-utils";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
-import { globToolRenderer } from "@oh-my-pi/pi-tui/tools/glob";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/path-utils";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
+import { globToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/glob";
 
 let uiTheme: Theme;
 

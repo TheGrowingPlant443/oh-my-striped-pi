@@ -2,13 +2,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "b
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EditTool } from "@oh-my-pi/pi-coding-agent/edit";
-import type { ClientBridge } from "@oh-my-pi/pi-coding-agent/session/client-bridge";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
-import type { AgentToolContext } from "@oh-my-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EditTool } from "@oh-my-striped-pi/pi-coding-agent/edit";
+import type { ClientBridge } from "@oh-my-striped-pi/pi-coding-agent/session/client-bridge";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { WriteTool } from "@oh-my-striped-pi/pi-coding-agent/tools/write";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
+import type { AgentToolContext } from "@oh-my-striped-pi/pi-agent-core";
 import { rejectionOf } from "./helpers/rejection";
 
 function createSession(cwd: string, bridge?: ClientBridge): ToolSession {

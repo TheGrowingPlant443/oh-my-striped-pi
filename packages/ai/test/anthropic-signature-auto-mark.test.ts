@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { AnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic-client";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { AnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
 import type {
 	AssistantMessage,
 	AssistantMessageEvent,
@@ -8,8 +8,8 @@ import type {
 	Message,
 	Model,
 	ProviderSessionState,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** An explicit unsigned-wire override still learns a signing rejection per session. */
 

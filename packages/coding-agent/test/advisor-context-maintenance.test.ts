@@ -1,22 +1,22 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import { Agent, type AgentMessage, type CompactionSummaryMessage } from "@oh-my-pi/pi-agent-core";
-import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import { calculateContextTokens, resolveThresholdTokens } from "@oh-my-pi/pi-agent-core/compaction";
-import { buildOpenAiNativeHistory } from "@oh-my-pi/pi-agent-core/compaction/openai";
-import type { AssistantMessage, Model, OpenAIResponsesHistoryPayload } from "@oh-my-pi/pi-ai";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { createMockModel, type MockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { estimateToolSchemaTokens } from "@oh-my-pi/pi-tui/status-line/context-usage";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, type AgentMessage, type CompactionSummaryMessage } from "@oh-my-striped-pi/pi-agent-core";
+import * as compactionModule from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { calculateContextTokens, resolveThresholdTokens } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import { buildOpenAiNativeHistory } from "@oh-my-striped-pi/pi-agent-core/compaction/openai";
+import type { AssistantMessage, Model, OpenAIResponsesHistoryPayload } from "@oh-my-striped-pi/pi-ai";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { createMockModel, type MockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { estimateToolSchemaTokens } from "@oh-my-striped-pi/pi-tui/status-line/context-usage";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { asGlobalFetch } from "./helpers/fetch-mock";
 
@@ -24,7 +24,7 @@ import {
 	cfgCompaction,
 	cfgCompactionKeepRecentTokens,
 	cfgCompactionThresholdTokens,
-} from "@oh-my-pi/pi-coding-agent/session/context-settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 const CONTEXT_WINDOW = 372_000;
 const CACHE_READ_TOKENS = 371_200;

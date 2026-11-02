@@ -1,19 +1,19 @@
 {
   "type": "module",
-  "name": "@oh-my-pi/collab-web",
+  "name": "@oh-my-striped-pi/collab-web",
   "version": "16.3.6",
   "private": true,
-  "description": "Self-hosted collaboration and standalone HTML session export viewer for omp",
-  "homepage": "https://omp.sh",
+  "description": "Self-hosted collaboration and standalone HTML session export viewer for omsp",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
   "author": { "name": "Stencil Labs, Inc.", "url": "https://stencil.so" },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/can1357/oh-my-pi.git",
+    "url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
     "directory": "packages/collab-web"
   },
   "bugs": {
-    "url": "https://github.com/can1357/oh-my-pi/issues"
+    "url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
   },
   "keywords": [
     "export",
@@ -33,9 +33,9 @@
     "fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts'"
   },
   "dependencies": {
-    "@oh-my-pi/omp-stats": "catalog:",
-    "@oh-my-pi/pi-utils": "catalog:",
-    "@oh-my-pi/pi-wire": "catalog:",
+    "@oh-my-striped-pi/omsp-stats": "catalog:",
+    "@oh-my-striped-pi/pi-utils": "catalog:",
+    "@oh-my-striped-pi/pi-wire": "catalog:",
     "katex": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",

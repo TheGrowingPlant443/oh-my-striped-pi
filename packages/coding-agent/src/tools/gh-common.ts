@@ -1,11 +1,11 @@
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
 import { CwdLookupMemo } from "../utils/forge-cli";
 import { github } from "../utils/github";
 import type { ToolSession } from ".";
-import type { GhToolDetails } from "@oh-my-pi/pi-tui/tools/github";
+import type { GhToolDetails } from "@oh-my-striped-pi/pi-tui/tools/github";
 import type { GhLabel, GhUser } from "./gh-types";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 
 export function normalizeText(value: string | null | undefined): string {

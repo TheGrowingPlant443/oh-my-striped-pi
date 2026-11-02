@@ -1,4 +1,4 @@
-import { logger, VERSION } from "@oh-my-pi/pi-utils";
+import { logger, VERSION } from "@oh-my-striped-pi/pi-utils";
 import { buildModel } from "./build";
 import { collapseBuiltVariants } from "./compat/collapse";
 import { readModelCache, writeModelCache } from "./model-cache";

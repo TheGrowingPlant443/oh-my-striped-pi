@@ -3,9 +3,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { applyHyperlinkSetting } from "@oh-my-pi/pi-tui/render/hyperlink";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { applyHyperlinkSetting } from "@oh-my-striped-pi/pi-tui/render/hyperlink";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 const PRIVATE_MODE = "\x1b[?1049h\x1b[?1003h";
 
@@ -22,7 +22,7 @@ describe("ast-grep control-byte filenames", () => {
 		"links the original file without exposing its terminal controls in the label",
 		async () => {
 			applyHyperlinkSetting("always");
-			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-ast-grep-link-"));
+			const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-ast-grep-link-"));
 			const filename = `fixture${PRIVATE_MODE}.ts`;
 			const absolutePath = path.join(dir, filename);
 			try {

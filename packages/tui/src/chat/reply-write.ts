@@ -8,8 +8,8 @@
  *   tool's result `details.replies` ({@link toolResultReplies}); transcripts draw each
  *   one as a prose block after the call ({@link replyDisplayMessage}).
  */
-import type { AssistantMessage, Usage } from "@oh-my-pi/pi-ai";
-import { isRecord } from "@oh-my-pi/pi-utils";
+import type { AssistantMessage, Usage } from "@oh-my-striped-pi/pi-ai";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import type { ImageBudget } from "../components/image";
 import { internalUrlSchemeSpec, internalUrlSchemeSpecs, splitUrlScheme } from "../tools/url-scheme-host";
 import { AssistantMessageComponent } from "./assistant-message";

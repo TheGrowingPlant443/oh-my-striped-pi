@@ -2,24 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ShellMinimizerSettings } from "@oh-my-pi/pi-coding-agent/exec/settings";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ShellMinimizerSettings } from "@oh-my-striped-pi/pi-coding-agent/exec/settings";
 import {
 	applyDirenvPreflight,
 	buildMinimizerOptions,
 	executeBash,
 	isPersistentShellCdCommand,
-} from "@oh-my-pi/pi-coding-agent/exec/bash-executor";
-import * as direnvModule from "@oh-my-pi/pi-coding-agent/exec/direnv";
-import { DEFAULT_MAX_BYTES } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import * as shellSnapshot from "@oh-my-pi/pi-coding-agent/utils/shell-snapshot";
-import { encodeTerminalImage } from "@oh-my-pi/pi-coding-agent/utils/terminal-graphics";
-import type { Shell, ShellRunResult } from "@oh-my-pi/pi-natives";
-import * as piNatives from "@oh-my-pi/pi-natives";
-import { $which, removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/exec/bash-executor";
+import * as direnvModule from "@oh-my-striped-pi/pi-coding-agent/exec/direnv";
+import { DEFAULT_MAX_BYTES } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import * as shellSnapshot from "@oh-my-striped-pi/pi-coding-agent/utils/shell-snapshot";
+import { encodeTerminalImage } from "@oh-my-striped-pi/pi-coding-agent/utils/terminal-graphics";
+import type { Shell, ShellRunResult } from "@oh-my-striped-pi/pi-natives";
+import * as piNatives from "@oh-my-striped-pi/pi-natives";
+import { $which, removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgBashDirenvLoadTimeoutMs, cfgShellPath } from "@oh-my-pi/pi-coding-agent/exec/settings";
+import { cfgBashDirenvLoadTimeoutMs, cfgShellPath } from "@oh-my-striped-pi/pi-coding-agent/exec/settings";
 
 // Matches the schema default for `tools.artifactHeadBytes` (20 KB) used by
 // OutputSink when bash-executor pulls settings via resolveOutputSinkHeadBytes.
@@ -35,7 +35,7 @@ const KILL_SETTLE_MS = 25; // let the kill signal land before we touch `release`
 const KILL_REACT_MS = 50; // > one poll interval: a survivor would write its marker
 
 function makeTempDir(): string {
-	return fs.mkdtempSync(path.join(os.tmpdir(), "omp-bash-exec-"));
+	return fs.mkdtempSync(path.join(os.tmpdir(), "omsp-bash-exec-"));
 }
 
 function shellQuote(value: string): string {
@@ -257,10 +257,10 @@ describe("executeBash", () => {
 	});
 
 	it("applies non-interactive environment defaults", async () => {
-		const result = await executeBash('echo "$AGENT:$GIT_TERMINAL_PROMPT:$PI_TEST_ENV"', {
+		const result = await executeBash('echo "$AGENT:$GIT_TERMINAL_PROMPT:$OMSP_TEST_ENV"', {
 			cwd: tempDir,
 			timeout: 5000,
-			env: { PI_TEST_ENV: "hello" },
+			env: { OMSP_TEST_ENV: "hello" },
 		});
 		expect(result.output.trim()).toBe("1:0:hello");
 	});
@@ -270,7 +270,7 @@ describe("executeBash", () => {
 			return;
 		}
 
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-shellpath-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-shellpath-"));
 		const marker = path.join(shellDir, "fake-shell-ran");
 		const markerEscaped = marker.replace(/'/g, "'\\''");
 		const fakeShell = path.join(shellDir, "fake-shell");
@@ -321,7 +321,7 @@ exit 64
 	it("persists cd, bare cd, and cd - when shortcut commands use a non-bash user shell", async () => {
 		if (process.platform === "win32") return;
 
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-cd-shellpath-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-cd-shellpath-"));
 		const marker = path.join(shellDir, "fake-shell-ran");
 		const fakeShell = path.join(shellDir, "fake-shell");
 		const childDir = path.join(tempDir, "child");
@@ -406,7 +406,7 @@ exit 64
 		}
 
 		const originalShell = Bun.env.SHELL;
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-env-shell-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-env-shell-"));
 		const marker = path.join(shellDir, "env-shell-ran");
 		const markerEscaped = marker.replace(/'/g, "'\\''");
 		const fakeShell = path.join(shellDir, "fish");
@@ -475,7 +475,7 @@ exit 64
 			return;
 		}
 
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-zsh-shellpath-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-zsh-shellpath-"));
 		fs.writeFileSync(path.join(shellDir, ".zshrc"), "alias pi_shell_alias='printf zsh-alias-ok\\\\n'\n");
 		cfgShellPath.set(Settings.instance, zshPath);
 
@@ -527,7 +527,7 @@ exit 64
 			return;
 		}
 
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-fish-shellpath-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-fish-shellpath-"));
 		const configDir = path.join(shellDir, ".config", "fish");
 		fs.mkdirSync(path.join(configDir, "conf.d"), { recursive: true });
 		fs.writeFileSync(path.join(configDir, "config.fish"), "function pi_fish_fn; echo fish-fn-ok; end\n");
@@ -569,7 +569,7 @@ exit 64
 	});
 
 	it("runs zsh shortcut commands on a headless PTY with a color-capable TTY", async () => {
-		if (process.platform === "win32" || Bun.env.PI_NO_PTY === "1") {
+		if (process.platform === "win32" || Bun.env.OMSP_NO_PTY === "1") {
 			return;
 		}
 		const zshPath = ["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh", "/opt/homebrew/bin/zsh"].find(candidate =>
@@ -579,7 +579,7 @@ exit 64
 			return;
 		}
 
-		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-zsh-pty-"));
+		const shellDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-zsh-pty-"));
 		fs.writeFileSync(path.join(shellDir, ".zshrc"), "alias pi_pty_alias='printf pty-alias-ok'\n");
 		cfgShellPath.set(Settings.instance, zshPath);
 
@@ -623,7 +623,7 @@ exit 64
 	});
 
 	it("lets the user answer a prompt in a zsh shortcut command through the PTY stdin writer (#17210)", async () => {
-		if (process.platform === "win32" || Bun.env.PI_NO_PTY === "1") {
+		if (process.platform === "win32" || Bun.env.OMSP_NO_PTY === "1") {
 			return;
 		}
 		const zshPath = ["/bin/zsh", "/usr/bin/zsh", "/usr/local/bin/zsh", "/opt/homebrew/bin/zsh"].find(candidate =>
@@ -806,12 +806,12 @@ exit 64
 		await Bun.sleep(0);
 		vi.restoreAllMocks();
 
-		await executeBash("export PI_AFTER_ABORT=still_persistent", {
+		await executeBash("export OMSP_AFTER_ABORT=still_persistent", {
 			cwd: tempDir,
 			timeout: 5000,
 			sessionKey: "settled-native-abort",
 		});
-		const next = await executeBash("printf '%s\n' \"$PI_AFTER_ABORT\"", {
+		const next = await executeBash("printf '%s\n' \"$OMSP_AFTER_ABORT\"", {
 			cwd: tempDir,
 			timeout: 5000,
 			sessionKey: "settled-native-abort",
@@ -929,8 +929,8 @@ exit 64
 		}
 
 		const sessionKey = "reset-on-abort";
-		await executeBash("export PI_RESET_VAR=alive", { cwd: tempDir, timeout: 5000, sessionKey });
-		const beforeAbort = await executeBash("echo $PI_RESET_VAR", { cwd: tempDir, timeout: 5000, sessionKey });
+		await executeBash("export OMSP_RESET_VAR=alive", { cwd: tempDir, timeout: 5000, sessionKey });
+		const beforeAbort = await executeBash("echo $OMSP_RESET_VAR", { cwd: tempDir, timeout: 5000, sessionKey });
 		expect(beforeAbort.output.trim()).toBe("alive");
 
 		const controller = new AbortController();
@@ -955,7 +955,7 @@ exit 64
 		expect(aborted.cancelled).toBe(true);
 
 		// oxlint-disable-next-line no-template-curly-in-string -- this is a bash variable expansion
-		const afterAbort = await executeBash("echo ${PI_RESET_VAR:-unset}", {
+		const afterAbort = await executeBash("echo ${OMSP_RESET_VAR:-unset}", {
 			cwd: tempDir,
 			timeout: 5000,
 			sessionKey,
@@ -1143,7 +1143,7 @@ exit 64
 			return;
 		}
 		const snapshotPath = path.join(tempDir, "snapshot.sh");
-		fs.writeFileSync(snapshotPath, "export PI_SNAPSHOT_TEST=from_snapshot\n");
+		fs.writeFileSync(snapshotPath, "export OMSP_SNAPSHOT_TEST=from_snapshot\n");
 		vi.spyOn(Settings.prototype, "getShellConfig").mockReturnValue({
 			shell: bashPath,
 			args: ["-l", "-c"],
@@ -1156,7 +1156,7 @@ exit 64
 		vi.spyOn(shellSnapshot, "getOrCreateSnapshot").mockResolvedValue(snapshotPath);
 		const sessionKey = "snapshot-test";
 		await executeBash("true", { cwd: tempDir, timeout: 5000, sessionKey });
-		const result = await executeBash("echo $PI_SNAPSHOT_TEST", { cwd: tempDir, timeout: 5000, sessionKey });
+		const result = await executeBash("echo $OMSP_SNAPSHOT_TEST", { cwd: tempDir, timeout: 5000, sessionKey });
 		expect(result.output.trim()).toBe("from_snapshot");
 	});
 

@@ -1,8 +1,8 @@
 /**
  * JSON tree rendering utilities shared across tool renderers.
  */
-import { INTENT_FIELD, type TspSpan, type TspTreeNode } from "@oh-my-pi/pi-wire";
-import { sanitizeText, sanitizeTextDeep } from "@oh-my-pi/pi-utils";
+import { INTENT_FIELD, type TspSpan, type TspTreeNode } from "@oh-my-striped-pi/pi-wire";
+import { sanitizeText, sanitizeTextDeep } from "@oh-my-striped-pi/pi-utils";
 import { TreeView, treeRowPrefix } from "../components/tree-view";
 import { truncateToWidth } from "../render/render-utils";
 import type { Theme, ThemeColor } from "../theme/theme";

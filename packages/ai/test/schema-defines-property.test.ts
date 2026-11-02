@@ -1,5 +1,5 @@
 import { expect, it } from "bun:test";
-import { schemaDefinesProperty } from "@oh-my-pi/pi-ai/utils/schema/json-schema-validator";
+import { schemaDefinesProperty } from "@oh-my-striped-pi/pi-ai/utils/schema/json-schema-validator";
 
 /**
  * `schemaDefinesProperty` answers whether a JSON-Schema graph owns a property

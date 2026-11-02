@@ -1,6 +1,6 @@
 /**
  * Server half of the machine-global text-prediction daemon (worker selector
- * `__omp_worker_text_predict`, started through the `text-predict` global broker).
+ * `__omsp_worker_text_predict`, started through the `text-predict` global broker).
  *
  * Lazily opens one `TextPredictor` per requested engine, keeps each learning
  * engine current with `history.db` (rows past a persisted row-id cursor, on
@@ -13,8 +13,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Database } from "bun:sqlite";
-import { type PredictedWord, TextPredictor } from "@oh-my-pi/pi-natives";
-import { getHistoryDbPath, getPredictStateDir, isEnoent, logger, VERSION } from "@oh-my-pi/pi-utils";
+import { type PredictedWord, TextPredictor } from "@oh-my-striped-pi/pi-natives";
+import { getHistoryDbPath, getPredictStateDir, isEnoent, logger, VERSION } from "@oh-my-striped-pi/pi-utils";
 import { JsonLineServer } from "../subprocess/jsonl-server";
 import { openSqliteReadConnection } from "../tools/sqlite-reader";
 import { blendPredictions } from "./blend";
@@ -69,7 +69,7 @@ async function readCursor(stateDir: string): Promise<number | undefined> {
 class SmolLmWeightsMissingError extends Error {
 	constructor() {
 		super(
-			"SmolLM weights are not downloaded yet (the editor fetches them on first use, or run `omp tiny-models download smollm`)",
+			"SmolLM weights are not downloaded yet (the editor fetches them on first use, or run `omsp tiny-models download smollm`)",
 		);
 	}
 }

@@ -1,27 +1,30 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { createCompactionSummaryMessage, createCustomMessage } from "@oh-my-pi/pi-agent-core/compaction/messages";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { createAdvisorMessageCard } from "@oh-my-pi/pi-tui/chat/advisor-message";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { BashExecutionComponent } from "@oh-my-pi/pi-tui/chat/bash-execution";
-import { ChatTranscriptBuilder } from "@oh-my-pi/pi-tui/chat/chat-transcript-builder";
-import { CompactionSummaryMessageComponent } from "@oh-my-pi/pi-tui/chat/compaction-summary-message";
-import { CustomMessageComponent } from "@oh-my-pi/pi-tui/chat/custom-message";
-import { EvalExecutionComponent } from "@oh-my-pi/pi-tui/chat/eval-execution";
-import { LateDiagnosticsMessageComponent } from "@oh-my-pi/pi-tui/chat/late-diagnostics-message";
-import { SkillMessageComponent } from "@oh-my-pi/pi-tui/chat/skill-message";
-import { StrippedToolCallsPlaceholder } from "@oh-my-pi/pi-tui/chat/stripped-tool-calls-placeholder";
-import { stopSharedSpinnerTicker, ToolExecutionComponent } from "@oh-my-pi/pi-tui/chat/tool-execution";
-import type { TranscriptEntryLike } from "@oh-my-pi/pi-tui/chat/transcript-entry";
-import { buildAsyncResultBlock, buildFileMentionBlock } from "@oh-my-pi/pi-tui/chat/transcript-render-helpers";
-import { TodoReminderComponent } from "@oh-my-pi/pi-tui/chat/todo-reminder";
-import { TtsrNotificationComponent } from "@oh-my-pi/pi-tui/chat/ttsr-notification";
-import { CollapsedSyntheticMessageComponent, UserMessageComponent } from "@oh-my-pi/pi-tui/chat/user-message";
-import { text } from "@oh-my-pi/pi-tui/native/describe";
-import { setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
-import type { TspNode, TspOp } from "@oh-my-pi/pi-wire";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import {
+	createCompactionSummaryMessage,
+	createCustomMessage,
+} from "@oh-my-striped-pi/pi-agent-core/compaction/messages";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { createAdvisorMessageCard } from "@oh-my-striped-pi/pi-tui/chat/advisor-message";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { BashExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/bash-execution";
+import { ChatTranscriptBuilder } from "@oh-my-striped-pi/pi-tui/chat/chat-transcript-builder";
+import { CompactionSummaryMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/compaction-summary-message";
+import { CustomMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/custom-message";
+import { EvalExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/eval-execution";
+import { LateDiagnosticsMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/late-diagnostics-message";
+import { SkillMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/skill-message";
+import { StrippedToolCallsPlaceholder } from "@oh-my-striped-pi/pi-tui/chat/stripped-tool-calls-placeholder";
+import { stopSharedSpinnerTicker, ToolExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import type { TranscriptEntryLike } from "@oh-my-striped-pi/pi-tui/chat/transcript-entry";
+import { buildAsyncResultBlock, buildFileMentionBlock } from "@oh-my-striped-pi/pi-tui/chat/transcript-render-helpers";
+import { TodoReminderComponent } from "@oh-my-striped-pi/pi-tui/chat/todo-reminder";
+import { TtsrNotificationComponent } from "@oh-my-striped-pi/pi-tui/chat/ttsr-notification";
+import { CollapsedSyntheticMessageComponent, UserMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/user-message";
+import { text } from "@oh-my-striped-pi/pi-tui/native/describe";
+import { setNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { initTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { TspNode, TspOp } from "@oh-my-striped-pi/pi-wire";
 import { TspHarness } from "./tsp-harness";
 
 beforeAll(async () => {
@@ -189,7 +192,7 @@ describe("native transcript", () => {
 		await h.render();
 		expect(h.find(node => node.k === "md")?.p).toMatchObject({ text: source, stream: true });
 
-		const wt = "file:///C:/Users/me/.omp/wt/cr2-43939c6";
+		const wt = "file:///C:/Users/me/.omsp/wt/cr2-43939c6";
 		component.updateContent(assistant([{ type: "text", text: source }]));
 		component.setLinkTargets(
 			new Map([
@@ -231,12 +234,12 @@ describe("native transcript", () => {
 			},
 		});
 		const h = await startWith(h => h.tui.addChild(component));
-		const card = h.find(node => node.p?.role === "omp.skill");
+		const card = h.find(node => node.p?.role === "omsp.skill");
 		expect(card?.p).not.toHaveProperty("collapsible");
 		expect(card?.c?.find(child => child.k === "md")?.p).toMatchObject({
 			text: "Organize the project foundation",
 		});
-		const prompt = h.find(node => node.p?.role === "omp.skill.prompt");
+		const prompt = h.find(node => node.p?.role === "omsp.skill.prompt");
 		expect(prompt?.p).toMatchObject({ collapsible: true, collapsed: true });
 		expect(prompt?.c).toBeUndefined();
 
@@ -260,7 +263,7 @@ describe("native transcript", () => {
 			builder.append(toolTranscript());
 			h.tui.addChild(builder.container);
 		});
-		const cardNode = h.find(node => node.k === "tool" && node.p?.role === "omp.tool.lookup_thing");
+		const cardNode = h.find(node => node.k === "tool" && node.p?.role === "omsp.tool.lookup_thing");
 		expect(cardNode?.p).toMatchObject({ status: "done", collapsible: true, collapsed: true });
 
 		h.event({ ev: "toggle", sf: h.terminal.surface!, id: cardNode!.id, collapsed: false });
@@ -345,7 +348,7 @@ describe("native transcript", () => {
 			builder.append(toolTranscript());
 			h.tui.addChild(builder.container);
 		});
-		const cardNode = h.find(node => node.k === "tool" && node.p?.role === "omp.tool.lookup_thing");
+		const cardNode = h.find(node => node.k === "tool" && node.p?.role === "omsp.tool.lookup_thing");
 		expect(opsSince(h, 0)).toContainEqual(["settle", cardNode!.id]);
 
 		const before = h.frames.length;
@@ -466,21 +469,21 @@ describe("native transcript", () => {
 		const roles = h.findAll(node => typeof node.p?.role === "string").map(node => node.p!.role);
 		expect(roles).toEqual(
 			expect.arrayContaining([
-				"omp.tool.lookup_thing",
-				"omp.user",
-				"omp.user.synthetic",
-				"omp.assistant",
-				"omp.thinking",
-				"omp.bash",
-				"omp.eval",
-				"omp.compaction",
-				"omp.custom",
-				"omp.notice.ttsr",
-				"omp.notice.todo",
-				"omp.diagnostics.late",
-				"omp.marker.cache-miss",
-				"omp.status-block",
-				"omp.advisor",
+				"omsp.tool.lookup_thing",
+				"omsp.user",
+				"omsp.user.synthetic",
+				"omsp.assistant",
+				"omsp.thinking",
+				"omsp.bash",
+				"omsp.eval",
+				"omsp.compaction",
+				"omsp.custom",
+				"omsp.notice.ttsr",
+				"omsp.notice.todo",
+				"omsp.diagnostics.late",
+				"omsp.marker.cache-miss",
+				"omsp.status-block",
+				"omsp.advisor",
 			]),
 		);
 		expect(h.errors).toEqual([]);

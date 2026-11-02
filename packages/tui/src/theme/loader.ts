@@ -1,8 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { adjustHsv } from "@oh-my-pi/pi-utils/color";
-import { getCustomThemesDir } from "@oh-my-pi/pi-utils/dirs";
-import { isEnoent } from "@oh-my-pi/pi-utils/fs-error";
+import { adjustHsv } from "@oh-my-striped-pi/pi-utils/color";
+import { getCustomThemesDir } from "@oh-my-striped-pi/pi-utils/dirs";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils/fs-error";
 import { detectColorMode, resolveThemeColors } from "./color";
 import darkThemeJson from "./dark.json" with { type: "json" };
 import defaultThemes from "./defaults.json" with { type: "json" };

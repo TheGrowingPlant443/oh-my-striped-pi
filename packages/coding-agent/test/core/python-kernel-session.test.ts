@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { disposeAllKernelSessions, executePython } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
+import { disposeAllKernelSessions, executePython } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
 import type {
 	KernelExecuteOptions,
 	KernelExecuteResult,
 	KernelShutdownResult,
-} from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { PythonKernel } from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { PythonKernel } from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 class FakeKernel {
 	executeCalls = 0;
@@ -45,7 +45,7 @@ describe("executePython kernel reuse", () => {
 	let kernels: FakeKernel[] = [];
 
 	beforeEach(() => {
-		Bun.env.PI_PYTHON_SKIP_CHECK = "1";
+		Bun.env.OMSP_PYTHON_SKIP_CHECK = "1";
 		startCalls = 0;
 		kernels = [];
 		PythonKernel.start = (async () => {

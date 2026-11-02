@@ -1,9 +1,16 @@
 // Explicit reasoning-history replay remains independent of the current turn's thinking setting.
 import { describe, expect, it } from "bun:test";
-import { renderDemotedThinking } from "@oh-my-pi/pi-ai/dialect";
-import { convertMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import type { AssistantMessage, Message, Model, ModelSpec, ThinkingContent, UserMessage } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { renderDemotedThinking } from "@oh-my-striped-pi/pi-ai/dialect";
+import { convertMessages } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import type {
+	AssistantMessage,
+	Message,
+	Model,
+	ModelSpec,
+	ThinkingContent,
+	UserMessage,
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);

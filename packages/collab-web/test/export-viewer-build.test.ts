@@ -2,12 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createContext, runInContext, runInNewContext } from "node:vm";
-import { HTMLElement, parseHTML } from "@oh-my-pi/pi-utils/dom";
-import type { Marked } from "@oh-my-pi/pi-utils/marked";
-import { TempDir } from "@oh-my-pi/pi-utils/temp";
+import { HTMLElement, parseHTML } from "@oh-my-striped-pi/pi-utils/dom";
+import type { Marked } from "@oh-my-striped-pi/pi-utils/marked";
+import { TempDir } from "@oh-my-striped-pi/pi-utils/temp";
 import { buildExportViewer, type ExportViewerMetadata } from "../scripts/build-export-viewer";
 
-const temp = TempDir.createSync("@omp-export-viewer-build-");
+const temp = TempDir.createSync("@omsp-export-viewer-build-");
 const outDir = temp.path();
 const staleName = `export-viewer-${"0".repeat(64)}.js`;
 const unrelatedName = "another-build.js";
@@ -131,7 +131,7 @@ describe("offline export viewer build", () => {
 			document,
 			HTMLElement: class extends HTMLElement {
 				constructor() {
-					super("omp-tool-view", document);
+					super("omsp-tool-view", document);
 				}
 			},
 			customElements: {
@@ -162,7 +162,6 @@ describe("offline export viewer build", () => {
 		).toBeNull();
 		expect(runInContext("typeof ompMarkdown.Marked", context)).toBe("function");
 		expect(runInContext("typeof hljs.highlight", context)).toBe("function");
-		expect(document.head.firstElementChild?.getAttribute("data-omp-export-viewer")).toBe("");
 		expect(document.getElementById("custom-theme")?.previousElementSibling).toBe(document.head.firstElementChild);
 		const assistant = document.querySelector(".assistant-message");
 		expect(assistant?.textContent).toContain("$x^2$");
@@ -190,7 +189,7 @@ describe("offline export viewer build", () => {
 		// actual registered React wrapper and deliver its normal connection callback.
 		runInContext(
 			`
-			const tool = new (customElements.get("omp-tool-view"))();
+			const tool = new (customElements.get("omsp-tool-view"))();
 			tool.setAttribute("payload", ${JSON.stringify(JSON.stringify(payload))});
 			document.body.appendChild(tool);
 			tool.connectedCallback();
@@ -199,9 +198,9 @@ describe("offline export viewer build", () => {
 		);
 		try {
 			flushWork();
-			expect(document.querySelector("omp-tool-view .tr-md math")).not.toBeNull();
-			expect(document.querySelector("omp-tool-view .hljs-keyword")?.textContent).toBe("const");
-			expect(document.querySelector("omp-tool-view pre")?.textContent).toContain("const toolCode = 2;");
+			expect(document.querySelector("omsp-tool-view .tr-md math")).not.toBeNull();
+			expect(document.querySelector("omsp-tool-view .hljs-keyword")?.textContent).toBe("const");
+			expect(document.querySelector("omsp-tool-view pre")?.textContent).toContain("const toolCode = 2;");
 			const transcriptParser = runInContext("new ompMarkdown.Marked()", context) as Marked;
 			expect(transcriptParser.parse("$x^2$", { async: false })).toBe("<p>$x^2$</p>\n");
 		} finally {

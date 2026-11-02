@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type StreamFn, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type StreamFn, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type Context,
 	Effort,
@@ -8,13 +8,13 @@ import {
 	type Message,
 	type Model,
 	type ProviderSessionState,
-} from "@oh-my-pi/pi-ai";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+} from "@oh-my-striped-pi/pi-ai";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 
 const responseSpec: ModelSpec<"openai-responses"> = {
 	id: "company-responses",

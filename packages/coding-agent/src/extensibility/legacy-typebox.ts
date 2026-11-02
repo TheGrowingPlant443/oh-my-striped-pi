@@ -1,17 +1,17 @@
-import { type } from "@oh-my-pi/omptype";
-import { IR_BRAND } from "@oh-my-pi/omptype/ir";
+import { type } from "@oh-my-striped-pi/omptype";
+import { IR_BRAND } from "@oh-my-striped-pi/omptype/ir";
 import {
 	type AnySchema,
 	type ObjectOpts,
 	Type as OmpType,
 	type TypeBuilder as OmpTypeBuilder,
 	type TUnsafe,
-} from "@oh-my-pi/omptype/typebox";
-import { upgradeJsonSchemaTo202012, validateJsonSchemaValue } from "@oh-my-pi/pi-ai/utils/schema";
+} from "@oh-my-striped-pi/omptype/typebox";
+import { upgradeJsonSchemaTo202012, validateJsonSchemaValue } from "@oh-my-striped-pi/pi-ai/utils/schema";
 
-export * from "@oh-my-pi/omptype/typebox";
+export * from "@oh-my-striped-pi/omptype/typebox";
 
-const VALIDATION_FAILURE = Symbol("omp.typebox.validationFailure");
+const VALIDATION_FAILURE = Symbol("omsp.typebox.validationFailure");
 
 interface ValidationFailure {
 	message: string;

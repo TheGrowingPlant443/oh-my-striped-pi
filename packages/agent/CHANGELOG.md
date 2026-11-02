@@ -4,7 +4,7 @@
 
 ### Breaking Changes
 
-- Removed the Bun event-loop workaround utilities from `@oh-my-pi/pi-agent-core/utils/yield`; agent loops no longer insert cooperative sleeps while streaming or between tool calls.
+- Removed the Bun event-loop workaround utilities from `@oh-my-striped-pi/pi-agent-core/utils/yield`; agent loops no longer insert cooperative sleeps while streaming or between tool calls.
 
 ### Added
 

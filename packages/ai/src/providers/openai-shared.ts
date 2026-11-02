@@ -1,6 +1,6 @@
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getSupportedEfforts } from "@oh-my-pi/pi-catalog/model-thinking";
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { getSupportedEfforts } from "@oh-my-striped-pi/pi-catalog/model-thinking";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
 import type {
 	CatalogPolicyInputs,
 	OpenAICompat,
@@ -8,8 +8,8 @@ import type {
 	ResolvedOpenAICompat,
 	ResolvedOpenAIResponsesCompat,
 	ResolvedOpenAISharedCompat,
-} from "@oh-my-pi/pi-catalog/types";
-import { parseGitHubCopilotApiKey } from "@oh-my-pi/pi-catalog/wire/github-copilot";
+} from "@oh-my-striped-pi/pi-catalog/types";
+import { parseGitHubCopilotApiKey } from "@oh-my-striped-pi/pi-catalog/wire/github-copilot";
 import {
 	classifyJsonPrefix,
 	cloneJsonTree,
@@ -18,7 +18,7 @@ import {
 	parseImageMetadata,
 	parseStreamingJsonThrottled,
 	stringifyJson,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import { NO_AUTH_SENTINEL } from "../auth-retry";
 import { resolveProviderApiKey } from "../env-api-key";
 import * as AIError from "../error";
@@ -1436,7 +1436,7 @@ export function convertResponsesInputContent(
 /**
  * Map freeform custom-tool wire names back to the internal tool name for
  * providers that only accept function_call / function_call_output.
- * Built once per request; `apply_patch` → `edit` is the OMP default.
+ * Built once per request; `apply_patch` → `edit` is the OMSP default.
  */
 function buildCustomToolWireNameMap(tools: readonly Tool[] | undefined): ReadonlyMap<string, string> | undefined {
 	if (!tools?.length) return undefined;

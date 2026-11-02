@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import * as path from "node:path";
-import { isRecord, readJsonl, TempDir } from "@oh-my-pi/pi-utils";
-import { selectRpcEntries } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-compat";
-import { RpcWordPredictor } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import type { TextPrediction } from "@oh-my-pi/pi-coding-agent/predict/client";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import type { SessionEntry, SessionTreeNode } from "@oh-my-pi/pi-coding-agent/session/session-entries";
+import { isRecord, readJsonl, TempDir } from "@oh-my-striped-pi/pi-utils";
+import { selectRpcEntries } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-compat";
+import { RpcWordPredictor } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import type { TextPrediction } from "@oh-my-striped-pi/pi-coding-agent/predict/client";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import type { SessionEntry, SessionTreeNode } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
 
 function customEntry(id: string, parentId: string | null): SessionEntry {
 	return { type: "custom", id, parentId, timestamp: new Date().toISOString(), customType: "probe" };
@@ -177,12 +177,12 @@ async function startRpcServer(): Promise<RpcServer> {
 			env: {
 				PATH: Bun.env.PATH,
 				HOME: temp.join("home"),
-				PI_CODING_AGENT_DIR: temp.join("agent"),
+				OMSP_CODING_AGENT_DIR: temp.join("agent"),
 				XDG_CONFIG_HOME: temp.join("config"),
 				XDG_DATA_HOME: temp.join("data"),
 				XDG_CACHE_HOME: temp.join("cache"),
 				CI: "true",
-				PI_NO_TITLE: "1",
+				OMSP_NO_TITLE: "1",
 			},
 			stdin: "pipe",
 			stdout: "pipe",
@@ -371,7 +371,7 @@ describe("RPC Pi-compatible primitives (live server)", () => {
 		const stateOff = await next();
 		expect((stateOff.data as { thinkingLevel: unknown }).thinkingLevel).toBe("off");
 
-		// Command discovery stays an OMP dialect: the Pi-spelled alias is
+		// Command discovery stays an OMSP dialect: the Pi-spelled alias is
 		// intentionally not served (see issue #6).
 		send({ type: "get_available_commands", id: "cmds-a" });
 		const available = await next();

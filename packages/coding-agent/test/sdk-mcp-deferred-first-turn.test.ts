@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { type MCPLoadResult, MCPManager, type MCPStartupStatus } from "@oh-my-pi/pi-coding-agent/mcp/manager";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { MCP_DISCOVERY_TURN_WAIT_MS } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { type MCPLoadResult, MCPManager, type MCPStartupStatus } from "@oh-my-striped-pi/pi-coding-agent/mcp/manager";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { MCP_DISCOVERY_TURN_WAIT_MS } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 // Contract: UI/RPC sessions (`hasUI`) defer MCP discovery off startup. A prompt that

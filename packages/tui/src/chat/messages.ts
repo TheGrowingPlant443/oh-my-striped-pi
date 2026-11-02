@@ -1,10 +1,13 @@
-import type { AssistantMessage, ImageContent, MessageAttribution, TextContent } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { COLLAB_PROMPT_MESSAGE_TYPE } from "@oh-my-pi/pi-wire";
+import type { AssistantMessage, ImageContent, MessageAttribution, TextContent } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { COLLAB_PROMPT_MESSAGE_TYPE } from "@oh-my-striped-pi/pi-wire";
 import type { OutputMeta } from "../tools/output-meta";
-import type { BranchSummaryMessage, CompactionSummaryMessage } from "@oh-my-pi/pi-agent-core/compaction/messages";
+import type {
+	BranchSummaryMessage,
+	CompactionSummaryMessage,
+} from "@oh-my-striped-pi/pi-agent-core/compaction/messages";
 
-declare module "@oh-my-pi/pi-agent-core" {
+declare module "@oh-my-striped-pi/pi-agent-core" {
 	interface CustomAgentMessages {
 		bashExecution: BashExecutionMessage;
 		pythonExecution: PythonExecutionMessage;
@@ -15,8 +18,11 @@ declare module "@oh-my-pi/pi-agent-core" {
 		fileMention: FileMentionMessage;
 	}
 }
-export { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "@oh-my-pi/pi-wire";
-export type { BranchSummaryMessage, CompactionSummaryMessage } from "@oh-my-pi/pi-agent-core/compaction/messages";
+export { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "@oh-my-striped-pi/pi-wire";
+export type {
+	BranchSummaryMessage,
+	CompactionSummaryMessage,
+} from "@oh-my-striped-pi/pi-agent-core/compaction/messages";
 
 export const SKILL_PROMPT_MESSAGE_TYPE = "skill-prompt";
 
@@ -85,7 +91,7 @@ export interface SkillPromptDetails {
  *  `ui-helpers.addMessageToChat` (renderers), `AgentHubOverlayComponent
  *  #buildTranscriptLines`, `runPrintMode`, and `AcpAgent#replayAssistantMessage`
  *  (fallback error emission) read it via `isSilentAbort`. */
-export const SILENT_ABORT_MARKER = "__omp.silent_abort__";
+export const SILENT_ABORT_MARKER = "__omsp.silent_abort__";
 
 /** Type-guard for silent aborts. Renderers MUST call this helper so structured
  *  `errorId` and legacy persisted marker messages stay in lockstep. */

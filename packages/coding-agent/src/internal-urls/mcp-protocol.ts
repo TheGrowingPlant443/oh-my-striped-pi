@@ -1,4 +1,4 @@
-import { untilAborted, withTimeout } from "@oh-my-pi/pi-utils";
+import { untilAborted, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import { MCPManager } from "../mcp/manager";
 import type { MCPResourceReadResult } from "../mcp/types";
 import mcpDoc from "../prompts/internal-urls/mcp.md" with { type: "text" };
@@ -202,7 +202,7 @@ export class McpResourceNotFoundError extends Error {
  *
  * URL forms:
  * - mcp://<resource-uri> (e.g. mcp://test://notes, mcp://ibkr://portfolio/positions)
- * - A resource's native URI when its scheme has no OMP handler (e.g. ags://capabilities/current-host)
+ * - A resource's native URI when its scheme has no OMSP handler (e.g. ags://capabilities/current-host)
  */
 export class McpProtocolHandler implements ProtocolHandler {
 	readonly scheme = "mcp";

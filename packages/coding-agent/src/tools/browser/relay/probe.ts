@@ -13,7 +13,7 @@
  *   nothing is coming and the open fails at once instead of burning the
  *   whole window every call.
  */
-import { VERSION } from "@oh-my-pi/pi-utils/dirs";
+import { VERSION } from "@oh-my-striped-pi/pi-utils/dirs";
 import { throwIfAborted } from "../../tool-errors";
 import { probeCdpResponse } from "../attach";
 import type { RelayUnavailableInfo } from "./server";
@@ -39,24 +39,24 @@ export type RelayWaitOutcome =
 	| "extension-gone"
 	/** An older relay server is still running. */
 	| "outdated-relay"
-	/** A compatible relay from an older OMP is ready and reports no CDP client connected to it. */
+	/** A compatible relay from an older OMSP is ready and reports no CDP client connected to it. */
 	| "idle-older-relay"
 	/** The relay extension is older than the running server. */
 	| "outdated-extension";
 
-/** The OMP version a parsed `/json/version` body (ready or waiting) reports; empty when it reports none. */
+/** The OMSP version a parsed `/json/version` body (ready or waiting) reports; empty when it reports none. */
 export function relayVersionOf(parsed: object): string {
-	return "ompRelayVersion" in parsed && typeof parsed.ompRelayVersion === "string" ? parsed.ompRelayVersion : "";
+	return "omspRelayVersion" in parsed && typeof parsed.omspRelayVersion === "string" ? parsed.omspRelayVersion : "";
 }
 
 /** CDP clients a parsed `/json/version` body (ready or waiting) reports; null for a relay too old to report them. */
 export function relayCdpClientsOf(parsed: object): number | null {
-	return "ompRelayCdpClients" in parsed && typeof parsed.ompRelayCdpClients === "number"
-		? parsed.ompRelayCdpClients
+	return "omspRelayCdpClients" in parsed && typeof parsed.omspRelayCdpClients === "number"
+		? parsed.omspRelayCdpClients
 		: null;
 }
 
-function parseUnavailableInfo(body: string): Omit<RelayUnavailableInfo, "ompRelayCdpClients"> | null {
+function parseUnavailableInfo(body: string): Omit<RelayUnavailableInfo, "omspRelayCdpClients"> | null {
 	try {
 		const parsed: unknown = JSON.parse(body);
 		if (
@@ -73,7 +73,7 @@ function parseUnavailableInfo(body: string): Omit<RelayUnavailableInfo, "ompRela
 				error: "",
 				extensionSeen: parsed.extensionSeen,
 				uptimeMs: parsed.uptimeMs,
-				ompRelayVersion: relayVersionOf(parsed),
+				omspRelayVersion: relayVersionOf(parsed),
 				disconnectedMs,
 			};
 		}
@@ -89,16 +89,16 @@ function readyOutcome(body: string): RelayWaitOutcome {
 		if (
 			typeof parsed !== "object" ||
 			parsed === null ||
-			!("ompRelayDiscardedTabsProtocol" in parsed) ||
-			parsed.ompRelayDiscardedTabsProtocol !== String(DISCARDED_TABS_PROTOCOL_VERSION)
+			!("omspRelayDiscardedTabsProtocol" in parsed) ||
+			parsed.omspRelayDiscardedTabsProtocol !== String(DISCARDED_TABS_PROTOCOL_VERSION)
 		) {
 			return "outdated-relay";
 		}
 		if (
-			!("ompExtensionDiscardedTabsProtocol" in parsed) ||
-			parsed.ompExtensionDiscardedTabsProtocol !== String(DISCARDED_TABS_PROTOCOL_VERSION)
+			!("omspExtensionDiscardedTabsProtocol" in parsed) ||
+			parsed.omspExtensionDiscardedTabsProtocol !== String(DISCARDED_TABS_PROTOCOL_VERSION)
 		) {
-			// A relay from another OMP version is the likelier culprit than the extension.
+			// A relay from another OMSP version is the likelier culprit than the extension.
 			if (relayVersionOf(parsed) !== VERSION) return "outdated-relay";
 			return "outdated-extension";
 		}
@@ -131,7 +131,7 @@ export async function waitForRelayExtension(cdpUrl: string, signal?: AbortSignal
 		const info = parseUnavailableInfo(response.body);
 		// Past the dial window a relay from another version reads as outdated even
 		// with CDP clients connected: no extension, so no browser, is behind them.
-		staleRelay = info !== null && info.ompRelayVersion !== VERSION;
+		staleRelay = info !== null && info.omspRelayVersion !== VERSION;
 		if (info && !info.extensionSeen) {
 			// Never connected: the window is measured from server start, not from now.
 			deadline = Math.min(deadline, Date.now() - info.uptimeMs + EXTENSION_DIAL_WINDOW_MS);
@@ -146,11 +146,11 @@ export async function waitForRelayExtension(cdpUrl: string, signal?: AbortSignal
 }
 
 /** The steps that replace an out-of-date relay extension. */
-export const UPDATE_RELAY_EXTENSION = "Run `omp browser-relay install` and reload the extension in Chrome.";
+export const UPDATE_RELAY_EXTENSION = "Run `omsp browser-relay install` and reload the extension in Chrome.";
 
 /**
  * Notice for an open through a ready relay where a connected extension was
- * installed by an older omp, or null. The extension still speaks the relay
+ * installed by an older omsp, or null. The extension still speaks the relay
  * protocol, so the open goes ahead; relay fixes shipped since that install
  * stay inactive until the user reinstalls it. A relay too old to report the
  * extension's version gets no notice: it cannot tell.
@@ -161,12 +161,12 @@ export async function relayExtensionNotice(cdpUrl: string, signal?: AbortSignal)
 	let installedBy: unknown;
 	try {
 		const parsed: unknown = JSON.parse(response.body);
-		if (typeof parsed !== "object" || parsed === null || !("ompExtensionVersion" in parsed)) return null;
-		installedBy = parsed.ompExtensionVersion;
+		if (typeof parsed !== "object" || parsed === null || !("omspExtensionVersion" in parsed)) return null;
+		installedBy = parsed.omspExtensionVersion;
 	} catch {
 		return null;
 	}
 	if (typeof installedBy !== "string" || !isOlderOmpVersion(installedBy, VERSION)) return null;
-	const origin = installedBy === "" ? "an older omp" : `omp ${installedBy}; this is omp ${VERSION}`;
-	return `The OMP Browser Relay extension is out of date (installed by ${origin}). ${UPDATE_RELAY_EXTENSION}`;
+	const origin = installedBy === "" ? "an older omsp" : `omsp ${installedBy}; this is omsp ${VERSION}`;
+	return `The OMSP Browser Relay extension is out of date (installed by ${origin}). ${UPDATE_RELAY_EXTENSION}`;
 }

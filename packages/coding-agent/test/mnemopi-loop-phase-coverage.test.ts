@@ -2,18 +2,21 @@ import { Database, type Statement } from "bun:sqlite";
 import { afterEach, beforeEach, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import { extendRecallWithLegacyBanks, type MnemopiBackendConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
-import * as content from "@oh-my-pi/pi-coding-agent/memory-backend/content";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import {
+	extendRecallWithLegacyBanks,
+	type MnemopiBackendConfig,
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/config";
+import * as content from "@oh-my-striped-pi/pi-coding-agent/memory-backend/content";
 import {
 	loadMnemopi,
 	loadMnemopiCore,
 	MnemopiSessionState,
 	setMnemopiSessionState,
-} from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import { resetMemoryForTests } from "@oh-my-pi/pi-mnemopi";
-import { currentLoopPhase, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import { resetMemoryForTests } from "@oh-my-striped-pi/pi-mnemopi";
+import { currentLoopPhase, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 // State construction uses the same preloaded, synchronous facade as memory-tools.test.ts.
 await Promise.all([loadMnemopi(), loadMnemopiCore()]);

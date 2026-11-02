@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import * as blobStore from "@oh-my-pi/pi-coding-agent/session/blob-store";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getAgentDir, getBlobsDir, setAgentDir } from "@oh-my-pi/pi-utils";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import * as blobStore from "@oh-my-striped-pi/pi-coding-agent/session/blob-store";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getAgentDir, getBlobsDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 
 const FRAME_COUNT = 10;
 const FRAME_RAW_BYTES = 300_000;
@@ -94,13 +94,12 @@ describe("lazy snapcompact frame resolution", () => {
 	const tempDirs: string[] = [];
 	const originalAgentDir = getAgentDir();
 	const originalEnv = {
-		PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR,
-		OMP_PROFILE: process.env.OMP_PROFILE,
-		PI_PROFILE: process.env.PI_PROFILE,
+		OMSP_CODING_AGENT_DIR: process.env.OMSP_CODING_AGENT_DIR,
+		OMSP_PROFILE: process.env.OMSP_PROFILE,
 	};
 
 	async function makeTempDir(): Promise<string> {
-		const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-lazy-frames-"));
+		const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-lazy-frames-"));
 		tempDirs.push(dir);
 		return dir;
 	}

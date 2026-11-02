@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ScopedModel } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { buildModelScopeNotification } from "@oh-my-pi/pi-coding-agent/main";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ScopedModel } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { buildModelScopeNotification } from "@oh-my-striped-pi/pi-coding-agent/main";
 
 function scopedModel(id: string): ScopedModel {
 	return {

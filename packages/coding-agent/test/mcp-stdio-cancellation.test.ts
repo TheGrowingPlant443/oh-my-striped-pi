@@ -3,11 +3,15 @@ import type { BunFile } from "bun";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { MCPTransportError } from "@oh-my-pi/pi-coding-agent/mcp/errors";
-import * as mcpTimeout from "@oh-my-pi/pi-coding-agent/mcp/timeout";
-import { StdioTransport } from "@oh-my-pi/pi-coding-agent/mcp/transports/stdio";
-import type { JsonRpcNotification, JsonRpcRequest, MCPStdioServerConfig } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { MCPTransportError } from "@oh-my-striped-pi/pi-coding-agent/mcp/errors";
+import * as mcpTimeout from "@oh-my-striped-pi/pi-coding-agent/mcp/timeout";
+import { StdioTransport } from "@oh-my-striped-pi/pi-coding-agent/mcp/transports/stdio";
+import type {
+	JsonRpcNotification,
+	JsonRpcRequest,
+	MCPStdioServerConfig,
+} from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { rejectionOf, trackUnhandled } from "./helpers/rejection";
 
 type Frame = JsonRpcRequest | JsonRpcNotification;
@@ -38,7 +42,7 @@ describe("StdioTransport cancellation", () => {
 	let frameLog: BunFile;
 
 	beforeEach(async () => {
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-cancellation-"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-cancellation-"));
 		logPath = path.join(tempDir, "frames.jsonl");
 		frameLog = Bun.file(logPath);
 		await Bun.write(frameLog, "");

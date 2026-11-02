@@ -6,11 +6,11 @@
  * - compare a tool capability tier against the active approval mode,
  * - format the generic approval prompt body.
  */
-import { isRecord, prompt, sanitizeText } from "@oh-my-pi/pi-utils";
-import { replaceTabs } from "@oh-my-pi/pi-tui";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { isRecord, prompt, sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import { replaceTabs } from "@oh-my-striped-pi/pi-tui";
+import { shortenPath } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import approvalFolderTemplate from "../prompts/tools/approval-folder.md" with { type: "text" };
-import type { AgentTool, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
+import type { AgentTool, ToolApprovalDecision, ToolTier } from "@oh-my-striped-pi/pi-agent-core";
 import * as path from "node:path";
 import type { Settings } from "../config/settings";
 import { normalizeToLF } from "../edit/normalize";
@@ -36,7 +36,7 @@ import {
 } from "./approval-targets";
 import { expandTilde, resolveToCwd } from "./path-utils";
 
-export type { ToolApproval, ToolApprovalDecision, ToolTier } from "@oh-my-pi/pi-agent-core";
+export type { ToolApproval, ToolApprovalDecision, ToolTier } from "@oh-my-striped-pi/pi-agent-core";
 
 export type ApprovalPolicy = "allow" | "deny" | "prompt";
 

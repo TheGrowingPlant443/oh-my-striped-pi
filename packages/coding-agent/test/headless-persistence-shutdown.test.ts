@@ -11,13 +11,13 @@
  */
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs";
-import { parseArgs, type Args } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { TempDir, postmortem } from "@oh-my-pi/pi-utils";
+import { parseArgs, type Args } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import type { CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { TempDir, postmortem } from "@oh-my-striped-pi/pi-utils";
 import type { AgentSession } from "../src/session/agent-session";
 import { SessionManager } from "../src/session/session-manager";
 
@@ -200,7 +200,7 @@ describe("headless persistence-failure shutdown path", () => {
 		} catch (error) {
 			// `cli.ts` runs `runCli(...).catch(fatal)`, and `fatal()` renders
 			// `Bun.inspect(error)` onto fd 2. Reproduce that here so the stderr
-			// asserted below is the stderr an `omp --print` user would get.
+			// asserted below is the stderr an `omsp --print` user would get.
 			escaped = error;
 			process.stderr.write(`${Bun.inspect(error, { colors: false })}\n`);
 		} finally {

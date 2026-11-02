@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Editor, type EditorTextAssistProvider } from "@oh-my-pi/pi-tui";
+import { Editor, type EditorTextAssistProvider } from "@oh-my-striped-pi/pi-tui";
 import { defaultEditorTheme } from "./test-themes";
 
 describe("Editor text assistance", () => {

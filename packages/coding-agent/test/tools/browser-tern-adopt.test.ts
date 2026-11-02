@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { acquireBrowser } from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import { acquireTab, releaseTab } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import { pickTernBlock, type TernBlockEntry } from "@oh-my-pi/pi-coding-agent/tools/browser/tern/blocks";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { acquireBrowser } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import { acquireTab, releaseTab } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import { pickTernBlock, type TernBlockEntry } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tern/blocks";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { type FakeAnswer, type FakeDaemon, startFakeDaemon } from "./tern-fake-daemon";
 
 const PANE = 3;
@@ -98,7 +98,7 @@ describe("pickTernBlock", () => {
 		expect(pickTernBlock([entry(8, {}), entry(9, {})], "x.example")?.block).toBe(8);
 	});
 
-	it("never matches a block another omp tab drives", () => {
+	it("never matches a block another omsp tab drives", () => {
 		const blocks = [entry(1, { shown: true }), entry(2, { shown: false })];
 		expect(pickTernBlock(blocks, "x.example", new Map([[1, "docs"]]))?.block).toBe(2);
 		expect(pickTernBlock(blocks, "1", new Map([[1, "docs"]]))).toBeUndefined();
@@ -153,7 +153,7 @@ describe("Tern block adoption", () => {
 });
 
 describe("Tern open result", () => {
-	const envKeys = ["TERN_PANE_SOCKET", "TERN_PANE", "PI_BROWSER_TERN"];
+	const envKeys = ["TERN_PANE_SOCKET", "TERN_PANE", "OMSP_BROWSER_TERN"];
 	let savedEnv: Map<string, string | undefined>;
 
 	beforeEach(() => {
@@ -170,7 +170,7 @@ describe("Tern open result", () => {
 	async function open(fake: FakeDaemon, name: string, app?: { target: string }): Promise<string> {
 		process.env.TERN_PANE_SOCKET = fake.socketPath;
 		process.env.TERN_PANE = String(PANE);
-		delete process.env.PI_BROWSER_TERN;
+		delete process.env.OMSP_BROWSER_TERN;
 		const session: ToolSession = {
 			cwd: "/tmp",
 			hasUI: false,
@@ -190,7 +190,7 @@ describe("Tern open result", () => {
 		const text = await open(await startWindow({ shown: false }), "hidden-pip");
 		expect(text).toStartWith('Opened tab "hidden-pip" on Tern browser picture-in-picture (pane 3)');
 		expect(text).toContain("Not on screen");
-		expect(text).toContain("this omp pane (block 3)");
+		expect(text).toContain("this omsp pane (block 3)");
 	});
 
 	it("names the user's adopted block and that closing releases it", async () => {

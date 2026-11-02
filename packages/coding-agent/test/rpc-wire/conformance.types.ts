@@ -11,13 +11,13 @@
  *   and every wire value fits the server field.
  * - Open unions (messages, assistant events) are pinned by discriminator set.
  */
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessageEvent, ImageContent, Model, Usage } from "@oh-my-pi/pi-ai";
-import type { BashResult } from "@oh-my-pi/pi-coding-agent/exec/bash-executor";
-import type { GoalModeState } from "@oh-my-pi/pi-coding-agent/goals/state";
-import type { RpcGoalResult } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-goal";
-import type { RpcMessagesPage } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-messages";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessageEvent, ImageContent, Model, Usage } from "@oh-my-striped-pi/pi-ai";
+import type { BashResult } from "@oh-my-striped-pi/pi-coding-agent/exec/bash-executor";
+import type { GoalModeState } from "@oh-my-striped-pi/pi-coding-agent/goals/state";
+import type { RpcGoalResult } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-goal";
+import type { RpcMessagesPage } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-messages";
 import type {
 	RpcAbortAndRestoreQueueResult,
 	RpcAgentSessionEventFrame,
@@ -54,15 +54,15 @@ import type {
 	RpcSubagentMessagesResult,
 	RpcSubagentProgressFrame,
 	RpcSubagentSnapshot,
-} from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import type * as Wire from "@oh-my-pi/pi-coding-agent/modes/rpc/wire/rpc-wire.generated";
-import type { RestoredQueuedMessage } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
-import type { SessionStats } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { BtwHistoryTurn } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import type { ContextUsage } from "@oh-my-pi/pi-tui/status-line/types";
-import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
-import type { Goal } from "@oh-my-pi/pi-tui/tools/goal";
-import type { TodoItem, TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import type * as Wire from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/wire/rpc-wire.generated";
+import type { RestoredQueuedMessage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session-types";
+import type { SessionStats } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { BtwHistoryTurn } from "@oh-my-striped-pi/pi-coding-agent/session/btw-history";
+import type { ContextUsage } from "@oh-my-striped-pi/pi-tui/status-line/types";
+import type { LogoutAccount } from "@oh-my-striped-pi/pi-tui/overlays/logout-account-selector";
+import type { Goal } from "@oh-my-striped-pi/pi-tui/tools/goal";
+import type { TodoItem, TodoPhase } from "@oh-my-striped-pi/pi-tui/tools/todo";
 
 type Assert<T extends true> = T;
 type Leaf = string | number | boolean | null;

@@ -5,7 +5,7 @@ afterEachOAuthFixture(() => resetOAuthMocks());
 /**
  * Regression coverage for issue #2421.
  *
- * Concurrent omp startups can race against WAL recovery so the auth-store init
+ * Concurrent omsp startups can race against WAL recovery so the auth-store init
  * sees `SQLITE_BUSY` / `SQLITE_BUSY_RECOVERY` before its multi-statement run
  * installs the busy handler. The fix hoists `PRAGMA busy_timeout` to a separate
  * statement that runs first and wraps `open()` in a bounded retry loop on the
@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { isSqliteBusyError, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
+import { isSqliteBusyError, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
 import { removeWithRetries } from "../../utils/src/temp";
 
 interface SqliteBusyShape extends Error {

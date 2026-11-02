@@ -1,19 +1,19 @@
 /**
- * `omp auth-gateway stdio`: the gateway's routes as JSON lines on stdin and
- * stdout (`serveAuthGatewayStdio`), for a parent process that wants omp's
+ * `omsp auth-gateway stdio`: the gateway's routes as JSON lines on stdin and
+ * stdout (`serveAuthGatewayStdio`), for a parent process that wants omsp's
  * inference without an HTTP listener or a bearer token.
  *
- * Unlike `serve` it runs on this omp's own credentials (the broker when one is
+ * Unlike `serve` it runs on this omsp's own credentials (the broker when one is
  * configured, else the local store), models (`models.yml` and extension
- * providers included) and settings. A request's `model` is an omp model
+ * providers included) and settings. A request's `model` is an omsp model
  * selector, as `--model` takes it ({@link selectorCandidates}); an attempt
  * that fails before its reply starts moves on to the next candidate. Serving
  * ends when stdin does.
  */
-import type { Api, Model } from "@oh-my-pi/pi-ai";
-import { createAuthGatewayRouter, serveAuthGatewayStdio } from "@oh-my-pi/pi-ai/auth-gateway";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
-import { getProjectDir, isRecord, logger, postmortem, VERSION } from "@oh-my-pi/pi-utils";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai";
+import { createAuthGatewayRouter, serveAuthGatewayStdio } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { getProjectDir, isRecord, logger, postmortem, VERSION } from "@oh-my-striped-pi/pi-utils";
 import { ModelRegistry } from "../config/model-registry";
 import { formatModelStringWithRouting, normalizeModelPatternList, resolveCliModel } from "../config/model-resolver";
 import { Settings } from "../config/settings";

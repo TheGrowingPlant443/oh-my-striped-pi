@@ -2,7 +2,7 @@ import { afterEach, expect, it, mock, spyOn } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Writable } from "node:stream";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { RpcFrameDecoder, RpcFrameEncoder } from "../src/modes/rpc/rpc-frame";
 import { RpcOutputWriter } from "../src/modes/rpc/rpc-output";
 import { getTestModel } from "./helpers/model-fixtures";
@@ -30,7 +30,7 @@ it("drains RPC command responses after stdin EOF while the real stdout pipe is b
 		],
 		{
 			cwd: import.meta.dir,
-			env: { ...process.env, PI_NO_TITLE: "1" },
+			env: { ...process.env, OMSP_NO_TITLE: "1" },
 			stdin: "pipe",
 			stdout: "pipe",
 			stderr: "pipe",

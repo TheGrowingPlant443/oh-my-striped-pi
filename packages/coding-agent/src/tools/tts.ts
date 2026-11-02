@@ -1,12 +1,12 @@
 // Ported from NousResearch/hermes-agent (MIT) — tools/tts_tool.py L167-171, L896-959.
 // On-device and configured-endpoint speech models share the speech role chain.
 
-import { type } from "@oh-my-pi/omptype";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { ConfigurationError, MissingApiKeyError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { synthesizeSpeech } from "@oh-my-pi/pi-ai/speech";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { ConfigurationError, MissingApiKeyError, ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import { synthesizeSpeech } from "@oh-my-striped-pi/pi-ai/speech";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { resolveRoleChain, type RoleChainCandidate } from "../config/model-resolver";
 import { roleCandidatePool } from "../config/model-roles";

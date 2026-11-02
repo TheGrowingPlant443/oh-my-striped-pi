@@ -4,7 +4,7 @@
  * Model entries switch the current session only; a search beginning with `@`
  * exposes the configured ctrl+p quick roles.
  */
-import type { Model } from "@oh-my-pi/pi-ai";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
 import { addKeyAliases, canonicalKeyId } from "../keybindings";
 import { type KeyId, parseKey } from "../keys";
 import type { Component, TUI } from "../tui";
@@ -25,7 +25,7 @@ import { editorKey, editorKeys } from "../chrome/keybinding-hints";
 import { card, compact, span, text } from "../native/describe";
 import type { DescribeContext, NativeChild, NativeNode, NativeUiEvent } from "../native/node";
 import { CLOSE_ACTION, picker, pickerAction, pickerEvent } from "../native/picker";
-import type { TspPickerProps } from "@oh-my-pi/pi-wire";
+import type { TspPickerProps } from "@oh-my-striped-pi/pi-wire";
 import { actionHint, hintsRow, type NativeHint } from "../native/overlay";
 
 /** Configured role resolved to a concrete model. */
@@ -493,7 +493,7 @@ export class ModelPickerComponent implements Component {
 		// `card` directly: the task-mode tone is a common prop `overlayCard` doesn't take.
 		const node = card(
 			{
-				role: "omp.overlay.model-picker",
+				role: "omsp.overlay.model-picker",
 				head: mode === "task" ? "Switch Task Model" : mode === "selection" ? "Select Model" : "Switch Model",
 				tone: this.#taskMode ? "error" : undefined,
 			},

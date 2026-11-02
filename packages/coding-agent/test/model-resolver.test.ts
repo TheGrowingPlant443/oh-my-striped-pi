@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from "bun:test";
-import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { logger } from "@oh-my-pi/pi-utils";
-import { parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import { type Api, Effort, type Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { logger } from "@oh-my-striped-pi/pi-utils";
+import { parseModelString } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import {
 	expandRoleAlias,
 	extractExplicitThinkingSelector,
@@ -28,9 +28,12 @@ import {
 	resolveSessionModelSelector,
 	rolePriorityDefaults,
 	resolveProviderModelReference,
-} from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { DEFAULT_MODEL_ROLE_ALIAS, LEGACY_MODEL_ROLE_ALIAS_PREFIX } from "@oh-my-pi/pi-coding-agent/config/model-roles";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+} from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import {
+	DEFAULT_MODEL_ROLE_ALIAS,
+	LEGACY_MODEL_ROLE_ALIAS_PREFIX,
+} from "@oh-my-striped-pi/pi-coding-agent/config/model-roles";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 
 // Literal provider fixtures: Copilot chat and a small on-device model.
 const mockModels: Model<Api>[] = [

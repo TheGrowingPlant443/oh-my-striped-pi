@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { logger, withLoopPhase } from "@oh-my-pi/pi-utils";
+import { logger, withLoopPhase } from "@oh-my-striped-pi/pi-utils";
 import { type Env, polyphonicRecallEnabled } from "../config";
 import { closeQuietly, type DatabasePath, openDatabase } from "../db";
 import { backfillConsolidatedFacts, ensureVeracityConsolidator } from "./beam/consolidate";

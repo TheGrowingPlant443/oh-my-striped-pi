@@ -21,13 +21,13 @@ onNativeRenderingChange(() => {
 const OSC8_PATTERN = /\x1b\]8;([^;\x07\x1b]*);([^\x07\x1b]*)(?:\x07|\x1b\\)/g;
 
 /**
- * The OSC 8 params tagging omp's own markers, so they are stripped from terminal output even after
+ * The OSC 8 params tagging omsp's own markers, so they are stripped from terminal output even after
  * their scheme is no longer registered. Each drawn link gets its own `-<n>` suffix, derived from the
  * link itself so every render of the same text draws the same bytes; a label wrapped across rows
  * repeats its marker, suffix included, on every row.
  */
-const MARKER_ID = "id=omp-extension-link";
-const MARKER_PARAMS_PATTERN = /^id=omp-extension-link(?:-\d+)?$/;
+const MARKER_ID = "id=omsp-extension-link";
+const MARKER_PARAMS_PATTERN = /^id=omsp-extension-link(?:-\d+)?$/;
 const MARKER_OPEN = `\x1b]8;${MARKER_ID}`;
 
 /**
@@ -142,7 +142,7 @@ export function linkHintTags(count: number): string[] {
 }
 
 /**
- * `line` without omp's extension-link markers (the OSC 8 open and close around each label), for
+ * `line` without omsp's extension-link markers (the OSC 8 open and close around each label), for
  * terminal output. Every other hyperlink is kept as is.
  */
 export function stripExtensionLinkMarkers(line: string): string {
@@ -176,7 +176,7 @@ export interface ExtensionLinkLabel {
 }
 
 /**
- * The extension link labels drawn on a rendered row, left to right. Only omp's own markers with a
+ * The extension link labels drawn on a rendered row, left to right. Only omsp's own markers with a
  * registered scheme match, so ordinary hyperlinks (even of a registered scheme) and rows drawn for
  * a scheme that is no longer registered never do.
  */

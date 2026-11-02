@@ -1,5 +1,5 @@
-import type { ModelRoleLookup } from "@oh-my-pi/pi-tui/overlays/model-browser";
-import { MAX_THINKING_SUFFIX_OPTIONS, splitThinkingSuffix } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import type { ModelRoleLookup } from "@oh-my-striped-pi/pi-tui/overlays/model-browser";
+import { MAX_THINKING_SUFFIX_OPTIONS, splitThinkingSuffix } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import {
 	resolveConfiguredModelPatterns,
 	resolveModelRoleValue,

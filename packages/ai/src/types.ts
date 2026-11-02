@@ -1,9 +1,17 @@
-export * from "@oh-my-pi/pi-catalog/effort";
-export * from "@oh-my-pi/pi-catalog/types";
+export * from "@oh-my-striped-pi/pi-catalog/effort";
+export * from "@oh-my-striped-pi/pi-catalog/types";
 
-import type { Type } from "@oh-my-pi/omptype";
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
-import type { Api, FetchImpl, KnownApi, Model, Provider, ThinkingBudgets, Usage } from "@oh-my-pi/pi-catalog/types";
+import type { Type } from "@oh-my-striped-pi/omptype";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import type {
+	Api,
+	FetchImpl,
+	KnownApi,
+	Model,
+	Provider,
+	ThinkingBudgets,
+	Usage,
+} from "@oh-my-striped-pi/pi-catalog/types";
 import type { ApiKey } from "./auth-retry";
 import type { OAuthRequestIdentity } from "./auth/types";
 import type { AnthropicOptions } from "./providers/anthropic";
@@ -19,7 +27,7 @@ export type { StopDetails } from "./providers/anthropic-wire";
 export type { AssistantMessageEventStream } from "./utils/event-stream";
 
 /**
- * Ceiling on the output-token count omp requests from any OpenAI-family endpoint
+ * Ceiling on the output-token count omsp requests from any OpenAI-family endpoint
  * (openai-responses, azure/xai responses, and openai-completions).
  *
  * Catalog `maxTokens` frequently reflects a model's context window rather than a
@@ -487,7 +495,7 @@ export interface StreamOptions {
 	 * (`compat.storeResponses`, e.g. Muse Code), so a stream that drops
 	 * mid-turn resumes from `GET /responses/{id}` instead of re-running the
 	 * turn. Privacy: stored runs retain prompts and outputs on the provider.
-	 * Unset falls back to `PI_MUSE_STORE_RESPONSES`, then the host's
+	 * Unset falls back to `OMSP_MUSE_STORE_RESPONSES`, then the host's
 	 * `configureProviderStoreResponses` default, else off. Ignored on hosts
 	 * without the capability.
 	 */
@@ -527,7 +535,7 @@ export interface StreamOptions {
 	/**
 	 * Optional per-provider concurrent request cap for LLM stream calls. Keys are
 	 * provider ids (`model.provider`); positive numeric values cap in-flight
-	 * requests across local OMP processes that share the same config root. Omitted
+	 * requests across local OMSP processes that share the same config root. Omitted
 	 * providers are unlimited. Non-chat provider APIs that bypass stream helpers
 	 * are not covered.
 	 */
@@ -564,11 +572,11 @@ export interface StreamOptions {
 	 * in the iterator while waiting for the first semantic stream event. Set to
 	 * `0` to disable both layers for this request. After the first semantic
 	 * event arrives, `streamIdleTimeoutMs` governs inter-event stalls. Falls
-	 * back to `PI_STREAM_FIRST_EVENT_TIMEOUT_MS` and then to a 100s default.
+	 * back to `OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS` and then to a 100s default.
 	 * OpenAI-family transports additionally honor
-	 * `PI_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS` as the most-specific override and
+	 * `OMSP_OPENAI_STREAM_FIRST_EVENT_TIMEOUT_MS` as the most-specific override and
 	 * floor the first-event budget at the resolved idle (per-call
-	 * `streamIdleTimeoutMs` or `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS`) so slow local
+	 * `streamIdleTimeoutMs` or `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS`) so slow local
 	 * OpenAI-compatible servers are not undercut during prompt processing.
 	 *
 	 * Iterator-level honored by: every built-in provider (via the lazy-stream
@@ -582,7 +590,7 @@ export interface StreamOptions {
 	 * milliseconds. Once the first event arrives, this guards against silent
 	 * mid-stream stalls (broker dies, half-open socket, model produces no real
 	 * progress for too long). Set to `0` to disable. Falls back to
-	 * `PI_STREAM_IDLE_TIMEOUT_MS` (alias: `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS`)
+	 * `OMSP_STREAM_IDLE_TIMEOUT_MS` (alias: `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS`)
 	 * and then to a 120s default.
 	 */
 	streamIdleTimeoutMs?: number;

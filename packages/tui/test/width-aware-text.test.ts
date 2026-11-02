@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { DescribeContext } from "@oh-my-pi/pi-tui/native/node";
-import { WidthAwareText } from "@oh-my-pi/pi-tui/render/width-aware-text";
+import type { DescribeContext } from "@oh-my-striped-pi/pi-tui/native/node";
+import { WidthAwareText } from "@oh-my-striped-pi/pi-tui/render/width-aware-text";
 
 function makeCx(cols: number): DescribeContext {
 	return {

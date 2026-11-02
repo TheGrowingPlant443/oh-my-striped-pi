@@ -2,42 +2,42 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { writeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel, getBundledModels } from "@oh-my-pi/pi-catalog/models";
-import { resolveModelCacheProviderId } from "@oh-my-pi/pi-catalog/provider-models";
-import { DEFAULT_MODEL_PER_PROVIDER } from "@oh-my-pi/pi-catalog/provider-models/descriptors";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry, type ProviderConfigInput } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { getModelMatchPreferences, resolveModelScope } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { writeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { getBundledModel, getBundledModels } from "@oh-my-striped-pi/pi-catalog/models";
+import { resolveModelCacheProviderId } from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { DEFAULT_MODEL_PER_PROVIDER } from "@oh-my-striped-pi/pi-catalog/provider-models/descriptors";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry, type ProviderConfigInput } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { getModelMatchPreferences, resolveModelScope } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	buildSessionOptions as buildCliSessionOptions,
 	rebuildScopedModels,
 	resolveScopedModels,
-} from "@oh-my-pi/pi-coding-agent/main";
-import { createAgentSession, type ExtensionFactory } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as discoveryModule from "@oh-my-pi/pi-coding-agent/task/discovery";
-import * as executorModule from "@oh-my-pi/pi-coding-agent/task/executor";
-import { getBundledAgent } from "@oh-my-pi/pi-coding-agent/task/agents";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+} from "@oh-my-striped-pi/pi-coding-agent/main";
+import { createAgentSession, type ExtensionFactory } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as discoveryModule from "@oh-my-striped-pi/pi-coding-agent/task/discovery";
+import * as executorModule from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { getBundledAgent } from "@oh-my-striped-pi/pi-coding-agent/task/agents";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import {
 	getRetryFallbackRole,
 	installRetryFallbackRole,
 	type RetryFallbackRole,
-} from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { getRestorableSessionModels } from "@oh-my-pi/pi-coding-agent/session/session-context";
-import { EPHEMERAL_MODEL_CHANGE_ROLE } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import { TurnRecovery, type TurnRecoveryHost } from "@oh-my-pi/pi-coding-agent/session/turn-recovery";
-import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import { removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { getRestorableSessionModels } from "@oh-my-striped-pi/pi-coding-agent/session/session-context";
+import { EPHEMERAL_MODEL_CHANGE_ROLE } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import { TurnRecovery, type TurnRecoveryHost } from "@oh-my-striped-pi/pi-coding-agent/session/turn-recovery";
+import type { AgentDefinition } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import { removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgRetryFallbackChains } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 describe("createAgentSession deferred model pattern resolution", () => {
 	let tempDir: string;

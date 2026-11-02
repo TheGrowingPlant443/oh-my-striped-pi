@@ -3,22 +3,27 @@ import { $ } from "bun";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { type AssistantMessage, createAssistantMessageEventStream, getCustomApi, type ToolCall } from "@oh-my-pi/pi-ai";
-import { runCommitAgentSession } from "@oh-my-pi/pi-coding-agent/commit/agentic/agent";
-import * as commitTools from "@oh-my-pi/pi-coding-agent/commit/agentic/tools";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { initializeExtensions } from "@oh-my-pi/pi-coding-agent/modes/runtime-init";
+import { type } from "@oh-my-striped-pi/omptype";
+import {
+	type AssistantMessage,
+	createAssistantMessageEventStream,
+	getCustomApi,
+	type ToolCall,
+} from "@oh-my-striped-pi/pi-ai";
+import { runCommitAgentSession } from "@oh-my-striped-pi/pi-coding-agent/commit/agentic/agent";
+import * as commitTools from "@oh-my-striped-pi/pi-coding-agent/commit/agentic/tools";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { initializeExtensions } from "@oh-my-striped-pi/pi-coding-agent/modes/runtime-init";
 import {
 	type CreateAgentSessionOptions,
 	createAgentSession,
 	type ExtensionFactory,
-} from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir, Snowflake } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir, Snowflake } from "@oh-my-striped-pi/pi-utils";
 
 function restoreEnv(key: string, value: string | undefined): void {
 	if (value === undefined) {
@@ -29,7 +34,7 @@ function restoreEnv(key: string, value: string | undefined): void {
 }
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
-import { cfgExtensionHandlersToolCallTimeoutMs } from "@oh-my-pi/pi-coding-agent/extensibility/settings";
+import { cfgExtensionHandlersToolCallTimeoutMs } from "@oh-my-striped-pi/pi-coding-agent/extensibility/settings";
 
 const providerName = "company-restricted-session";
 const modelId = "restricted-session-model";
@@ -43,9 +48,9 @@ describe("restricted sessions sharing extension providers", () => {
 	let providerRequests: number;
 	let settings: Settings;
 
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	const originalPiProfile = process.env.PI_PROFILE;
-	const originalOmpProfile = process.env.OMP_PROFILE;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+	const originalPiProfile = process.env.OMSP_PROFILE;
+	const originalOmpProfile = process.env.OMSP_PROFILE;
 
 	beforeEach(() => {
 		tempDir = path.join(os.tmpdir(), `pi-sdk-restricted-provider-${Snowflake.next()}`);
@@ -65,18 +70,18 @@ describe("restricted sessions sharing extension providers", () => {
 			modelRegistry.clearSourceRegistrations(sourceId);
 			authStorage.close();
 		} finally {
-			restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-			restoreEnv("PI_PROFILE", originalPiProfile);
-			restoreEnv("OMP_PROFILE", originalOmpProfile);
+			restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+			restoreEnv("OMSP_PROFILE", originalPiProfile);
+			restoreEnv("OMSP_PROFILE", originalOmpProfile);
 			__resetDirsFromEnvForTests();
 			removeSyncWithRetries(tempDir);
 		}
 	});
 
 	afterAll(() => {
-		restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-		restoreEnv("PI_PROFILE", originalPiProfile);
-		restoreEnv("OMP_PROFILE", originalOmpProfile);
+		restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+		restoreEnv("OMSP_PROFILE", originalPiProfile);
+		restoreEnv("OMSP_PROFILE", originalOmpProfile);
 		__resetDirsFromEnvForTests();
 	});
 

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import type { CustomToolContext } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/types";
-import { connectToServer } from "@oh-my-pi/pi-coding-agent/mcp/client";
-import { DeferredMCPTool, MCPTool } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
-import type { MCPServerConnection } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import type { CustomToolContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/types";
+import { connectToServer } from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import { DeferredMCPTool, MCPTool } from "@oh-my-striped-pi/pi-coding-agent/mcp/tool-bridge";
+import type { MCPServerConnection } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const TOOL_DEF = { name: "record_effect", inputSchema: { type: "object" as const } };
 const connections: MCPServerConnection[] = [];
@@ -19,7 +19,7 @@ let auth: AuthStorage;
 let context: CustomToolContext;
 
 beforeEach(async () => {
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-no-replay-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-no-replay-"));
 	effectsPath = path.join(tempDir, "effects.txt");
 	auth = await AuthStorage.create(":memory:");
 	context = {

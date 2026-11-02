@@ -6,16 +6,16 @@ import type {
 	AgentToolResult,
 	AgentToolUpdateCallback,
 	ToolApprovalDecision,
-} from "@oh-my-pi/pi-agent-core";
-import { isEnoent, isFsError, logger, prompt, untilAborted } from "@oh-my-pi/pi-utils";
-import { type Theme, theme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-agent-core";
+import { isEnoent, isFsError, logger, prompt, untilAborted } from "@oh-my-striped-pi/pi-utils";
+import { type Theme, theme } from "@oh-my-striped-pi/pi-tui/theme";
 import lspDescription from "../prompts/tools/lsp.md" with { type: "text" };
 import type { ToolSession } from "../tools";
 import { truncateForPrompt } from "../tools/approval";
 import { formatPathRelativeToCwd, resolveToCwd } from "../tools/path-utils";
-import { replaceTabs, shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { replaceTabs, shortenPath } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { ToolAbortError, throwIfAborted } from "../tools/tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { clampTimeout, resolveLspTimeouts, TOOL_TIMEOUTS } from "../tools/tool-timeouts";
 import {
 	applyWorkspaceEditWithLsp,
@@ -88,7 +88,7 @@ import {
 	type TextEdit,
 	type WorkspaceEdit,
 } from "./types";
-import { type LspParams, type LspToolDetails } from "@oh-my-pi/pi-tui/tools/lsp";
+import { type LspParams, type LspToolDetails } from "@oh-my-striped-pi/pi-tui/tools/lsp";
 import {
 	applyCodeAction,
 	dedupeWorkspaceSymbols,
@@ -108,7 +108,7 @@ import {
 	symbolKindToIcon,
 	uriToFile,
 } from "./utils";
-import { formatGroupedDiagnosticMessages } from "@oh-my-pi/pi-tui/tools/output-meta";
+import { formatGroupedDiagnosticMessages } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
 import { runWorkspaceDiagnostics } from "./workspace-diagnostics";
 
 import { cfgToolsMaxTimeout } from "../tools/settings";
@@ -386,7 +386,7 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 						const client = await getOrCreateClient(serverConfig, this.session.cwd, undefined, signal);
 						// Sync open dependencies, then make the server compute the target's
 						// diagnostics against current disk state. A report cached from an earlier
-						// call cannot be trusted: a dependency OMP never opened may have changed.
+						// call cannot be trusted: a dependency OMSP never opened may have changed.
 						await reconcileOpenFilesFromDisk(client, signal, uri);
 						const minVersion = client.diagnosticsVersion;
 						// Set when clangd was asked to rebuild: its report is final only once its
@@ -1161,7 +1161,7 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 
 		if (action === "reload" && (isWorkspace || !resolvedFile)) {
 			// `reload *` is the user's explicit request to re-read config from
-			// disk. Drop the per-cwd cache entry so `.omp/lsp.json`, root markers,
+			// disk. Drop the per-cwd cache entry so `.omsp/lsp.json`, root markers,
 			// and plugin configs added after the first LSP call become visible —
 			// otherwise `getConfig` returns the first observation for the rest of
 			// the process lifetime (#3546).
@@ -1573,7 +1573,7 @@ export class LspTool implements AgentTool<typeof lspSchema, LspToolDetails, Them
 					}
 
 					// A project-wide rename answers with ranges for every file it
-					// touches. An already-open consumer that was edited outside OMP
+					// touches. An already-open consumer that was edited outside OMSP
 					// still holds its stale overlay, so those ranges point at the old
 					// text and the edit lands on the wrong lines while the rename
 					// reports success (#15772). Sync every open document, not just

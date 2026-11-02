@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { raceWithSignal } from "@oh-my-pi/pi-ai/utils/abort";
+import { raceWithSignal } from "@oh-my-striped-pi/pi-ai/utils/abort";
 
 const unhandled: unknown[] = [];
 const onUnhandled = (reason: unknown): void => {

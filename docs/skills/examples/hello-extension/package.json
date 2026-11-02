@@ -1,9 +1,9 @@
 {
   "name": "hello-extension",
   "version": "1.0.0",
-  "description": "Minimal omp extension example",
-  "homepage": "https://omp.sh",
-  "omp": {
+  "description": "Minimal omsp extension example",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
+  "omsp": {
     "extensions": ["./index.ts"]
   }
 }

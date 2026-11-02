@@ -2,22 +2,22 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { findFreeCdpPort } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
-import { ensureChromiumExecutable } from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
-import { acquireBrowser, releaseBrowser } from "@oh-my-pi/pi-coding-agent/tools/browser/registry";
-import { unpackedExtensionId } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/extension-files";
-import { waitForRelayExtension } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/probe";
-import { type RelayServer, startRelayServer } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/server";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { findFreeCdpPort } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
+import { ensureChromiumExecutable } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
+import { acquireBrowser, releaseBrowser } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/registry";
+import { unpackedExtensionId } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/extension-files";
+import { waitForRelayExtension } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/probe";
+import { type RelayServer, startRelayServer } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/server";
 import type {
 	WorkerInbound,
 	WorkerInitPayload,
 	WorkerOutbound,
-} from "@oh-my-pi/pi-coding-agent/tools/browser/tab-protocol";
-import { acquireTab, releaseTab, runInTab } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import { WorkerCore } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-worker";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { getPuppeteerDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-protocol";
+import { acquireTab, releaseTab, runInTab } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import { WorkerCore } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-worker";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { getPuppeteerDir } from "@oh-my-striped-pi/pi-utils";
 import puppeteer, { type Browser } from "puppeteer-core";
 import { chromiumAvailable } from "./chromium-probe";
 
@@ -83,7 +83,7 @@ async function launchRelayFixture(
 ): Promise<RelayFixture> {
 	const port = await findFreeCdpPort();
 	const server = startRelayServer({ port, group: false, log });
-	const extensionDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-relay-isolation-"));
+	const extensionDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-relay-isolation-"));
 	const pages = Bun.serve({
 		port: 0,
 		fetch(request) {
@@ -141,7 +141,7 @@ async function launchRelayFixture(
 			await fs.copyFile(path.join(ASSETS, `${file}.txt`), path.join(extensionDir, file));
 		}
 		const background = await fs.readFile(path.join(ASSETS, "background.js.txt"), "utf8");
-		const defaultPort = "var DEFAULT_PORT = 9224;";
+		const defaultPort = "var DEFAULT_PORT = 9225;";
 		if (!background.includes(defaultPort)) throw new Error("Relay extension default port not found");
 		// Point the disposable extension at this relay without deferring listener registration.
 		await fs.writeFile(
@@ -281,7 +281,7 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("relay tab ownership", () => {
 		}
 	}, 60_000);
 
-	it("opens a default tab in the browser of the tab omp used last, not the first selected one", async () => {
+	it("opens a default tab in the browser of the tab omsp used last, not the first selected one", async () => {
 		const secondHello = Promise.withResolvers<void>();
 		let hellos = 0;
 		const fixture = await launchRelayFixture(message => {
@@ -388,11 +388,11 @@ describe.skipIf(!CHROMIUM_AVAILABLE)("owned tab recovery", () => {
 			mode: "attach",
 			browserWSEndpoint: launched.browser.wsEndpoint(),
 			safeDir: getPuppeteerDir(),
-			uploadDir: "/tmp/omp-uploads-test",
+			uploadDir: "/tmp/omsp-uploads-test",
 			page: { kind: "owned", targetId: target._targetId },
 			recover: true,
 		};
-		const downloadDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-recovery-download-"));
+		const downloadDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-recovery-download-"));
 		const blockedDownloadPath = path.join(downloadDir, "not-a-directory");
 		await fs.writeFile(blockedDownloadPath, "existing file");
 		const failed = startWorker({ ...payload, downloadsPath: blockedDownloadPath });

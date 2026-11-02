@@ -19,7 +19,7 @@ For packaged user-facing extension CLIs/features, see [`user-facing-packages.md`
 An extension is a TS/JS module exporting a default factory. Factories may initialize synchronously or return a promise:
 
 ```ts
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
 
 export default function myExtension(pi: ExtensionAPI) {
 	// register handlers/tools/commands/renderers
@@ -69,7 +69,7 @@ Important constraint from `loader.ts`:
 ## Quick start
 
 ```ts
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
 	const z = pi.zod;
@@ -161,11 +161,11 @@ Also exposed:
 
 ### Runtime setting overrides
 
-Settings are addressed through typed registry handles (see "Definitions" in [config-usage.md](./config-usage.md#definitions-srcconfigregistryts)); the string-path `settings.get`/`set`/`override` methods were removed in 18.3. Extensions resolve a handle by id with `lookup(id)` (and enumerate them with `all()`) from the `@oh-my-pi/pi-coding-agent/config/registry` subpath, then pass `pi.pi.settings` as the scope:
+Settings are addressed through typed registry handles (see "Definitions" in [config-usage.md](./config-usage.md#definitions-srcconfigregistryts)); the string-path `settings.get`/`set`/`override` methods were removed in 18.3. Extensions resolve a handle by id with `lookup(id)` (and enumerate them with `all()`) from the `@oh-my-striped-pi/pi-coding-agent/config/registry` subpath, then pass `pi.pi.settings` as the scope:
 
 ```ts
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import { lookup } from "@oh-my-pi/pi-coding-agent/config/registry";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
+import { lookup } from "@oh-my-striped-pi/pi-coding-agent/config/registry";
 
 export default function (pi: ExtensionAPI) {
 	const recap = lookup("recap.enabled");
@@ -244,7 +244,7 @@ Handlers and tool `execute` receive `ctx` with:
    ```
 
 - `getSystemPrompt()`
-- `isProjectTrusted()` — always `true`; OMP does not ask for per-directory trust before loading project inputs
+- `isProjectTrusted()` — always `true`; OMSP does not ask for per-directory trust before loading project inputs
 - `agent` — the agent this session runs: `{ kind: "main" | "sub", id, name, depth, parentId? }`. Factories are rebound to every subagent session (task tool, eval `agent()`, `/tan` clones), so a handler can check `ctx.agent.kind === "sub"` or the lowercased agent definition `name` (for example `"explore"`) to act only in subagents. Use `kind`, not `depth`: `depth` counts `task` nesting only, so `/tan` clones are subagents at depth 0 and report `name: "sub"`. An advisor's own tool calls reach the session's `tool_call`/`tool_result` handlers with `{ kind: "sub", id: "advisor", name: "advisor", depth: 0, parentId }`, so `kind === "main"` also excludes advisor activity
 - `runEphemeralTurn(...)` (optional; see below)
 - `memory` (optional structured memory runtime — status/search/save across the configured backend)
@@ -351,7 +351,7 @@ source. Its `session_start` still runs (it is delivered when the extension
 binds), and the first submitted message and every model turn wait until it is
 loaded, so its tools, commands, and `input`/`before_agent_start` hooks apply from
 the first request. Events emitted before it binds are not replayed. Resumed
-sessions, `--tools`, and launches with flags omp does not recognize load every
+sessions, `--tools`, and launches with flags omsp does not recognize load every
 extension before the session starts.
 
 `session.compacting` receives `{ sessionId, messages }` and can return
@@ -547,7 +547,7 @@ supports it. Repeats (compared ignoring surrounding whitespace) are dropped at t
 identical to an earlier handler's on the same call, and a call's joined context identical to an earlier
 call's in the same batch. Raw tool output and other untrusted data must stay in the ordinary tool result.
 
-Distinct non-empty context from every non-blocking handler is preserved in registration order. OMP waits
+Distinct non-empty context from every non-blocking handler is preserved in registration order. OMSP waits
 until the tool batch settles, then emits the context after the corresponding tool results in
 assistant tool-call order and before the next provider request. Handler context is delivered only when
 the call actually runs and returns a non-error result: if the call is blocked by this or a later
@@ -642,7 +642,7 @@ with a permission error (`EPERM`/`EACCES`/`EROFS` — every other error, such as
 via `pi.registerFileWriteFallback` before giving up:
 
 ```ts
-import type { FileWriteFallbackHandler } from "@oh-my-pi/pi-coding-agent";
+import type { FileWriteFallbackHandler } from "@oh-my-striped-pi/pi-coding-agent";
 
 const writeThroughBroker: FileWriteFallbackHandler = async (req, ctx) => {
 	// req: { dst: string; content: string; cause: unknown; sessionId: string | undefined }
@@ -813,7 +813,7 @@ Herdr, CMUX, and Orca are supported; screen and wmux remain recognized by the
 multiplexer taxonomy but are currently unsupported.
 
 Provider-specific session detection is centralized in
-`@oh-my-pi/pi-tui/terminal-multiplexer`, which registers one module per multiplexer.
+`@oh-my-striped-pi/pi-tui/terminal-multiplexer`, which registers one module per multiplexer.
 `hasTerminalMultiplexerSession(provider, env)` checks explicit session markers, while
 `classifyTerminalMultiplexer(env)` names the multiplexer hosting the process: session
 markers first, then a `tmux`/`screen` `TERM` fallback, then outer applications such as
@@ -825,7 +825,7 @@ provider session or a native pane ID exists.
 The TUI host injects this capability; extensions do not need to import dispatcher
 code to use it.
 
-Built-in OMP callers can pass `classifyTerminalMultiplexer(env)` to
+Built-in OMSP callers can pass `classifyTerminalMultiplexer(env)` to
 `getTerminalLaunchPlacement(...)` for support and presentation metadata or as the
 first argument to `createDefaultTerminalLaunchRequest(...)` for a validated
 provider-default request. The factory also takes a placement, command argv, cwd, and
@@ -954,7 +954,7 @@ backends turn argv into shell text, under the required POSIX grammar assertion.
 
 - dialog methods (`select`, `confirm`, `input`, `editor`) round-trip to client responses; `input` forwards `ExtensionUIDialogOptions.secret` as an unnegotiated host hint (`secret?: boolean`) on the `extension_ui_request` frame
 - fire-and-forget methods emit requests (`notify`, `setStatus`, `setWidget` for string arrays or removal, and `setEditorText` as `method: "set_editor_text"`); `pasteToEditor` falls back to `setEditorText`
-- `setTitle` emits only when `PI_RPC_EMIT_TITLE` is `1`, `true`, `yes`, or `on` (case-insensitive)
+- `setTitle` emits only when `OMSP_RPC_EMIT_TITLE` is `1`, `true`, `yes`, or `on` (case-insensitive)
 
 Unsupported/no-op in RPC implementation:
 
@@ -1070,8 +1070,8 @@ for (const entry of ctx.sessionManager.getBranch()) {
 `registerComposerShape` adds an extension-owned input-editor layout to **Appearance → Composer Shape**. Register it from the extension factory; the renderer is used by the live editor and its settings preview.
 
 ```ts
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
-import type { ComposerStyle } from "@oh-my-pi/pi-tui";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent";
+import type { ComposerStyle } from "@oh-my-striped-pi/pi-tui";
 
 const dockStyle: ComposerStyle = {
 	id: "acme-dock",
@@ -1153,7 +1153,7 @@ Used by interactive rendering when custom messages are displayed.
 ## Assistant thinking renderer
 
 ```ts
-import { Container, Text } from "@oh-my-pi/pi-tui";
+import { Container, Text } from "@oh-my-striped-pi/pi-tui";
 
 pi.registerAssistantThinkingRenderer((context, theme) => {
 	const container = new Container();
@@ -1195,13 +1195,13 @@ pi.on("link_activate", ({ url }) => {
 ```
 
 - **Drawing.** In a plain terminal, a markdown link using a claimed scheme, in an assistant reply or anywhere else markdown is drawn, shows its label only, with a dotted underline (a plain underline in terminals without styled underlines) that sets it apart from web links: no ` (url)` suffix, and no hyperlink the terminal or a browser could open.
-- **Keyboard.** In a plain terminal, `app.links.hint` (`Alt+O` by default, see [keybindings](./keybindings.md)) tags each claimed link on screen with one or two letters drawn over the start of its label; a label wrapped across rows gets one tag. Typing a whole tag raises `link_activate` for the claiming extension. `Esc` or any key that is not a lowercase letter cancels and is swallowed, except `Ctrl+C` and a paste, which cancel and keep their usual effect. Hint mode works while the prompt editor has focus and ends when an overlay or dialog takes it, or when a repaint moves or removes the tagged labels, as a streaming reply can, so a tag never picks a link no longer under it. With no claimed link on screen the key only shows a status, and with more links on one row than their tags can fit side by side it shows a status instead of tags. The first time a claimed link is drawn omp says which key picks it.
+- **Keyboard.** In a plain terminal, `app.links.hint` (`Alt+O` by default, see [keybindings](./keybindings.md)) tags each claimed link on screen with one or two letters drawn over the start of its label; a label wrapped across rows gets one tag. Typing a whole tag raises `link_activate` for the claiming extension. `Esc` or any key that is not a lowercase letter cancels and is swallowed, except `Ctrl+C` and a paste, which cancel and keep their usual effect. Hint mode works while the prompt editor has focus and ends when an overlay or dialog takes it, or when a repaint moves or removes the tagged labels, as a streaming reply can, so a tag never picks a link no longer under it. With no claimed link on screen the key only shows a status, and with more links on one row than their tags can fit side by side it shows a status instead of tags. The first time a claimed link is drawn omsp says which key picks it.
 - **Clicks.** With `tui.mouse` on, a left click on the label in a plain terminal does the same as typing its tag, instead of any other click action. Either way, while a subagent's transcript is focused, the event goes to that subagent's copy of the extension (the one whose renderers drew it), and the handler's `ctx.ui` is the interactive UI, so call `ctx.ui.rerenderMessage` from the handler's own context. Labels already in terminal scrollback cannot be picked.
 - **Untrusted input.** `url` comes from whatever drew the link, not only from your renderer: the model, or tool output it repeats, can write `[Continue](cc-stretch:delete/all)`, and since the URL is hidden the user sees only `Continue`. Validate `url` and treat it like user input: parse it strictly, reject unknown operations, and confirm before anything destructive.
 - **Handler.** A `link_activate` handler runs like a command, without the event-handler timeout, so it may await a dialog (`ctx.ui.confirm`, `ctx.ui.select`, …). A handler that throws is reported as an extension error.
 - **Fallback.** `ctx.ui.getLinkClicksAvailable()` is true only while claimed links can be picked: interactive mode, a plain terminal, `extensionRenderers.assistantText` on, and the hint key bound or `tui.mouse` on. A subagent's copy of the extension gets the same answer, since its links are picked on the same screen. Changing the setting, `tui.mouse` while the hint key is unbound, Tern's native view opening or closing, or suspending or resuming an extension (a live `disabledExtensions` edit) re-runs the assistant text renderers, so a renderer can check it on each call and draw content inline instead of behind a link nobody can pick.
-- **Ownership.** Scheme names are case-insensitive and at least two characters long, so no scheme captures a Windows drive path such as `C:/notes.md`. When two extensions claim one scheme, the first loaded gets its clicks; a suspended extension's schemes are released until it resumes. Web, file and mail schemes (`http`, `https`, `file`, `mailto`, …) and omp's internal URL schemes (`local`, `skill`, `agent`, …) are reserved: claiming one throws and fails the extension's load. Only links omp draws itself are picked: a raw terminal hyperlink of a claimed scheme in tool output stays an ordinary hyperlink.
-- **Tern.** Tern's native view draws such links as its own links and does not route their clicks back to omp; handle them there with a Tern plugin.
+- **Ownership.** Scheme names are case-insensitive and at least two characters long, so no scheme captures a Windows drive path such as `C:/notes.md`. When two extensions claim one scheme, the first loaded gets its clicks; a suspended extension's schemes are released until it resumes. Web, file and mail schemes (`http`, `https`, `file`, `mailto`, …) and omsp's internal URL schemes (`local`, `skill`, `agent`, …) are reserved: claiming one throws and fails the extension's load. Only links omsp draws itself are picked: a raw terminal hyperlink of a claimed scheme in tool output stays an ordinary hyperlink.
+- **Tern.** Tern's native view draws such links as its own links and does not route their clicks back to omsp; handle them there with a Tern plugin.
 
 ## Tool call/result renderer
 

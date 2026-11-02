@@ -5,10 +5,10 @@ import {
 	getCustomApi,
 	registerCustomApi,
 	unregisterCustomApis,
-} from "@oh-my-pi/pi-ai/api-registry";
-import { createMockModel, streamMock } from "@oh-my-pi/pi-ai/providers/mock";
-import { completeSimple } from "@oh-my-pi/pi-ai/stream";
-import type { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/types";
+} from "@oh-my-striped-pi/pi-ai/api-registry";
+import { createMockModel, streamMock } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { completeSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import type { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/types";
 
 afterEach(() => {
 	clearCustomApis();

@@ -1,4 +1,4 @@
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { CONTEXT_PRESENTATION } from "../chrome/context-presentation";
 import type { ContextViewCategory, ContextViewData, ContextViewEntry } from "../chrome/context-view-model";
 import { editorKey } from "../chrome/keybinding-hints";
@@ -209,7 +209,7 @@ export class ContextViewer implements Component {
 			this.#nativeOverlay = {
 				category,
 				props: {
-					role: "omp.overlay.report",
+					role: "omsp.overlay.report",
 					size: "lg",
 					anchor: "center",
 					head: [
@@ -577,7 +577,7 @@ export class ContextViewer implements Component {
 			]),
 		);
 		return col(children, {
-			role: "omp.context",
+			role: "omsp.context",
 			// Overview and category lists own their scrollers, so the pinned actions never cover a revealed row.
 			...(this.#state !== "entry" ? { grow: 1, min: { h: 0 } } : {}),
 		});

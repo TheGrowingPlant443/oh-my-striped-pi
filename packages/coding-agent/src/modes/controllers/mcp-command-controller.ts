@@ -3,10 +3,10 @@
  *
  * Handles /mcp subcommands for managing MCP servers.
  */
-import { type Component, replaceTabs, Spacer, Text } from "@oh-my-pi/pi-tui";
-import { getMCPConfigPath, getProjectDir } from "@oh-my-pi/pi-utils";
-import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
-import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
+import { type Component, replaceTabs, Spacer, Text } from "@oh-my-striped-pi/pi-tui";
+import { getMCPConfigPath, getProjectDir } from "@oh-my-striped-pi/pi-utils";
+import { formatKeyHint } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { appKey } from "@oh-my-striped-pi/pi-tui/chrome/keybinding-hints";
 import { clearCache as clearFsCache } from "../../capability/fs";
 import type { SourceMeta } from "../../capability/types";
 import {
@@ -46,18 +46,18 @@ import {
 	removeManagedMcpOAuthCredentials,
 } from "../../mcp/oauth-credentials";
 import type { MCPAuthChallenge, MCPConfigFile, MCPServerConfig, MCPServerConnection } from "../../mcp/types";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
-import { urlHyperlinkAlways } from "@oh-my-pi/pi-tui/render";
+import { shortenPath } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { urlHyperlinkAlways } from "@oh-my-striped-pi/pi-tui/render";
 import { copyToClipboard } from "../../utils/clipboard";
 import { openPath } from "../../utils/open";
-import { ChatBlock } from "@oh-my-pi/pi-tui/chrome/chat-block";
-import { DynamicBorder } from "@oh-my-pi/pi-tui/chrome/dynamic-border";
-import { MCPAddWizard } from "@oh-my-pi/pi-tui/overlays/mcp-add-wizard";
-import { TranscriptBlock } from "@oh-my-pi/pi-tui/chrome/transcript-container";
+import { ChatBlock } from "@oh-my-striped-pi/pi-tui/chrome/chat-block";
+import { DynamicBorder } from "@oh-my-striped-pi/pi-tui/chrome/dynamic-border";
+import { MCPAddWizard } from "@oh-my-striped-pi/pi-tui/overlays/mcp-add-wizard";
+import { TranscriptBlock } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
 import { parseCommandArgs } from "../../utils/command-args";
-import { theme } from "@oh-my-pi/pi-tui/theme";
-import { col, span, text } from "@oh-my-pi/pi-tui/native/describe";
-import type { NativeNode } from "@oh-my-pi/pi-tui/native/node";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { col, span, text } from "@oh-my-striped-pi/pi-tui/native/describe";
+import type { NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
 import type { InteractiveModeContext } from "../types";
 import { groupBySource, parseRemoveArgs, readScopeFlag, showCommandMessage } from "./command-controller-shared";
 
@@ -121,7 +121,7 @@ function wrapUrlRows(label: string, url: string, width: number): string[] {
 /**
  * Renders the MCP OAuth fallback URL. Always shows the full authorization URL
  * as the primary `Copy URL:` target — that works from any machine, including
- * SSH/WSL/headless sessions where the OMP-hosted `/launch` loopback URL would
+ * SSH/WSL/headless sessions where the OMSP-hosted `/launch` loopback URL would
  * resolve against the user's local browser and fail.
  *
  * The render is `width`-aware: on any viewport narrower than the composed row
@@ -758,9 +758,9 @@ export class MCPCommandController {
 					openPath(info.url);
 					// Stage the FULL authorization URL on the clipboard via OSC 52.
 					// The full URL works from any machine (unlike `launchUrl`, which
-					// only resolves against the OMP host), and OSC 52 is a
+					// only resolves against the OMSP host), and OSC 52 is a
 					// wire-level protocol — the terminal writes it to the user's
-					// LOCAL clipboard even when OMP is on a remote SSH box.
+					// LOCAL clipboard even when OMSP is on a remote SSH box.
 					// Best-effort: falls back to the visible copy-URL rows below
 					// whether or not the terminal honors OSC 52.
 					void copyToClipboard(info.url).catch(() => {});

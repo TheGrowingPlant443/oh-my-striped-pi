@@ -1,14 +1,22 @@
 import { describe, expect, it } from "bun:test";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import { convertMessages as convertOpenAICompletionsMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import { convertMessages as convertOpenAICompletionsMessages } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
 import {
 	appendResponsesToolResultMessages,
 	convertResponsesInputContent,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { NON_VISION_IMAGE_PLACEHOLDER } from "@oh-my-pi/pi-ai/providers/vision-guard";
-import type { Api, AssistantMessage, Context, Model, ModelSpec, ToolResultMessage, Usage } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ResolvedOpenAICompat } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { NON_VISION_IMAGE_PLACEHOLDER } from "@oh-my-striped-pi/pi-ai/providers/vision-guard";
+import type {
+	Api,
+	AssistantMessage,
+	Context,
+	Model,
+	ModelSpec,
+	ToolResultMessage,
+	Usage,
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ResolvedOpenAICompat } from "@oh-my-striped-pi/pi-catalog/types";
 
 const emptyUsage: Usage = {
 	input: 0,

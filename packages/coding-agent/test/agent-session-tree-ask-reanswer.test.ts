@@ -14,14 +14,14 @@
  * silently reporting a successful no-op navigation (review on #5895).
  */
 import { describe, expect, it, vi } from "bun:test";
-import { Agent, AgentBusyError, type AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
-import { SecretObfuscator } from "@oh-my-pi/pi-coding-agent/secrets/obfuscator";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { AskToolDetails } from "@oh-my-pi/pi-tui/tools/ask";
+import { Agent, AgentBusyError, type AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
+import { SecretObfuscator } from "@oh-my-striped-pi/pi-coding-agent/secrets/obfuscator";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { AskToolDetails } from "@oh-my-striped-pi/pi-tui/tools/ask";
 
 const TEST_MODEL = getBundledModel("github-copilot", "claude-sonnet-4.5")!;
 

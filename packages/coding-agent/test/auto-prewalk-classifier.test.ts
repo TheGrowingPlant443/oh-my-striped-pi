@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	AUTO_PREWALK_TIMEOUT_MS,
 	type AutoPrewalkInput,
 	classifyAutoPrewalk,
 	type PrewalkRoute,
-} from "@oh-my-pi/pi-coding-agent/auto-prewalk/classifier";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ChainJudge, hasNativeJudge } from "@oh-my-pi/pi-coding-agent/judgment";
-import { MAX_TINY_MESSAGE_CHARS } from "@oh-my-pi/pi-coding-agent/tiny/message-preproc";
-import { tinyModelClient } from "@oh-my-pi/pi-coding-agent/tiny/title-client";
+} from "@oh-my-striped-pi/pi-coding-agent/auto-prewalk/classifier";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ChainJudge, hasNativeJudge } from "@oh-my-striped-pi/pi-coding-agent/judgment";
+import { MAX_TINY_MESSAGE_CHARS } from "@oh-my-striped-pi/pi-coding-agent/tiny/message-preproc";
+import { tinyModelClient } from "@oh-my-striped-pi/pi-coding-agent/tiny/title-client";
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 const ONLINE = getBundledModel("github-copilot", "claude-sonnet-4.6");

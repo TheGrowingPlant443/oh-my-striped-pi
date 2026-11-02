@@ -1,16 +1,16 @@
-import type { WriteToolDetails } from "@oh-my-pi/pi-tui/tools/write";
+import type { WriteToolDetails } from "@oh-my-striped-pi/pi-tui/tools/write";
 import { Database } from "bun:sqlite";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import type {
 	AgentTool,
 	AgentToolContext,
 	AgentToolResult,
 	AgentToolUpdateCallback,
 	ToolApprovalDecision,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 
 import {
 	BINARY_SNIFF_BYTES,
@@ -20,7 +20,7 @@ import {
 	prompt,
 	untilAborted,
 	withFileLock,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import {
 	type ArchiveMemberContent,
 	archiveFormatFromPath,
@@ -30,7 +30,7 @@ import {
 	parseArchivePathCandidates,
 	readArchiveEntries,
 	writeArchive,
-} from "@oh-my-pi/pi-utils/ar";
+} from "@oh-my-striped-pi/pi-utils/ar";
 import { detectLineEnding, normalizeToLF, restoreLineEndings } from "../edit/normalize";
 
 import {
@@ -57,11 +57,11 @@ import { formatApprovalArguments, truncateForPrompt } from "./approval";
 import { approvalTargetKey } from "./approval-targets";
 import { assertEditableFile } from "./auto-generated-guard";
 
-import { isReadTruncationNotice } from "@oh-my-pi/pi-tui/tools/hashline-format";
+import { isReadTruncationNotice } from "@oh-my-striped-pi/pi-tui/tools/hashline-format";
 import { recoverConflictUriPrefix } from "./conflict-detect";
 import { outputMeta } from "./output-meta";
 import { formatPathRelativeToCwd, probeLiteralPathExists, specialFileKind } from "./path-utils";
-import { splitPathAndSel } from "@oh-my-pi/pi-tui/tools/read";
+import { splitPathAndSel } from "@oh-my-striped-pi/pi-tui/tools/read";
 import {
 	enforcePlanModeWrite,
 	resolvePlanPath,
@@ -70,7 +70,7 @@ import {
 } from "./plan-mode-guard";
 import { decodeUtf8Text } from "./read-format";
 import { routeReadThroughBridge } from "./read-summary";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { shortenPath } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 
 import {
 	deleteRowByKey,
@@ -82,7 +82,7 @@ import {
 	updateRowByKey,
 	updateRowByRowId,
 } from "./sqlite-reader";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 import { maybeWriteSnapshotHeader, stripWriteContent } from "./write-content";
 
@@ -327,7 +327,7 @@ function assertNotShorterReadProjection(
 	const payloadLength = writeContent === rawContent ? rawPayloadLength : lfNormalizedLength(writeContent);
 	if (payloadLength >= lfNormalizedLength(currentContent)) return;
 	throw new ToolError(
-		`Refusing to overwrite '${displayPath}' with an incomplete read projection: the content ends with an omp read truncation notice and covers less than the current source, so it would discard unseen content. Re-read the omitted ranges and write the complete file, or use edit for a partial change.`,
+		`Refusing to overwrite '${displayPath}' with an incomplete read projection: the content ends with an omsp read truncation notice and covers less than the current source, so it would discard unseen content. Re-read the omitted ranges and write the complete file, or use edit for a partial change.`,
 	);
 }
 
@@ -1124,7 +1124,7 @@ export class WriteTool implements AgentTool<typeof writeSchema, WriteToolDetails
 			emitWriteProgress(onUpdate, writeBytes, displayPath, absolutePath);
 
 			// Try ACP bridge first for editor-visible filesystem paths. Internal
-			// artifacts such as local:// plans are owned by OMP, not the editor.
+			// artifacts such as local:// plans are owned by OMSP, not the editor.
 			const bridgeWrite = await routeWriteThroughBridge(this.session, path, absolutePath, cleanContent, signal);
 			if (bridgeWrite) {
 				// `write` always replaces the whole file, so (unlike hashline's

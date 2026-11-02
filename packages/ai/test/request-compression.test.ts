@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import type { FetchImpl } from "@oh-my-pi/pi-ai/types";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai/types";
 import {
 	resetRequestCompressionForTesting,
 	wrapFetchForRequestCompression,
-} from "@oh-my-pi/pi-ai/utils/request-compression";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/utils/request-compression";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const COPILOT_URL = "https://api.individual.githubcopilot.com/chat/completions";
 const OTHER_COPILOT_URL = "https://api.business.githubcopilot.com/v1/messages";

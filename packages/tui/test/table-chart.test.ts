@@ -1,28 +1,28 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
 import {
 	buildChart,
 	type ChartKind,
 	type ChartPlan,
 	planChart,
 	worthCharting,
-} from "@oh-my-pi/pi-tui/charts/chart-plan";
-import { renderChartSvg } from "@oh-my-pi/pi-tui/charts/chart-svg";
-import { analyzeTable, parseCell } from "@oh-my-pi/pi-tui/charts/table-data";
-import { svgFigurePalette } from "@oh-my-pi/pi-tui/chat/svg-figure";
-import { prepareSvg } from "@oh-my-pi/pi-tui/chat/svg-source";
+} from "@oh-my-striped-pi/pi-tui/charts/chart-plan";
+import { renderChartSvg } from "@oh-my-striped-pi/pi-tui/charts/chart-svg";
+import { analyzeTable, parseCell } from "@oh-my-striped-pi/pi-tui/charts/table-data";
+import { svgFigurePalette } from "@oh-my-striped-pi/pi-tui/chat/svg-figure";
+import { prepareSvg } from "@oh-my-striped-pi/pi-tui/chat/svg-source";
 import {
 	lookupTableChart,
 	setTableCharts,
 	splitTableCharts,
 	type TableChartPlanner,
-} from "@oh-my-pi/pi-tui/chat/table-chart";
-import { lexDocument } from "@oh-my-pi/pi-tui/components/markdown";
-import { trimBlankEdges } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-pi/pi-tui/terminal-capabilities";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { Tokens } from "@oh-my-pi/pi-utils/marked";
+} from "@oh-my-striped-pi/pi-tui/chat/table-chart";
+import { lexDocument } from "@oh-my-striped-pi/pi-tui/components/markdown";
+import { trimBlankEdges } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { Tokens } from "@oh-my-striped-pi/pi-utils/marked";
 
 function table(markdown: string): Tokens.Table {
 	const token = lexDocument(markdown).find((entry): entry is Tokens.Table => entry.type === "table");

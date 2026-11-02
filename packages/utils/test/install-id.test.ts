@@ -9,8 +9,8 @@ import {
 	getInstallId,
 	setAgentDir,
 	setProfile,
-} from "@oh-my-pi/pi-utils/dirs";
-import { Snowflake } from "@oh-my-pi/pi-utils/snowflake";
+} from "@oh-my-striped-pi/pi-utils/dirs";
+import { Snowflake } from "@oh-my-striped-pi/pi-utils/snowflake";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,14 +21,14 @@ describe("getInstallId", () => {
 
 	beforeEach(async () => {
 		originalAgentDir = getAgentDir();
-		originalConfigDir = process.env.PI_CONFIG_DIR;
-		const slug = `omp-install-id-${Snowflake.next()}`;
+		originalConfigDir = process.env.OMSP_CONFIG_DIR;
+		const slug = `omsp-install-id-${Snowflake.next()}`;
 		tempRoot = path.join(os.tmpdir(), slug);
 		await fs.mkdir(tempRoot, { recursive: true });
-		// Point the resolver's config root at the temp dir. Using PI_CONFIG_DIR
+		// Point the resolver's config root at the temp dir. Using OMSP_CONFIG_DIR
 		// keeps the parent equal to os.homedir() but flips the basename, so the
 		// install-id file lands inside our temp tree.
-		process.env.PI_CONFIG_DIR = path.relative(os.homedir(), tempRoot);
+		process.env.OMSP_CONFIG_DIR = path.relative(os.homedir(), tempRoot);
 		setAgentDir(path.join(tempRoot, "agent"));
 		__resetInstallIdCacheForTests();
 	});
@@ -36,9 +36,9 @@ describe("getInstallId", () => {
 	afterEach(async () => {
 		__resetInstallIdCacheForTests();
 		if (originalConfigDir === undefined) {
-			delete process.env.PI_CONFIG_DIR;
+			delete process.env.OMSP_CONFIG_DIR;
 		} else {
-			process.env.PI_CONFIG_DIR = originalConfigDir;
+			process.env.OMSP_CONFIG_DIR = originalConfigDir;
 		}
 		setAgentDir(originalAgentDir);
 		await fs.rm(tempRoot, { recursive: true, force: true });

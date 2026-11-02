@@ -1,28 +1,34 @@
-import type { AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import { renderDemotedThinking } from "@oh-my-pi/pi-ai/dialect/demotion";
-import { ollamaChatDropsOwnThinking } from "@oh-my-pi/pi-ai/providers/ollama";
-import { completionsDropsOwnThinking, isLiteLLMThinkingSignature } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { isColdReplayableResponsesTurn } from "@oh-my-pi/pi-ai/providers/openai-shared";
+import type { AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import { renderDemotedThinking } from "@oh-my-striped-pi/pi-ai/dialect/demotion";
+import { ollamaChatDropsOwnThinking } from "@oh-my-striped-pi/pi-ai/providers/ollama";
+import {
+	completionsDropsOwnThinking,
+	isLiteLLMThinkingSignature,
+} from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { isColdReplayableResponsesTurn } from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
 import {
 	isSameModelTurn,
 	shouldDropTruncatedThinkingOnlyAssistant,
-} from "@oh-my-pi/pi-ai/providers/transform-messages";
+} from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
 import {
 	getOpenAIResponsesHistoryItems,
 	sanitizeOpenAIResponsesAssistantHistoryItemsForReplay,
-} from "@oh-my-pi/pi-ai/utils";
-import { resolveThinkingReplayTokens, type ThinkingReplayTokens } from "@oh-my-pi/pi-catalog/compat/thinking-replay";
-import type { ModelTokenizer } from "@oh-my-pi/pi-catalog/types";
-import * as natives from "@oh-my-pi/pi-natives";
-import { materializeString, stringifyJson } from "@oh-my-pi/pi-utils";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-ai/utils";
+import {
+	resolveThinkingReplayTokens,
+	type ThinkingReplayTokens,
+} from "@oh-my-striped-pi/pi-catalog/compat/thinking-replay";
+import type { ModelTokenizer } from "@oh-my-striped-pi/pi-catalog/types";
+import * as natives from "@oh-my-striped-pi/pi-natives";
+import { materializeString, stringifyJson } from "@oh-my-striped-pi/pi-utils";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 import { isEstimateCacheable, messageEstimateVersion } from "./compaction/message-cache";
 import { base64ImageSize, estimateImageTokens, type ImageDetail, type ImageSize } from "./image-tokens";
 import type { AgentMessage } from "./types";
 
 const testEnv = Bun.env.NODE_ENV === "test";
-const accurate = process.env.PI_TOKENIZER_ACCURATE === "1" && !testEnv;
+const accurate = process.env.OMSP_TOKENIZER_ACCURATE === "1" && !testEnv;
 
 const NATIVE_ENCODING: Record<ModelTokenizer, natives.Encoding> = {
 	"claude-v3": natives.Encoding.ClaudeV3,
@@ -81,7 +87,7 @@ export interface TokenizerOptions {
  * when known, o200k_base otherwise), falling back to the byte upper bound when
  * the loaded addon does not recognize that encoding. `approximate` and
  * `upperbound` prefer the same exact count for known tokenizer families or
- * when `PI_TOKENIZER_ACCURATE=1` is set; otherwise they use a cheap heuristic:
+ * when `OMSP_TOKENIZER_ACCURATE=1` is set; otherwise they use a cheap heuristic:
  * `approximate` a bytes/4 guess, `upperbound` the raw byte length (never
  * undercounts).
  */
@@ -206,7 +212,7 @@ interface MessageEstimate {
  * identity or native-history replay state changes); one-shot flows construct
  * their own for the model that will be billed. Known tokenizer families use
  * exact native counts; unknown models keep the fast byte estimate (or o200k
- * when `PI_TOKENIZER_ACCURATE=1`).
+ * when `OMSP_TOKENIZER_ACCURATE=1`).
  */
 export class Tokenizer {
 	readonly #encoding: natives.Encoding | null;

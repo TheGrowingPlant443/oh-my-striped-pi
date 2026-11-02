@@ -1,5 +1,5 @@
-import { APP_NAME } from "@oh-my-pi/pi-utils/dirs";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import { APP_NAME } from "@oh-my-striped-pi/pi-utils/dirs";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { formatDoubleTap, formatKeyHint, formatKeyHints, type KeyName } from "../app-keybindings";
 import { editorKey } from "../chrome/keybinding-hints";
 import { getKeybindings, type Keybinding } from "../keybindings";
@@ -190,7 +190,7 @@ export function renderWelcomeTip(tip: string, width: number, phase = 0): string[
 
 /**
  * The session's welcome banner. In a terminal: the gradient logo beside the
- * `omp` wordmark with the version under it (the logo alone when the lockup does
+ * `omsp` wordmark with the version under it (the logo alone when the lockup does
  * not fit) and the tip of the session (dropped below {@link TIP_MIN_COLUMNS}
  * columns). Natively: a card with the same logo, wordmark, version and tip
  * ({@link WelcomeComponent.describe}).
@@ -230,8 +230,8 @@ export class WelcomeComponent implements Component {
 	}
 
 	/**
-	 * A `card` (`omp.welcome`) mirroring the terminal banner: the lockup
-	 * (`omp.welcome.lockup`: the terminal's builtin `omp` mark, which it animates,
+	 * A `card` (`omsp.welcome`) mirroring the terminal banner: the lockup
+	 * (`omsp.welcome.lockup`: the terminal's builtin `omsp` mark, which it animates,
 	 * beside the wordmark with the version under it) and the tip of the session.
 	 * Roles carry the look (gradient logo, type scale); a "[NEW]" tip
 	 * carries a terminal-clocked shimmering tag.
@@ -244,14 +244,14 @@ export class WelcomeComponent implements Component {
 			const isNew = NEW_TIP_MARKER.test(tip);
 			const tipText = compactText(tipSpans(expandTipKeys(isNew ? tip.replace(NEW_TIP_MARKER, "") : tip)));
 			const tipRow: NativeChild[] = [
-				node("icon", { name: "lightbulb", role: "omp.welcome.tip-icon" }),
-				text(tipText, { wrap: "word", role: "omp.welcome.tip-text" }),
+				node("icon", { name: "lightbulb", role: "omsp.welcome.tip-icon" }),
+				text(tipText, { wrap: "word", role: "omsp.welcome.tip-text" }),
 			];
-			if (isNew) tipRow.push(node("shimmer", { text: "New", role: "omp.welcome.new" }));
-			body.push(node("row", { gap: "sm", align: "start", role: "omp.welcome.tip" }, tipRow, "tip"));
+			if (isNew) tipRow.push(node("shimmer", { text: "New", role: "omsp.welcome.new" }));
+			body.push(node("row", { gap: "sm", align: "start", role: "omsp.welcome.tip" }, tipRow, "tip"));
 		}
 		// No head row or chevron: the card is the hero; the version sits under the wordmark.
-		const described = card({ role: "omp.welcome" }, body);
+		const described = card({ role: "omsp.welcome" }, body);
 		this.#native = { tip, node: described };
 		return described;
 	}
@@ -377,8 +377,8 @@ export class WelcomeComponent implements Component {
 }
 
 /**
- * omp's native lockup (`omp.welcome.lockup`, keyed `lockup`): the terminal's
- * builtin `omp` mark, which it draws on, beside the `omp` wordmark with
+ * omsp's native lockup (`omsp.welcome.lockup`, keyed `lockup`): the terminal's
+ * builtin `omsp` mark, which it draws on, beside the `omsp` wordmark with
  * `v<version>` under it. The welcome card and the setup splash show it.
  */
 export function lockupNode(version: string): NativeNode {
@@ -388,32 +388,32 @@ export function lockupNode(version: string): NativeNode {
 	return keyed(
 		row(
 			[
-				node("image", { builtin: "omp", alt: APP_NAME, w: 128, role: "omp.welcome.logo" }, undefined, "logo"),
+				node("image", { builtin: "omsp", alt: APP_NAME, w: 128, role: "omsp.welcome.logo" }, undefined, "logo"),
 				keyed(
 					col(
 						[
-							art([span(APP_NAME, "strong")], "omp.welcome.wordmark"),
-							art([span(`v${version}`, "dim mono")], "omp.welcome.version"),
+							art([span(APP_NAME, "strong")], "omsp.welcome.wordmark"),
+							art([span(`v${version}`, "dim mono")], "omsp.welcome.version"),
 						],
-						{ role: "omp.welcome.mark" },
+						{ role: "omsp.welcome.mark" },
 					),
 					"mark",
 				),
 			],
-			{ align: "center", gap: "md", role: "omp.welcome.lockup" },
+			{ align: "center", gap: "md", role: "omsp.welcome.lockup" },
 		),
 		"lockup",
 	);
 }
 
 /** Block-grid brand mark shared by the welcome and setup surfaces. */
-export const PI_LOGO = ["████████████", "   ██  ██   ", "   ██  ██   ", "   ▒▒  ██   ", "       ██   "];
+export const OMSP_LOGO = ["████████████", "   ██  ██   ", "   ██  ██   ", "   ▒▒  ██   ", "       ██   "];
 
-/** Columns of {@link PI_LOGO}. */
-const LOGO_WIDTH = Math.max(...PI_LOGO.map(row => row.length));
+/** Columns of {@link OMSP_LOGO}. */
+const LOGO_WIDTH = Math.max(...OMSP_LOGO.map(row => row.length));
 
 /**
- * The `omp` wordmark in half-blocks, set beside {@link PI_LOGO} from its second
+ * The `omsp` wordmark in half-blocks, set beside {@link OMSP_LOGO} from its second
  * row: the `p` descends into the fourth, the version takes the fifth.
  */
 const WORDMARK = ["▄▀▀▄ █▀▄▀▄ █▀▀▄", "▀▄▄▀ █ █ █ █▄▄▀", "           █"];
@@ -564,11 +564,11 @@ function introLogoFrame(progress: number): string[] {
 	const phase = ((((1 - eased) * INTRO_SWEEPS) % 1) + 1) % 1;
 	const shinePos = (((progress * INTRO_SHINE_TRAVERSALS) % 1) + 1) % 1;
 	const shineStrength = (1 - eased) ** 1.5;
-	return gradientLogo(PI_LOGO, phase, {
+	return gradientLogo(OMSP_LOGO, phase, {
 		strength: shineStrength,
 		pos: shinePos,
 	});
 }
 
 /** Resting gradient frame, cached for re-renders outside of the intro. */
-const REST_FRAME = gradientLogo(PI_LOGO, 0);
+const REST_FRAME = gradientLogo(OMSP_LOGO, 0);

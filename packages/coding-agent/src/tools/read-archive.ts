@@ -1,20 +1,20 @@
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import type { TextContent } from "@oh-my-pi/pi-ai";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import type { TextContent } from "@oh-my-striped-pi/pi-ai";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import {
 	type ArchiveFormat,
 	type ArchiveReader,
 	formatArchiveEntryLines,
 	openArchive,
 	parseArchivePathCandidates,
-} from "@oh-my-pi/pi-utils/ar";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+} from "@oh-my-striped-pi/pi-utils/ar";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
 import type { ToolSession } from "../sdk";
 import { convertBufferWithMarkit } from "../utils/markit";
-import { truncateHead } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import { applyListLimit } from "@oh-my-pi/pi-tui/tools/list-limit";
+import { truncateHead } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import { applyListLimit } from "@oh-my-striped-pi/pi-tui/tools/list-limit";
 import { resolveReadPath } from "./path-utils";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
 import {
 	buildInMemorySelectorResult,
 	decodeUtf8Text,
@@ -31,9 +31,9 @@ import {
 import { isMultiRange, type ParsedSelector, parseSel, resolveTailSelector, selToOffsetLimit } from "./read-selector";
 import { type PdfImageReadTarget, type PdfPageReadOptions, splitPdfImageReadPath } from "./read-pdf";
 import { cfgReadRenderMarkdown } from "./settings";
-import { formatBytes } from "@oh-my-pi/pi-tui/render/render-utils";
+import { formatBytes } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import { throwIfAborted } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 
 interface ResolvedArchiveReadPath {
@@ -252,7 +252,7 @@ export async function readArchive(
 		if (pdfImageRead) {
 			// Only the selected, extraction-bounded member is materialized, under
 			// an owned name rather than any untrusted archive path.
-			await using scratch = await TempDir.create("@omp-read-archive-pdf-");
+			await using scratch = await TempDir.create("@omsp-read-archive-pdf-");
 			const pdfPath = scratch.join("member.pdf");
 			await Bun.write(pdfPath, entry.bytes);
 			throwIfAborted(signal);

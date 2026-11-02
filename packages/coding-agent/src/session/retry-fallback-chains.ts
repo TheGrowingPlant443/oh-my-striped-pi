@@ -1,8 +1,8 @@
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
+import type { ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
 import type { ModelRegistry } from "../config/model-registry";
 import { cfgModelRoles } from "../config/model-settings";
-import { formatModelSelectorValue, parseModelString } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import { formatModelSelectorValue, parseModelString } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import { formatModelString, formatModelStringWithRouting } from "../config/model-resolver";
 import type { Settings } from "../config/settings";
 import {
@@ -10,7 +10,7 @@ import {
 	type ConfiguredThinkingLevel,
 	concreteThinkingLevel,
 	resolveThinkingLevelForModel,
-} from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import { resolveConfiguredModelPatterns, resolveModelRoleValue } from "../config/model-resolver";
 import { getRoleInfo, isKindRole } from "../config/model-roles";
 import { resolveSearchRoleValue } from "../web/search/selection";
@@ -248,7 +248,7 @@ function providerScopedPool(
  *
  * `options.isDiscoveryPending` suppresses "unknown model" warnings for
  * selectors whose provider discovery has not settled yet: a cold discovery
- * cache after `omp update` bumps the cache namespace (#10048), or a startup
+ * cache after `omsp update` bumps the cache namespace (#10048), or a startup
  * cache replay the pending online refresh may still extend. Such selectors
  * are re-checked once background discovery settles. Logging is the caller's
  * responsibility so a post-discovery re-run does not double-log persistent

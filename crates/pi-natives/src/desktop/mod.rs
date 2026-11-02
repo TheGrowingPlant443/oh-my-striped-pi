@@ -1755,7 +1755,7 @@ impl SessionCore {
 		let caps = Arc::clone(&self.capabilities);
 		let display_awake = Arc::clone(&self.display_awake);
 		let join = thread::Builder::new()
-			.name("omp-desktop-session".into())
+			.name("omsp-desktop-session".into())
 			.spawn(move || {
 				Worker::new(selector, caps, display_awake).serve(&rx, DISPLAY_AWAKE_GRACE);
 				let _ = done_tx.send(());
@@ -4849,7 +4849,7 @@ mod capture_tests {
 		// Holding control takes this process's one input ownership, which the
 		// other worker tests here take to send input, so the test runs alone in
 		// a child test process.
-		const ALONE: &str = "PI_DESKTOP_TEST_ALONE";
+		const ALONE: &str = "OMSP_DESKTOP_TEST_ALONE";
 		if std::env::var_os(ALONE).is_none() {
 			let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
 				.args([

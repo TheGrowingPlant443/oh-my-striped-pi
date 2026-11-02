@@ -115,7 +115,7 @@ _BAD_OBJECT_REF_RE = re.compile(
 )
 _FETCH_PRUNE_REPAIR_ATTEMPTS = 8
 
-_SHARED_OMP_GID = 2000
+_SHARED_OMSP_GID = 2000
 _AGENT_HOME = Path("/srv/agent-home")
 
 
@@ -127,7 +127,7 @@ def _slot_subprocess_kwargs(slot_uid: int | None) -> dict[str, Any]:
     if not _slot_permissions_active(slot_uid):
         return {}
     assert slot_uid is not None
-    return {"user": slot_uid, "group": slot_uid, "extra_groups": [_SHARED_OMP_GID], "umask": 0o002}
+    return {"user": slot_uid, "group": slot_uid, "extra_groups": [_SHARED_OMSP_GID], "umask": 0o002}
 
 
 def _append_safe_directory(env: dict[str, str], repo_dir: Path) -> None:
@@ -573,7 +573,7 @@ def _backfill_tip_blobs(
 
     A checkout of ``rev`` then never needs a lazy promisor fetch, which in
     proxy-transport deployments runs in the orchestrator without a PAT and
-    dies (oh-my-pi#1818). Only the tip tree is materialized, not ``rev``'s
+    dies (oh-my-striped-pi#1818). Only the tip tree is materialized, not ``rev``'s
     history, so the transfer is the files changed since the pool last saw
     them. Returns the fetch result, or ``None`` when nothing was missing.
 
@@ -680,7 +680,7 @@ def fetch_pr_head(
     Immediately followed by ``git worktree add --detach FETCH_HEAD`` for PR
     review checkouts, so the head's tree blobs are backfilled the same way as
     :func:`fetch_ref`; without them the worktree-add triggers a promisor lazy
-    fetch that fails under proxy-transport deployments (oh-my-pi#1818).
+    fetch that fails under proxy-transport deployments (oh-my-striped-pi#1818).
 
     Raises ``GitCommandError`` when the fetch or the backfill fails.
     """

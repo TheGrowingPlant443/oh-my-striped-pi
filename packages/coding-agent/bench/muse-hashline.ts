@@ -1,18 +1,18 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Context, Model, ModelSpec, Tool } from "@oh-my-pi/pi-ai";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { EditSession, EditStore, editDescription, type EditPolicy } from "@oh-my-pi/pi-natives";
-import { type } from "@oh-my-pi/omptype";
+import type { Context, Model, ModelSpec, Tool } from "@oh-my-striped-pi/pi-ai";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { EditSession, EditStore, editDescription, type EditPolicy } from "@oh-my-striped-pi/pi-natives";
+import { type } from "@oh-my-striped-pi/omptype";
 import { editDescriptionCompact } from "../src/edit/index";
 
 const WARMUP = 10;
 const SAMPLES = 41;
 const REQUEST_REPETITIONS = 100;
-const root = path.join(os.tmpdir(), "omp-bench-muse-hashline");
+const root = path.join(os.tmpdir(), "omsp-bench-muse-hashline");
 const target = path.join(root, "fixture.ts");
 const fixture =
 	Array.from(

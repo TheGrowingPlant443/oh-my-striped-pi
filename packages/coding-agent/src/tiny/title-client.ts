@@ -2,13 +2,13 @@
  * Client for the per-model tiny-model workers.
  *
  * Each local model is served by one worker process on the machine — the ONNX
- * worker (`worker.ts`) or, with `PI_TINY_DEVICE=mlx`, the MLX worker
+ * worker (`worker.ts`) or, with `OMSP_TINY_DEVICE=mlx`, the MLX worker
  * (`mlx-server.py`) — that owns a socket named after the model. This client
  * connects to it, spawning it detached when it is not running, and lets it
  * die on its own once idle. Prompt construction and title extraction live
  * here so both workers only ever see message-level `chat` requests.
  */
-import { $env, getTinyWorkerRuntimeDir, logger, prompt } from "@oh-my-pi/pi-utils";
+import { $env, getTinyWorkerRuntimeDir, logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import packageJson from "../../package.json" with { type: "json" };
 import type { Setting } from "../config/registry";
 import { isSettingsInitialized, settings } from "../config/settings";
@@ -107,14 +107,14 @@ function normalizeTinyTitleGenerateOptions(
 
 // ── Device / dtype resolution ────────────────────────────────────────
 
-/** Setting value (its env var included); only the env var when settings are uninitialized (e.g. `omp --smoke-test`). */
+/** Setting value (its env var included); only the env var when settings are uninitialized (e.g. `omsp --smoke-test`). */
 function readTinyModelSetting(setting: Setting<string>): string | undefined {
 	return isSettingsInitialized() ? setting.get(settings) : setting.envValue();
 }
 
 /**
  * Map the resolved `providers.tinyModelDevice` / `providers.tinyModelDtype`
- * values onto the `PI_TINY_DEVICE` / `PI_TINY_DTYPE` vars a worker should run
+ * values onto the `OMSP_TINY_DEVICE` / `OMSP_TINY_DTYPE` vars a worker should run
  * with. Only resolved keys are returned — never the default sentinel — so the
  * worker's built-in defaults apply for anything absent. Pure for testability;
  * see {@link tinyModelEnv} for the settings glue.
@@ -126,9 +126,9 @@ export function tinyWorkerEnvOverlay(
 ): Record<string, string> {
 	const overlay: Record<string, string> = {};
 	const device = tinyModelDeviceSettingToEnv(deviceSetting);
-	if (device) overlay.PI_TINY_DEVICE = device;
+	if (device) overlay.OMSP_TINY_DEVICE = device;
 	const dtype = tinyModelDtypeSettingToEnv(dtypeSetting);
-	if (dtype) overlay.PI_TINY_DTYPE = dtype;
+	if (dtype) overlay.OMSP_TINY_DTYPE = dtype;
 	return overlay;
 }
 
@@ -143,7 +143,7 @@ function tinyModelEnv(): Record<string, string> {
 /** Identity of the resolved device/dtype; a worker started under a different key is stale. */
 export function tinyModelEnvKey(): string {
 	const env = tinyModelEnv();
-	return `${env.PI_TINY_DEVICE ?? ""}|${env.PI_TINY_DTYPE ?? ""}`;
+	return `${env.OMSP_TINY_DEVICE ?? ""}|${env.OMSP_TINY_DTYPE ?? ""}`;
 }
 
 /**
@@ -163,7 +163,7 @@ export function tinyWorkerUsesMlx(): boolean {
 	return (
 		!mlxUnavailable &&
 		tinyMlxSupported() &&
-		resolveTinyModelDevicePreference(tinyModelEnv().PI_TINY_DEVICE).device === MLX_DEVICE
+		resolveTinyModelDevicePreference(tinyModelEnv().OMSP_TINY_DEVICE).device === MLX_DEVICE
 	);
 }
 
@@ -176,7 +176,7 @@ export interface TinyWorkerLaunch extends SharedWorkerLaunch {
 
 /** How to start the ONNX worker for `modelKey` with the resolved device/dtype env. @internal */
 export function onnxLaunch(modelKey: TinyLocalModelKey, modelEnv: Record<string, string>): TinyWorkerLaunch {
-	const tag = `${packageJson.version}|onnx|${modelEnv.PI_TINY_DEVICE ?? ""}|${modelEnv.PI_TINY_DTYPE ?? ""}`;
+	const tag = `${packageJson.version}|onnx|${modelEnv.OMSP_TINY_DEVICE ?? ""}|${modelEnv.OMSP_TINY_DTYPE ?? ""}`;
 	return {
 		label: `tiny onnx worker for ${modelKey}`,
 		backend: "onnx",
@@ -209,7 +209,7 @@ function mlxLaunch(
 			const python = await ensureTinyMlxRuntime(phase =>
 				emitProgress({ modelKey, status: phase, name: `mlx-lm@${MLX_LM_VERSION}` }),
 			);
-			const script = await stageRunnerScript("omp-tiny-mlx", "py", MLX_SERVER_SCRIPT);
+			const script = await stageRunnerScript("omsp-tiny-mlx", "py", MLX_SERVER_SCRIPT);
 			const env = inferenceWorkerEnv({
 				PYTHONUNBUFFERED: "1",
 				PYTHONIOENCODING: "utf-8",

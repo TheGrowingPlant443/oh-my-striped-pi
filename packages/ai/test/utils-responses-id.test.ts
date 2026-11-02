@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
 	convertResponsesInputContent,
 	normalizeResponsesToolCallIdForTransform,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
-import { normalizeResponsesToolCallId } from "@oh-my-pi/pi-ai/utils";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import { normalizeResponsesToolCallId } from "@oh-my-striped-pi/pi-ai/utils";
 
 describe("normalizeResponsesToolCallId", () => {
 	it("preserves opaque call ids while truncating oversized item ids", () => {

@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resolveModelRoleValue } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { MODEL_ROLES, roleCandidatePool } from "@oh-my-pi/pi-coding-agent/config/model-roles";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createModelBrowserSource } from "@oh-my-pi/pi-coding-agent/modes/model-browser-source";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { validateRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { getSearchEngineModel, getSearchProvider } from "@oh-my-pi/pi-coding-agent/web/search/provider";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resolveModelRoleValue } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { MODEL_ROLES, roleCandidatePool } from "@oh-my-striped-pi/pi-coding-agent/config/model-roles";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createModelBrowserSource } from "@oh-my-striped-pi/pi-coding-agent/modes/model-browser-source";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { validateRetryFallbackChains } from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { getSearchEngineModel, getSearchProvider } from "@oh-my-striped-pi/pi-coding-agent/web/search/provider";
 import {
 	DEFAULT_SEARCH_CHAIN,
 	resolveSearchChain,
 	resolveSearchRoleValue,
-} from "@oh-my-pi/pi-coding-agent/web/search/selection";
-import { resolveRoleAssignments } from "@oh-my-pi/pi-tui/overlays/model-browser";
+} from "@oh-my-striped-pi/pi-coding-agent/web/search/selection";
+import { resolveRoleAssignments } from "@oh-my-striped-pi/pi-tui/overlays/model-browser";
 import { createInMemoryAuthStorage } from "../../helpers/agent-session-setup";
 
 const storages = new Set<AuthStorage>();

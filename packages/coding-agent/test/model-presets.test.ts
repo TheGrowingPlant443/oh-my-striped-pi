@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import {
 	acquireModelRoleMutation,
 	applyModelPreset,
@@ -12,15 +12,15 @@ import {
 	getModelPresetNames,
 	modelPresetShadowOwner,
 	saveModelPreset,
-} from "@oh-my-pi/pi-coding-agent/config/model-presets";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { cfgModelPresets } from "@oh-my-pi/pi-coding-agent/config/model-settings";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { cfgDefaultThinkingLevel } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/config/model-presets";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { cfgModelPresets } from "@oh-my-striped-pi/pi-coding-agent/config/model-settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { cfgDefaultThinkingLevel } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const SONNET = "github-copilot/claude-sonnet-4.5";
 const SONNET_46 = "github-copilot/claude-sonnet-4.6";
@@ -72,8 +72,8 @@ describe("model presets", () => {
 		const dir = TempDir.createSync("@pi-model-presets-project-");
 		tempDirs.push(dir);
 		const projectDir = path.join(dir.path(), "project");
-		fs.mkdirSync(path.join(projectDir, ".omp"), { recursive: true });
-		if (options.project) fs.writeFileSync(path.join(projectDir, ".omp", "config.yml"), options.project);
+		fs.mkdirSync(path.join(projectDir, ".omsp"), { recursive: true });
+		if (options.project) fs.writeFileSync(path.join(projectDir, ".omsp", "config.yml"), options.project);
 		const configFiles: string[] = [];
 		if (options.overlay) {
 			const overlayPath = path.join(dir.path(), "overlay.yml");

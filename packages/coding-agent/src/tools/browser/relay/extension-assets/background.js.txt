@@ -17,7 +17,7 @@ async function ownedDebuggerTabs(targets, probe) {
 }
 
 // extension/background.ts
-var DEFAULT_PORT = 9224;
+var DEFAULT_PORT = 9225;
 var PING_INTERVAL_MS = 20000;
 var RECONNECT_MIN_MS = 1000;
 var RECONNECT_MAX_MS = 1e4;
@@ -175,7 +175,7 @@ async function buildHello() {
     userAgent: navigator.userAgent,
     browserVersion: versionMatch?.[0] ?? "Chrome/unknown",
     discardedTabsProtocol: 1,
-    ompVersion: typeof OMP_INSTALL_VERSION === "string" ? OMP_INSTALL_VERSION : undefined,
+    omspVersion: typeof OMSP_INSTALL_VERSION === "string" ? OMSP_INSTALL_VERSION : undefined,
     reloadProtocol: EXTENSION_RELOAD_PROTOCOL_VERSION,
     tabs: snapshots,
     attachedTabIds
@@ -313,9 +313,9 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   post({ t: "tabRemoved", tabId });
 });
-chrome.alarms.create("omp-relay-keepalive", { periodInMinutes: 0.5 });
+chrome.alarms.create("omsp-relay-keepalive", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "omp-relay-keepalive")
+  if (alarm.name === "omsp-relay-keepalive")
     connect();
 });
 chrome.storage.onChanged.addListener((_changes, areaName) => {

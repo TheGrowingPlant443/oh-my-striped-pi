@@ -2,18 +2,18 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const cliEntry = path.resolve(import.meta.dir, "../src/cli.ts");
 
 describe("company-managed application updates", () => {
 	it("runs the real CLI without release requests, installer discovery or executable replacement", async () => {
-		using temp = TempDir.createSync("@omp-managed-update-");
+		using temp = TempDir.createSync("@omsp-managed-update-");
 		const home = temp.join("home");
 		const bin = temp.join("bin");
 		fs.mkdirSync(home);
 		fs.mkdirSync(bin);
-		const executable = path.join(bin, process.platform === "win32" ? "omp.exe" : "omp");
+		const executable = path.join(bin, process.platform === "win32" ? "omsp.exe" : "omsp");
 		const installed = "company-managed executable: do not replace\n";
 		fs.writeFileSync(executable, installed, { mode: 0o755 });
 		const npmrc = path.join(home, ".npmrc");
@@ -39,14 +39,13 @@ Bun.spawnSync = refuse("spawnSync");
 			HOME: home,
 			USERPROFILE: home,
 			PATH: bin,
-			PI_CODING_AGENT_DIR: path.join(home, "agent"),
-			PI_CONFIG_DIR: path.join(home, "config"),
+			OMSP_CODING_AGENT_DIR: path.join(home, "agent"),
+			OMSP_CONFIG_DIR: path.join(home, "config"),
 			XDG_CACHE_HOME: path.join(home, "cache"),
 			XDG_CONFIG_HOME: path.join(home, "config"),
 			XDG_DATA_HOME: path.join(home, "data"),
 			XDG_STATE_HOME: path.join(home, "state"),
-			OMP_PROFILE: "",
-			PI_PROFILE: "",
+			OMSP_PROFILE: "",
 			NO_COLOR: "1",
 		};
 		const proc = Bun.spawn([process.execPath, "--preload", preload, cliEntry, "update", "--check"], {

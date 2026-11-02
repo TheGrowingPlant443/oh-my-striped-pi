@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { $which, TempDir } from "@oh-my-pi/pi-utils";
+import { $which, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { PYTHON_PRELUDE } from "../../../src/eval/py/prelude";
 import { artifactReadBridge } from "../../helpers/artifact-read-bridge";
 const pythonPath = Bun.env.PYTHON ?? ($which("python3") ? "python3" : "python");
@@ -10,12 +10,12 @@ async function runPrelude(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
 	const prelude = PYTHON_PRELUDE.replace(
 		"from __future__ import annotations",
-		"from __future__ import annotations\n__omp_emit_status = __omp_emit_image = lambda *args, **kwargs: None",
+		"from __future__ import annotations\n__omsp_emit_status = __omsp_emit_image = lambda *args, **kwargs: None",
 	);
 	const script = `${prelude}\n${code}`;
 	// The full prelude exceeds Windows' ~32k `python -c` command-line limit
 	// (ENAMETOOLONG); a script file behaves identically on every platform.
-	const dir = await TempDir.create("@omp-py-prelude-");
+	const dir = await TempDir.create("@omsp-py-prelude-");
 	try {
 		const scriptPath = dir.join("script.py");
 		await Bun.write(scriptPath, script);
@@ -45,11 +45,11 @@ describe("python prelude", () => {
 				"def word_count(text: Annotated[str, 'Text to split'], sep: Literal[' ', ','] = ' ', limit: Optional[int] = None) -> dict:",
 				'    """Count words in text."""',
 				"    return {'count': len(text.split(sep))}",
-				"first = __omp_tools__['word_count'].describe()",
+				"first = __omsp_tools__['word_count'].describe()",
 				"@tool(name='word_count', description='Replacement')",
 				"def replacement(text: str) -> dict:",
 				"    return {'count': 1}",
-				"print(json.dumps({'first': first, 'current': __omp_tools__['word_count'].describe(), 'defined': tool.defined()}, sort_keys=True))",
+				"print(json.dumps({'first': first, 'current': __omsp_tools__['word_count'].describe(), 'defined': tool.defined()}, sort_keys=True))",
 				"print(tool.undefine('word_count'), tool.defined())",
 			].join("\n"),
 			{},
@@ -93,9 +93,9 @@ describe("python prelude", () => {
 
 		try {
 			const result = await runPrelude(`print(read("mcp://server/resource", 10, 5))`, {
-				PI_TOOL_BRIDGE_URL: server.url.toString(),
-				PI_TOOL_BRIDGE_TOKEN: "test-token",
-				PI_TOOL_BRIDGE_SESSION: "test-session",
+				OMSP_TOOL_BRIDGE_URL: server.url.toString(),
+				OMSP_TOOL_BRIDGE_TOKEN: "test-token",
+				OMSP_TOOL_BRIDGE_SESSION: "test-session",
 			});
 
 			expect(result).toEqual({
@@ -134,11 +134,11 @@ describe("python prelude", () => {
 		try {
 			// No inherited artifacts root (an Eval cell running these tests has one); tests that want one pass it.
 			const result = await runPrelude(code, {
-				PI_EVAL_LOCAL_ROOTS: "{}",
+				OMSP_EVAL_LOCAL_ROOTS: "{}",
 				...env,
-				PI_TOOL_BRIDGE_URL: server.url.toString(),
-				PI_TOOL_BRIDGE_TOKEN: "test-token",
-				PI_TOOL_BRIDGE_SESSION: "test-session",
+				OMSP_TOOL_BRIDGE_URL: server.url.toString(),
+				OMSP_TOOL_BRIDGE_TOKEN: "test-token",
+				OMSP_TOOL_BRIDGE_SESSION: "test-session",
 			});
 			return { stdout: result.stdout, stderr: result.stderr, requests };
 		} finally {
@@ -152,14 +152,14 @@ describe("python prelude", () => {
 	);
 
 	it("reads an artifact from this session's dir; empty for limit <= 0", async () => {
-		using artifacts = TempDir.createSync("@omp-py-prelude-artifacts-");
+		using artifacts = TempDir.createSync("@omsp-py-prelude-artifacts-");
 		await Bun.write(artifacts.join("12.eval.log"), "first\nsecond\nthird\n");
 		const { stdout, stderr, requests } = await runWithReadBridge(
 			[
 				`print(repr(read("artifact://12", offset=2, limit=1)))`,
 				`print([read("artifact://12", limit=0), read("artifact://12", limit=-1), read("artifact://7", limit=0)])`,
 			].join("\n"),
-			{ PI_EVAL_LOCAL_ROOTS: JSON.stringify({ artifact: artifacts.path() }) },
+			{ OMSP_EVAL_LOCAL_ROOTS: JSON.stringify({ artifact: artifacts.path() }) },
 			async () => ({ text: "from the read tool" }),
 		);
 
@@ -169,7 +169,7 @@ describe("python prelude", () => {
 	});
 
 	it("reads an artifact another session holds in full, however large, through the read tool", async () => {
-		using tmp = TempDir.createSync("@omp-py-prelude-artifact-fallback-");
+		using tmp = TempDir.createSync("@omsp-py-prelude-artifact-fallback-");
 		await Bun.write(tmp.join("owner", "7.bash.log"), largeArtifact);
 		await Bun.write(tmp.join("own", "12.eval.log"), "this session's");
 		const out = tmp.join("out.txt");
@@ -179,7 +179,7 @@ describe("python prelude", () => {
 				`print(repr(read("artifact://7", offset=3, limit=2)))`,
 				`print(read("artifact://7", offset=3) == "".join(f"row {i}\\n" for i in range(3000)))`,
 			].join("\n"),
-			{ PI_EVAL_LOCAL_ROOTS: JSON.stringify({ artifact: tmp.join("own") }) },
+			{ OMSP_EVAL_LOCAL_ROOTS: JSON.stringify({ artifact: tmp.join("own") }) },
 			artifactReadBridge(tmp.path(), tmp.join("owner")),
 		);
 
@@ -194,7 +194,7 @@ describe("python prelude", () => {
 	});
 
 	it("reads an artifact in full through the read tool when no artifacts dir was injected", async () => {
-		using tmp = TempDir.createSync("@omp-py-prelude-artifact-no-root-");
+		using tmp = TempDir.createSync("@omsp-py-prelude-artifact-no-root-");
 		await Bun.write(tmp.join("12.eval.log"), largeArtifact);
 		const out = tmp.join("out.txt");
 		const { stderr, requests } = await runWithReadBridge(
@@ -263,9 +263,9 @@ describe("python prelude", () => {
 					"asyncio.run(main())",
 				].join("\n"),
 				{
-					PI_TOOL_BRIDGE_URL: bridge.url.toString(),
-					PI_TOOL_BRIDGE_TOKEN: "test-token",
-					PI_TOOL_BRIDGE_SESSION: "test-session",
+					OMSP_TOOL_BRIDGE_URL: bridge.url.toString(),
+					OMSP_TOOL_BRIDGE_TOKEN: "test-token",
+					OMSP_TOOL_BRIDGE_SESSION: "test-session",
 					HTTP_PROXY: proxyUrl,
 					http_proxy: proxyUrl,
 					ALL_PROXY: proxyUrl,

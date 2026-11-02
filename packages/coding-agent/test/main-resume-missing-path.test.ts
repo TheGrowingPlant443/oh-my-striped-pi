@@ -12,12 +12,12 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fsp from "node:fs/promises";
 import * as path from "node:path";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { createSessionManager, runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { createSessionManager, runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 class ProcessExitSignal extends Error {
 	constructor(readonly code: number) {
@@ -57,7 +57,7 @@ afterEach(() => {
 
 describe("--resume <path> — missing path (#13928)", () => {
 	it("exits non-zero naming the path and does not create a session there", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-missing-path-");
+		using tempDir = TempDir.createSync("@omsp-resume-missing-path-");
 		const sessionDir = tempDir.path();
 		const missingPath = path.join(sessionDir, "ghost-zz9q.jsonl");
 		const authStorage = await AuthStorage.create(path.join(sessionDir, "auth.db"));
@@ -108,7 +108,7 @@ describe("--resume <path> — missing path (#13928)", () => {
 
 describe("--resume <path> — existing path (#13928)", () => {
 	it("still resumes the session file at that path", async () => {
-		using tempDir = TempDir.createSync("@omp-resume-existing-path-");
+		using tempDir = TempDir.createSync("@omsp-resume-existing-path-");
 		const sessionDir = tempDir.path();
 		const existingPath = await makeSessionFile(sessionDir, "019ea530-0000-7000-0000-000000000000");
 

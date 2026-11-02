@@ -5,9 +5,9 @@
  * every regex compiles, every field a block reads is fed by a rule, and the
  * rules match the samples the author saw.
  */
-import { LineMatcher } from "@oh-my-pi/pi-natives";
-import type { TspTone } from "@oh-my-pi/pi-wire";
-import { isRecord, truncate } from "@oh-my-pi/pi-utils";
+import { LineMatcher } from "@oh-my-striped-pi/pi-natives";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
+import { isRecord, truncate } from "@oh-my-striped-pi/pi-utils";
 import { TOOL_CALL_MARK, TOOLS_SOURCE_ID } from "./types";
 
 /** How a field's values reduce to one number. */
@@ -317,7 +317,7 @@ export function parseWidgetValue(text: string): number {
  * enable the dry run, which rejects:
  * - rules matching none of the non-empty samples (an empty widget);
  * - a field read as a number whose sample captures hold none;
- * - rules reading omp's {@link TOOL_CALL_MARK} lines of a subagent's tool
+ * - rules reading omsp's {@link TOOL_CALL_MARK} lines of a subagent's tool
  *   calls (counting or naming tool calls is activity, not progress).
  *
  * With `brief` (the job's command, task and hints) as well, a constant meter
@@ -467,7 +467,7 @@ function dryRun(
 	}
 	for (const index of marked) {
 		errors.push(
-			`rules[${index}]: matches \`${TOOL_CALL_MARK}<tool> <intent>\` lines, which are omp's markers of the subagent's tool calls, not its output; match the literal text of the result lines that report progress, or skip if none do`,
+			`rules[${index}]: matches \`${TOOL_CALL_MARK}<tool> <intent>\` lines, which are omsp's markers of the subagent's tool calls, not its output; match the literal text of the result lines that report progress, or skip if none do`,
 		);
 	}
 	for (const [field, where] of numeric) {

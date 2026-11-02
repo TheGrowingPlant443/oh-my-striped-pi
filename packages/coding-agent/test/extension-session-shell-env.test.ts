@@ -8,20 +8,20 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { executeBash } from "@oh-my-pi/pi-coding-agent/exec/bash-executor";
-import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { ExtensionAgentIdentity } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { __resetShellConfigCacheForTests, getShellConfig } from "@oh-my-pi/pi-utils/procmgr";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { executeBash } from "@oh-my-striped-pi/pi-coding-agent/exec/bash-executor";
+import { loadExtensions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { ExtensionAgentIdentity } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { __resetShellConfigCacheForTests, getShellConfig } from "@oh-my-striped-pi/pi-utils/procmgr";
 
 const SUBAGENT: ExtensionAgentIdentity = { kind: "sub", id: "0-Task", name: "task", depth: 1, parentId: "Main" };
 
-const ENV_KEY = "PI_TEST_SESSION_SCOPED_ENV";
+const ENV_KEY = "OMSP_TEST_SESSION_SCOPED_ENV";
 
 // Exports the current session id, the way an extension attributes child
 // processes (commit trailers, audit logs) to the session that ran them.
@@ -127,12 +127,12 @@ describe("session lifecycle environment reaches bash commands", () => {
 		const runner = await createRunner(sessionManager);
 		await runner.emit({ type: "session_start" });
 		const sessionKey = sessionManager.getSessionId();
-		await run("export PI_TEST_PERSISTENT_MARK=kept", sessionKey);
+		await run("export OMSP_TEST_PERSISTENT_MARK=kept", sessionKey);
 
 		// Same session, same exported value: the rebuilt environment is identical.
 		await runner.emit({ type: "session_start" });
 
-		expect(await run(`printf '%s' "$PI_TEST_PERSISTENT_MARK"`, sessionKey)).toBe("kept");
+		expect(await run(`printf '%s' "$OMSP_TEST_PERSISTENT_MARK"`, sessionKey)).toBe("kept");
 	});
 
 	it("a subagent's session start leaves the parent's commands with the parent's value", async () => {

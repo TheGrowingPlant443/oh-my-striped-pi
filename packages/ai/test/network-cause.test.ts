@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import type { FetchImpl } from "@oh-my-pi/pi-ai/types";
-import { postOpenAIStream } from "@oh-my-pi/pi-ai/utils/openai-http";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import type { FetchImpl } from "@oh-my-striped-pi/pi-ai/types";
+import { postOpenAIStream } from "@oh-my-striped-pi/pi-ai/utils/openai-http";
 
 const OFFLINE_ANTHROPIC =
 	"No internet connection: couldn't reach api.anthropic.com (getaddrinfo ETIMEOUT). Check your network or proxy and try again.";

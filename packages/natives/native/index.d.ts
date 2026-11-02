@@ -2452,8 +2452,8 @@ export interface IpcConnectOptions {
  * Platform endpoint for `name` scoped to directory `dir`.
  *
  * Unix: `<dir>/<stem>.sock`; when that path does not fit `sun_path` (104 bytes
- * on macOS/BSD, 108 on Linux, including NUL), `/tmp/omp-<euid>/<hash16>.sock`.
- * Windows: `\\.\pipe\omp-<stem>-<hash16(lowercase(resolve(dir)))>`.
+ * on macOS/BSD, 108 on Linux, including NUL), `/tmp/omsp-<euid>/<hash16>.sock`.
+ * Windows: `\\.\pipe\omsp-<stem>-<hash16(lowercase(resolve(dir)))>`.
  * `stem` is `name` with every char outside `[A-Za-z0-9._-]` replaced by "_".
  * Pure and deterministic: every process computes the same endpoint.
  */
@@ -2818,7 +2818,7 @@ export interface MinimizerOptions {
    * Kill-switch to fall back to the pre-PR (legacy) filter behavior for
    * grep / find / pytest. When `Some(true)`, filters that opted into the
    * always-shrink Tier 1 / Tier 2 behavior skip the new code path. When
-   * `None`, defers to the `OMP_MINIMIZER_LEGACY_FILTERS` env var.
+   * `None`, defers to the `OMSP_MINIMIZER_LEGACY_FILTERS` env var.
    */
   legacyFilters?: boolean
 }

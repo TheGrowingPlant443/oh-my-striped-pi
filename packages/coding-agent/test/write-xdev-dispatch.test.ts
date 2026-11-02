@@ -2,20 +2,20 @@ import { describe, expect, it, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as themeModule from "@oh-my-pi/pi-tui/theme";
-import { ToolChoiceQueue } from "@oh-my-pi/pi-coding-agent/session/tool-choice-queue";
-import { LocalProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/local-protocol";
-import { createTools, type Tool, type ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { requiresApproval, resolveApproval } from "@oh-my-pi/pi-coding-agent/tools/approval";
-import { Text } from "@oh-my-pi/pi-tui";
-import { githubToolRenderer } from "@oh-my-pi/pi-tui/tools/github";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
-import { WriteTool } from "@oh-my-pi/pi-coding-agent/tools/write";
-import { type WriteRenderContext, writeToolRenderer } from "@oh-my-pi/pi-tui/tools/write";
-import { shortenPath } from "@oh-my-pi/pi-tui/render/render-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as themeModule from "@oh-my-striped-pi/pi-tui/theme";
+import { ToolChoiceQueue } from "@oh-my-striped-pi/pi-coding-agent/session/tool-choice-queue";
+import { LocalProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/local-protocol";
+import { createTools, type Tool, type ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { requiresApproval, resolveApproval } from "@oh-my-striped-pi/pi-coding-agent/tools/approval";
+import { Text } from "@oh-my-striped-pi/pi-tui";
+import { githubToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/github";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
+import { WriteTool } from "@oh-my-striped-pi/pi-coding-agent/tools/write";
+import { type WriteRenderContext, writeToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/write";
+import { shortenPath } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 import {
 	dispatchXdevTool,
 	listXdevTools,
@@ -28,10 +28,10 @@ import {
 	xdevDocs,
 	xdevDocsAll,
 	xdevEntries,
-} from "@oh-my-pi/pi-coding-agent/tools/xdev";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/tools/xdev";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgToolsXdev, cfgToolsXdevDocs } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgToolsXdev, cfgToolsXdevDocs } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 /**
  * Mirrors `ToolExecutionComponent#buildRenderContext`: the host state's own
@@ -911,7 +911,7 @@ describe("device-only write transport for explicit lists omitting write", () => 
 			await fs.mkdir(tempDir, { recursive: true });
 			const session = xdevSession(tempDir, {
 				getSessionId: () => "device-only-home",
-				getArtifactsDir: () => path.join(homeDir, ".omp", "artifacts"),
+				getArtifactsDir: () => path.join(homeDir, ".omsp", "artifacts"),
 			});
 			const tools = await createTools(session, ["read"]);
 			const write = tools.find(entry => entry.name === "write");
@@ -924,7 +924,7 @@ describe("device-only write transport for explicit lists omitting write", () => 
 					(caught: unknown) => caught,
 				);
 			const message = err instanceof Error ? err.message : String(err);
-			expect(message).toContain("~/.omp/artifacts/local/<name>");
+			expect(message).toContain("~/.omsp/artifacts/local/<name>");
 			expect(message).not.toContain(homeDir);
 		} finally {
 			homedirSpy.mockRestore();

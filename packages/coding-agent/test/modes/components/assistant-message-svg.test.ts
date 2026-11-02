@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { ImageBudget, ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-pi/pi-tui";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { ImageBudget, ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-striped-pi/pi-tui";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 const originalImageProtocol = TERMINAL.imageProtocol;
 const FIGURE = "<svg viewBox='0 0 80 20'><rect width='80' height='20' fill='var(--accent)'/></svg>";

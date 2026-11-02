@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "bun:test";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
 import { KeybindingsManager } from "../src/app-keybindings";
 import { MoveOverlay, type MoveOverlayResult } from "../src/overlays/move-overlay";
 import { AnnotationOverlay } from "../src/overlays/annotation-overlay";
@@ -270,7 +270,7 @@ describe("BtwHistoryPanel native events", () => {
 		// action, which copies the button's own label and never reaches the panel.
 		const copyAct = findNode(
 			history.describe(),
-			node => node.p?.role === "omp.btn" && String(node.p?.title).startsWith("Copy answer"),
+			node => node.p?.role === "omsp.btn" && String(node.p?.title).startsWith("Copy answer"),
 		)?.p?.actions?.click;
 		expect(copyAct).toBeDefined();
 		expect(copyAct).not.toBe("copy");

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { MCPConnectionTimeoutError, connectToServer, listTools } from "@oh-my-pi/pi-coding-agent/mcp/client";
-import { MCPTransportError } from "@oh-my-pi/pi-coding-agent/mcp/errors";
-import { isRetriableConnectionError } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
-import { LegacySseTransport } from "@oh-my-pi/pi-coding-agent/mcp/transports/sse";
-import type { JsonRpcMessage, JsonRpcRequest } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import type { MCPProgress } from "@oh-my-pi/pi-tui/tools/mcp";
-import { withTimeout } from "@oh-my-pi/pi-utils";
+import { MCPConnectionTimeoutError, connectToServer, listTools } from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import { MCPTransportError } from "@oh-my-striped-pi/pi-coding-agent/mcp/errors";
+import { isRetriableConnectionError } from "@oh-my-striped-pi/pi-coding-agent/mcp/tool-bridge";
+import { LegacySseTransport } from "@oh-my-striped-pi/pi-coding-agent/mcp/transports/sse";
+import type { JsonRpcMessage, JsonRpcRequest } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import type { MCPProgress } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import { withTimeout } from "@oh-my-striped-pi/pi-utils";
 
 const encoder = new TextEncoder();
 let server: Bun.Server<undefined> | null = null;

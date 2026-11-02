@@ -1,16 +1,16 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as rewriteImports from "@oh-my-pi/pi-coding-agent/eval/js/shared/rewrite-imports";
-import * as toolBridge from "@oh-my-pi/pi-coding-agent/eval/js/tool-bridge";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { findFreeCdpPort } from "@oh-my-pi/pi-coding-agent/tools/browser/attach";
-import { ensureChromiumExecutable } from "@oh-my-pi/pi-coding-agent/tools/browser/launch";
-import { DISCARDED_TABS_PROTOCOL_VERSION } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/protocol";
-import { type RelayServer, startRelayServer } from "@oh-my-pi/pi-coding-agent/tools/browser/relay/server";
-import { getTab, releaseTab, runInTab } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { ToolAbortError } from "@oh-my-pi/pi-coding-agent/tools/tool-errors";
-import { isRecord } from "@oh-my-pi/pi-utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as rewriteImports from "@oh-my-striped-pi/pi-coding-agent/eval/js/shared/rewrite-imports";
+import * as toolBridge from "@oh-my-striped-pi/pi-coding-agent/eval/js/tool-bridge";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { findFreeCdpPort } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/attach";
+import { ensureChromiumExecutable } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/launch";
+import { DISCARDED_TABS_PROTOCOL_VERSION } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/protocol";
+import { type RelayServer, startRelayServer } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/relay/server";
+import { getTab, releaseTab, runInTab } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { ToolAbortError } from "@oh-my-striped-pi/pi-coding-agent/tools/tool-errors";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
 import { chromiumAvailable } from "./chromium-probe";
 
@@ -188,7 +188,7 @@ class ChromeBackedExtension {
 	}
 
 	/**
-	 * Resolves once the relay forwards the evaluation of {@link HANG}. omp itself also evaluates in the page between
+	 * Resolves once the relay forwards the evaluation of {@link HANG}. omsp itself also evaluates in the page between
 	 * and before calls (holding the page's `print()`), so any `Runtime.callFunctionOn` is not yet the call's code.
 	 */
 	hanging(): Promise<void> {
@@ -233,7 +233,7 @@ class ChromeBackedExtension {
 	}
 }
 
-describe("relay tabs Chrome detaches omp from", () => {
+describe("relay tabs Chrome detaches omsp from", () => {
 	let chromium: Browser | undefined;
 	let site: Bun.Server<undefined> | undefined;
 	let relay: RelayServer | undefined;
@@ -310,7 +310,7 @@ describe("relay tabs Chrome detaches omp from", () => {
 
 	const readMark = { action: "run", code: "return await page.evaluate(() => window.mark);", timeout: 10 };
 
-	/** Resolves once the bridge has handled the extension's next detach report, which sends the tab's worker `OMP.debuggerDetached`. */
+	/** Resolves once the bridge has handled the extension's next detach report, which sends the tab's worker `OMSP.debuggerDetached`. */
 	function bridgeHandlesDetach(): Promise<void> {
 		if (!relay) throw new Error("relay not started");
 		const bridge = relay.bridge;
@@ -359,7 +359,7 @@ describe("relay tabs Chrome detaches omp from", () => {
 			await evaluating;
 			await ext.chromeDetach("target_closed");
 			const failure = String(await stalled);
-			expect(failure).toContain("Chrome detached omp from this tab (target_closed) during this call");
+			expect(failure).toContain("Chrome detached omsp from this tab (target_closed) during this call");
 			expect(failure).toContain("password manager");
 			expect(failure).toContain("may already have landed");
 			expect(failure).toContain("reattached to the same tab");
@@ -383,13 +383,13 @@ describe("relay tabs Chrome detaches omp from", () => {
 			});
 			try {
 				const evaluating = ext.hanging();
-				const code = `void __omp_call_tool__("probe", {}); ${HANG.code}`;
+				const code = `void __omsp_call_tool__("probe", {}); ${HANG.code}`;
 				const stalled = invoke({ action: "run", code, timeout: HANG.timeout }).catch((error: unknown) => error);
 				const signal = await started.promise;
 				await evaluating;
 				await ext.chromeDetach("target_closed");
 				expect(String(await stalled)).toContain(
-					"Chrome detached omp from this tab (target_closed) during this call",
+					"Chrome detached omsp from this tab (target_closed) during this call",
 				);
 				expect(signal.aborted).toBe(true);
 			} finally {
@@ -404,24 +404,24 @@ describe("relay tabs Chrome detaches omp from", () => {
 		async () => {
 			const ext = await openRelayTab();
 			// The call's first page command (reapplying this user agent) goes out behind the bridge's
-			// `OMP.debuggerDetached` on the worker's socket, so the worker sees the detach before the call's code starts.
-			await invoke({ action: "run", code: 'await tab.emulate({ userAgent: "omp-detach-test" });', timeout: 10 });
+			// `OMSP.debuggerDetached` on the worker's socket, so the worker sees the detach before the call's code starts.
+			await invoke({ action: "run", code: 'await tab.emulate({ userAgent: "omsp-detach-test" });', timeout: 10 });
 			const handled = bridgeHandlesDetach();
 			await ext.chromeDetach("target_closed");
 			await handled;
 			const next = await invoke(readMark);
 			expect(next.value).toBe("kept");
-			expect(next.text).toContain("Chrome had detached omp from this tab since the last call");
+			expect(next.text).toContain("Chrome had detached omsp from this tab since the last call");
 		},
 		60_000,
 	);
 
 	it.skipIf(!CHROMIUM_AVAILABLE)(
-		"runs a call on the re-adopted tab when Chrome detached omp before its code started",
+		"runs a call on the re-adopted tab when Chrome detached omsp before its code started",
 		async () => {
 			const ext = await openRelayTab();
 			// A user agent set by an earlier call is reapplied before each call's code starts.
-			await invoke({ action: "run", code: 'await tab.emulate({ userAgent: "omp-detach-test" });', timeout: 10 });
+			await invoke({ action: "run", code: 'await tab.emulate({ userAgent: "omsp-detach-test" });', timeout: 10 });
 			const reapplying = ext.nextSend("Network.setUserAgentOverride");
 			const next = invoke(readMark);
 			await reapplying;
@@ -429,7 +429,7 @@ describe("relay tabs Chrome detaches omp from", () => {
 			const result = await next;
 			expect(result.value).toBe("kept");
 			expect(result.text).toContain(
-				"omp reattached to the same tab on a new worker, without reloading it, and then ran this call",
+				"omsp reattached to the same tab on a new worker, without reloading it, and then ran this call",
 			);
 		},
 		60_000,
@@ -448,14 +448,14 @@ describe("relay tabs Chrome detaches omp from", () => {
 				await compiled.promise;
 				return await wrapCode(code);
 			});
-			const probe = `OMP_DETACH_PROBE_${process.pid}`;
+			const probe = `OMSP_DETACH_PROBE_${process.pid}`;
 			try {
 				const code = `process.env.${probe} = "ran"; return await page.evaluate(() => window.mark);`;
 				const next = invoke({ action: "run", code, timeout: 10 }).catch((error: unknown) => error);
 				await compiling.promise;
 				await ext.chromeDetach("target_closed");
 				expect(String(await next)).toContain(
-					"Chrome detached omp from this tab (target_closed) before this call, so its code did not run",
+					"Chrome detached omsp from this tab (target_closed) before this call, so its code did not run",
 				);
 				// The compile finishing after the detach must not evaluate the cell late. The runtime awaits the
 				// compile before this test does, so its evaluation, if any, has run once this await returns.
@@ -507,7 +507,7 @@ describe("relay tabs Chrome detaches omp from", () => {
 			await evaluating;
 			await ext.chromeDetach("target_closed");
 			const failure = String(await stalled);
-			expect(failure).toContain("Chrome detached omp from this tab (target_closed) during this call");
+			expect(failure).toContain("Chrome detached omsp from this tab (target_closed) during this call");
 			expect(failure).toContain("could not reattach");
 			const later = String(await invoke(readMark).catch((error: unknown) => error));
 			expect(later).toContain("could not reattach");
@@ -533,7 +533,7 @@ describe("relay tabs Chrome detaches omp from", () => {
 				await evaluating;
 				await ext.chromeDetach("canceled_by_user");
 				const failure = String(await stalled);
-				expect(failure).toContain("Chrome detached omp from this tab (canceled_by_user) during this call");
+				expect(failure).toContain("Chrome detached omsp from this tab (canceled_by_user) during this call");
 				expect(failure).toContain("The user cancelled Chrome's debugging bar");
 				expect(failure).toContain("navigate it in Chrome, then open it again");
 				expect(failure).not.toContain("password manager");

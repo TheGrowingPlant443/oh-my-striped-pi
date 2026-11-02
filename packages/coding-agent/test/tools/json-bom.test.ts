@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Shell } from "@oh-my-pi/pi-natives";
+import { Shell } from "@oh-my-striped-pi/pi-natives";
 import { Settings } from "../../src/config/settings";
 import type { ToolSession } from "../../src/sdk";
 import { ReadTool } from "../../src/tools/read";
@@ -30,7 +30,7 @@ describe("JSON input BOM decoding", () => {
 	let tool: ReadTool;
 
 	beforeAll(async () => {
-		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-json-bom-"));
+		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-json-bom-"));
 		json = path.join(dir, "bom.json");
 		jsonl = path.join(dir, "bom.jsonl");
 		await Bun.write(json, '\uFEFF{"ok":true,"items":["a","b","c"],"text":"x\uFEFFy"}\n');

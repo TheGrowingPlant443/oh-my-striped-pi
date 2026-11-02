@@ -1,11 +1,15 @@
 import * as path from "node:path";
-import { type ApiKeyResolver, type FetchImpl, type ResolvedApiKey, type UsageProvider } from "@oh-my-pi/pi-ai";
-import { type AuthApiKeyOptions, type AuthPeekOptions } from "@oh-my-pi/pi-ai/auth-storage";
-import { registerCustomApi, unregisterCustomApis } from "@oh-my-pi/pi-ai/api-registry";
-import { registerOAuthProvider, unregisterOAuthProvider, unregisterOAuthProviders } from "@oh-my-pi/pi-ai/oauth";
-import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-pi/pi-ai/oauth/types";
-import { getProviderDefinition } from "@oh-my-pi/pi-ai/registry";
-import { OAuthRefreshUnavailableError } from "@oh-my-pi/pi-ai/error";
+import { type ApiKeyResolver, type FetchImpl, type ResolvedApiKey, type UsageProvider } from "@oh-my-striped-pi/pi-ai";
+import { type AuthApiKeyOptions, type AuthPeekOptions } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { registerCustomApi, unregisterCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
+import {
+	registerOAuthProvider,
+	unregisterOAuthProvider,
+	unregisterOAuthProviders,
+} from "@oh-my-striped-pi/pi-ai/oauth";
+import type { OAuthCredentials, OAuthLoginCallbacks } from "@oh-my-striped-pi/pi-ai/oauth/types";
+import { getProviderDefinition } from "@oh-my-striped-pi/pi-ai/registry";
+import { OAuthRefreshUnavailableError } from "@oh-my-striped-pi/pi-ai/error";
 import type {
 	Api,
 	Context,
@@ -14,29 +18,33 @@ import type {
 	RemoteCompactionConfig,
 	SimpleStreamOptions,
 	ThinkingConfig,
-} from "@oh-my-pi/pi-ai/types";
-import type { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildDiscoveredModel, buildModel, nextBuildPriceChange } from "@oh-my-pi/pi-catalog/build";
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
-import { collapseBuiltVariants } from "@oh-my-pi/pi-catalog/compat/collapse";
-import { resolveMaxContextWindow } from "@oh-my-pi/pi-catalog/compat/context-window";
-import { applyCatalogMetrics, CatalogMetricsIndex } from "@oh-my-pi/pi-catalog/identity/metrics";
-import { getModelCacheWriteStats, readModelCache, retainModelCacheConnection } from "@oh-my-pi/pi-catalog/model-cache";
+} from "@oh-my-striped-pi/pi-ai/types";
+import type { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildDiscoveredModel, buildModel, nextBuildPriceChange } from "@oh-my-striped-pi/pi-catalog/build";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { collapseBuiltVariants } from "@oh-my-striped-pi/pi-catalog/compat/collapse";
+import { resolveMaxContextWindow } from "@oh-my-striped-pi/pi-catalog/compat/context-window";
+import { applyCatalogMetrics, CatalogMetricsIndex } from "@oh-my-striped-pi/pi-catalog/identity/metrics";
+import {
+	getModelCacheWriteStats,
+	readModelCache,
+	retainModelCacheConnection,
+} from "@oh-my-striped-pi/pi-catalog/model-cache";
 import {
 	createModelManager,
 	type ModelManagerOptions,
 	type ModelRefreshStrategy,
-} from "@oh-my-pi/pi-catalog/model-manager";
-import { getBundledModels, getBundledProviders } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-catalog/model-manager";
+import { getBundledModels, getBundledProviders } from "@oh-my-striped-pi/pi-catalog/models";
 import {
 	isCredentialScopedModelCacheProvider,
 	PROVIDER_DESCRIPTORS,
 	resolveModelCacheProviderId,
 	resolveOllamaModelCacheProviderId,
-} from "@oh-my-pi/pi-catalog/provider-models";
-import { toModelSpec } from "@oh-my-pi/pi-catalog/provider-models/bundled-references";
-import { apiServesKind, modelKind, type ModelKind } from "@oh-my-pi/pi-catalog/types";
-import { getAgentDir, isBunTestRuntime, logger, wrapFetchForExtraCa } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-catalog/provider-models";
+import { toModelSpec } from "@oh-my-striped-pi/pi-catalog/provider-models/bundled-references";
+import { apiServesKind, modelKind, type ModelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { getAgentDir, isBunTestRuntime, logger, wrapFetchForExtraCa } from "@oh-my-striped-pi/pi-utils";
 import { resolveProviderModelReference } from "./model-resolver";
 import { redactUrlForLog } from "../mcp/json-rpc";
 import type { AuthStorage } from "../session/auth-storage";
@@ -222,7 +230,7 @@ function selectProviderModels<T extends { provider: string }>(models: T[], provi
  * Online discovery (`strategy: "online"`) is independent of credential minting:
  * opening `/models` and hovering a provider fetch catalogs without re-running
  * `!command` helpers. Pass `refreshCommandCredentials` only for explicit user
- * refresh (`omp models refresh`, TUI F5).
+ * refresh (`omsp models refresh`, TUI F5).
  */
 export interface ModelRegistryRefreshOptions {
 	refreshCommandCredentials?: boolean;
@@ -2956,7 +2964,7 @@ export class ModelRegistry {
 	 * Whether an unresolved selector on `provider` may still be supplied by
 	 * discovery this process has not finished. Two states qualify:
 	 * - `idle`: a config-declared provider with a cold cache has no catalog yet
-	 *   (e.g. after `omp update` bumps the cache namespace, #10048).
+	 *   (e.g. after `omsp update` bumps the cache namespace, #10048).
 	 * - `cached`/`unavailable` while the initial background refresh is in
 	 *   flight: startup replayed a cache row or fell back to the bundled
 	 *   catalog, and that refresh may still add ids (a cold namespace after an
@@ -3005,7 +3013,7 @@ export class ModelRegistry {
 	 * discovered model that defines one.
 	 *
 	 * The overrides lead because a model-derived answer is only available once
-	 * discovery has populated the registry. `omp usage` builds a `ModelRegistry`
+	 * discovery has populated the registry. `omsp usage` builds a `ModelRegistry`
 	 * and probes credentials immediately, and providers whose roster is
 	 * discovery-only (no bundled rows) have no model to read a URL from at that
 	 * point — so deriving solely from models returned `undefined` cache-cold and

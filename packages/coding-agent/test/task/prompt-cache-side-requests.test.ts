@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, expect, it, vi } from "bun:test";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import * as catalogPolicy from "@oh-my-pi/pi-catalog/compat/catalog-policy";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as settingsStream from "@oh-my-pi/pi-coding-agent/session/settings-stream-fn";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import * as catalogPolicy from "@oh-my-striped-pi/pi-catalog/compat/catalog-policy";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as settingsStream from "@oh-my-striped-pi/pi-coding-agent/session/settings-stream-fn";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 interface Request {
 	stage: string;
@@ -45,7 +45,7 @@ it.each([
 ] as const)(
 	"keeps primary, ephemeral, and handoff routing consistent for %s",
 	async (_name, switchToIneligible, explicit) => {
-		using dir = TempDir.createSync("@omp-task-side-cache-");
+		using dir = TempDir.createSync("@omsp-task-side-cache-");
 		const auth = await AuthStorage.create(dir.join("auth.db"));
 		auth.keys.setRuntime("github-copilot", "test-key");
 		const mock = createMockModel({ handler: { content: [{ type: "text", text: "## Goal\nContinue the review." }] } });

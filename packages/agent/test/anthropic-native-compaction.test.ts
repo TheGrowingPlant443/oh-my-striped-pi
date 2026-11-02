@@ -15,10 +15,10 @@ import {
 	shouldUseAnthropicNativeCompaction,
 	shouldUseProviderNativeCompaction,
 	withAnthropicCompactionPreserveData,
-} from "@oh-my-pi/pi-agent-core/compaction";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import * as ai from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
 import type {
 	AnthropicRequestControls,
 	AssistantMessage,
@@ -27,12 +27,12 @@ import type {
 	Model,
 	SimpleStreamOptions,
 	Usage,
-} from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 
 const ZERO_USAGE: Usage = {
 	input: 0,

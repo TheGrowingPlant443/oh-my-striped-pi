@@ -13,9 +13,9 @@ use grep_matcher::Matcher;
 use grep_pcre2::{RegexMatcher as PcreMatcher, RegexMatcherBuilder as PcreMatcherBuilder};
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 
-/// `OMP_PCRE2_JIT` from the process environment, read once.
+/// `OMSP_PCRE2_JIT` from the process environment, read once.
 static PCRE2_JIT: LazyLock<bool> =
-	LazyLock::new(|| pcre2_jit_enabled(std::env::var("OMP_PCRE2_JIT").ok().as_deref()));
+	LazyLock::new(|| pcre2_jit_enabled(std::env::var("OMSP_PCRE2_JIT").ok().as_deref()));
 
 /// A compiled pattern.
 pub enum Engine {
@@ -94,7 +94,7 @@ impl Matcher for Engine {
 	}
 }
 
-/// PCRE2 JIT toggle for an `OMP_PCRE2_JIT` value.
+/// PCRE2 JIT toggle for an `OMSP_PCRE2_JIT` value.
 ///
 /// `1` forces JIT on,
 /// `0`/`false` forces it off. Unset or empty, JIT stays on everywhere except

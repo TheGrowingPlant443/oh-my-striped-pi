@@ -9,17 +9,21 @@ import { describe, expect, it, vi } from "bun:test";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Args } from "@oh-my-pi/pi-coding-agent/cli/args";
-import type { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createSessionManager, SessionResolutionError, writeStartupNotice } from "@oh-my-pi/pi-coding-agent/main";
+import type { Args } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import type { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	createSessionManager,
+	SessionResolutionError,
+	writeStartupNotice,
+} from "@oh-my-striped-pi/pi-coding-agent/main";
 import {
 	collectPendingToolCalls,
 	TOOL_EXECUTION_START_CUSTOM_TYPE,
-} from "@oh-my-pi/pi-coding-agent/session/exit-diagnostics";
-import * as sessionListingModule from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { loadEntriesFromFile, loadSessionFile } from "@oh-my-pi/pi-coding-agent/session/session-loader";
-import { ForkSourceNotFoundError, SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
+} from "@oh-my-striped-pi/pi-coding-agent/session/exit-diagnostics";
+import * as sessionListingModule from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { loadEntriesFromFile, loadSessionFile } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
+import { ForkSourceNotFoundError, SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
 
 function buildResumeArgs(resume: string, sessionDir?: string): Args {
 	return {
@@ -117,7 +121,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: 'Session "019ea530-0000-7000-0000-000000000000" not found.',
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 
 			// Confirm it's the exported class so `runRootCommand`'s `instanceof` check works.
@@ -133,7 +137,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("rejects --resume with unknown id instead of falling back to latest persisted session", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-resume-unknown-id-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-resume-unknown-id-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const missingId = "019ea530-ffff-7000-8000-000000000000";
 		try {
@@ -148,7 +152,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: `Session "${missingId}" not found.`,
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 		} finally {
 			await fsp.rm(cwd, { recursive: true, force: true });
@@ -156,7 +160,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("rejects --continue followed by an unknown session id instead of falling back to latest", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-continue-unknown-id-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-continue-unknown-id-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const missingId = "019ea530-ffff-7000-8000-000000000000";
 		try {
@@ -170,7 +174,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: `Session "${missingId}" not found.`,
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 		} finally {
 			await fsp.rm(cwd, { recursive: true, force: true });
@@ -189,7 +193,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: 'Session "019ea530-0000-7000-0000-000000000000" not found.',
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 		} finally {
 			vi.restoreAllMocks();
@@ -208,7 +212,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	it.each(["path", "selector"] as const)(
 		"preserves an unknown started-tool outcome in a CLI --fork via %s",
 		async route => {
-			const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-live-tail-"));
+			const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-live-tail-"));
 			const sessionDir = path.join(cwd, "sessions");
 			const source = path.join(sessionDir, "source.jsonl");
 			const id = "019ea530-0000-7000-0000-000000000000";
@@ -319,7 +323,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	);
 
 	it("rejects --fork with missing path without writing a session (#11491)", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-missing-path-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-missing-path-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const missingPath = path.join(cwd, "ghost-zz9q.jsonl");
 		try {
@@ -328,7 +332,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: `Session "${missingPath}" not found.`,
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 			await expect(fsp.readdir(sessionDir)).resolves.toEqual([]);
 		} finally {
@@ -337,7 +341,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("forkFrom rejects a missing source without writing a session (#11491)", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-missing-path-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-missing-path-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const missingPath = path.join(cwd, "ghost-zz9q.jsonl");
 		try {
@@ -353,7 +357,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("forkFrom rejects a vanished source on the streaming path (#11491)", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-missing-path-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-missing-path-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const missingPath = path.join(cwd, "ghost-zz9q.jsonl");
 		const storage = new FileSessionStorage();
@@ -375,7 +379,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("rejects --fork <id> when resolved session vanished before forkFrom reads it (#11491)", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-vanished-id-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-vanished-id-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const vanishedPath = path.join(cwd, "vanished.jsonl");
 		const forkId = "019ea530-0000-7000-0000-000000000000";
@@ -401,7 +405,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: `Session "${forkId}" not found.`,
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 			await expect(fsp.readdir(sessionDir)).resolves.toEqual([]);
 		} finally {
@@ -411,7 +415,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	});
 
 	it("rejects --fork with ENOTDIR path without writing a session (#11491)", async () => {
-		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-fork-enotdir-"));
+		const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-fork-enotdir-"));
 		const sessionDir = path.join(cwd, "sessions");
 		const regularFile = path.join(cwd, "file.txt");
 		await Bun.write(regularFile, "not a directory");
@@ -422,7 +426,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 			).rejects.toMatchObject({
 				name: "SessionResolutionError",
 				message: `Session "${enotdirChild}" not found.`,
-				hint: expect.stringContaining("omp --resume"),
+				hint: expect.stringContaining("omsp --resume"),
 			});
 			await expect(fsp.readdir(sessionDir)).resolves.toEqual([]);
 		} finally {
@@ -434,7 +438,7 @@ describe("createSessionManager — missing session (#2084)", () => {
 	it.skipIf(process.platform === "win32")(
 		"propagates ENOTDIR on ordinary session loads when throwIfMissing is false (#11491)",
 		async () => {
-			const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-enotdir-ordinary-"));
+			const cwd = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-enotdir-ordinary-"));
 			const regularFile = path.join(cwd, "file.txt");
 			await Bun.write(regularFile, "not a directory");
 			const enotdirChild = path.join(regularFile, "child.jsonl");

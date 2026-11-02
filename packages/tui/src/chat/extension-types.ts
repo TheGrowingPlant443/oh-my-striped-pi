@@ -1,4 +1,4 @@
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
 import type { Component, TUI } from "../tui";
 import type { Theme } from "../theme/theme";
 import type { CustomMessage, HookMessage } from "./messages";

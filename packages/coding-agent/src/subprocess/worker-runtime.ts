@@ -8,7 +8,7 @@ import {
 	installRuntimeModuleResolver,
 	isCompiledBinary,
 	resolveRuntimeModule,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import packageJson from "../../package.json" with { type: "json" };
 
 /**
@@ -27,7 +27,7 @@ import packageJson from "../../package.json" with { type: "json" };
  */
 
 export const TRANSFORMERS_PACKAGE = "@huggingface/transformers";
-const COMPILED_TRANSFORMERS_VERSION = process.env.PI_TINY_TRANSFORMERS_VERSION;
+const COMPILED_TRANSFORMERS_VERSION = process.env.OMSP_TINY_TRANSFORMERS_VERSION;
 const ONNX_RUNTIME_NODE_PACKAGE = "onnxruntime-node";
 const ONNX_RUNTIME_CUDA_INSTALL = "cuda12";
 const ONNX_RUNTIME_CUDA_PROVIDER_FILES = [
@@ -166,7 +166,7 @@ export function replayCachedReady<K, M>(
  */
 export async function installSharpStubResolver(runtimeDir: string): Promise<string> {
 	const nodeModules = path.join(runtimeDir, "node_modules");
-	const sharpStub = path.join(runtimeDir, "omp-sharp-stub.cjs");
+	const sharpStub = path.join(runtimeDir, "omsp-sharp-stub.cjs");
 	await Bun.write(sharpStub, "module.exports = {};\n");
 	installRuntimeModuleResolver({ runtimeNodeModules: nodeModules, stubs: { sharp: sharpStub } });
 	return nodeModules;
@@ -233,7 +233,7 @@ async function installOnnxRuntimeCudaProviders(packageDir: string, runtimeDir: s
  */
 export async function ensureOnnxRuntimeCudaProviders(
 	runtimeDir: string,
-	device = process.env.PI_TINY_DEVICE,
+	device = process.env.OMSP_TINY_DEVICE,
 ): Promise<void> {
 	if (!shouldInstallOnnxRuntimeCudaProviders(device)) return;
 	const nodeModules = path.join(runtimeDir, "node_modules");
@@ -393,7 +393,7 @@ export async function formatOnnxRuntimeCudaDiagnostics(
 	if (!packageDir) {
 		return [
 			"ONNX Runtime CUDA diagnostics:",
-			`  PI_TINY_DEVICE=${requestedDevice} requested CUDAExecutionProvider`,
+			`  OMSP_TINY_DEVICE=${requestedDevice} requested CUDAExecutionProvider`,
 			"  cause: unable to resolve onnxruntime-node in the tiny-model runtime",
 		].join("\n");
 	}
@@ -402,7 +402,7 @@ export async function formatOnnxRuntimeCudaDiagnostics(
 	const sideRuntime = metadata.__ompRuntimeNodeModules;
 	const lines = [
 		"ONNX Runtime CUDA diagnostics:",
-		`  PI_TINY_DEVICE=${requestedDevice} requested CUDAExecutionProvider`,
+		`  OMSP_TINY_DEVICE=${requestedDevice} requested CUDAExecutionProvider`,
 		sideRuntime ? `  side runtime: ${sideRuntime}` : `  onnxruntime-node: ${packageDir}`,
 		`  cause: ${cudaFailureCause(metadata, error, missingFiles)}`,
 	];

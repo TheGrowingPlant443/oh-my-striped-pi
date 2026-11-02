@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 // Regression: setting config on a fresh Windows profile over WinRM
 // exited 0 with no output and never wrote config.yml. The CLI entry is a floating `runCli()`
@@ -9,10 +9,10 @@ import { TempDir } from "@oh-my-pi/pi-utils";
 // settles and holds no live handle let the event loop drain, and Bun exited 0: an unfinished
 // command reported as success. The process entry now fails that drain with exit 1 and a
 // diagnostic. A preload makes `Settings.init` never settle to reach the same state. #12441
-// reports the same silent exit 0 for `omp auth-broker token` on a fresh Windows profile; the
+// reports the same silent exit 0 for `omsp auth-broker token` on a fresh Windows profile; the
 // stalled await itself is still unidentified.
 //
-// Regression #13470: on Windows Bun emits `beforeExit` while `omp update` still has I/O in
+// Regression #13470: on Windows Bun emits `beforeExit` while `omsp update` still has I/O in
 // flight, then keeps running the loop; the command completed but exited 1 with the diagnostic.
 // Preloads that resume work from a `beforeExit` listener reproduce that runtime state.
 
@@ -70,10 +70,10 @@ async function runConfigSet(tempDir: TempDir, settingsInit: SettingsInitMode): P
 	}
 	// The child must resolve its agent dir from the isolated home, not an inherited override or profile.
 	const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: "1" };
-	delete env.PI_CODING_AGENT_DIR;
-	delete env.PI_CONFIG_DIR;
-	delete env.OMP_PROFILE;
-	delete env.PI_PROFILE;
+	delete env.OMSP_CODING_AGENT_DIR;
+	delete env.OMSP_CONFIG_DIR;
+	delete env.OMSP_PROFILE;
+	delete env.OMSP_PROFILE;
 	delete env.XDG_CACHE_HOME;
 	delete env.XDG_CONFIG_HOME;
 	delete env.XDG_DATA_HOME;
@@ -90,25 +90,25 @@ async function runConfigSet(tempDir: TempDir, settingsInit: SettingsInitMode): P
 		new Response(proc.stdout).text(),
 		new Response(proc.stderr).text(),
 	]);
-	return { exitCode, stdout, stderr, configPath: path.join(home, ".omp", "agent", "config.yml") };
+	return { exitCode, stdout, stderr, configPath: path.join(home, ".omsp", "agent", "config.yml") };
 }
 
 // Each case cold-starts the CLI graph in a child process; the budget covers that transpile.
 describe("one-shot CLI command settlement", () => {
 	it("exits 1 with a diagnostic when the command's work never settles", async () => {
-		using tempDir = TempDir.createSync("@omp-cli-unsettled-");
+		using tempDir = TempDir.createSync("@omsp-cli-unsettled-");
 		const run = await runConfigSet(tempDir, "stall");
 
 		expect(run.exitCode, run.stderr).toBe(1);
 		// Names the stalled subcommand so automation logs show what failed, without its arguments.
-		expect(run.stderr).toContain(`\`omp config\` ${DIAGNOSTIC}`);
+		expect(run.stderr).toContain(`\`omsp config\` ${DIAGNOSTIC}`);
 		expect(run.stderr).not.toContain("browser.headless");
 		expect(run.stdout).toBe("");
 		expect(fs.existsSync(run.configPath)).toBe(false);
 	}, 30_000);
 
 	it("keeps a completed command's exit 0 and output", async () => {
-		using tempDir = TempDir.createSync("@omp-cli-settled-");
+		using tempDir = TempDir.createSync("@omsp-cli-settled-");
 		const run = await runConfigSet(tempDir, "real");
 
 		expect(run.exitCode, run.stderr).toBe(0);
@@ -118,7 +118,7 @@ describe("one-shot CLI command settlement", () => {
 	}, 30_000);
 
 	it("keeps exit 0 when the loop resumes after a premature beforeExit and the command completes", async () => {
-		using tempDir = TempDir.createSync("@omp-cli-resumed-");
+		using tempDir = TempDir.createSync("@omsp-cli-resumed-");
 		const run = await runConfigSet(tempDir, "resume-after-drain");
 
 		expect(run.exitCode, run.stderr).toBe(0);
@@ -128,7 +128,7 @@ describe("one-shot CLI command settlement", () => {
 	}, 30_000);
 
 	it("keeps an explicit exit's code when the loop resumed after a premature beforeExit", async () => {
-		using tempDir = TempDir.createSync("@omp-cli-exited-");
+		using tempDir = TempDir.createSync("@omsp-cli-exited-");
 		const run = await runConfigSet(tempDir, "exit-after-drain");
 
 		expect(run.exitCode, run.stderr).toBe(0);

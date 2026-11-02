@@ -13,13 +13,13 @@ import {
 	type Message,
 	type Model,
 	retryTransientCompletion,
-} from "@oh-my-pi/pi-ai";
-import { ThinkingInbandScanner } from "@oh-my-pi/pi-ai/dialect/thinking";
-import { writeTerminalSequence } from "@oh-my-pi/pi-tui";
-import { isNativeRendering, onNativeRenderingChange } from "@oh-my-pi/pi-tui/native/state";
-import { theme } from "@oh-my-pi/pi-tui/theme";
-import { SPINNER_FRAMES } from "@oh-my-pi/pi-tui/theme/symbols";
-import { $env, isTerminalHeadless, isWsl, logger, prompt } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai";
+import { ThinkingInbandScanner } from "@oh-my-striped-pi/pi-ai/dialect/thinking";
+import { writeTerminalSequence } from "@oh-my-striped-pi/pi-tui";
+import { isNativeRendering, onNativeRenderingChange } from "@oh-my-striped-pi/pi-tui/native/state";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { SPINNER_FRAMES } from "@oh-my-striped-pi/pi-tui/theme/symbols";
+import { $env, isTerminalHeadless, isWsl, logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 
 import { roleCandidatePool } from "../config/model-roles";
@@ -37,11 +37,11 @@ import { cfgRetryModelFallback } from "../session/settings";
 const TITLE_SYSTEM_PROMPT = prompt.render(titleSystemPrompt);
 const TITLE_MARKER_INSTRUCTION = prompt.render(titleMarkerInstruction);
 
-// Plain π, not the nerd-font `icon.omp` glyph: window/tab titles render in the
+// Plain π, not the nerd-font `icon.omsp` glyph: window/tab titles render in the
 // OS UI font, which has no nerd-font PUA coverage.
 const DEFAULT_TERMINAL_TITLE = "π";
 /** The native tab title without a session name. */
-const NATIVE_TERMINAL_TITLE = "omp";
+const NATIVE_TERMINAL_TITLE = "omsp";
 const TERMINAL_TITLE_CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 
 /**
@@ -105,7 +105,7 @@ function setWindowsConsoleTitle(title: string): boolean {
 }
 
 /**
- * Whether the live console title differs from `title`, the one omp last set.
+ * Whether the live console title differs from `title`, the one omsp last set.
  * The console title is shared by every process attached to the console, so a
  * child (a worker, `browser-relay`, an npm `.cmd` shim's `title`) can replace
  * it behind the dedupe cache. Unreadable titles and the latched OSC fallback
@@ -144,7 +144,7 @@ const TITLE_MAX_TOKENS = 1024;
 
 /** Matches the title the model wraps in `<title>...</title>`. */
 const TITLE_MARKER_GLOBAL_RE = /<title>([\s\S]*?)<\/title>|<title\s*\/>|<title>\s*$/gi;
-const TITLE_VISIBILITY_SENTINEL = "\uE000omp-title-visible\uE000";
+const TITLE_VISIBILITY_SENTINEL = "\uE000omsp-title-visible\uE000";
 const THINKING_TAG_ENVELOPE_RE = /<(think|thinking|reasoning)>\s*[\s\S]*?<\/\1>/gi;
 const THINKING_FENCE_ENVELOPE_RE = /```(?:thinking|reasoning)\b[\s\S]*?```/gi;
 const LEADING_THINKING_TAG_RE = /^\s*<(think|thinking|reasoning)>\s*[\s\S]*?<\/\1>\s*/i;
@@ -710,13 +710,13 @@ export function nerdGlyphsActive(): boolean {
 }
 
 /** The OSC 1337 user variable Tern reads the session file from. */
-const TERN_SESSION_FILE_VAR = "omp_session_file";
+const TERN_SESSION_FILE_VAR = "omsp_session_file";
 /**
- * The OSC 1337 user variable telling Tern this omp understands `--restore`, set to
+ * The OSC 1337 user variable telling Tern this omsp understands `--restore`, set to
  * `1` before each session file report: Tern's daemon then relaunches it after a
  * crash with `--restore <file>` instead of `--resume <file>`.
  */
-const TERN_RESTORE_VAR = "omp_restore";
+const TERN_RESTORE_VAR = "omsp_restore";
 
 /** The live session as Tern hears about it (read from the interactive session manager). */
 export interface TerminalSessionSource {
@@ -737,8 +737,8 @@ let reportedCwd: string | undefined;
  * Name the live session's source. Every session title update (start, new
  * session, resume, cwd switch) and {@link reportTernSession} re-read it and, in
  * Tern, report what changed: the file, so Tern's daemon can relaunch
- * `omp --resume <file>` after it restarts, and the directory, which Tern names
- * in omp's composer bar.
+ * `omsp --resume <file>` after it restarts, and the directory, which Tern names
+ * in omsp's composer bar.
  */
 export function setTerminalSessionSource(source: TerminalSessionSource | undefined): void {
 	sessionSource = source;
@@ -919,7 +919,7 @@ export function buildTerminalTitleWithState(
 }
 
 /**
- * The tab title while a TSP terminal renders: the session name (`omp` before
+ * The tab title while a TSP terminal renders: the session name (`omsp` before
  * there is one) and the branch's pull request. The terminal shows run state
  * itself, so there is no brand or state separator.
  */
@@ -1045,7 +1045,7 @@ export function initTerminalTitleState(): void {
 	terminalTitleRuntime.nativeTitleFailed = false;
 	terminalTitleRuntime.nativeTitleRestored = false;
 	// `??=` keeps the shell's title across a repeat claim, which would otherwise
-	// read omp's own title back.
+	// read omsp's own title back.
 	try {
 		terminalTitleRuntime.initialWindowsConsoleTitle ??= getWindowsConsoleTitleApi()?.get();
 	} catch {
@@ -1107,7 +1107,7 @@ export function pushTerminalTitle(): void {
  * Clears the title (OSC 0) before popping the one {@link pushTerminalTitle} saved
  * (CSI 23;2t): a terminal with a title stack (xterm, iTerm2, VTE, mintty) restores
  * the saved title over the clear, and one without a stack ignores the pop and
- * keeps the clear instead of omp's title. Writes nothing when teardown already
+ * keeps the clear instead of omsp's title. Writes nothing when teardown already
  * restored a Windows console title natively.
  */
 export function popTerminalTitle(): void {

@@ -39,10 +39,14 @@ import { LEAF_TARGETS } from "../packages/natives/scripts/gen-npm-packages.ts";
 import { compareVersions } from "../packages/utils/src/version.ts";
 import { packages } from "./ci-release-publish.ts";
 
+if (import.meta.main) {
+	throw new Error("Public npm publishing setup is disabled for oh-my-striped-pi.");
+}
+
 const repoRoot = path.join(import.meta.dir, "..");
 const MIN_NPM = "11.16.0";
 const DEFAULT_WORKFLOW = "ci.yml";
-const FALLBACK_REPO = "can1357/oh-my-pi";
+const FALLBACK_REPO = "TheGrowingPlant443/oh-my-striped-pi";
 const PLACEHOLDER_VERSION = "0.0.0";
 
 interface NativeLeafTarget {
@@ -169,7 +173,7 @@ async function collectTargets(): Promise<{ names: string[]; repoFromManifest: st
 		// own published package and needs its own trusted-publisher link.
 		if (pkg.kind === "native") {
 			for (const target of LEAF_TARGETS) {
-				const leaf = `@oh-my-pi/pi-natives-${target.tag}`;
+				const leaf = `@oh-my-striped-pi/pi-natives-${target.tag}`;
 				if (!seen.has(leaf)) {
 					seen.add(leaf);
 					names.push(leaf);
@@ -236,7 +240,7 @@ async function waitForPackageExists(name: string): Promise<boolean> {
 }
 
 function nativeLeafName(tag: string): string {
-	return `@oh-my-pi/pi-natives-${tag}`;
+	return `@oh-my-striped-pi/pi-natives-${tag}`;
 }
 
 function nativeLeafTargetForPackage(name: string): NativeLeafTarget | null {
@@ -254,7 +258,7 @@ function placeholderManifest(name: string, target: NativeLeafTarget, repo: strin
 	return {
 		name,
 		version: PLACEHOLDER_VERSION,
-		description: `Placeholder for the ${target.tag} native addon of @oh-my-pi/pi-natives. The real binary is published during release.`,
+		description: `Placeholder for the ${target.tag} native addon of @oh-my-striped-pi/pi-natives. The real binary is published during release.`,
 		license: "MIT",
 		os: [target.os],
 		cpu: [target.cpu],
@@ -276,7 +280,7 @@ function placeholderReadme(name: string, target: NativeLeafTarget): string {
 	return [
 		`# ${name}`,
 		"",
-		`Placeholder package reserving the npm name for the \`${target.tag}\` native addon of \`@oh-my-pi/pi-natives\`.`,
+		`Placeholder package reserving the npm name for the \`${target.tag}\` native addon of \`@oh-my-striped-pi/pi-natives\`.`,
 		"",
 		`This \`${PLACEHOLDER_VERSION}\` release ships no binary. The real, versioned platform addon is generated during release and installed as an optional dependency of the core package.`,
 		"",
@@ -284,7 +288,7 @@ function placeholderReadme(name: string, target: NativeLeafTarget): string {
 }
 
 async function publishNativeLeafPlaceholder(name: string, target: NativeLeafTarget, repo: string): Promise<boolean> {
-	const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-native-placeholder-"));
+	const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-native-placeholder-"));
 	try {
 		await Bun.write(
 			path.join(tmpDir, "package.json"),
@@ -460,4 +464,4 @@ function printSummary(outcomes: ReadonlyMap<string, Outcome>, bootstrapped: numb
 	if (counts.failed) console.log(`  failed:       ${counts.failed}`);
 }
 
-await main();
+if (import.meta.main) await main();

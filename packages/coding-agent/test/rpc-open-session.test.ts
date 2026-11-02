@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { openRpcSession, type RpcOpenSessionSession } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-mode";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getConfigRootDir, setAgentDir } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { openRpcSession, type RpcOpenSessionSession } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-mode";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getConfigRootDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { makeAssistantMessage } from "./session-manager/helpers";
 
 /** AgentSession stand-in whose session transitions run against a real SessionManager. */
@@ -44,10 +44,10 @@ describe("openRpcSession", () => {
 	let root: string;
 	let cwd: string;
 	let threadDir: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 
 	beforeEach(async () => {
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-open-session-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-open-session-"));
 		setAgentDir(path.join(root, "agent"));
 		cwd = path.join(root, "project");
 		threadDir = path.join(root, "threads", "thread-a");
@@ -58,7 +58,7 @@ describe("openRpcSession", () => {
 		if (originalAgentDir) setAgentDir(originalAgentDir);
 		else {
 			setAgentDir(path.join(getConfigRootDir(), "agent"));
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await fs.rm(root, { recursive: true, force: true });
 	});

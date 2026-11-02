@@ -12,13 +12,13 @@ import type {
 	SpeculativeOperationContext,
 	SpeculativeToolExecutionConfig,
 	SpeculativeToolReference,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import {
 	BINARY_SNIFF_BYTES,
 	IMAGE_METADATA_HEADER_BYTES,
 	isProbablyBinaryHeader,
 	parseImageMetadata,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import type { ToolSession } from "../tools";
 import { approvalRestrictions, resolveApproval } from "../tools/approval";
@@ -32,7 +32,7 @@ import {
 } from "../tools/read";
 import { isCpuProfilePath } from "../utils/cpuprofile";
 import { isSampleProfilePath } from "../utils/sample-profile";
-import { isVideoPath } from "@oh-my-pi/pi-tui/prompt/video";
+import { isVideoPath } from "@oh-my-striped-pi/pi-tui/prompt/video";
 import { cfgTaskSpeculativeLaunch } from "../task/settings";
 
 import {

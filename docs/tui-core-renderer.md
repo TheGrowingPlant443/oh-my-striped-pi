@@ -99,15 +99,15 @@ shrink may have pushed before the resize callback ran):
 - `preserve` repaints only the viewport and leaves old-width history unchanged.
 
 The raw TUI defaults to `preserve` and accepts
-`PI_TUI_RESIZE_SCROLLBACK`; the coding agent defaults to `rebuild`. Append and
+`OMSP_TUI_RESIZE_SCROLLBACK`; the coding agent defaults to `rebuild`. Append and
 rebuild resize policies each prepare one complete bottom-first replay
 transaction; preserve prepares none. Replay consumes one fresh monotonic history
 id without rewinding logical retirement state, and acknowledgement happens only
 after the synchronous write returns.
 
 In-place resize (Warp by default outside multiplexers/ConPTY, or forced with
-`PI_TUI_RESIZE_IN_PLACE=1`) skips resize replay entirely and repaints once the
-drag settles. `PI_TUI_RESIZE_IN_PLACE=0` forces the borrowed-buffer path.
+`OMSP_TUI_RESIZE_IN_PLACE=1`) skips resize replay entirely and repaints once the
+drag settles. `OMSP_TUI_RESIZE_IN_PLACE=0` forces the borrowed-buffer path.
 See [runtime resize details](./tui-runtime-internals.md#resize).
 
 The renderer never probes the user's scroll position. This keeps updates safe
@@ -160,15 +160,15 @@ advertisement while consuming the reply bytes and preserving sentinel ownership.
 A missing DA1 attribute does not reject support reported by XTSMGRAPHICS.
 Selecting SIXEL from DA1 does not end a pending XTSMGRAPHICS query: its input
 consumer remains until the graphics reply arrives or the probe times out.
-Explicit `PI_FORCE_IMAGE_PROTOCOL` choices, including `none`/`off`, take priority;
+Explicit `OMSP_FORCE_IMAGE_PROTOCOL` choices, including `none`/`off`, take priority;
 native TSP surfaces keep their own image transport.
 
 ### Native rendering (Tern Surface Protocol)
 
 `ProcessTerminal` also sends the TSP `hello` query (APC `tsp`) behind a `tsp`
-DA1 sentinel owner. `PI_TUI_NATIVE=0` disables it; multiplexers, devenv's
+DA1 sentinel owner. `OMSP_TUI_NATIVE=0` disables it; multiplexers, devenv's
 reloading shell (`DEVENV_RELOAD_FILE`: its terminal layer forwards DA1 but drops
-APC) and Bun tests skip it by default, while `PI_TUI_NATIVE=1` forces the probe
+APC) and Bun tests skip it by default, while `OMSP_TUI_NATIVE=1` forces the probe
 (tmux still needs `@tern-tsp`). With `TERM_PROGRAM=tern` only a multiplexer's
 session marker counts, not a `screen*`/`tmux*` `TERM` alone, and the debug log
 records once why the pane stayed on rows. A supported-version
@@ -188,7 +188,7 @@ module graph loads comes from Tern instead: the composer's `editor` node
 carries `typeahead: true` (`Editor.nativeTypeahead`, set by `Composer.start`),
 and Tern keeps the text typed into it, draws it at the caret, and writes it to
 the pty as typed once the prop clears, or ahead of the first key it does not
-keep. Typing that reaches omp during startup (from such a flush, or a Tern
+keep. Typing that reaches omsp during startup (from such a flush, or a Tern
 without typeahead) splits in the TUI: plain typing (printable text, Backspace)
 edits the component focused at start live; the first other key (a shortcut,
 Enter, an arrow, a paste) and every key after it are held, in typing order. A
@@ -210,7 +210,7 @@ debug socket's `doc` op returns the reference document
 
 #### Explicit composer submission
 
-omp's `q: "hello"` advertises `features: ["edit", "undo", "send"]`.
+omsp's `q: "hello"` advertises `features: ["edit", "undo", "send"]`.
 The `editor`/`input` prop `sendable` is separate from text editability:
 `sendable: true` means the owner is ready to accept an atomic prompt submission.
 An absent or false value is not ready, even if the field is writable or focused.
@@ -232,7 +232,7 @@ with an `e` message:
 ```
 
 `sf` must name a live surface and `id` its editable composer node (the
-`editor` descendant of the `omp.editor` role, normally `<component>.line/input`),
+`editor` descendant of the `omsp.editor` role, normally `<component>.line/input`),
 not the composer wrapper or its Send button. All three payload fields are
 required strings; surface and node ids must be nonempty. Malformed payloads,
 unknown or closed surfaces, and stale/noneditable node targets are ignored.

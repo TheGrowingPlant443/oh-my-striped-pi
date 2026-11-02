@@ -4,10 +4,10 @@ import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import { getManagedSkillsDir } from "@oh-my-pi/pi-coding-agent/autolearn/managed-skills";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { mnemopiBackend } from "@oh-my-pi/pi-coding-agent/mnemopi/backend";
-import { loadMnemopiConfig, type MnemopiBackendConfig } from "@oh-my-pi/pi-coding-agent/mnemopi/config";
+import { getManagedSkillsDir } from "@oh-my-striped-pi/pi-coding-agent/autolearn/managed-skills";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { mnemopiBackend } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/backend";
+import { loadMnemopiConfig, type MnemopiBackendConfig } from "@oh-my-striped-pi/pi-coding-agent/mnemopi/config";
 import {
 	getMnemopiScopedDbPaths,
 	getMnemopiSessionState,
@@ -15,17 +15,17 @@ import {
 	loadMnemopiCore,
 	MnemopiSessionState,
 	setMnemopiSessionState,
-} from "@oh-my-pi/pi-coding-agent/mnemopi/state";
-import type { AgentSessionEventListener } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { Tool, ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
-import { LearnTool } from "@oh-my-pi/pi-coding-agent/tools/learn";
-import { MemoryEditTool } from "@oh-my-pi/pi-coding-agent/tools/memory-edit";
-import { MemoryRecallTool } from "@oh-my-pi/pi-coding-agent/tools/memory-recall";
-import { MemoryReflectTool } from "@oh-my-pi/pi-coding-agent/tools/memory-reflect";
-import { MemoryRetainTool } from "@oh-my-pi/pi-coding-agent/tools/memory-retain";
-import { resetMemoryForTests } from "@oh-my-pi/pi-mnemopi";
-import { currentLoopPhase, logger, TempDir } from "@oh-my-pi/pi-utils";
-import { getAgentDir, setAgentDir } from "@oh-my-pi/pi-utils/dirs";
+} from "@oh-my-striped-pi/pi-coding-agent/mnemopi/state";
+import type { AgentSessionEventListener } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { Tool, ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
+import { LearnTool } from "@oh-my-striped-pi/pi-coding-agent/tools/learn";
+import { MemoryEditTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-edit";
+import { MemoryRecallTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-recall";
+import { MemoryReflectTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-reflect";
+import { MemoryRetainTool } from "@oh-my-striped-pi/pi-coding-agent/tools/memory-retain";
+import { resetMemoryForTests } from "@oh-my-striped-pi/pi-mnemopi";
+import { currentLoopPhase, logger, TempDir } from "@oh-my-striped-pi/pi-utils";
+import { getAgentDir, setAgentDir } from "@oh-my-striped-pi/pi-utils/dirs";
 
 // Mnemopi is lazy-loaded at runtime; preload it for synchronous state construction.
 await Promise.all([loadMnemopi(), loadMnemopiCore()]);

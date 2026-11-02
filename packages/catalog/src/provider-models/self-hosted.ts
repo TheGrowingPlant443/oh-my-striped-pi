@@ -1,4 +1,4 @@
-import * as logger from "@oh-my-pi/pi-utils/logger";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
 import { authPolicyFor } from "../compat/auth";
 import { isExcludedDiscoveryMode, isLikelyOpenAIResponsesId } from "../compat/behavior";
 import { compareRevision, parseRevision } from "../compat/revision";
@@ -148,7 +148,7 @@ async function fetchOllamaNativeModels(
  * Ollama's cloud catalog reports for stock models.
  */
 const OLLAMA_FALLBACK_CONTEXT_WINDOW = 128_000;
-/** Cap max output tokens at a value that matches OMP's other openai-responses defaults. */
+/** Cap max output tokens at a value that matches OMSP's other openai-responses defaults. */
 const OLLAMA_DEFAULT_MAX_TOKENS = 8192;
 
 interface OllamaResolvedMetadata {

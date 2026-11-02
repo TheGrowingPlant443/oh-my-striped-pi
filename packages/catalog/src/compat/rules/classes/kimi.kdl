@@ -29,7 +29,7 @@ class "kimi" {
 			thinking-efforts "minimal" "low" "medium" "high"
 		}
 	}
-	// K3 reasoning reaches omp as its plaintext trace on every host, and K3 was
+	// K3 reasoning reaches omsp as its plaintext trace on every host, and K3 was
 	// trained to read all of its earlier reasoning back (preserved thinking).
 	// K3 reasoning can replay natively on other hosts serving the same weights.
 	family "k3" {

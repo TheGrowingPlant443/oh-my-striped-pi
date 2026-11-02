@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { prompt } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import { prompt } from "@oh-my-striped-pi/pi-utils";
 import { resolveModelOverrideWithAuthFallback, resolveSessionModelSelector } from "../config/model-resolver";
 import { sessionFilesFromDisk } from "../internal-urls/registry-helpers";
 import seanceAssignmentTemplate from "../prompts/system/seance-assignment.md" with { type: "text" };
@@ -14,7 +14,7 @@ import { FileSessionStorage, type SessionStorage } from "../session/session-stor
 import { SessionManager, type PersistedSessionInit } from "../session/session-manager";
 import { loadSessionFile } from "../session/session-loader";
 import type { ModelRegistry } from "../config/model-registry";
-import type { TaskItem, TaskParams } from "@oh-my-pi/pi-tui/tools/task";
+import type { TaskItem, TaskParams } from "@oh-my-striped-pi/pi-tui/tools/task";
 import type { ToolSession } from "../tools";
 import { resolveToCwd } from "../tools/path-utils";
 import { getBundledAgent } from "./agents";

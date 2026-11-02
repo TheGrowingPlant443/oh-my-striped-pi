@@ -2,20 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { computeDefaultSessionDir } from "@oh-my-pi/pi-coding-agent/session/session-paths";
-import { loadPinnedSessionIds } from "@oh-my-pi/pi-coding-agent/session/session-pins";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
-import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import { getConfigRootDir, setAgentDir } from "@oh-my-pi/pi-utils";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { computeDefaultSessionDir } from "@oh-my-striped-pi/pi-coding-agent/session/session-paths";
+import { loadPinnedSessionIds } from "@oh-my-striped-pi/pi-coding-agent/session/session-pins";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
+import { executeBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import { getConfigRootDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 
 let tempDir: string;
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 const storage = new FileSessionStorage();
 
 beforeEach(async () => {
-	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-pin-command-"));
+	tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-pin-command-"));
 	setAgentDir(path.join(tempDir, "agent"));
 });
 

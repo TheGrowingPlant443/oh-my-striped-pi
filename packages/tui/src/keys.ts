@@ -18,12 +18,12 @@
  * - isKittyProtocolActive() - Query global Kitty protocol state
  */
 
-import type { KeyEventType } from "@oh-my-pi/pi-natives";
+import type { KeyEventType } from "@oh-my-striped-pi/pi-natives";
 import {
 	matchesKey as matchesKeyNative,
 	parseKey as parseKeyNative,
 	parseKittySequence as parseKittySequenceNative,
-} from "@oh-my-pi/pi-natives";
+} from "@oh-my-striped-pi/pi-natives";
 import { isInsideTerminalMultiplexer, isSshSession } from "./terminal-capabilities";
 
 // =============================================================================
@@ -42,14 +42,14 @@ export function isWindowsTerminalSession(): boolean {
  * Backspace as `0x7f` (DEL). Remote/container sessions lose terminal identity,
  * and multiplexers (tmux/screen/Zellij) inherit `WT_SESSION` while emitting
  * raw `0x08` for plain Backspace themselves, so the automatic heuristic is
- * limited to direct Windows Terminal sessions. `PI_TUI_RAW_BACKSPACE_IS_CTRL=1`
+ * limited to direct Windows Terminal sessions. `OMSP_TUI_RAW_BACKSPACE_IS_CTRL=1`
  * explicitly opts into the mapping everywhere.
  */
 export function matchesRawBackspace(data: string, expectedModifier: number): boolean {
 	if (data === "\x7f") return expectedModifier === 0;
 	if (data !== "\x08") return false;
 	const rawBackspaceIsCtrl =
-		process.env.PI_TUI_RAW_BACKSPACE_IS_CTRL === "1" ||
+		process.env.OMSP_TUI_RAW_BACKSPACE_IS_CTRL === "1" ||
 		(isWindowsTerminalSession() && !isInsideTerminalMultiplexer(process.env));
 	return rawBackspaceIsCtrl ? expectedModifier === 4 : expectedModifier === 0;
 }
@@ -197,7 +197,7 @@ export type KeyId = BaseKey | ModifiedKeyId<BaseKey>;
  * modifier methods return precisely-typed concatenations (e.g. `Key.ctrl("c")`
  * is `"ctrl+c"`, not just `string`). This mirrors the upstream
  * `@mariozechner/pi-tui` `Key` export verbatim so plugins built against any
- * scope alias (`@mariozechner`, `@earendil-works`, `@oh-my-pi`) keep working
+ * scope alias (`@mariozechner`, `@earendil-works`, `@oh-my-striped-pi`) keep working
  * once the specifier shim remaps them to this package.
  */
 export const Key = {

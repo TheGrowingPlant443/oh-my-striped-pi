@@ -1,10 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getRecentRequests, initDb, insertMessageStats } from "@oh-my-pi/omp-stats/db";
-import { parseSessionFile } from "@oh-my-pi/omp-stats/parser";
-import { handleApi } from "@oh-my-pi/omp-stats/server";
-import { getSessionsDir } from "@oh-my-pi/pi-utils";
+import { getRecentRequests, initDb, insertMessageStats } from "@oh-my-striped-pi/omsp-stats/db";
+import { parseSessionFile } from "@oh-my-striped-pi/omsp-stats/parser";
+import { handleApi } from "@oh-my-striped-pi/omsp-stats/server";
+import { getSessionsDir } from "@oh-my-striped-pi/pi-utils";
 import { installStatsTestIsolation } from "./helpers/temp-agent";
 
 installStatsTestIsolation("@pi-stats-model-usage-");

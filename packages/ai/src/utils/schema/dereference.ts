@@ -9,7 +9,7 @@
  *
  * After dereferencing, `$defs` and `definitions` are stripped from the root.
  */
-import { parseLocalRefPointer } from "@oh-my-pi/omptype";
+import { parseLocalRefPointer } from "@oh-my-striped-pi/omptype";
 import { isJsonObject, type JsonObject } from "./types";
 
 // Only schema-valued keywords may contain references; literal JSON is opaque.

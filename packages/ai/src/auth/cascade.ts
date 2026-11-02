@@ -1,5 +1,5 @@
-import { authPolicyFor } from "@oh-my-pi/pi-catalog/compat/auth";
-import { $env, $envExact, logger } from "@oh-my-pi/pi-utils";
+import { authPolicyFor } from "@oh-my-striped-pi/pi-catalog/compat/auth";
+import { $env, $envExact, logger } from "@oh-my-striped-pi/pi-utils";
 import { type ApiKeyResolver, createOAuthProvenance, markAfterSiblingWait, type ResolvedApiKey } from "../auth-retry";
 import { getEnvApiKey, getEnvApiKeyName } from "../env-api-key";
 import * as AIError from "../error";

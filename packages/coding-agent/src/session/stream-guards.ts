@@ -4,11 +4,11 @@ import {
 	type AgentMessage,
 	type AgentTurnEndContext,
 	createToolScopedAbortReason,
-} from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, AssistantMessageEvent, Model } from "@oh-my-pi/pi-ai";
-import { GeminiHeaderRunDetector } from "@oh-my-pi/pi-ai/utils/thinking-loop";
-import { type RepeatedToolCallDetection, ToolCallLoopGuard } from "@oh-my-pi/pi-ai/utils/tool-call-loop-guard";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, AssistantMessageEvent, Model } from "@oh-my-striped-pi/pi-ai";
+import { GeminiHeaderRunDetector } from "@oh-my-striped-pi/pi-ai/utils/thinking-loop";
+import { type RepeatedToolCallDetection, ToolCallLoopGuard } from "@oh-my-striped-pi/pi-ai/utils/tool-call-loop-guard";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import geminiToolReminderTemplate from "../prompts/system/gemini-tool-call-reminder.md" with { type: "text" };
 import streamingEditRecoveryTemplate from "../prompts/system/streaming-edit-recovery.md" with { type: "text" };

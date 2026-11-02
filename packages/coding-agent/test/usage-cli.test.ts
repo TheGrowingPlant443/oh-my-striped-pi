@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import type { UsageReport } from "@oh-my-pi/pi-ai";
+import type { UsageReport } from "@oh-my-striped-pi/pi-ai";
 import {
 	annotateUsagePolicy,
 	buildRedactionMap,
 	computeProviderWindowStats,
 	formatUsageBreakdown,
 	formatUsageHistory,
-} from "@oh-my-pi/pi-coding-agent/cli/usage-cli";
+} from "@oh-my-striped-pi/pi-coding-agent/cli/usage-cli";
 
 const report: UsageReport = {
 	provider: "github-copilot",

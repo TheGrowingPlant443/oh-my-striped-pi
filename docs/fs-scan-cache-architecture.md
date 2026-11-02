@@ -43,7 +43,7 @@ The cache is split into 64 shards behind read/write locks. It retains at most ab
 
 ## Walk parallelism
 
-`walk::walk` and `walk::collect` use a fixed pool of long-lived workers on the current tokio runtime; pi-walker has no runtime of its own. Workers share a directory queue and retain their sessions and buffers. Dropping the future sets the halt flag and aborts registered tasks, including startup. `walk::walk` returns a `Stream` of `Batch<T> { dir, items }`; unbounded grep scans files on these same workers before sending results. `walk::Tree` is a serial async cursor that spends tokio's coop budget per entry. `PI_WALK_WORKERS` (or `Fs::workers`) sets the worker count:
+`walk::walk` and `walk::collect` use a fixed pool of long-lived workers on the current tokio runtime; pi-walker has no runtime of its own. Workers share a directory queue and retain their sessions and buffers. Dropping the future sets the halt flag and aborts registered tasks, including startup. `walk::walk` returns a `Stream` of `Batch<T> { dir, items }`; unbounded grep scans files on these same workers before sending results. `walk::Tree` is a serial async cursor that spends tokio's coop budget per entry. `OMSP_WALK_WORKERS` (or `Fs::workers`) sets the worker count:
 
 - a positive `N` uses `N` workers;
 - unset or `0` uses the per-filesystem default: 4 on macOS, 8 on Linux, 4 elsewhere and for providers;

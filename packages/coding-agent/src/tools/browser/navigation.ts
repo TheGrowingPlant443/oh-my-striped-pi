@@ -1,4 +1,4 @@
-import { untilAborted, withTimeout } from "@oh-my-pi/pi-utils";
+import { untilAborted, withTimeout } from "@oh-my-striped-pi/pi-utils";
 import type { Page, WaitForOptions } from "puppeteer-core";
 import { puppeteerTimeoutError } from "./launch";
 

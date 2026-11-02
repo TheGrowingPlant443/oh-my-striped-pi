@@ -1,5 +1,5 @@
-import { formatNumber } from "@oh-my-pi/pi-utils/format";
-export * from "@oh-my-pi/pi-utils/format";
+import { formatNumber } from "@oh-my-striped-pi/pi-utils/format";
+export * from "@oh-my-striped-pi/pi-utils/format";
 
 /** HTML-escape text destined for `dangerouslySetInnerHTML`. */
 export function escapeHtml(s: string): string {

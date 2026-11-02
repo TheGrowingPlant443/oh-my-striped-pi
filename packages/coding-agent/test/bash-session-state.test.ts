@@ -20,7 +20,7 @@ let cwd: string;
 let manager: AsyncJobManager;
 
 beforeEach(async () => {
-	cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omp-bash-session-state-"));
+	cwd = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-bash-session-state-"));
 	manager = new AsyncJobManager({});
 });
 
@@ -52,8 +52,8 @@ async function run(tool: BashTool, command: string) {
 
 it.skipIf(process.platform === "win32")("keeps a variable set by one call for the next call", async () => {
 	const tool = bashTool();
-	await run(tool, "PI_STATE_VAR=kept");
-	expect((await run(tool, 'printf "%s" "$PI_STATE_VAR"')).text).toBe("kept");
+	await run(tool, "OMSP_STATE_VAR=kept");
+	expect((await run(tool, 'printf "%s" "$OMSP_STATE_VAR"')).text).toBe("kept");
 });
 
 it.skipIf(process.platform === "win32")("keeps a function defined by one call callable in the next call", async () => {
@@ -66,29 +66,29 @@ it.skipIf(process.platform === "win32")(
 	"keeps state set by a call that moved to the background once it finishes",
 	async () => {
 		const tool = bashTool({ "bash.autoBackground.thresholdMs": 100 });
-		const started = await run(tool, "PI_STATE_VAR=from-bg; pi_bg_fn() { printf fn; }; sleep 1");
+		const started = await run(tool, "OMSP_STATE_VAR=from-bg; pi_bg_fn() { printf fn; }; sleep 1");
 		expect(started.async?.state).toBe("running");
 		await manager.waitForAll();
-		expect((await run(tool, 'printf "%s:" "$PI_STATE_VAR"; pi_bg_fn')).text).toBe("from-bg:fn");
+		expect((await run(tool, 'printf "%s:" "$OMSP_STATE_VAR"; pi_bg_fn')).text).toBe("from-bg:fn");
 	},
 	10_000,
 );
 
 it.skipIf(process.platform === "win32")("keeps state and options after a call that exits non-zero", async () => {
 	const tool = bashTool();
-	await run(tool, "set -uo pipefail; PI_STATE_VAR=kept");
+	await run(tool, "set -uo pipefail; OMSP_STATE_VAR=kept");
 	expect((await run(tool, "false")).text).toContain("Command exited with code 1");
-	expect((await run(tool, 'printf "%s %s" "$PI_STATE_VAR" "$-"')).text).toMatch(/^kept \S*u\S*$/);
+	expect((await run(tool, 'printf "%s %s" "$OMSP_STATE_VAR" "$-"')).text).toMatch(/^kept \S*u\S*$/);
 });
 
 it.skipIf(process.platform === "win32")(
 	"reports calls that overlap a backgrounded one and leaves the session shell intact",
 	async () => {
 		const tool = bashTool({ "bash.autoBackground.thresholdMs": 100 });
-		await run(tool, "PI_STATE_VAR=kept");
+		await run(tool, "OMSP_STATE_VAR=kept");
 		expect((await run(tool, "sleep 2")).async?.state).toBe("running");
 
-		const overlapping = await run(tool, 'printf "[%s]" "$PI_STATE_VAR"; PI_STATE_VAR=lost');
+		const overlapping = await run(tool, 'printf "[%s]" "$OMSP_STATE_VAR"; OMSP_STATE_VAR=lost');
 		expect(overlapping.text).toStartWith("[]");
 		expect(overlapping.text).toContain("Ran in a temporary shell");
 		// An overlapping call that itself moves to the background says so in its start result.
@@ -97,7 +97,7 @@ it.skipIf(process.platform === "win32")(
 		expect(promoted.text).toContain("Ran in a temporary shell");
 
 		await manager.waitForAll();
-		expect((await run(tool, 'printf "%s" "$PI_STATE_VAR"')).text).toBe("kept");
+		expect((await run(tool, 'printf "%s" "$OMSP_STATE_VAR"')).text).toBe("kept");
 	},
 	10_000,
 );
@@ -118,15 +118,15 @@ it.skipIf(process.platform === "win32")(
 			},
 		);
 		try {
-			expect((await run(tool, "PI_STATE_VAR=from-first")).async?.state).toBe("running");
+			expect((await run(tool, "OMSP_STATE_VAR=from-first")).async?.state).toBe("running");
 			sessionId = second;
 			heldAllocation.resolve({});
 			await manager.waitForAll();
 
-			expect((await run(tool, 'printf "[%s]" "$PI_STATE_VAR"')).text).toBe("[]");
+			expect((await run(tool, 'printf "[%s]" "$OMSP_STATE_VAR"')).text).toBe("[]");
 			// The left session's shell was dropped when that call finished.
 			sessionId = first;
-			expect((await run(tool, 'printf "[%s]" "$PI_STATE_VAR"')).text).toBe("[]");
+			expect((await run(tool, 'printf "[%s]" "$OMSP_STATE_VAR"')).text).toBe("[]");
 		} finally {
 			releaseShellSessions(first);
 			releaseShellSessions(second);

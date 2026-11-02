@@ -898,7 +898,7 @@ export function resolveModelPolicy(input: ModelSpec<Api>): ResolvedModelPolicy<A
  * inheriting a provider-wide default or {@link resolveThinkingPolicy} falling
  * through to the neutral wire ladder.
  *
- * Discovery uses this to tell "omp knows this model's tiers" apart from "omp
+ * Discovery uses this to tell "omsp knows this model's tiers" apart from "omsp
  * is guessing them", so catalog-published tiers can correct the guess without
  * ever overriding reviewed knowledge.
  */

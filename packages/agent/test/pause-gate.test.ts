@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, agentLoop, agentPauseGate } from "@oh-my-pi/pi-agent-core";
-import type { AgentContext, AgentLoopConfig, AgentMessage, AgentTool } from "@oh-my-pi/pi-agent-core/types";
-import type { Message } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockModel } from "@oh-my-pi/pi-ai/providers/mock";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, agentLoop, agentPauseGate } from "@oh-my-striped-pi/pi-agent-core";
+import type { AgentContext, AgentLoopConfig, AgentMessage, AgentTool } from "@oh-my-striped-pi/pi-agent-core/types";
+import type { Message } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
 import { createUserMessage } from "./helpers";
 
 function identityConverter(messages: AgentMessage[]): Message[] {

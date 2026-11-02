@@ -1,4 +1,4 @@
-import type { TspText } from "@oh-my-pi/pi-wire";
+import type { TspText } from "@oh-my-striped-pi/pi-wire";
 import { Spacer } from "../components/spacer";
 import { Text } from "../components/text";
 import { node, text } from "../native/describe";
@@ -8,7 +8,7 @@ import { theme } from "../theme";
 import type { Component } from "../tui";
 import { TranscriptBlock } from "./transcript-container";
 
-/** How loud an inline transcript notice is; a native terminal styles it as `omp.notice.<tone>`. */
+/** How loud an inline transcript notice is; a native terminal styles it as `omsp.notice.<tone>`. */
 export type NoticeTone = "info" | "success" | "warning" | "error";
 
 /** Each tone's default icon. */
@@ -34,7 +34,7 @@ export interface NoticeRowOptions {
 }
 
 /**
- * One inline transcript notice for a native terminal (`omp.notice.<tone>`): a
+ * One inline transcript notice for a native terminal (`omsp.notice.<tone>`): a
  * leading icon beside the wrapped message. Warnings, errors, background-job
  * completions and prompt file reads all draw as this row, so they read alike.
  * The tone colors the icon (an info notice keeps it quiet); the message spans
@@ -48,7 +48,7 @@ export function noticeRow(tone: NoticeTone, message: TspText, options: NoticeRow
 	});
 	return node(
 		"row",
-		{ role: `omp.notice.${tone}`, tone, gap: "sm", align: "start" },
+		{ role: `omsp.notice.${tone}`, tone, gap: "sm", align: "start" },
 		[icon, text(message, { wrap: "word", grow: 1, shrink: 1 })],
 		options.key,
 	);

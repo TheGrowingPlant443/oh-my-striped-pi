@@ -14,7 +14,7 @@ const clientFiles = {
 };
 
 async function startEmbeddedDashboard(): Promise<{ url: string; tmpDir: string }> {
-	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-stats-embedded-"));
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-stats-embedded-"));
 	tempDirs.push(root);
 	const tmpDir = path.join(root, "tmp");
 	await fs.mkdir(tmpDir);
@@ -48,10 +48,10 @@ process.stdout.write(JSON.stringify({ url: "http://" + server.hostname + ":" + s
 			TMPDIR: tmpDir,
 			TMP: tmpDir,
 			TEMP: tmpDir,
-			PI_CONFIG_DIR: ".omp",
-			PI_CODING_AGENT_DIR: path.join(root, ".omp", "agent"),
-			OMP_PROFILE: "",
-			PI_PROFILE: "",
+			OMSP_CONFIG_DIR: ".omsp",
+			OMSP_CODING_AGENT_DIR: path.join(root, ".omsp", "agent"),
+			OMSP_PROFILE: "",
+			OMSP_PROFILE: "",
 			XDG_DATA_HOME: path.join(root, "data"),
 			XDG_STATE_HOME: path.join(root, "state"),
 			XDG_CACHE_HOME: path.join(root, "cache"),

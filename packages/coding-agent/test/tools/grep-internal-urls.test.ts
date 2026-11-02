@@ -2,30 +2,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as capability from "@oh-my-pi/pi-coding-agent/capability";
-import type { CapabilityResult } from "@oh-my-pi/pi-coding-agent/capability/types";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { resetActiveSkillsForTests, setActiveSkills } from "@oh-my-pi/pi-coding-agent/extensibility/skills";
+import * as capability from "@oh-my-striped-pi/pi-coding-agent/capability";
+import type { CapabilityResult } from "@oh-my-striped-pi/pi-coding-agent/capability/types";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { resetActiveSkillsForTests, setActiveSkills } from "@oh-my-striped-pi/pi-coding-agent/extensibility/skills";
 import {
 	type InternalResource,
 	type InternalUrl,
 	InternalUrlRouter,
 	LocalProtocolHandler,
 	type ProtocolHandler,
-} from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import * as sshFileTransfer from "@oh-my-pi/pi-coding-agent/ssh/file-transfer";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { formatOutputNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import type { SessionEntry } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import * as sshFileTransfer from "@oh-my-striped-pi/pi-coding-agent/ssh/file-transfer";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { formatOutputNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { AstGrepTool } from "../../src/tools/ast-grep";
 import { GlobTool } from "../../src/tools/glob";
 import { GrepTool } from "../../src/tools/grep";
 
-import { cfgCompactionExperimentalContextManagement } from "@oh-my-pi/pi-coding-agent/session/context-settings";
-import { cfgReadSummarizeEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { cfgCompactionExperimentalContextManagement } from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
+import { cfgReadSummarizeEnabled } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 function getResultText(result: { content: Array<{ type: string; text?: string }> }): string {
 	return result.content
@@ -405,40 +405,42 @@ describe("GrepTool internal URL resolution", () => {
 		);
 	});
 
-	it("expands omp:// root to grep embedded documentation files", async () => {
+	it("expands omsp:// root to grep embedded documentation files", async () => {
 		const session = createSession();
 		const tool = new GrepTool(session);
 
 		const result = await tool.execute("test-call", {
 			pattern: "Grep file contents with a regex across files",
-			path: "omp://",
+			path: "omsp://",
 		});
 
 		const text = getResultText(result);
-		expect(text).toContain("# omp://tools/grep.md");
+		expect(text).toContain("# omsp://tools/grep.md");
 		expect(text).toContain("Grep file contents with a regex across files");
 	});
 
-	it("walks an omp:// docs subdirectory and names hits by URL without edit anchors", async () => {
+	it("walks an omsp:// docs subdirectory and names hits by URL without edit anchors", async () => {
 		const session = createSession({ hasEditTool: true });
 		const tool = new GrepTool(session);
 
 		const result = await tool.execute("test-call", {
 			pattern: "Read files, directories, archives",
-			path: "omp://tools",
+			path: "omsp://tools",
 		});
 
 		const text = getResultText(result);
-		expect(result.details?.files).toContain("omp://tools/read.md");
+		expect(result.details?.files).toContain("omsp://tools/read.md");
 		expect(text).toContain("Read files, directories, archives");
-		expect(text).not.toMatch(/omp:\/\/tools\/read\.md#[0-9A-F]{4}/);
+		expect(text).not.toMatch(/omsp:\/\/tools\/read\.md#[0-9A-F]{4}/);
 	});
 
-	it("globs omp:// docs by URL pattern", async () => {
-		const text = getResultText(await new GlobTool(createSession()).execute("glob-omp", { path: "omp://tools/*.md" }));
+	it("globs omsp:// docs by URL pattern", async () => {
+		const text = getResultText(
+			await new GlobTool(createSession()).execute("glob-omsp", { path: "omsp://tools/*.md" }),
+		);
 
-		expect(text).toContain("omp://tools/read.md");
-		expect(text).toContain("omp://tools/grep.md");
+		expect(text).toContain("omsp://tools/read.md");
+		expect(text).toContain("omsp://tools/grep.md");
 	});
 
 	it("suppresses hashline anchors when searching immutable artifact:// sources", async () => {

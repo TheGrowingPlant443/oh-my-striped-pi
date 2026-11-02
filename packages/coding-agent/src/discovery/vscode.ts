@@ -5,7 +5,7 @@
  * Supports MCP server discovery from `mcp.json` with nested `mcp.servers` structure.
  */
 import * as fs from "node:fs/promises";
-import { isEnoent, tryParseJson } from "@oh-my-pi/pi-utils";
+import { isEnoent, tryParseJson } from "@oh-my-striped-pi/pi-utils";
 import { registerProvider } from "../capability";
 import { readFile } from "../capability/fs";
 import { type MCPServer, mcpCapability } from "../capability/mcp";

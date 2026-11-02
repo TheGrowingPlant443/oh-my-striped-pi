@@ -1,5 +1,5 @@
 {
-  description = "OMP coding agent and development environment";
+  description = "OMSP coding agent and development environment";
 
   nixConfig = {
     extra-substituters = [ "https://nix-community.cachix.org" ];
@@ -102,21 +102,21 @@
       packages = forAllSystems (
         system:
         let
-          omp = packageFor system;
+          omsp = packageFor system;
         in
         {
-          inherit omp;
-          default = omp;
+          inherit omsp;
+          default = omsp;
         }
       );
 
       apps = forAllSystems (system: {
         default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/omp";
-          meta.description = "Run OMP";
+          program = "${self.packages.${system}.default}/bin/omsp";
+          meta.description = "Run OMSP";
         };
-        omp = self.apps.${system}.default;
+        omsp = self.apps.${system}.default;
       });
 
       devShells = forAllSystems (
@@ -150,8 +150,8 @@
               }
               self.homeManagerModules.default
               {
-                programs.omp.enable = true;
-                programs.omp.settings.startup.quiet = true;
+                programs.omsp.enable = true;
+                programs.omsp.settings.startup.quiet = true;
               }
             ];
           };
@@ -165,18 +165,18 @@
                 };
               }
               self.nixosModules.default
-              { programs.omp.enable = true; }
+              { programs.omsp.enable = true; }
             ];
           };
           modulesEvaluate =
             assert builtins.elem self.packages.${system}.default homeManagerEvaluation.config.home.packages;
-            assert homeManagerEvaluation.config.home.activation ? ompConfig;
+            assert homeManagerEvaluation.config.home.activation ? omspConfig;
             assert builtins.elem self.packages.${system}.default
               nixosEvaluation.config.environment.systemPackages;
-            pkgs.runCommand "omp-module-evaluation" { } "touch $out";
+            pkgs.runCommand "omsp-module-evaluation" { } "touch $out";
         in
         {
-          bun-lock = pkgs.runCommand "omp-bun-lock" { nativeBuildInputs = [ bun2nix ]; } ''
+          bun-lock = pkgs.runCommand "omsp-bun-lock" { nativeBuildInputs = [ bun2nix ]; } ''
             cp -R ${self.outPath} source
             chmod -R u+w source
             cd source
@@ -187,19 +187,19 @@
             touch "$out"
           '';
           modules = modulesEvaluate;
-          omp = self.packages.${system}.default;
+          omsp = self.packages.${system}.default;
         }
       );
 
       formatter = forAllSystems (system: (pkgsFor system).nixfmt);
 
       overlays.default = _final: previous: {
-        omp = self.packages.${previous.stdenv.hostPlatform.system}.default;
+        omsp = self.packages.${previous.stdenv.hostPlatform.system}.default;
       };
 
       homeManagerModules.default = import ./nix/home-manager.nix { inherit self; };
-      homeManagerModules.omp = self.homeManagerModules.default;
+      homeManagerModules.omsp = self.homeManagerModules.default;
       nixosModules.default = import ./nix/nixos-module.nix { inherit self; };
-      nixosModules.omp = self.nixosModules.default;
+      nixosModules.omsp = self.nixosModules.default;
     };
 }

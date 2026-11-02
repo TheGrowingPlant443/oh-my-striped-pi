@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { HindsightApi, HindsightError, type RecallOptions } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import type { HindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import { HINDSIGHT_NOTICE_SOURCE, HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import { HindsightApi, HindsightError, type RecallOptions } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import type { HindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import { HINDSIGHT_NOTICE_SOURCE, HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
 
 const config = {
 	hindsightApiUrl: "http://localhost:8888",
@@ -17,7 +17,7 @@ const config = {
 	retainMode: "full-session",
 	retainEveryNTurns: 3,
 	retainOverlapTurns: 2,
-	retainContext: "omp",
+	retainContext: "omsp",
 	recallBudget: "mid",
 	recallMaxTokens: 1024,
 	recallTypes: [],

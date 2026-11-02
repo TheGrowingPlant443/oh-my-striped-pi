@@ -11,7 +11,7 @@ rust_library(
     name = "pi-ast",
     srcs = glob(["src/**/*.rs"]),
     aliases = aliases(),
-    # Cargo gates WebAssembly grammars behind the default `wasm` feature; omp's
+    # Cargo gates WebAssembly grammars behind the default `wasm` feature; omsp's
     # Bazel build always ships them.
     crate_features = ["wasm"],
     crate_name = "pi_ast",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import type { Usage } from "@oh-my-pi/pi-catalog/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
+import type { Usage } from "@oh-my-striped-pi/pi-catalog/types";
 
 function usage(fields: Pick<Usage, "input" | "output" | "cacheRead" | "cacheWrite">): Usage {
 	return {

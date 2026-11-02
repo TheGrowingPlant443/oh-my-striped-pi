@@ -1,4 +1,4 @@
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { Text } from "../components/text";
 import { col } from "../native/describe";
 import type { NativeNode } from "../native/node";
@@ -33,7 +33,7 @@ export interface TranscriptStatusRow {
 /**
  * Shared compact status block for background activity and prompt file reads:
  * one themed line per row in a text terminal, one notice row per row natively
- * (`omp.status-block`).
+ * (`omsp.status-block`).
  */
 export class TranscriptStatusBlock extends TranscriptBlock {
 	readonly #native: NativeNode;
@@ -46,7 +46,7 @@ export class TranscriptStatusBlock extends TranscriptBlock {
 		}
 		this.#native = col(
 			rows.map(({ native }) => noticeRow(native.tone, native.message, { icon: native.icon })),
-			{ role: "omp.status-block" },
+			{ role: "omsp.status-block" },
 		);
 	}
 

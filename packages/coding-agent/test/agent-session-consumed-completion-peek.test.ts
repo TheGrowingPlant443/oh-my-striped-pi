@@ -1,21 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent, type AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { ToolResultMessage } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockHandler } from "@oh-my-pi/pi-ai/providers/mock";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as daemonClient from "@oh-my-pi/pi-coding-agent/launch/client";
-import type { DaemonBrokerClient } from "@oh-my-pi/pi-coding-agent/launch/client";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { WaitTool } from "@oh-my-pi/pi-coding-agent/tools/wait";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, type AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { ToolResultMessage } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockHandler } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as daemonClient from "@oh-my-striped-pi/pi-coding-agent/launch/client";
+import type { DaemonBrokerClient } from "@oh-my-striped-pi/pi-coding-agent/launch/client";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { WaitTool } from "@oh-my-striped-pi/pi-coding-agent/tools/wait";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 /**
  * An eval cell awaiting a subagent consumes the subagent's output after the

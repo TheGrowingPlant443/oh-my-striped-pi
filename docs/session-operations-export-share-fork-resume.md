@@ -27,7 +27,7 @@ This document describes operator-visible behavior for session export, conversati
 | `/clear`                                  | Interactive slash command    | Yes (clears live/model conversation context)  | Retains identity/file/history; a lazy session still follows the normal persistence gate                                                                                      | Appends `reset_boundary`                                                            |
 | `/delete`                                 | Interactive slash command    | Yes (starts an empty conversation)            | Attempts to delete the current persisted session and artifacts, then switches to a lazy successor (no empty file until content)                                              | None                                                                                |
 | `/fork`                                   | Interactive slash command    | Yes (active session identity changes)         | Creates new session file and switches current session to it (persistent mode only)                                                                                           | Copies artifact directory to new session namespace when present                     |
-| `/fork pane`, `/fork window`, `/fork tab` | Interactive slash command    | No (parent session retained)                  | Opens a child OMP process from the flushed current transcript in a multiplexer pane/group (tmux window, Zellij/Herdr/Orca tab, or CMUX workspace)                            | Child receives a separate forked session                                            |
+| `/fork pane`, `/fork window`, `/fork tab` | Interactive slash command    | No (parent session retained)                  | Opens a child OMSP process from the flushed current transcript in a multiplexer pane/group (tmux window, Zellij/Herdr/Orca tab, or CMUX workspace)                            | Child receives a separate forked session                                            |
 | `--fork <id\|path>`                       | CLI startup                  | Yes after session creation                    | Creates a new session fork from the selected source into current cwd/session dir                                                                                             | Copies source artifacts recursively by default                                      |
 | `/seance [id\|path] [--model sel]`        | Interactive slash command    | No (active session and model unchanged)       | Forks the source transcript into a read-only consultant subagent under the current session                                                                                   | None; the consultant reads the source's artifacts in place                          |
 | `/resume [id\|@claude\|@codex]`           | Interactive slash command    | Yes (active in-memory state replaced)         | Switches to a selected/matched session, or imports a selected foreign session                                                                                                | None                                                                                |
@@ -57,11 +57,11 @@ Behavior details:
 - The viewer uses the `/stats` design, with Auto/Light/Dark themes; Light uses soft-gray surfaces and high-contrast secondary text. The sidebar lists the main session, nested subagents, and advisors; selecting a session or a task-card agent opens its transcript and conversation tree. Session and message links preserve the selected transcript.
 - Child transcripts stored next to the session file (`<session>/<AgentId>.jsonl`, recursively for nested spawns) are embedded as `subSessions`, including advisor and gzip-compressed transcripts. Discovery descends only into real child directories and flags tombstoned agents as `aborted`. `includeSubSessions: false` in `ExportOptions` excludes child transcripts and their trace tracks.
 - The bottom **Timeline** drawer and **Trace** view reuse `/trace`'s span assembly and viewer: duration/turn/call axes, idle compression, search, zoom, nested tracks, entry details, and tool aggregates. **Jump to transcript** opens the corresponding session and message. All transcript, trace and viewer data remain embedded; no network or stats server is needed.
-- Tool calls use `<omp-tool-view>`; traces use `<omp-session-trace>`. `bun run gen:export-viewer` bundles these with React, Markdown, Highlight.js, the shell, styles and default themes. Source, packaged and compiled exports all inline the same complete viewer; no remote JavaScript is loaded.
+- Tool calls use `<omsp-tool-view>`; traces use `<omsp-session-trace>`. `bun run gen:export-viewer` bundles these with React, Markdown, Highlight.js, the shell, styles and default themes. Source, packaged and compiled exports all inline the same complete viewer; no remote JavaScript is loaded.
 - Transcript hyperlinks stay clickable. Remote Markdown images render as links instead of fetching when the file opens; embedded attachments stay offline. Raw transcript HTML is escaped.
 - Each export contains the viewer in addition to the session data. `--themes` also embeds the selected TUI theme overrides.
 - No session entries are appended during export.
-- The default filename is `omp-session-<session-file-stem>.html` in the current directory. HTML export is not secret-redacted or encrypted; it can contain raw context, image data, and extension payloads.
+- The default filename is `omsp-session-<session-file-stem>.html` in the current directory. HTML export is not secret-redacted or encrypted; it can contain raw context, image data, and extension payloads.
 
 Caveat:
 
@@ -105,14 +105,14 @@ Dump transcript content includes:
 - Tool results and execution blocks (except `excludeFromContext` bash/python entries)
 - Custom/hook/file mention/branch summary/compaction summary entries
 
-The best-effort JSON sidecar is named `omp-llm-request-<id>.json` under the OS temporary directory. It contains the current model, thinking level, service tier, system prompt, wire tool schemas, and LLM-converted messages. It persists after the command and can contain raw context or secrets; protect or remove it accordingly. A sidecar failure does not suppress the transcript (the TUI reports the failure; headless execution silently omits the path).
+The best-effort JSON sidecar is named `omsp-llm-request-<id>.json` under the OS temporary directory. It contains the current model, thinking level, service tier, system prompt, wire tool schemas, and LLM-converted messages. It persists after the command and can contain raw context or secrets; protect or remove it accordingly. A sidecar failure does not suppress the transcript (the TUI reports the failure; headless execution silently omits the path).
 
 No session persistence entries are appended by dumping.
 
 ### `/dump all` (zip of per-agent dumps)
 
 `/dump all` calls `session.dumpSessionArchiveToTmpDir()`, which writes
-`omp-dump-<id>.zip` under the OS temporary directory with:
+`omsp-dump-<id>.zip` under the OS temporary directory with:
 
 - `session.md` — the same main transcript `/dump` copies
 - `llm-request.json` — the same payload as the `/dump` sidecar (best-effort; omitted if conversion fails)
@@ -158,7 +158,7 @@ keeping the conversation you can see.
   prompt-cache handles) and reports how many were pruned.
 - Mints a fresh provider session id, re-keys memory state, and invalidates the
   append-only context so the next turn rebuilds from the local conversation.
-- Leaves the local transcript, session file, and OMP session-manager identity
+- Leaves the local transcript, session file, and OMSP session-manager identity
   unchanged; the provider-facing `AgentSession.sessionId` changes.
 
 Because it keeps both the visible and model-facing conversation, `/fresh`
@@ -206,7 +206,7 @@ for keyboard controls, follow-ups, persistence, and migration safety.
 ## Fork
 
 Bare `/fork` creates a new session from the current one and switches the active
-session identity. `/fork pane` opens a separate OMP process in a new pane;
+session identity. `/fork pane` opens a separate OMSP process in a new pane;
 `/fork window` and `/fork tab` open it in a new multiplexer group (a tmux
 window, Zellij/Herdr/Orca tab, or CMUX workspace). The child starts from the current
 persisted transcript, while the parent session stays active and continues
@@ -259,7 +259,7 @@ Orca development checkout, then `orca-ide` on Linux outside an Orca terminal, th
 `orca`).
 
 Orca's CLI `--command` accepts shell text, not argv, and has no `--cwd`; after
-confirmation, OMP supplies `cd <quoted-cwd> && <quoted-command>` using shared
+confirmation, OMSP supplies `cd <quoted-cwd> && <quoted-command>` using shared
 POSIX shell quoting. When Orca cannot show the new tab and starts the child in a
 background terminal instead, `/fork` reports that as a warning rather than a
 visible tab.
@@ -323,7 +323,7 @@ Startup `--fork` is resolved before normal session creation:
    The parent transcript is unchanged.
 5. Full-context forks automatically seed `providerPromptCacheKey` from the source header's inherited key, falling back to the source session id. Startup drops that automatic inheritance for explicit `--model`, `--thinking`, `--system-prompt`, `--system-prompt-template`, `--append-system-prompt`, `--tools`, or `--no-tools` overrides, or an applicable scoped-model override.
 
-Use `--prompt-cache-key <key>` to pin the provider prompt-cache identity explicitly and independently from both the OMP session id and `--provider-session-id`. `--provider-session-id` continues to control provider session/routing headers and sticky credential selection; `--prompt-cache-key` controls the OpenAI Responses `prompt_cache_key` payload where supported.
+Use `--prompt-cache-key <key>` to pin the provider prompt-cache identity explicitly and independently from both the OMSP session id and `--provider-session-id`. `--provider-session-id` continues to control provider session/routing headers and sticky credential selection; `--prompt-cache-key` controls the OpenAI Responses `prompt_cache_key` payload where supported.
 
 ## Seance
 
@@ -353,7 +353,7 @@ Without an argument:
 With an argument:
 
 - `/resume <id>` resolves an id/filename prefix with local-first, then global fallback, and opens the copy `resolveResumeTarget` picks, the same one the CLI's `--resume <id>` opens (see CLI `--resume <value>`); an unknown value reports `Session "<value>" not found`.
-- `/resume @claude` and `/resume @codex` open a foreign-session picker. Selecting one converts and persists it under a fresh OMP session identity, then switches to that new session.
+- `/resume @claude` and `/resume @codex` open a foreign-session picker. Selecting one converts and persists it under a fresh OMSP session identity, then switches to that new session.
 
 ## CLI `--resume`
 
@@ -396,8 +396,8 @@ replaced under a session that went on in a sibling (see above).
 `--restore [value]` selects and opens its session exactly as `--resume [value]`
 does, then, once the interactive TUI is up, goes on with what the session's last
 process left unfinished when it died (`task/restore.ts`, `restoreSession`). Tern's
-session daemon relaunches omp panes with it after a crash: omp reports
-`omp_restore=1` (OSC 1337 user variable) beside its session file to say it
+session daemon relaunches omsp panes with it after a crash: omsp reports
+`omsp_restore=1` (OSC 1337 user variable) beside its session file to say it
 understands the flag.
 
 1. **Subagents first.** Every persisted subagent transcript under the session

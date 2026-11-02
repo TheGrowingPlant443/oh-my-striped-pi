@@ -6,12 +6,12 @@ import {
 	ImageInputTooLargeError,
 	InvalidImageDataError,
 	imageDecodeFailureReason,
-} from "@oh-my-pi/pi-tui/chat/image-loading";
+} from "@oh-my-striped-pi/pi-tui/chat/image-loading";
 import * as path from "node:path";
-import type { Context, ImageContent, Message, Model, ProviderPayload, TextContent } from "@oh-my-pi/pi-ai";
-import { rasterizeSvg } from "@oh-my-pi/pi-natives";
-import { $which, isRecord, logger, readImageMetadata } from "@oh-my-pi/pi-utils";
-import { LRUCache } from "@oh-my-pi/pi-utils/lru";
+import type { Context, ImageContent, Message, Model, ProviderPayload, TextContent } from "@oh-my-striped-pi/pi-ai";
+import { rasterizeSvg } from "@oh-my-striped-pi/pi-natives";
+import { $which, isRecord, logger, readImageMetadata } from "@oh-my-striped-pi/pi-utils";
+import { LRUCache } from "@oh-my-striped-pi/pi-utils/lru";
 import { resolveReadPath } from "../tools/path-utils";
 import { formatDimensionNote, type ImageResizeOptions, resizeImage } from "./image-resize";
 import { decodeStillImageJpeg, VideoError } from "./video";
@@ -148,7 +148,7 @@ export interface LoadImageInputOptions {
 	maxBytes?: number;
 	resolvedPath?: string;
 	detectedMimeType?: string;
-	/** Force non-WebP output (e.g. for Ollama). Leave unset to honor `OMP_NO_WEBP`. */
+	/** Force non-WebP output (e.g. for Ollama). Leave unset to honor `OMSP_NO_WEBP`. */
 	excludeWebP?: boolean;
 }
 
@@ -159,7 +159,7 @@ export interface LoadImageAttachmentInputOptions {
 	uri: string;
 	autoResize: boolean;
 	maxBytes?: number;
-	/** Force non-WebP output (e.g. for Ollama). Leave unset to honor `OMP_NO_WEBP`. */
+	/** Force non-WebP output (e.g. for Ollama). Leave unset to honor `OMSP_NO_WEBP`. */
 	excludeWebP?: boolean;
 }
 

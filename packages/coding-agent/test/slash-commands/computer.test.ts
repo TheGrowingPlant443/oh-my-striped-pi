@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { executeAcpBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/acp-builtins";
-import { cfgComputerEnabled } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { executeAcpBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/acp-builtins";
+import { cfgComputerEnabled } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 function acpRuntime(
 	options: {

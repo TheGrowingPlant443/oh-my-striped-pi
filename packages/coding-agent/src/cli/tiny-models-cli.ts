@@ -1,5 +1,5 @@
-import { formatBytes } from "@oh-my-pi/pi-utils";
-import chalk from "@oh-my-pi/pi-utils/chalk";
+import { formatBytes } from "@oh-my-striped-pi/pi-utils";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
 import {
 	DEFAULT_TINY_TITLE_LOCAL_MODEL_KEY,
 	getTinyLocalModelSpec,
@@ -54,7 +54,7 @@ function writeLine(text = ""): void {
 	process.stdout.write(`${text}\n`);
 }
 
-const ACTIONABLE_DOWNLOAD_ERROR_LINE = /PI_TINY_|CUDA|cuDNN|cudnn|libcudnn|tiny-title-runtime|onnxruntime-node/i;
+const ACTIONABLE_DOWNLOAD_ERROR_LINE = /OMSP_TINY_|CUDA|cuDNN|cudnn|libcudnn|tiny-title-runtime|onnxruntime-node/i;
 
 function downloadErrorSummary(error: string | undefined): string | undefined {
 	const lines =

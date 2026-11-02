@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
 import * as vm from "node:vm";
-import * as ai from "@oh-my-pi/pi-ai";
-import type { Api, AssistantMessage, ImageContent, Model } from "@oh-my-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import type { Api, AssistantMessage, ImageContent, Model } from "@oh-my-striped-pi/pi-ai";
 import { ModelRegistry } from "../../src/config/model-registry";
 import { Settings } from "../../src/config/settings";
 import { runEvalJudgment } from "../../src/eval/judgment-bridge";
@@ -12,7 +12,7 @@ import type { ToolSession } from "../../src/tools";
 import { createInMemoryAuthStorage } from "../helpers/agent-session-setup";
 import { asGlobalFetch } from "../helpers/fetch-mock";
 import { rejectionOf } from "../helpers/rejection";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { CostCapError, CostGate } from "../../src/session/cost-gate";
 
 const SMOL: Model<Api> = {
@@ -225,7 +225,7 @@ describe("eval judge() bridge", () => {
 	});
 
 	it("passes local and embedded images to vision chat as real image blocks", async () => {
-		const tempDir = TempDir.createSync("@omp-eval-judge-image-");
+		const tempDir = TempDir.createSync("@omsp-eval-judge-image-");
 		const embeddedImage: ImageContent = { ...IMAGE_TWO, detail: "original" };
 		try {
 			await Bun.write(path.join(tempDir.path(), "local.png"), Buffer.from(IMAGE_ONE.data, "base64"));
@@ -272,7 +272,7 @@ describe("eval judge() bridge", () => {
 	});
 
 	it("rejects malformed local images instead of silently dropping them", async () => {
-		const tempDir = TempDir.createSync("@omp-eval-judge-bad-image-");
+		const tempDir = TempDir.createSync("@omsp-eval-judge-bad-image-");
 		try {
 			await Bun.write(path.join(tempDir.path(), "broken.png"), "not an image");
 			const complete = vi.spyOn(ai, "completeSimple").mockResolvedValue(reply("tests: yes"));
@@ -368,7 +368,7 @@ describe("eval judge() bridge", () => {
 	it("forwards image options through the JavaScript judge helper callback", async () => {
 		const calls: Array<{ name: string; args: unknown }> = [];
 		const sandbox: Record<string, unknown> = {
-			__omp_call_tool__: async (name: string, args: unknown) => {
+			__omsp_call_tool__: async (name: string, args: unknown) => {
 				calls.push({ name, args });
 				if (name === "__judge__") return { answers: { ok: { type: "bool", bool: 1 } }, model: "p/smol" };
 				throw new Error(`unexpected bridge call ${name}`);
@@ -405,7 +405,7 @@ describe("eval js judge() prelude", () => {
 	it("awaits to the structured answers", async () => {
 		const calls: Array<{ name: string; args: unknown }> = [];
 		const sandbox: Record<string, unknown> = {
-			__omp_call_tool__: async (name: string, args: unknown) => {
+			__omsp_call_tool__: async (name: string, args: unknown) => {
 				calls.push({ name, args });
 				if (name === "__judge__") return { answers: { ok: { type: "bool", bool: 1 } }, model: "p/smol" };
 				throw new Error(`unexpected bridge call ${name}`);

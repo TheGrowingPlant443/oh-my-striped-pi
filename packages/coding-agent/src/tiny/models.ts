@@ -6,7 +6,7 @@ export interface TinyTitleLocalModelSpec {
 	/** ONNX export loaded by transformers.js on every platform. */
 	repo: string;
 	dtype: "q4";
-	/** Pre-quantized MLX export loaded by mlx-lm when `PI_TINY_DEVICE=mlx`. */
+	/** Pre-quantized MLX export loaded by mlx-lm when `OMSP_TINY_DEVICE=mlx`. */
 	mlxRepo: string;
 	label: string;
 	description: string;

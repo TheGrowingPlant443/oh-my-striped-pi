@@ -1,7 +1,7 @@
-//! Regression tests for oh-my-pi issue #13325: `ulimit` in the embedded shell
-//! must never change the host process's own resource limits. The shell runs
-//! in-process and `( … )` subshells are clones, not forks, so limits live in
-//! shell state and apply only to the external commands the shell spawns.
+//! Regression tests for oh-my-striped-pi issue #13325: `ulimit` in the embedded
+//! shell must never change the host process's own resource limits. The shell
+//! runs in-process and `( … )` subshells are clones, not forks, so limits live
+//! in shell state and apply only to the external commands the shell spawns.
 //!
 //! This lives in `tests/` (a process of its own) on purpose: on regression the
 //! builtin lowers the test process's `RLIMIT_NOFILE`.

@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { resolveAgentServiceTierOverride } from "@oh-my-pi/pi-coding-agent/config/service-tier";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createAgentSession, type ExtensionFactory } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { resolveAgentServiceTierOverride } from "@oh-my-striped-pi/pi-coding-agent/config/service-tier";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createAgentSession, type ExtensionFactory } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 const deferredModelPattern = "github-copilot/gpt-4o-sdk-deferred";
@@ -31,7 +31,7 @@ const runtimeProviderExtension: ExtensionFactory = pi => {
 	});
 };
 
-const originalNoTitle = Bun.env.PI_NO_TITLE;
+const originalNoTitle = Bun.env.OMSP_NO_TITLE;
 
 function captureCopilotRequests() {
 	const payloads: unknown[] = [];
@@ -74,7 +74,7 @@ function captureCopilotRequests() {
 
 describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	beforeEach(() => {
-		Bun.env.PI_NO_TITLE = "1";
+		Bun.env.OMSP_NO_TITLE = "1";
 		vi.spyOn(globalThis, "fetch").mockImplementation(
 			Object.assign(
 				async () => {
@@ -90,8 +90,8 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 		vi.restoreAllMocks();
 		for (const authStorage of authStorages) authStorage.close();
 		authStorages.length = 0;
-		if (originalNoTitle === undefined) delete Bun.env.PI_NO_TITLE;
-		else Bun.env.PI_NO_TITLE = originalNoTitle;
+		if (originalNoTitle === undefined) delete Bun.env.OMSP_NO_TITLE;
+		else Bun.env.OMSP_NO_TITLE = originalNoTitle;
 	});
 
 	function openAuthStorage(): AuthStorage {
@@ -123,7 +123,7 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	}
 
 	it("resolves an exact-agent tier override against the final Copilot model without sending unsupported tiers", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-first-turn-");
+		using tempDir = TempDir.createSync("@omsp-service-tier-first-turn-");
 		const requests = captureCopilotRequests();
 		const resolvedModels: Array<Model | undefined> = [];
 		const { session } = await createAgentSession({
@@ -156,7 +156,7 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	it.each([undefined, { openai: "default" }] as const)(
 		"keeps the resolved tier map %j without putting unsupported service_tier on Copilot requests",
 		async tiers => {
-			using tempDir = TempDir.createSync("@omp-service-tier-default-");
+			using tempDir = TempDir.createSync("@omsp-service-tier-default-");
 			const requests = captureCopilotRequests();
 			const resolveServiceTierByFamily = tiers ? () => tiers : undefined;
 			const { session } = await createAgentSession({
@@ -183,7 +183,7 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	);
 
 	it("evaluates the resolver against a deferred model and replaces configured tiers", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-resolver-");
+		using tempDir = TempDir.createSync("@omsp-service-tier-resolver-");
 		const resolvedModels: Array<Model | undefined> = [];
 		const { session } = await createAgentSession({
 			...sessionOptions(
@@ -209,7 +209,7 @@ describe.serial("createAgentSession resolveServiceTierByFamily", () => {
 	});
 
 	it("persists an empty resolved tier map so a reopened session does not re-derive tiers from settings", async () => {
-		using tempDir = TempDir.createSync("@omp-service-tier-resolver-reopen-");
+		using tempDir = TempDir.createSync("@omsp-service-tier-resolver-reopen-");
 		const authStorage = openAuthStorage();
 		const sessionFile = path.join(tempDir.path(), "session.jsonl");
 		const settings = Settings.isolated({ "tier.openai": "priority" });

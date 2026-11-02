@@ -12,7 +12,7 @@ In addition to the tools above, you may have access to other custom tools depend
 <rules>
 - Use bash for file operations like ls, rg, find
 - Use read to examine files instead of cat or sed.
-- You can inspect PI_* environment variables for current model and session details.
+- You can inspect OMSP_* environment variables for current model and session details.
 - Use edit for precise changes (edits[].oldText must match exactly)
 - When changing multiple separate locations in one file, use one edit call with multiple entries in edits[] instead of multiple edit calls
 - Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.

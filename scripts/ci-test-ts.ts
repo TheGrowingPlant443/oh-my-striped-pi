@@ -106,9 +106,9 @@ const nativeAndIntegrationPackages = [
 ];
 
 const projectToolTestCommand: TestCommand = {
-	label: ".omp/tests (project-local TUI debug tool)",
+	label: ".omsp/tests (project-local TUI debug tool)",
 	cwd: ".",
-	command: ["bun", "test", ...onlyFailuresArgs, "./.omp/tests/tui.test.ts"],
+	command: ["bun", "test", ...onlyFailuresArgs, "./.omsp/tests/tui.test.ts"],
 	parallel: 1,
 };
 
@@ -151,7 +151,7 @@ const codingAgentRuntimePathPatterns = [
 ];
 
 const codingAgentNativeContentMarkers = [
-	"@oh-my-pi/pi-natives",
+	"@oh-my-striped-pi/pi-natives",
 	"pi-natives",
 	"native",
 	"readImageMetadata",
@@ -187,7 +187,7 @@ const codingAgentSingletonContentPatterns = [
 ];
 
 const codingAgentUiContentMarkers = [
-	"@oh-my-pi/pi-tui",
+	"@oh-my-striped-pi/pi-tui",
 	"InteractiveMode",
 	"InputController",
 	"StatusLine",
@@ -475,7 +475,7 @@ function buildChildEnv(): Record<string, string | undefined> {
 	const env: Record<string, string | undefined> = {
 		...Bun.env,
 		GITHUB_ACTIONS: "",
-		PI_TEST_RUNTIME: "1",
+		OMSP_TEST_RUNTIME: "1",
 		BUN_JSC_useConcurrentGC: "0",
 		BUN_JSC_numberOfGCMarkers: "1",
 	};
@@ -492,9 +492,9 @@ function buildChildEnv(): Record<string, string | undefined> {
 // parallel path awaits the child's stdout/stderr pipes, which stay open as
 // long as the wedged process — or any grandchild that inherited them — lives.
 // After this many seconds the child is SIGKILLed and reported as a failure.
-// Override with OMP_TEST_CHUNK_TIMEOUT (seconds).
+// Override with OMSP_TEST_CHUNK_TIMEOUT (seconds).
 function chunkTimeoutMs(): number {
-	const raw = Number(Bun.env.OMP_TEST_CHUNK_TIMEOUT?.trim());
+	const raw = Number(Bun.env.OMSP_TEST_CHUNK_TIMEOUT?.trim());
 	if (Number.isFinite(raw) && raw >= 1) return raw * 1000;
 	return 600_000;
 }
@@ -589,10 +589,10 @@ const MAX_CHUNK_ATTEMPTS = 3;
 // two very different ways -- the per-chunk watchdog firing, or the kernel OOM
 // killer reaping a chunk that outgrew the runner -- and the bare exit code
 // cannot tell them apart. Which one it was is the difference between "raise
-// OMP_TEST_CHUNK_TIMEOUT" and "lower this bucket's chunkSize", so say it.
+// OMSP_TEST_CHUNK_TIMEOUT" and "lower this bucket's chunkSize", so say it.
 function describeChunkFailure(exitCode: number, timedOut: boolean): string {
 	if (timedOut) {
-		return `exceeded the ${Math.round(chunkTimeoutMs() / 1000)}s chunk watchdog and was killed (exit ${exitCode}; OMP_TEST_CHUNK_TIMEOUT to change)`;
+		return `exceeded the ${Math.round(chunkTimeoutMs() / 1000)}s chunk watchdog and was killed (exit ${exitCode}; OMSP_TEST_CHUNK_TIMEOUT to change)`;
 	}
 	if (exitCode === 137) {
 		return "was SIGKILLed (exit 137) without reaching the chunk watchdog, which on a CI runner means the OOM killer; lower this bucket's chunkSize";
@@ -612,7 +612,7 @@ function isCI(): boolean {
 }
 
 // Fan-out width for the local parallel path, clamped to the command count and
-// to `cores`. Defaults to `cores`; `OMP_TEST_CONCURRENCY` (`spec`) dials it down
+// to `cores`. Defaults to `cores`; `OMSP_TEST_CONCURRENCY` (`spec`) dials it down
 // on a memory-constrained machine, and `all`/`max` name the cap explicitly.
 // Never wider than `cores`: every chunk is a full `bun test` process (~1 GB
 // resident on coding-agent), so launching all ~190 at once only trades a
@@ -625,7 +625,7 @@ function testConcurrency(total: number, spec: string | undefined, cores: number)
 	if (Number.isFinite(override) && override >= 1) {
 		return Math.min(Math.floor(override), cap);
 	}
-	throw new Error(`Invalid OMP_TEST_CONCURRENCY=${JSON.stringify(raw)}; expected a positive integer, all, or max`);
+	throw new Error(`Invalid OMSP_TEST_CONCURRENCY=${JSON.stringify(raw)}; expected a positive integer, all, or max`);
 }
 
 // Test files interleave real IO — sqlite writes, temp dirs, spawned CLIs — with
@@ -655,9 +655,9 @@ function budgetedParallel(requested: number, poolWidth: number): number {
 // timeout that says nothing about the code. Timing out is still worth catching,
 // so keep a ceiling — just one loose enough to only fire on a real hang. The
 // per-chunk watchdog (chunkTimeoutMs) remains the backstop for a wedged process.
-// Override with OMP_TEST_TIMEOUT (seconds); per-test `it(name, fn, ms)` still wins.
+// Override with OMSP_TEST_TIMEOUT (seconds); per-test `it(name, fn, ms)` still wins.
 function testTimeoutMs(): number {
-	const raw = Number(Bun.env.OMP_TEST_TIMEOUT?.trim());
+	const raw = Number(Bun.env.OMSP_TEST_TIMEOUT?.trim());
 	if (Number.isFinite(raw) && raw >= 1) return raw * 1000;
 	return 30_000;
 }
@@ -838,7 +838,7 @@ async function runTestCommandsInParallel(commands: TestCommand[], concurrency: n
 	const fileWidths = [...new Set(commands.map(c => c.parallel).filter(p => p !== undefined))].sort((a, b) => a - b);
 	console.log(
 		`Running ${commands.length} test command(s), up to ${concurrency} in parallel ` +
-			`(OMP_TEST_CONCURRENCY=<n> to lower); ${os.availableParallelism()} cores, ` +
+			`(OMSP_TEST_CONCURRENCY=<n> to lower); ${os.availableParallelism()} cores, ` +
 			`--parallel=${fileWidths.join("/") || "n/a"} per chunk.`,
 	);
 
@@ -920,7 +920,7 @@ async function runTestCommandsInParallel(commands: TestCommand[], concurrency: n
 		return {
 			exitCode,
 			timedOut,
-			output: `${stdout.text}${stderr.text}${timedOut ? `\n${stuckTree}[watchdog] chunk exceeded ${Math.round(chunkTimeoutMs() / 1000)}s; killed with SIGKILL (OMP_TEST_CHUNK_TIMEOUT to change)\n` : ""}`,
+			output: `${stdout.text}${stderr.text}${timedOut ? `\n${stuckTree}[watchdog] chunk exceeded ${Math.round(chunkTimeoutMs() / 1000)}s; killed with SIGKILL (OMSP_TEST_CHUNK_TIMEOUT to change)\n` : ""}`,
 		};
 	}
 
@@ -986,7 +986,7 @@ async function runTestCommandsInParallel(commands: TestCommand[], concurrency: n
 	}
 }
 
-// `OMP_TEST_SHARD=i/n` splits a mode's chunk commands across n CI jobs; job i
+// `OMSP_TEST_SHARD=i/n` splits a mode's chunk commands across n CI jobs; job i
 // runs every chunk whose index ≡ i-1 (mod n). Round-robin rather than
 // contiguous ranges because the chunk list follows sorted file order, so slow
 // neighbouring suites spread evenly instead of piling into one shard. Every
@@ -998,11 +998,11 @@ function selectShard<T>(commands: T[], spec: string | undefined): T[] {
 	const index = match ? Number(match[1]) : 0;
 	const count = match ? Number(match[2]) : 0;
 	if (!match || count < 1 || index < 1 || index > count) {
-		throw new Error(`Invalid OMP_TEST_SHARD=${JSON.stringify(trimmed)}; expected i/n with 1 <= i <= n`);
+		throw new Error(`Invalid OMSP_TEST_SHARD=${JSON.stringify(trimmed)}; expected i/n with 1 <= i <= n`);
 	}
 	const selected = commands.filter((_, i) => i % count === index - 1);
 	if (selected.length === 0) {
-		throw new Error(`OMP_TEST_SHARD=${trimmed} selects no chunks (${commands.length} available)`);
+		throw new Error(`OMSP_TEST_SHARD=${trimmed} selects no chunks (${commands.length} available)`);
 	}
 	return selected;
 }
@@ -1011,8 +1011,8 @@ if (!(requestedMode in validModes)) {
 	throw new Error(`Unknown mode ${shellQuote(requestedMode)}. Expected one of: ${Object.keys(validModes).join(", ")}`);
 }
 
-const requestedCommands = selectShard(await commandsForMode(requestedMode as Mode), Bun.env.OMP_TEST_SHARD);
-const explicitConcurrency = Boolean(Bun.env.OMP_TEST_CONCURRENCY?.trim());
+const requestedCommands = selectShard(await commandsForMode(requestedMode as Mode), Bun.env.OMSP_TEST_SHARD);
+const explicitConcurrency = Boolean(Bun.env.OMSP_TEST_CONCURRENCY?.trim());
 // CI defaults to one process at a time, but memory-sized workflow buckets
 // explicitly opt into bounded process concurrency. Local runs fan out by
 // default and may use the same override. Resolved before the dry-run check so
@@ -1020,7 +1020,7 @@ const explicitConcurrency = Boolean(Bun.env.OMP_TEST_CONCURRENCY?.trim());
 const pooled = requestedCommands.length > 1 && (!isCI() || explicitConcurrency);
 // The sequential path is a pool of one, so a lone chunk keeps the whole budget.
 const poolWidth = pooled
-	? testConcurrency(requestedCommands.length, Bun.env.OMP_TEST_CONCURRENCY, os.availableParallelism())
+	? testConcurrency(requestedCommands.length, Bun.env.OMSP_TEST_CONCURRENCY, os.availableParallelism())
 	: 1;
 const testCommands = applyChunkBudget(requestedCommands, poolWidth);
 if (pooled && !isDryRun) {

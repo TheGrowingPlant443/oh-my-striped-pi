@@ -767,7 +767,7 @@ fn build_matcher(
 			.whole_line(cli.line_regexp)
 			.utf(true)
 			.ucp(true)
-			.jit_if_available(pcre2_jit_enabled(host.var("OMP_PCRE2_JIT")));
+			.jit_if_available(pcre2_jit_enabled(host.var("OMSP_PCRE2_JIT")));
 		return builder
 			.build_many(patterns)
 			.map(Engine::Pcre)

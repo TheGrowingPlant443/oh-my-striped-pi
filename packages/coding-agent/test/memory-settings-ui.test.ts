@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createSettingsHost } from "@oh-my-pi/pi-coding-agent/config/settings-ui";
-import { cfgMemoryBackend } from "@oh-my-pi/pi-coding-agent/memory-backend/settings";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createSettingsHost } from "@oh-my-striped-pi/pi-coding-agent/config/settings-ui";
+import { cfgMemoryBackend } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/settings";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "./helpers/settings-test-state";
 
 let settingsState: SettingsTestState | undefined;
@@ -24,7 +24,7 @@ describe("memory backend settings visibility", () => {
 			return entry;
 		});
 		for (const entry of backendEntries) expect(entry.condition!()).toBe(false);
-		using dir = TempDir.createSync("@omp-memory-settings-ui-");
+		using dir = TempDir.createSync("@omsp-memory-settings-ui-");
 		const settings = await Settings.init({
 			cwd: dir.path(),
 			agentDir: dir.join("agent"),

@@ -1,25 +1,31 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import * as compactionModule from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage, Context, Model, UserMessage } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { type CompactionMethod, resolveSpeculationMethod } from "@oh-my-pi/pi-coding-agent/session/compaction-methods";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionMaintenance, type SessionMaintenanceHost } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as snapcompactModule from "@oh-my-pi/snapcompact";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import * as compactionModule from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage, Context, Model, UserMessage } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import {
+	type CompactionMethod,
+	resolveSpeculationMethod,
+} from "@oh-my-striped-pi/pi-coding-agent/session/compaction-methods";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import {
+	SessionMaintenance,
+	type SessionMaintenanceHost,
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as snapcompactModule from "@oh-my-striped-pi/snapcompact";
 
 import {
 	cfgCompaction,
 	cfgCompactionAsyncEnabled,
 	cfgCompactionMethodOrder,
-} from "@oh-my-pi/pi-coding-agent/session/context-settings";
+} from "@oh-my-striped-pi/pi-coding-agent/session/context-settings";
 
 const CONTEXT_WINDOW = 100_000;
 const THRESHOLD = 50_000;

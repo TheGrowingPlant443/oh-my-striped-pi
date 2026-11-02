@@ -11,9 +11,9 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { pricingPeerFor } from "@oh-my-pi/pi-catalog/compat/behavior";
-import { getBundledModel, type GeneratedProvider } from "@oh-my-pi/pi-catalog/models";
-import { getSessionsDir, isEnoent } from "@oh-my-pi/pi-utils";
+import { pricingPeerFor } from "@oh-my-striped-pi/pi-catalog/compat/behavior";
+import { getBundledModel, type GeneratedProvider } from "@oh-my-striped-pi/pi-catalog/models";
+import { getSessionsDir, isEnoent } from "@oh-my-striped-pi/pi-utils";
 import { initDb, isScheduledCatalogModel } from "./db";
 import { extractFolderFromPath, parseAllSessionEntries, resolveUsageTotal } from "./parser";
 import { getSessionRollups } from "./rollup";

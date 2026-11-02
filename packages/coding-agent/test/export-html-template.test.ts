@@ -3,23 +3,24 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { runInNewContext } from "node:vm";
-import { parseHTML } from "@oh-my-pi/pi-utils/dom";
+import { parseHTML } from "@oh-my-striped-pi/pi-utils/dom";
 import type { BunPlugin } from "bun";
 import { getTemplate } from "../src/export/html/index";
 
 const bundleDistUrl = new URL("../scripts/bundle-dist.ts", import.meta.url).href;
 const probePath = path.resolve(import.meta.dir, "fixtures", "html-export-template-probe.ts");
 const packageDir = path.resolve(import.meta.dir, "..");
-const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-html-template-"));
+const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-html-template-"));
 const unrelatedCwd = path.join(tempRoot, "unrelated-cwd");
 const bundleDir = path.join(tempRoot, "bundle");
 const compiledPath = path.join(tempRoot, "compiled-template-probe");
 let bundlePath: string;
 const dependencyStubs: Record<string, string> = {
-	"@oh-my-pi/omp-stats/trace":
+	"@oh-my-striped-pi/omsp-stats/trace":
 		'export const buildSessionTraceFromSnapshots = () => { throw new Error("Trace assembly is outside the template probe"); };',
-	"@oh-my-pi/pi-utils": 'export const APP_NAME = "omp"; export const isEnoent = err => err?.code === "ENOENT";',
-	"@oh-my-pi/pi-tui/theme":
+	"@oh-my-striped-pi/pi-utils":
+		'export const APP_NAME = "omsp"; export const isEnoent = err => err?.code === "ENOENT";',
+	"@oh-my-striped-pi/pi-tui/theme":
 		"export const getResolvedThemeColors = async () => ({}); export const getThemeExportColors = async () => ({});",
 	"../../session/sub-sessions": "export const collectSubSessions = async () => ({});",
 	"../../session/session-manager":
@@ -56,7 +57,7 @@ beforeAll(async () => {
 		outdir: bundleDir,
 		target: "bun",
 		plugins: [focusedBundlePlugin],
-		define: { "process.env.PI_BUNDLED": '"true"' },
+		define: { "process.env.OMSP_BUNDLED": '"true"' },
 	});
 	if (!bundle.success) throw new AggregateError(bundle.logs, "Template probe bundle failed");
 	const entrypoint = bundle.outputs.find(output => output.kind === "entry-point");
@@ -66,7 +67,7 @@ beforeAll(async () => {
 		entrypoints: [probePath],
 		target: "bun",
 		plugins: [focusedBundlePlugin],
-		define: { "process.env.PI_BUNDLED": '"true"' },
+		define: { "process.env.OMSP_BUNDLED": '"true"' },
 		compile: { outfile: compiledPath },
 	});
 	if (!compiled.success) throw new AggregateError(compiled.logs, "Compiled template probe failed");

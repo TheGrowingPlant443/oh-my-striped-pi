@@ -31,24 +31,24 @@ fn main() {
 	if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
 		build_darwin_native_helper(
 			"src/desktop/macos/capture/helper.m",
-			"omp-capture-helper",
-			"OMP_CAPTURE_DARWIN_HELPER",
+			"omsp-capture-helper",
+			"OMSP_CAPTURE_DARWIN_HELPER",
 			&["AppKit", "ScreenCaptureKit", "CoreGraphics"],
 			"14.0",
 		);
 		build_darwin_native_helper(
 			"src/desktop/macos/keymap-helper.m",
-			"omp-keymap-helper",
-			"OMP_KEYMAP_DARWIN_HELPER",
+			"omsp-keymap-helper",
+			"OMSP_KEYMAP_DARWIN_HELPER",
 			&["Carbon"],
 			"12.0",
 		);
 		build_rust_helper(
 			"src/desktop/macos/release_helper.rs",
 			&["src/desktop/macos/release.rs", "src/desktop/macos/route.rs"],
-			"omp_input_release",
-			"omp-input-release",
-			"OMP_INPUT_RELEASE_HELPER",
+			"omsp_input_release",
+			"omsp-input-release",
+			"OMSP_INPUT_RELEASE_HELPER",
 		);
 		build_applefm_bridge();
 	}
@@ -66,12 +66,12 @@ fn build_syntax_set() {
 		.join("syntaxes.packdump");
 	syntect::dumps::dump_to_uncompressed_file(&syntax_set_builder::build_syntax_set(), &output)
 		.unwrap_or_else(|error| panic!("failed to write {}: {error}", output.display()));
-	println!("cargo:rustc-env=OMP_SYNTAX_SET={}", output.display());
+	println!("cargo:rustc-env=OMSP_SYNTAX_SET={}", output.display());
 }
 
 /// Builds the Apple Foundation Models bridge dylib through
 /// `src/applefm/build-bridge.sh` (shared with Bazel) and exposes it to the
-/// crate as `OMP_APPLEFM_BRIDGE` for embedding: `bridge.swift` when a Swift
+/// crate as `OMSP_APPLEFM_BRIDGE` for embedding: `bridge.swift` when a Swift
 /// 6.4+ / macOS 27 SDK toolchain exists and the target is Apple silicon,
 /// otherwise an empty file (bridge not built).
 ///
@@ -87,7 +87,8 @@ fn build_applefm_bridge() {
 	for file in ["build-bridge.sh", "bridge.swift"] {
 		println!("cargo:rerun-if-changed={}", sources.join(file).display());
 	}
-	for variable in ["OMP_APPLEFM_SWIFTC", "OMP_APPLEFM_MODULE_CACHE", "SDKROOT", "DEVELOPER_DIR"] {
+	for variable in ["OMSP_APPLEFM_SWIFTC", "OMSP_APPLEFM_MODULE_CACHE", "SDKROOT", "DEVELOPER_DIR"]
+	{
 		println!("cargo:rerun-if-env-changed={variable}");
 	}
 	// SDK installs and upgrades change which toolchain is detected. Watch files,
@@ -146,7 +147,7 @@ fn build_applefm_bridge() {
 		String::from_utf8_lossy(&result.stderr)
 	);
 
-	println!("cargo:rustc-env=OMP_APPLEFM_BRIDGE={}", library.display());
+	println!("cargo:rustc-env=OMSP_APPLEFM_BRIDGE={}", library.display());
 }
 
 /// Returns `(swiftc, sdk)` for the first toolchain `build-bridge.sh detect`
@@ -174,16 +175,16 @@ fn build_oauth_callback_helper() {
 }
 
 fn build_oauth_callback_relay(target_os: &str) {
-	let mut name = String::from("omp-oauth-callback-relay");
+	let mut name = String::from("omsp-oauth-callback-relay");
 	if target_os == "windows" {
 		name.push_str(".exe");
 	}
 	build_rust_helper(
 		"src/oauth_callback/relay.rs",
 		&["src/oauth_callback/publication.rs"],
-		"omp_oauth_callback_relay",
+		"omsp_oauth_callback_relay",
 		&name,
-		"OMP_OAUTH_RELAY_BINARY",
+		"OMSP_OAUTH_RELAY_BINARY",
 	);
 }
 
@@ -270,8 +271,8 @@ mod darwin_compiler;
 fn build_darwin_oauth_callback_helper() {
 	build_darwin_native_helper(
 		"src/oauth_callback/darwin-helper.m",
-		"omp-oauth-callback-darwin-helper",
-		"OMP_OAUTH_DARWIN_HELPER",
+		"omsp-oauth-callback-darwin-helper",
+		"OMSP_OAUTH_DARWIN_HELPER",
 		&["AppKit"],
 		"12.0",
 	);

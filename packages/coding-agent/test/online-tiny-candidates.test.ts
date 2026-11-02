@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { getRoleInfo } from "@oh-my-pi/pi-coding-agent/config/model-roles";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { getRoleInfo } from "@oh-my-striped-pi/pi-coding-agent/config/model-roles";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	collectOnlineTinyCandidates,
 	expandOnlineTinyModelFallbacks,
-} from "@oh-my-pi/pi-coding-agent/tiny/online-candidates";
+} from "@oh-my-striped-pi/pi-coding-agent/tiny/online-candidates";
 
 function companyModel(provider: string, id: string) {
 	return buildModel({

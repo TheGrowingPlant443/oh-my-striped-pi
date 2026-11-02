@@ -1,18 +1,18 @@
-# @oh-my-pi/pi-agent
+# @oh-my-striped-pi/pi-agent-core
 
-Stateful agent with tool execution and event streaming. Built on `@oh-my-pi/pi-ai`.
+Stateful agent with tool execution and event streaming. Built on `@oh-my-striped-pi/pi-ai`.
 
-## Installation
+## Workspace setup
 
-```bash
-npm install @oh-my-pi/pi-agent
-```
+This is a private source workspace, not a public npm package. Use it from an
+authenticated monorepo or company workspace with managed dependencies prepared.
+The examples below import the local workspace package.
 
 ## Quick Start
 
 ```typescript
-import { Agent } from "@oh-my-pi/pi-agent";
-import { getModel } from "@oh-my-pi/pi-ai";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { getModel } from "@oh-my-striped-pi/pi-ai";
 
 const agent = new Agent({
 	initialState: {
@@ -260,7 +260,7 @@ remain separate. `replaceQueue("steering" | "followUp", messages)` replaces only
 Extend `AgentMessage` via declaration merging:
 
 ```typescript
-declare module "@oh-my-pi/pi-agent" {
+declare module "@oh-my-striped-pi/pi-agent-core" {
 	interface CustomAgentMessages {
 		notification: { role: "notification"; text: string; timestamp: number };
 	}
@@ -287,7 +287,7 @@ const agent = new Agent({
 Define tools using `AgentTool` with an omptype parameter schema.
 
 ```typescript
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 
 const readFileTool: AgentTool = {
 	name: "read_file",
@@ -333,7 +333,7 @@ Thrown errors are caught by the agent and reported to the LLM as tool errors wit
 For browser apps that proxy through a backend:
 
 ```typescript
-import { Agent, streamProxy } from "@oh-my-pi/pi-agent";
+import { Agent, streamProxy } from "@oh-my-striped-pi/pi-agent-core";
 
 const agent = new Agent({
 	streamFn: (model, context, options) =>
@@ -350,7 +350,7 @@ const agent = new Agent({
 For direct control without the Agent class:
 
 ```typescript
-import { agentLoop, agentLoopContinue } from "@oh-my-pi/pi-agent";
+import { agentLoop, agentLoopContinue } from "@oh-my-striped-pi/pi-agent-core";
 
 const context: AgentContext = {
 	systemPrompt: ["You are helpful."],
@@ -448,7 +448,7 @@ Callers that drive the loop multiple times (verify pass, benchmark harness)
 fold N summaries with `aggregateAgentRunSummaries` / `aggregateAgentRunCoverage`:
 
 ```typescript
-import { aggregateAgentRunSummaries, aggregateAgentRunCoverage } from "@oh-my-pi/pi-agent";
+import { aggregateAgentRunSummaries, aggregateAgentRunCoverage } from "@oh-my-striped-pi/pi-agent-core";
 
 const summaries: AgentRunSummary[] = [];
 const coverages: AgentRunCoverage[] = [];
@@ -464,7 +464,7 @@ const runCoverage = aggregateAgentRunCoverage(coverages);
 
 ### Tool status reporting
 
-`execute_tool` spans carry `omp.gen_ai.tool.status` ∈
+`execute_tool` spans carry `omsp.gen_ai.tool.status` ∈
 `"ok" | "error" | "skipped" | "blocked" | "timeout" | "aborted"`.
 `beforeToolCall` blocks throw a distinguishable `ToolCallBlockedError`
 internally; the catch path reports `status: "blocked"` instead of conflating

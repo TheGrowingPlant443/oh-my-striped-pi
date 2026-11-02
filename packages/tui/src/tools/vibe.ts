@@ -1,7 +1,7 @@
 import type { Component } from "../tui";
 import { Text } from "../components/text";
 import { describeShimmer, shimmerEnabled, shimmerText } from "../theme/shimmer";
-import type { TspCardStatus, TspSpan, TspTone } from "@oh-my-pi/pi-wire";
+import type { TspCardStatus, TspSpan, TspTone } from "@oh-my-striped-pi/pi-wire";
 import { compact, elapsed, node, row, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { OwnerMemo } from "../native/memo";
@@ -325,7 +325,7 @@ function vibeNativeLabel(op: VibeOp, args: VibeRenderArgs | undefined): string {
 function vibeComposer(message: string): NativeNode | undefined {
 	const trimmed = plainText(message).trim();
 	if (!trimmed) return undefined;
-	return text([span("> ", "accent"), span(trimmed, "toolOutput")], { wrap: "word", role: "omp.vibe.composer" });
+	return text([span("> ", "accent"), span(trimmed, "toolOutput")], { wrap: "word", role: "omsp.vibe.composer" });
 }
 
 function vibeScreenStatus(
@@ -404,7 +404,7 @@ function describeVibeScreen(
 	return node(
 		"card",
 		{
-			role: "omp.vibe.screen",
+			role: "omsp.vibe.screen",
 			status,
 			tone,
 			head,

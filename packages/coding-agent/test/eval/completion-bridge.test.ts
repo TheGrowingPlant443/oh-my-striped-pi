@@ -1,9 +1,9 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import type { Api, AssistantMessage, Model } from "@oh-my-pi/pi-ai";
-import * as ai from "@oh-my-pi/pi-ai";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Api, AssistantMessage, Model } from "@oh-my-striped-pi/pi-ai";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { $ } from "bun";
 import type { ModelRegistry } from "../../src/config/model-registry";
 import { Settings } from "../../src/config/settings";
@@ -22,11 +22,11 @@ import { disposeAllVmContexts } from "../../src/eval/js/context-manager";
 import { executeJs } from "../../src/eval/js/executor";
 import { disposeAllKernelSessions, type PythonResult } from "../../src/eval/py/executor";
 import type { ToolSession } from "../../src/tools";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { CostGate } from "../../src/session/cost-gate";
 import { rejectionOf } from "../helpers/rejection";
 
-import { cfgRetryFallbackChains, cfgRetryMaxRetries } from "@oh-my-pi/pi-coding-agent/session/settings";
+import { cfgRetryFallbackChains, cfgRetryMaxRetries } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
 
 async function runEvalCompletionAndWait(
 	args: unknown,
@@ -1016,7 +1016,7 @@ describe("completion() through eval runtimes", () => {
 	});
 
 	it("exposes plain and structured completion() in the JavaScript runtime", async () => {
-		using tempDir = TempDir.createSync("@omp-eval-completion-js-");
+		using tempDir = TempDir.createSync("@omsp-eval-completion-js-");
 		const sessionFile = path.join(tempDir.path(), "session.jsonl");
 		const sessionId = `js-completion:${crypto.randomUUID()}`;
 		vi.spyOn(ai, "completeSimple")
@@ -1040,7 +1040,7 @@ describe("completion() through eval runtimes", () => {
 	});
 
 	it("waits for a completion started in an earlier JavaScript cell", async () => {
-		using tempDir = TempDir.createSync("@omp-eval-completion-cells-");
+		using tempDir = TempDir.createSync("@omsp-eval-completion-cells-");
 		const options = {
 			cwd: tempDir.path(),
 			sessionId: `js-completion-cells:${crypto.randomUUID()}`,
@@ -1062,7 +1062,7 @@ describe("completion() through eval runtimes", () => {
 	});
 
 	it("times out waiting on a running completion started in an earlier JavaScript cell", async () => {
-		using tempDir = TempDir.createSync("@omp-eval-completion-cells-timeout-");
+		using tempDir = TempDir.createSync("@omsp-eval-completion-cells-timeout-");
 		const options = {
 			cwd: tempDir.path(),
 			sessionId: `js-completion-cells-timeout:${crypto.randomUUID()}`,
@@ -1089,7 +1089,7 @@ describe("completion() through eval runtimes", () => {
 	});
 
 	it("exposes plain and structured completion() in the Python runtime", async () => {
-		const tempDir = TempDir.createSync("@omp-eval-completion-py-");
+		const tempDir = TempDir.createSync("@omsp-eval-completion-py-");
 		try {
 			const result = await runPythonCompletionsInSubprocess(tempDir);
 			expect(result.exitCode).toBe(0);

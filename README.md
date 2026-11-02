@@ -1,17 +1,20 @@
+# oh-my-striped-pi
+
+Runs as `omsp`, independently of `omp`. Native configuration and runtime state use `~/.omsp`, project `.omsp/`, and XDG `omsp/` directories; application environment variables use `OMSP_*`. Upstream `OMP_*` and `PI_*` variables do not select this fork's state. Nothing is copied or migrated from an existing `omp` installation.
+
 <p align="center">
-  <img src="https://github.com/can1357/oh-my-pi/blob/main/assets/hero.png?raw=true" alt="omp">
+  <img src="https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/assets/hero.png?raw=true" alt="omsp">
 </p>
 
 <p align="center">
   <strong>A coding agent with the IDE wired in.</strong>
-  <strong><a href="https://omp.sh">omp.sh</a></strong>
+  <strong>Private fork · CLI: <code>omsp</code></strong>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent"><img src="https://img.shields.io/npm/v/@oh-my-pi/pi-coding-agent?style=flat&colorA=222222&colorB=CB3837" alt="npm version"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-keep-E05735?style=flat&colorA=222222" alt="Changelog"></a>
-  <a href="https://github.com/can1357/oh-my-pi/actions"><img src="https://img.shields.io/github/actions/workflow/status/can1357/oh-my-pi/ci.yml?style=flat&colorA=222222&colorB=3FB950" alt="CI"></a>
-  <a href="https://github.com/can1357/oh-my-pi/blob/main/LICENSE"><img src="https://img.shields.io/github/license/can1357/oh-my-pi?style=flat&colorA=222222&colorB=58A6FF" alt="License"></a>
+  <a href="https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/packages/coding-agent/CHANGELOG.md"><img src="https://img.shields.io/badge/changelog-keep-E05735?style=flat&colorA=222222" alt="Changelog"></a>
+  <a href="https://github.com/TheGrowingPlant443/oh-my-striped-pi/actions"><img src="https://img.shields.io/github/actions/workflow/status/TheGrowingPlant443/oh-my-striped-pi/ci.yml?style=flat&colorA=222222&colorB=3FB950" alt="CI"></a>
+  <a href="https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/LICENSE"><img src="https://img.shields.io/github/license/TheGrowingPlant443/oh-my-striped-pi?style=flat&colorA=222222&colorB=58A6FF" alt="License"></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&colorA=222222&logo=typescript&logoColor=white" alt="TypeScript"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Rust-DEA584?style=flat&colorA=222222&logo=rust&logoColor=white" alt="Rust"></a>
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/runtime-Bun-f472b6?style=flat&colorA=222222" alt="Bun"></a>
@@ -19,7 +22,7 @@
 </p>
 
 <p align="center">
-  Built by <a href="https://stencil.so">Stencil Labs</a> · Fork of <a href="https://github.com/badlogic/pi-mono">Pi</a> by <a href="https://github.com/mariozechner">@mariozechner</a>
+  Fork of <a href="https://github.com/can1357/oh-my-pi">oh-my-pi</a>, built by <a href="https://stencil.so">Stencil Labs</a> · Based on <a href="https://github.com/badlogic/pi-mono">Pi</a> by <a href="https://github.com/mariozechner">@mariozechner</a>
 </p>
 
 The most capable agent surface that ships. Continuously tuned by real-world use — complete out of the box, open all the way down.
@@ -34,7 +37,7 @@ Credential administration remains available: token access, auth export/import, a
 
 Smithery cloud marketplace/login and Exa-specific MCP credential overrides are removed. Manual/local MCP configuration and plugins remain; existing remote MCP entries and credential files are not deleted, so review their destinations before use.
 
-`/update` and `omp update` explain that application updates are company-managed; they do not check upstream releases, obtain GitHub credentials or replace the application. Deploy this fork through Git, Nix or your company's release process. Plugin updates remain available through `omp update --plugins`, with `--check` for a dry run.
+`/update` and `omsp update` explain that application updates are company-managed; they do not check upstream releases, obtain GitHub credentials or replace the application. Deploy this fork through Git, Nix or your company's release process. Plugin updates remain available through `omsp update --plugins`, with `--check` for a dry run.
 
 > [!NOTE]
 > Pull requests are **temporarily open to everyone** as a trial. We previously
@@ -49,21 +52,21 @@ Build or deploy this checkout through your company's release process. Upstream i
 **Nix, from this checkout**
 
 ```sh
-nix build .#omp
-./result/bin/omp
+nix build .#omsp
+./result/bin/omsp
 
 # Or install this checkout into the active profile
 nix profile add .
 ```
 
-Flake consumers can use `packages.<system>.omp`, `overlays.default`, `nixosModules.default`, or `homeManagerModules.default`. Pin the `omp` input to your company-controlled fork. A Home Manager module can install OMP and own its settings declaratively:
+Flake consumers can use `packages.<system>.omsp`, `overlays.default`, `nixosModules.default`, or `homeManagerModules.default`. Pin the `omsp` input to your company-controlled fork. A Home Manager module can install OMSP and own its settings declaratively:
 
 ```nix
 { inputs, ... }: {
 
   # In your Home Manager module:
-  imports = [ inputs.omp.homeManagerModules.default ];
-  programs.omp = {
+  imports = [ inputs.omsp.homeManagerModules.default ];
+  programs.omsp = {
     enable = true;
     settings.startup.quiet = true;
   };
@@ -75,17 +78,17 @@ macOS · Linux · Windows · bun ≥ 1.4.4
 
 ### Shell completions
 
-`omp` generates its own completion scripts for **bash**, **zsh**, and **fish** from the live command/flag metadata, so they never drift from the actual CLI. Subcommands, flags, and enum values complete statically; model names (`--model`, `--smol`, `--slow`, `--plan`) resolve against the bundled model catalog and `--resume` against your on-disk sessions.
+`omsp` generates its own completion scripts for **bash**, **zsh**, and **fish** from the live command/flag metadata, so they never drift from the actual CLI. Subcommands, flags, and enum values complete statically; model names (`--model`, `--smol`, `--slow`, `--plan`) resolve against the bundled model catalog and `--resume` against your on-disk sessions.
 
 ```sh
 # zsh — add to ~/.zshrc (or write the output into a file on your $fpath)
-eval "$(omp completions zsh)"
+eval "$(omsp completions zsh)"
 
 # bash — add to ~/.bashrc
-eval "$(omp completions bash)"
+eval "$(omsp completions bash)"
 
 # fish
-omp completions fish > ~/.config/fish/completions/omp.fish
+omsp completions fish > ~/.config/fish/completions/omsp.fish
 ```
 
 ## Every tool, _benchmaxxed_.
@@ -108,19 +111,19 @@ Edits that land on the first attempt. Reads that summarize files instead of dump
 
 ## The Pi _you love_, with **batteries included**.
 
-Originally built on [Mario Zechner](https://github.com/mariozechner)'s wonderful [Pi](https://github.com/badlogic/pi-mono), omp adds everything you're missing.
+Originally built on [Mario Zechner](https://github.com/mariozechner)'s wonderful [Pi](https://github.com/badlogic/pi-mono), omsp adds everything you're missing.
 
 ### 01 · Code execution w/ tool-calling
 
 Most harnesses give the agent a Python sandbox and call it done. Ours runs persistent Python and a Bun worker, and either kernel can call back into the agent's own tools — read, search, task — over a loopback bridge. The agent loads a CSV with tool.read from inside Python, charts it from JavaScript, and never leaves the cell.
 
-![omp TUI running Python code and rendering a chart.](assets/python.webp)
+![omsp TUI running Python code and rendering a chart.](assets/python.webp)
 
 ### 02 · LSP wired into every write
 
 Ask for a rename and you get a rename. The call goes through workspace/willRenameFiles, so re-exports, barrel files, and aliased imports update before the file moves. Everything your IDE knows, the agent knows.
 
-![omp TUI with TypeScript and Biome language servers active.](assets/lspv.webp)
+![omsp TUI with TypeScript and Biome language servers active.](assets/lspv.webp)
 
 _[Read the LSP config docs](docs/lsp-config.md)_
 
@@ -128,7 +131,7 @@ _[Read the LSP config docs](docs/lsp-config.md)_
 
 A C binary segfaults: the agent attaches lldb, steps to the bad pointer, reads the frame. A Go service hangs: it attaches dlv and walks the goroutines. A Python process is wedged: debugpy, pause, inspect, evaluate. Most agents are still sprinkling print statements.
 
-![omp TUI: a live lldb-dap session against a native binary at /tmp/omp-native/demo. Adapter=lldb-dap, Status=stopped, Frame=xorshift32, Instruction pointer 0x10000055C, Location demo.c:6:10. Debug scopes and Debug variables cards show locals (x = 57351) and the agent confirms the math: x went from 7 → 57351 (= 7 ^ (7<<13)).](https://omp.sh/clips/dap-poster.webp)
+![omsp TUI: a live lldb-dap session against a native binary at /tmp/omsp-native/demo. Adapter=lldb-dap, Status=stopped, Frame=xorshift32, Instruction pointer 0x10000055C, Location demo.c:6:10. Debug scopes and Debug variables cards show locals (x = 57351) and the agent confirms the math: x went from 7 → 57351 (= 7 ^ (7<<13)).](https://omp.sh/clips/dap-poster.webp)
 
 _[Watch the capture ↗](https://omp.sh/clips/dap.mp4)_
 
@@ -136,7 +139,7 @@ _[Watch the capture ↗](https://omp.sh/clips/dap.mp4)_
 
 Your rules sit dormant until the model goes off-script. A regex match aborts the stream mid-token, injects the rule as a system reminder, and retries from the same point. You get course-correction without paying context tax on every turn. Injections survive compaction, so the fix sticks.
 
-![omp TUI: agent reading src.rs and about to write Box::leak when the request aborts (red `Error: Request was aborted`), an amber `⚠ Injecting rule: box-leak` card injects the rule body `Don't reach for Box::leak in production code paths`, and the agent then course-corrects by proposing `Arc<str>` and asking the user to confirm.](https://omp.sh/clips/ttsr-poster.webp)
+![omsp TUI: agent reading src.rs and about to write Box::leak when the request aborts (red `Error: Request was aborted`), an amber `⚠ Injecting rule: box-leak` card injects the rule body `Don't reach for Box::leak in production code paths`, and the agent then course-corrects by proposing `Arc<str>` and asking the user to confirm.](https://omp.sh/clips/ttsr-poster.webp)
 
 _[Watch the capture ↗](https://omp.sh/clips/ttsr.mp4)_
 
@@ -144,7 +147,7 @@ _[Watch the capture ↗](https://omp.sh/clips/ttsr.mp4)_
 
 Split a job across workers and get typed results back. task fans out into isolated worktrees, each worker runs its own tool surface, and the final yield is a schema-validated object the parent reads directly. No prose to parse, no merge conflicts between siblings, no orphaned edits.
 
-![omp TUI showing `task` spawning two subagents `ComponentsExports` and `RoutesExports`, the constraints block requiring an IRC DM between peers, the per-subagent status cards with cost and duration, and a final Findings section listing both exports plus an honest 'IRC coordination note' about a one-sided handshake.](https://omp.sh/clips/irc-poster.webp)
+![omsp TUI showing `task` spawning two subagents `ComponentsExports` and `RoutesExports`, the constraints block requiring an IRC DM between peers, the per-subagent status cards with cost and duration, and a final Findings section listing both exports plus an honest 'IRC coordination note' about a one-sided handshake.](https://omp.sh/clips/irc-poster.webp)
 
 _[Watch the capture ↗](https://omp.sh/clips/irc.mp4)_
 
@@ -163,7 +166,7 @@ Pair a reviewer model to the 'advisor' role and it reads every turn the main age
 
 ### 08 · Unapologetically native. Even on Windows.
 
-Other agents shell out to rg, grep, find, and bash. On many machines those binaries don't exist, and on the ones where they do, every call costs a fork-exec round-trip. omp links the real implementations into the process. ripgrep, glob, find: in-process. brush is the bash — with sessions that survive across calls, and 58 command-line utilities (ls, sed, sort, xargs, even jq) ported into the builtins crate and run in-process, zero fork/exec. The same omp binary runs on macOS, Linux, and Windows — no WSL bridge.
+Other agents shell out to rg, grep, find, and bash. On many machines those binaries don't exist, and on the ones where they do, every call costs a fork-exec round-trip. omsp links the real implementations into the process. ripgrep, glob, find: in-process. brush is the bash — with sessions that survive across calls, and 58 command-line utilities (ls, sed, sort, xargs, even jq) ported into the builtins crate and run in-process, zero fork/exec. The same omsp binary runs on macOS, Linux, and Windows — no WSL bridge.
 
 ### 10 · Code review with priorities and a verdict
 
@@ -185,15 +188,15 @@ The agent remembers your codebase between sessions. It writes facts mid-run with
 
 ### 14 · ACP: editor-drivable agent
 
-Run omp inside Zed and you get the same agent you drive from the terminal — reading the buffer you're actually looking at, writing through the editor's save path, spawning shells in the editor's terminal. Destructive tools pause for a permission prompt you can answer once and forget. No bridge, no plugin, no second brain to keep in sync.
+Run omsp inside Zed and you get the same agent you drive from the terminal — reading the buffer you're actually looking at, writing through the editor's save path, spawning shells in the editor's terminal. Destructive tools pause for a permission prompt you can answer once and forget. No bridge, no plugin, no second brain to keep in sync.
 
 ### 15 · Inherits what your other tools already wrote
 
-Every other agent ships an importer and expects you to convert. omp reads the eight formats already on disk in their native shape — Cursor MDC, Cline .clinerules, Codex AGENTS.md, Copilot applyTo, and the rest. No migration script, no YAML-to-TOML port, no "supported subset" footnotes. The config your team wrote last quarter still works tonight.
+Every other agent ships an importer and expects you to convert. omsp reads the eight formats already on disk in their native shape — Cursor MDC, Cline .clinerules, Codex AGENTS.md, Copilot applyTo, and the rest. No migration script, no YAML-to-TOML port, no "supported subset" footnotes. The config your team wrote last quarter still works tonight.
 
-### 16 · omp commit: atomic splits, validated messages
+### 16 · omsp commit: atomic splits, validated messages
 
-omp reads the working tree through git_overview, git_file_diff, and git_hunk, then splits unrelated changes into atomic commits ordered by their dependencies. Cycles are rejected before anything is written. Source files score above tests, docs, and configs, so the headline commit is the one that matters. Lock files are excluded from analysis entirely.
+omsp reads the working tree through git_overview, git_file_diff, and git_hunk, then splits unrelated changes into atomic commits ordered by their dependencies. Cycles are rejected before anything is written. Source files score above tests, docs, and configs, so the headline commit is the one that matters. Lock files are excluded from analysis entirely.
 
 ### 17 · Read PRs. _Walk skills._ Pull JSON out of subagents.
 
@@ -203,7 +206,7 @@ Sixteen internal schemes — `pr://`, `issue://`, `agent://`, `skill://`, `ssh:/
 
 Each merge conflict becomes one URL. The agent writes `@theirs`, `@ours`, or `@base` to `conflict://N` and the file resolves cleanly. Bulk form: `conflict://*`.
 
-![omp TUI: ✓ Read src/session.ts (⚠ 1 conflict), then ✓ Write conflict://1 · 1 line with content @theirs, then a confirmation 'Resolved.'](https://omp.sh/clips/conflict-poster.webp)
+![omsp TUI: ✓ Read src/session.ts (⚠ 1 conflict), then ✓ Write conflict://1 · 1 line with content @theirs, then a confirmation 'Resolved.'](https://omp.sh/clips/conflict-poster.webp)
 
 _[Watch the capture ↗](https://omp.sh/clips/conflict.mp4)_
 
@@ -211,7 +214,7 @@ _[Watch the capture ↗](https://omp.sh/clips/conflict.mp4)_
 
 `ast_edit` returns a _(proposed)_ card with the replacement count. The change is staged. The agent writes a one-line reason to `xd://resolve`; the TUI turns it into an **Accept** card and the disk move happens — atomic, all or nothing.
 
-![omp TUI: ✓ AST Edit: console.log($X) (proposed) 3 replacements · 1 file, then ✓ Accept: 3 replacements in 1 file (AST Edit), followed by 'Applied 3 replacements in src/auth.ts.'](https://omp.sh/clips/codemod-poster.webp)
+![omsp TUI: ✓ AST Edit: console.log($X) (proposed) 3 replacements · 1 file, then ✓ Accept: 3 replacements in 1 file (AST Edit), followed by 'Applied 3 replacements in src/auth.ts.'](https://omp.sh/clips/codemod-poster.webp)
 
 _[Watch the capture ↗](https://omp.sh/clips/codemod.mp4)_
 
@@ -276,7 +279,7 @@ Core tools live in the same namespace as `read` and `bash`. Pin the active set w
 
 Setting-gated, off by default: `github`, `security_scan`, `tts`, `checkpoint`, `rewind`, and the memory tools (`retain`/`recall`/`reflect`/`memory_edit`, per `memory.backend`).
 
-[Full reference →](https://omp.sh/docs/tools)
+[Full reference →](docs/tools/)
 
 ### Prompt controls
 
@@ -310,7 +313,7 @@ Model families served through Copilot or a company server do not enable separate
 
 ### Custom OpenAI-compatible providers
 
-Define custom providers in `~/.omp/agent/models.yml`:
+Define custom providers in `~/.omsp/agent/models.yml`:
 
 ```yaml
 providers:
@@ -325,9 +328,9 @@ providers:
            maxTokens: 32000
 ```
 
-Run `omp models spark` to verify discovery. Then run `omp setup` and choose the model in the default-model step, or open `/model` in a session and assign it to the `default` role.
+Run `omsp models spark` to verify discovery. Then run `omsp setup` and choose the model in the default-model step, or open `/model` in a session and assign it to the `default` role.
 
-To preconfigure the default without the picker, add the selector to `~/.omp/agent/config.yml`:
+To preconfigure the default without the picker, add the selector to `~/.omsp/agent/config.yml`:
 
 ```yaml
 modelRoles:
@@ -336,7 +339,7 @@ modelRoles:
 
 ### Four knobs that make routing useful
 
-- **Custom providers** — Configure explicit company endpoints using the supported chat/native or modality protocols in `~/.omp/agent/models.yml`; use `auth: none` for a keyless service. Trusted extensions may register custom providers, transports and OAuth flows. See [Model configuration](docs/models.md).
+- **Custom providers** — Configure explicit company endpoints using the supported chat/native or modality protocols in `~/.omsp/agent/models.yml`; use `auth: none` for a keyless service. Trusted extensions may register custom providers, transports and OAuth flows. See [Model configuration](docs/models.md).
 - **Fallback chains** — Per-role or per-model chains under `retry.fallbackChains`. When the primary throws 429s or hits a quota wall, the next entry takes the rest of the turn — restored on cooldown.
 - **Path-scoped models** — Scope `enabledModels` and `disabledProviders` entries to a `path:` prefix to pin a different model set on one repo without touching the global config. Scoped entries cover the path and everything under it.
 - **Round-robin credentials** — Stack API keys per provider and the runtime rotates with session affinity and per-credential backoff. Useful when one key would burn its quota by lunch.
@@ -376,7 +379,7 @@ Vuln lookups answer with vendor data, not blog summaries.
 - **OSV** — open source vuln feed
 - **CISA KEV** — known exploited vulns
 
-[`web_search` reference ↗](https://omp.sh/docs/tools#web_search)
+[`web_search` reference ↗](docs/tools/web_search.md)
 
 ## Roughly **~80,000** lines of Rust, doing the work other harnesses shell out for.
 
@@ -426,7 +429,7 @@ Inside `pi-natives`, the per-module breakdown (glue and tests omitted):
 
 ## Four entry points: _interactive_, _one-shot_, RPC, and ACP.
 
-Same engine, four wrappers. `omp` runs the TUI. `omp -p` answers a single prompt and exits. The Node SDK embeds the session in your process. `omp --mode rpc` and `omp acp` hand the wheel to another program over stdio.
+Same engine, four wrappers. `omsp` runs the TUI. `omsp -p` answers a single prompt and exits. The Node SDK embeds the session in your process. `omsp --mode rpc` and `omsp acp` hand the wheel to another program over stdio.
 
 ### Interactive — when in doubt, the agent asks
 
@@ -434,16 +437,16 @@ The TUI is the default surface. Tool calls render as cards, edits preview before
 
 The same prompt cards surface over ACP, so editors get the picker without writing one.
 
-![omp TUI showing a multi-select question from the ask tool.](assets/ask.webp)
+![omsp TUI showing a multi-select question from the ask tool.](assets/ask.webp)
 
 ### SDK — embed in Node
 
-`@oh-my-pi/pi-coding-agent`
+`@oh-my-striped-pi/pi-coding-agent`
 
 Node and TypeScript hosts pull the engine in directly. The package exposes `ModelRegistry`, `SessionManager`, `createAgentSession`, and `discoverAuthStorage`; the session emits typed events you subscribe to.
 
 ```ts
-import { ModelRegistry, SessionManager, createAgentSession, discoverAuthStorage } from "@oh-my-pi/pi-coding-agent";
+import { ModelRegistry, SessionManager, createAgentSession, discoverAuthStorage } from "@oh-my-striped-pi/pi-coding-agent";
 
 const auth = await discoverAuthStorage();
 const models = new ModelRegistry(auth);
@@ -459,12 +462,12 @@ await session.prompt("list .ts files");
 
 ### RPC — drive over stdio
 
-`omp --mode rpc`
+`omsp --mode rpc`
 
 For non-Node embedders, or when you want process isolation. NDJSON commands in, response and event frames out; each prompt ends with its own `prompt_result`. `--mode rpc-ui` adds tool cards, selectors, and dialogs as `extension_ui_request` frames the host must answer; `--no-ui` keeps even extension dialogs off the wire for hosts with no UI.
 
 ```
-$ omp --mode rpc --no-session
+$ omsp --mode rpc --no-session
 > {"id":"r1","type":"prompt","message":"list .ts files"}
 < {"id":"r1","type":"response", ...}
 > {"id":"r2","type":"set_model","provider":"anthropic","modelId":"sonnet-4.5"}
@@ -473,24 +476,24 @@ $ omp --mode rpc --no-session
 
 ### ACP — speak to editors
 
-`omp acp`
+`omsp acp`
 
 The [Agent Client Protocol](https://github.com/zed-industries/agent-client-protocol) over JSON-RPC. When the editor advertises capabilities, tool I/O routes through it and writes are gated by `session/request_permission`.
 
-| omp tool     | ACP route                           |
+| omsp tool     | ACP route                           |
 | ------------ | ----------------------------------- |
 | `bash`       | `terminal/create + terminal/output` |
 | `read`       | `fs/read_text_file`                 |
 | `write`      | `fs/write_text_file`                |
 | `edit, bash` | `session/request_permission`        |
 
-Full reference: [omp.sh/docs/sdk](https://omp.sh/docs/sdk).
+Full reference: [SDK documentation](docs/sdk.md).
 
 ## A harness worth keeping is one you _don't_ outgrow.
 
-Pick it up at **[omp.sh](https://omp.sh)**.
+Pick it up at **[omsp.sh](https://github.com/TheGrowingPlant443/oh-my-striped-pi)**.
 
-omp is a fork of [Pi](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner), rewritten as a coding-first surface: sessions, subagents, slash commands, extensions — all TypeScript, all MIT, all on [GitHub](https://github.com/can1357/oh-my-pi). Shape it from config, hook it from outside, or read the source when you need to.
+omsp is a fork of [Pi](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner), rewritten as a coding-first surface: sessions, subagents, slash commands, extensions — all TypeScript, all MIT, all on [GitHub](https://github.com/TheGrowingPlant443/oh-my-striped-pi). Shape it from config, hook it from outside, or read the source when you need to.
 
 ### Primitives
 
@@ -498,15 +501,15 @@ An extension is a TypeScript module. Same tool API, same slash-command registry,
 
 ### Discovery
 
-On first run omp inherits whatever is already on disk: rules, skills, and MCP servers from `.claude`, `.cursor`, `.windsurf`, `.gemini`, `.codex`, `.cline`, `.github/copilot`, and `.vscode`. No migration script.
+On first run omsp inherits whatever is already on disk: rules, skills, and MCP servers from `.claude`, `.cursor`, `.windsurf`, `.gemini`, `.codex`, `.cline`, `.github/copilot`, and `.vscode`. No migration script.
 
 ### Extensibility
 
-Ask omp to write the piece you're missing, then `/reload-plugins`. Keep it local, ship it in a `marketplace`, or publish it to npm.
+Ask omsp to write the piece you're missing, then `/reload-plugins`. Keep it local, ship it in a `marketplace`, or publish it to npm.
 
 ## Philosophy
 
-omp is a fork of [pi-mono](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner), extended with a batteries-included coding workflow.
+omsp is a fork of [pi-mono](https://github.com/badlogic/pi-mono) by [Mario Zechner](https://github.com/mariozechner), extended with a batteries-included coding workflow.
 
 Key ideas:
 
@@ -538,7 +541,7 @@ bun setup
 bun dev
 ```
 
-`bun setup` installs Bun workspaces and builds `@oh-my-pi/pi-natives`. Re-run `bun run build:native` after changing Rust crates or `packages/natives`.
+`bun setup` installs Bun workspaces and builds `@oh-my-striped-pi/pi-natives`. Re-run `bun run build:native` after changing Rust crates or `packages/natives`.
 
 Nix users get the pinned Bun and Rust toolchains plus all native build dependencies:
 
@@ -548,7 +551,7 @@ bun setup
 bun dev
 ```
 
-Build and smoke-test the distributable Nix package with `nix build .#omp`. Wayland screencast support is off by default (linking libpipewire adds ~750 MB of runtime closure); enable it with `omp.override { withWaylandScreencast = true; }`. Release builds link `pi-natives` with fat LTO; `omp.override { withFatLto = false; }` uses thin LTO for much faster local rebuilds. Rust dependencies and the native addon build in separate derivations, so Rust edits reuse compiled dependencies and TypeScript edits reuse the addon. `nix/bun.nix` is generated only when `bun.lock` changes; releases regenerate it automatically. For dependency changes, run:
+Build and smoke-test the distributable Nix package with `nix build .#omsp`. Wayland screencast support is off by default (linking libpipewire adds ~750 MB of runtime closure); enable it with `omsp.override { withWaylandScreencast = true; }`. Release builds link `pi-natives` with fat LTO; `omsp.override { withFatLto = false; }` uses thin LTO for much faster local rebuilds. Rust dependencies and the native addon build in separate derivations, so Rust edits reuse compiled dependencies and TypeScript edits reuse the addon. `nix/bun.nix` is generated only when `bun.lock` changes; releases regenerate it automatically. For dependency changes, run:
 
 ```sh
 bun run gen:nix
@@ -574,28 +577,28 @@ For architecture and contribution guidelines, see [packages/coding-agent/DEVELOP
 
 | Package                                                                       | Description                                                                 |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **[@oh-my-pi/collab-web](packages/collab-web)**                               | Browser guest client, mock host, and local relay for collab live sessions   |
-| **[@oh-my-pi/pi-ai](packages/ai)**                                            | Multi-provider LLM client with streaming and model/provider integration     |
-| **[@oh-my-pi/pi-catalog](packages/catalog)**                                  | Model catalog: bundled model database, provider descriptors, and identity   |
-| **[@oh-my-pi/pi-agent-core](packages/agent)**                                 | Agent runtime with tool calling and state management                        |
-| **[@oh-my-pi/pi-coding-agent](packages/coding-agent)**                        | Interactive coding agent CLI and SDK                                        |
-| **[@oh-my-pi/pi-tui](packages/tui)**                                          | Terminal UI library with differential rendering                             |
-| **[@oh-my-pi/pi-natives](packages/natives)**                                  | N-API bindings for grep, shell, image, text, syntax highlighting, and more  |
-| **[@oh-my-pi/omp-stats](packages/stats)**                                     | Local observability dashboard for AI usage statistics                       |
-| **[@oh-my-pi/omptype](packages/omptype)**                                     | ArkType-compatible schema validation with lazy JIT compilation              |
-| **[@oh-my-pi/pi-utils](packages/utils)**                                      | Shared utilities (logging, streams, dirs/env/process helpers)               |
-| **[@oh-my-pi/pi-wire](packages/wire)**                                        | Shared collab live-session protocol types and relay constants               |
-| **[@oh-my-pi/pi-mnemopi](packages/mnemopi)**                                  | Local SQLite memory engine for omp agents                                   |
-| **[@oh-my-pi/snapcompact](packages/snapcompact)**                             | Bitmap-frame context compression package and SQuAD eval suite               |
-| **[@oh-my-pi/browser-relay](packages/browser-relay)**                         | Chrome extension that lets the Eval browser API drive your existing tabs    |
-| **[@oh-my-pi/pi-metaharness](packages/metaharness)**                          | Unified benchmark runners, Harbor run storage, REST/SSE API, live dashboard |
-| **[@oh-my-pi/typescript-edit-benchmark](packages/typescript-edit-benchmark)** | Edit benchmark suite built on TypeScript source mutations                   |
+| **[@oh-my-striped-pi/collab-web](packages/collab-web)**                               | Browser guest client, mock host, and local relay for collab live sessions   |
+| **[@oh-my-striped-pi/pi-ai](packages/ai)**                                            | Multi-provider LLM client with streaming and model/provider integration     |
+| **[@oh-my-striped-pi/pi-catalog](packages/catalog)**                                  | Model catalog: bundled model database, provider descriptors, and identity   |
+| **[@oh-my-striped-pi/pi-agent-core](packages/agent)**                                 | Agent runtime with tool calling and state management                        |
+| **[@oh-my-striped-pi/pi-coding-agent](packages/coding-agent)**                        | Interactive coding agent CLI and SDK                                        |
+| **[@oh-my-striped-pi/pi-tui](packages/tui)**                                          | Terminal UI library with differential rendering                             |
+| **[@oh-my-striped-pi/pi-natives](packages/natives)**                                  | N-API bindings for grep, shell, image, text, syntax highlighting, and more  |
+| **[@oh-my-striped-pi/omsp-stats](packages/stats)**                                     | Local observability dashboard for AI usage statistics                       |
+| **[@oh-my-striped-pi/omptype](packages/omptype)**                                     | ArkType-compatible schema validation with lazy JIT compilation              |
+| **[@oh-my-striped-pi/pi-utils](packages/utils)**                                      | Shared utilities (logging, streams, dirs/env/process helpers)               |
+| **[@oh-my-striped-pi/pi-wire](packages/wire)**                                        | Shared collab live-session protocol types and relay constants               |
+| **[@oh-my-striped-pi/pi-mnemopi](packages/mnemopi)**                                  | Local SQLite memory engine for omsp agents                                   |
+| **[@oh-my-striped-pi/snapcompact](packages/snapcompact)**                             | Bitmap-frame context compression package and SQuAD eval suite               |
+| **[@oh-my-striped-pi/browser-relay](packages/browser-relay)**                         | Chrome extension that lets the Eval browser API drive your existing tabs    |
+| **[@oh-my-striped-pi/pi-metaharness](packages/metaharness)**                          | Unified benchmark runners, Harbor run storage, REST/SSE API, live dashboard |
+| **[@oh-my-striped-pi/typescript-edit-benchmark](packages/typescript-edit-benchmark)** | Edit benchmark suite built on TypeScript source mutations                   |
 
 ### Rust Crates
 
 | Crate                                      | Description                                                                                              |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| **[pi-natives](crates/pi-natives)**        | Core Rust native addon (N-API `cdylib`) used by `@oh-my-pi/pi-natives`; aggregates the crates below      |
+| **[pi-natives](crates/pi-natives)**        | Core Rust native addon (N-API `cdylib`) used by `@oh-my-striped-pi/pi-natives`; aggregates the crates below      |
 | **[pi-shell](crates/pi-shell)**            | Embedded shell / PTY / process management split out of `pi-natives` (wraps `brush-*`)                    |
 | **[pi-ast](crates/pi-ast)**                | tree-sitter-based code summarizer and AST utilities (50+ language grammars)                              |
 | **[pi-iso](crates/pi-iso)**                | Task isolation backend resolver: APFS clones, btrfs/zfs reflinks, overlayfs, projfs, rcopy               |
@@ -616,13 +619,13 @@ guidelines on contributing.
 
 ## License
 
-OMP is licensed under the [MIT License](LICENSE).
+OMSP is licensed under the [MIT License](LICENSE).
 
 Third-party and vendored code, including `crates/vendor/brush-core` and the
 third-party portions identified in `crates/pi-builtins/LICENSE`, remains under
 its respective upstream license. Each shipped component carries its own
 `THIRD-PARTY-NOTICES.txt`: the CLI (`packages/coding-agent`), the native addon
-(`packages/natives`), and robomp (`python/robomp`). `omp --license` prints the
+(`packages/natives`), and robomp (`python/robomp`). `omsp --license` prints the
 CLI's and the addon's.
 
 © 2025 Mario Zechner  
@@ -631,10 +634,8 @@ CLI's and the addon's.
 
 _made for terminals that stay open_
 
-- [omp.sh](https://omp.sh)
 - [Stencil Labs](https://stencil.so)
-- [GitHub](https://github.com/can1357/oh-my-pi)
-- [Changelog](https://github.com/can1357/oh-my-pi/blob/main/packages/coding-agent/CHANGELOG.md)
-- [npm](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
+- [GitHub](https://github.com/TheGrowingPlant443/oh-my-striped-pi)
+- [Changelog](https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/packages/coding-agent/CHANGELOG.md)
 - [Discord](https://discord.gg/4NMW9cdXZa)
-- [MIT](https://github.com/can1357/oh-my-pi/blob/main/LICENSE)
+- [MIT](https://github.com/TheGrowingPlant443/oh-my-striped-pi/blob/main/LICENSE)

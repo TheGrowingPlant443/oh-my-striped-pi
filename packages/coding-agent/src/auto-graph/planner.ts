@@ -16,7 +16,7 @@ import {
 	judgeQuestions,
 	type Questions,
 	renderQuestion,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	buildChart,
 	type ChartKind,
@@ -45,9 +45,14 @@ import {
 	stageColumns,
 	tableLadders,
 	tableTakeaways,
-} from "@oh-my-pi/pi-tui/charts/chart-plan";
-import { isMonotonic, isNumber, type TableAnalysis, type TableColumn } from "@oh-my-pi/pi-tui/charts/table-data";
-import type { TableChartRequest } from "@oh-my-pi/pi-tui/chat/table-chart";
+} from "@oh-my-striped-pi/pi-tui/charts/chart-plan";
+import {
+	isMonotonic,
+	isNumber,
+	type TableAnalysis,
+	type TableColumn,
+} from "@oh-my-striped-pi/pi-tui/charts/table-data";
+import type { TableChartRequest } from "@oh-my-striped-pi/pi-tui/chat/table-chart";
 import type { ChainJudge } from "../judgment";
 import questionFile from "../prompts/judge/auto-graph.json" with { type: "json" };
 

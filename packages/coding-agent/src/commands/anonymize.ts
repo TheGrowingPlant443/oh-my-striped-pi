@@ -1,7 +1,7 @@
 /**
  * Write a shareable, anonymized copy of a session and its subagent transcripts.
  */
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
 import { runAnonymizeCommand } from "../cli/anonymize-cli";
 import { reportCliUsageError } from "../cli/args";
 import { anonymizeHelp as commandHelp } from "../cli/command-help";
@@ -16,9 +16,9 @@ export default class Anonymize extends Command {
 	};
 
 	static examples = [
-		"omp anonymize",
-		"omp anonymize 01a0285c -o ./bug-report",
-		"omp anonymize ~/.omp/agent/sessions/--work-pi--/session.jsonl",
+		"omsp anonymize",
+		"omsp anonymize 01a0285c -o ./bug-report",
+		"omsp anonymize ~/.omsp/agent/sessions/--work-pi--/session.jsonl",
 	];
 
 	async run(): Promise<void> {

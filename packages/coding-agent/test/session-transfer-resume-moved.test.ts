@@ -3,27 +3,27 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { createSessionManager } from "@oh-my-pi/pi-coding-agent/main";
-import { closeSessionIndex } from "@oh-my-pi/pi-coding-agent/session/session-index";
-import { loadEntriesFromFile } from "@oh-my-pi/pi-coding-agent/session/session-loader";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { createSessionManager } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { closeSessionIndex } from "@oh-my-striped-pi/pi-coding-agent/session/session-index";
+import { loadEntriesFromFile } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import {
 	lastSessionTransfer,
 	markSessionMoved,
 	SESSION_TRANSFER_MESSAGE_TYPE,
-} from "@oh-my-pi/pi-coding-agent/session/session-transfer";
-import { getConfigRootDir, setAgentDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-transfer";
+import { getConfigRootDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { makeAssistantMessage } from "./session-manager/helpers";
 
 describe("resuming a session that moved away", () => {
 	let root: string;
 	let cwd: string;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 
 	beforeEach(async () => {
-		root = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-session-moved-resume-"));
+		root = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-session-moved-resume-"));
 		cwd = path.join(root, "project");
 		fs.mkdirSync(cwd, { recursive: true });
 		setAgentDir(path.join(root, "agent"));
@@ -35,7 +35,7 @@ describe("resuming a session that moved away", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(path.join(getConfigRootDir(), "agent"));
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await fsp.rm(root, { recursive: true, force: true });
 	});

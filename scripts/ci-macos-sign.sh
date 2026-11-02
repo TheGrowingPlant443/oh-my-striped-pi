@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Sign a compiled macOS `omp` binary on Linux: with a Developer ID identity
+# Sign a compiled macOS `omsp` binary on Linux: with a Developer ID identity
 # and notarization when the credentials are configured, ad hoc otherwise.
 #
 # The release build (`ci:release:build-binaries`) cross-compiles the binary on
@@ -18,20 +18,15 @@
 #     binary runs (forks and releases before the secrets exist).
 # Both go through rcodesign (github.com/indygreg/apple-platform-rs, pinned and
 # sha256-checked below), the open-source implementation of codesign and
-# notarytool. The signing identifier is the file name (omp-darwin-<arch>),
-# as every release before had it.
+# notarytool. The signing identifier is the file name (omsp-darwin-<arch>).
 #
-# A bare Mach-O executable cannot be stapled (stapling only supports .app/.pkg/
-# .dmg), so the notarization ticket is served online: Gatekeeper fetches it by
-# cdhash on first assessment. `curl` downloads and Homebrew *formula* installs do
-# not set the quarantine bit, so they never invoke Gatekeeper; for an offline,
-# quarantined cask we would need a stapleable .pkg/.dmg wrapper (follow-up).
-# Apple's `codesign --verify --strict` and the launch check under the final
-# signature run on a macOS runner afterwards (release_smoke in
-# .github/workflows/ci.yml); notarization itself rejects a malformed signature
-# first.
+# A bare Mach-O executable cannot be stapled (.app/.pkg/.dmg can), so
+# Gatekeeper needs an online notarization-ticket lookup for quarantined files.
+# Offline quarantined delivery requires a stapleable wrapper.
+# After signing, operators must run `codesign --verify --strict`, --version,
+# and --smoke-test on macOS. This private fork has no release_smoke workflow.
 #
-# Credentials (GitHub Actions secrets; all five or none):
+# Managed signing inputs (all five or none; no workflow is activated by them):
 #   APPLE_CERTIFICATE_P12        base64 of the Developer ID Application .p12 bundle
 #   APPLE_CERTIFICATE_PASSWORD   password protecting that .p12
 #   APPLE_API_KEY_ID             App Store Connect API key id (the "Key ID")

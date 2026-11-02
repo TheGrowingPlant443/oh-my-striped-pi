@@ -1,9 +1,9 @@
 /**
  * Builds the browser relay extension and its distribution artifacts:
  * - `dist/extension/` — unpacked extension (load via chrome://extensions)
- * - `dist/omp-browser-relay-extension.zip` — packaged extension for GH releases
+ * - `dist/omsp-browser-relay-extension.zip` — packaged extension for GH releases
  * - `../coding-agent/src/tools/browser/relay/extension-assets/*.txt` —
- *   generated text assets embedded into the omp CLI so `omp browser-relay
+ *   generated text assets embedded into the omsp CLI so `omsp browser-relay
  *   install` works from the compiled binary. Re-run this script after touching
  *   anything under `extension/` and commit the regenerated assets.
  *
@@ -41,19 +41,19 @@ for (const file of ["options.html", "options.js"]) {
 	await Bun.write(path.join(distExtension, file), Bun.file(path.join(root, "extension", file)));
 }
 await Bun.write(path.join(distExtension, "LICENSE"), Bun.file(path.join(repoRoot, "LICENSE")));
-// The release zip carries the omp version it ships with, as `omp browser-relay install` stamps its copy;
+// The release zip carries the omsp version it ships with, as `omsp browser-relay install` stamps its copy;
 // the extension reports it to the relay. The embedded assets stay unstamped so releases do not rewrite them.
 const sourceManifest = path.join(root, "extension/manifest.json");
 const distScript = path.join(distExtension, "background.js");
 const unstampedScript = await Bun.file(distScript).text();
-const { version: ompVersion } = await Bun.file(path.join(root, "../coding-agent/package.json")).json();
-await Bun.write(distScript, stampRelayExtensionScript(unstampedScript, ompVersion));
+const { version: omspVersion } = await Bun.file(path.join(root, "../coding-agent/package.json")).json();
+await Bun.write(distScript, stampRelayExtensionScript(unstampedScript, omspVersion));
 await Bun.write(
 	path.join(distExtension, "manifest.json"),
-	stampRelayExtensionManifest(await Bun.file(sourceManifest).text(), ompVersion),
+	stampRelayExtensionManifest(await Bun.file(sourceManifest).text(), omspVersion),
 );
 
-const zip = await $`zip -qr ../omp-browser-relay-extension.zip .`.cwd(distExtension).nothrow();
+const zip = await $`zip -qr ../omsp-browser-relay-extension.zip .`.cwd(distExtension).nothrow();
 if (zip.exitCode !== 0) {
 	console.error("zip failed:", zip.stderr.toString());
 	process.exit(1);
@@ -73,5 +73,5 @@ for (const [source, destination] of embeddedAssets) {
 
 console.log("built:");
 console.log(`  ${distExtension}`);
-console.log(`  ${path.join(dist, "omp-browser-relay-extension.zip")}`);
+console.log(`  ${path.join(dist, "omsp-browser-relay-extension.zip")}`);
 console.log(`  ${assetsDir} (embedded CLI assets — commit these)`);

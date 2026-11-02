@@ -1,6 +1,6 @@
 # Provider compatibility
 
-OMP retains shared wire support only as required by `github-copilot` and literal `local` inference. The supported protocol IDs are `openai-completions`, `openai-responses`, `anthropic-messages`, and `local-inference`. Protocol names do not make the upstream vendors selectable providers.
+OMSP retains shared wire support only as required by `github-copilot` and literal `local` inference. The supported protocol IDs are `openai-completions`, `openai-responses`, `anthropic-messages`, and `local-inference`. Protocol names do not make the upstream vendors selectable providers.
 
 ## Catalog and request behavior
 

@@ -13,9 +13,9 @@ import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { ConfigFile } from "@oh-my-pi/pi-coding-agent/config/config-file";
-import { getModelsConfigSchema } from "@oh-my-pi/pi-coding-agent/config/models-config-schema-bundle";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+import { ConfigFile } from "@oh-my-striped-pi/pi-coding-agent/config/config-file";
+import { getModelsConfigSchema } from "@oh-my-striped-pi/pi-coding-agent/config/models-config-schema-bundle";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const API_KEY = "sk-live-secret";
 const LEGACY_MODELS_JSON = JSON.stringify({
@@ -38,7 +38,7 @@ describe("ConfigFile JSON → YAML migration", () => {
 	});
 
 	test("publishes the migrated config readable only by its owner", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-config-migrate-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-config-migrate-"));
 		tempDirs.push(dir);
 		fs.writeFileSync(path.join(dir, "models.json"), LEGACY_MODELS_JSON, { encoding: "utf-8", mode: 0o600 });
 		const ymlPath = path.join(dir, "models.yml");
@@ -54,7 +54,7 @@ describe("ConfigFile JSON → YAML migration", () => {
 	});
 
 	test("a write that dies midway leaves no config behind, so the next load retries", () => {
-		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-config-migrate-"));
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-config-migrate-"));
 		tempDirs.push(dir);
 		fs.writeFileSync(path.join(dir, "models.json"), LEGACY_MODELS_JSON, { encoding: "utf-8", mode: 0o600 });
 		const ymlPath = path.join(dir, "models.yml");

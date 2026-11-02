@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from "bun:test";
 import {
 	createOpenAIEffortControlState,
 	planStableOpenAIEffort,
-} from "@oh-my-pi/pi-ai/providers/openai-configuration-update";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import type { ModelSpec } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-configuration-update";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 
 /** Loose wire item for planner tests: replayed items carry output-only `status`/`id`. */
 interface TestItem {

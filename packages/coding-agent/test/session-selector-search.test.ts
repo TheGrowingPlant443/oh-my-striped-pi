@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { rankSessionSearchMatches, SessionSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-selector";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
+import { rankSessionSearchMatches, SessionSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/session-selector";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
 
 /**
  * Contracts of the session picker's incremental search engine: a keystroke

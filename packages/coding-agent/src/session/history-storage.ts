@@ -8,7 +8,7 @@ import {
 	openSqliteDatabaseSync,
 	postmortem,
 	readSalvageableRows,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import { closeSessionIndex, salvageSessionIndex } from "./session-index";
 
 /** A unique prompt with provenance from its most recent submission. */

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import type { Api, Context, Model, Tool, ToolResultMessage } from "@oh-my-pi/pi-ai";
-import { complete } from "@oh-my-pi/pi-ai";
-import type { OptionsForApi } from "@oh-my-pi/pi-ai/types";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { Api, Context, Model, Tool, ToolResultMessage } from "@oh-my-striped-pi/pi-ai";
+import { complete } from "@oh-my-striped-pi/pi-ai";
+import type { OptionsForApi } from "@oh-my-striped-pi/pi-ai/types";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 import { resolveApiKey } from "./oauth";
 
 const githubCopilotToken = await resolveApiKey("github-copilot");

@@ -5,15 +5,15 @@
  * appending to that tree for the life of the process.
  */
 import { afterEach, describe, expect, it, spyOn } from "bun:test";
-import { parseArgs, type Args } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { logger, postmortem, TempDir } from "@oh-my-pi/pi-utils";
+import { parseArgs, type Args } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import type { CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { logger, postmortem, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const tempDirs: TempDir[] = [];
 
@@ -68,9 +68,9 @@ describe("startup timing after a headless runner starts", () => {
 			dispose: () => manager.close(),
 		} as unknown as AgentSession;
 		const quitSpy = spyOn(postmortem, "quit").mockImplementation(async () => {});
-		// Print mode intentionally keeps recording under PI_TIMING; this case covers the default.
-		const savedTiming = process.env.PI_TIMING;
-		delete process.env.PI_TIMING;
+		// Print mode intentionally keeps recording under OMSP_TIMING; this case covers the default.
+		const savedTiming = process.env.OMSP_TIMING;
+		delete process.env.OMSP_TIMING;
 		try {
 			await runRootCommand(headlessArgs(["--print", "hello"], dir.path()), ["--print", "hello"], {
 				discoverAuthStorage: async () => authStorage,
@@ -78,7 +78,7 @@ describe("startup timing after a headless runner starts", () => {
 				createAgentSession: async () => ({ session }) as unknown as CreateAgentSessionResult,
 			});
 		} finally {
-			if (savedTiming !== undefined) process.env.PI_TIMING = savedTiming;
+			if (savedTiming !== undefined) process.env.OMSP_TIMING = savedTiming;
 			logger.endTiming();
 			quitSpy.mockRestore();
 			authStorage.close();

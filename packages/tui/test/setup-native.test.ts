@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn, vi } from "bun:test";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import type { DescribeContext, NativeChild, NativeNode } from "../src/native/node";
 import { setNativeRendering } from "../src/native/state";
 import type {
@@ -161,13 +161,13 @@ describe("setup surfaces under native rendering", () => {
 		void wizard.run();
 		try {
 			wizard.handleNativeEvent({ type: "action", key: "", act: "skip", mods: [] });
-			const steps = nodes([wizard.describe(cx)]).filter(n => n.p?.role === "omp.setup.step");
+			const steps = nodes([wizard.describe(cx)]).filter(n => n.p?.role === "omsp.setup.step");
 			expect(steps.map(n => n.p?.tone)).toEqual(["accent", "muted"]);
 
 			first.hosts[0]?.finish("done");
 			expect(ansi.hosts).toHaveLength(0);
 			expect(last.hosts).toHaveLength(1);
-			const after = nodes([wizard.describe(cx)]).filter(n => n.p?.role === "omp.setup.step");
+			const after = nodes([wizard.describe(cx)]).filter(n => n.p?.role === "omsp.setup.step");
 			expect(after.map(n => n.p?.tone)).toEqual(["success", "accent"]);
 		} finally {
 			wizard.dispose();
@@ -210,8 +210,8 @@ describe("setup surfaces under native rendering", () => {
 			expect(nodes([wizard.describe(cx)]).some(n => n.p?.actions?.click === "exit")).toBe(true);
 			wizard.handleNativeEvent({ type: "action", key: "", act: "exit", mods: [] });
 			const outro = nodes([wizard.describe(cx)]);
-			expect(outro.some(n => n.p?.role === "omp.setup.outro.model")).toBe(true);
-			expect(JSON.stringify(outro.find(n => n.p?.role === "omp.setup.outro.model")?.p)).toContain("Opus 4.5");
+			expect(outro.some(n => n.p?.role === "omsp.setup.outro.model")).toBe(true);
+			expect(JSON.stringify(outro.find(n => n.p?.role === "omsp.setup.outro.model")?.p)).toContain("Opus 4.5");
 			advance(SETUP_OUTRO_MS);
 			await done;
 		} finally {

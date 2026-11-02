@@ -1,21 +1,21 @@
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import type {
 	AgentTool,
 	AgentToolContext,
 	AgentToolResult,
 	AgentToolUpdateCallback,
 	ToolSpeculationPolicy,
-} from "@oh-my-pi/pi-agent-core";
-import type { ImageContent, ToolExample } from "@oh-my-pi/pi-ai";
-import { formatBackgroundNotice } from "@oh-my-pi/pi-tui/tools/bash";
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent, ToolExample } from "@oh-my-striped-pi/pi-ai";
+import { formatBackgroundNotice } from "@oh-my-striped-pi/pi-tui/tools/bash";
 import {
 	replaceTabs,
 	shortenEmbeddedPaths,
 	TRUNCATE_LENGTHS,
 	truncateToWidth,
-} from "@oh-my-pi/pi-tui/render/render-utils";
-import { parseConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
-import { isRecord, prompt, sanitizeText } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { parseConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
+import { isRecord, prompt, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import { raceJobSettlement, resolveAutoBackgroundWaitMs } from "../async";
 import { jsBackend, pythonBackend } from "../eval";
 import type { ExecutorBackend, ExecutorBackendResult } from "../eval/backend";
@@ -33,7 +33,7 @@ import type {
 	EvalStatusEvent,
 	EvalToolDetails,
 	EvalViewEntry,
-} from "@oh-my-pi/pi-tui/tools/eval";
+} from "@oh-my-striped-pi/pi-tui/tools/eval";
 import evalDescription from "../prompts/tools/eval.md" with { type: "text" };
 import evalAgentsTopic from "../prompts/tools/eval-agents.md" with { type: "text" };
 import evalJudgeTopic from "../prompts/tools/eval-judge.md" with { type: "text" };
@@ -44,21 +44,21 @@ import {
 	OutputSink,
 	type OutputSummary,
 	TailBuffer,
-} from "@oh-my-pi/pi-tui/tools/streaming-output";
+} from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import { sessionDelegationBias } from "../task/prompt-policy";
 import { resolveSpawnPolicy } from "../task/spawn-policy";
 import { canSpawnAtDepth } from "../task/types";
-import { webpExclusionForModel } from "@oh-my-pi/pi-tui/chat/image-loading";
+import { webpExclusionForModel } from "@oh-my-striped-pi/pi-tui/chat/image-loading";
 import { formatDimensionNote, resizeImage } from "../utils/image-resize";
 import type { ToolSession } from ".";
 import { truncateForPrompt } from "./approval";
 import { type EvalBackendsAllowance, resolveAdvertisedEvalBackends, resolveEvalBackends } from "./eval-backends";
-import { recordStatusEvent, type StatusEventLog } from "@oh-my-pi/pi-tui/tools/eval";
-import { formatOutputNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
+import { recordStatusEvent, type StatusEventLog } from "@oh-my-striped-pi/pi-tui/tools/eval";
+import { formatOutputNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
 import { resolveOutputMaxColumns, resolveOutputSinkArtifactMaxBytes, resolveOutputSinkHeadBytes } from "./output-meta";
 import { ToolAbortError, throwIfAborted } from "./tool-errors";
 import { hasWaitTool } from "./wait";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 import { clampTimeout, TOOL_TIMEOUTS } from "./tool-timeouts";
 
@@ -314,7 +314,7 @@ async function resolveBackend(
 	const allowJs = backends.js;
 
 	if (language === "python") {
-		if (!allowPy) throw new ToolError("Python backend is disabled (PI_PY=0 or eval.py = false).");
+		if (!allowPy) throw new ToolError("Python backend is disabled (OMSP_PY=0 or eval.py = false).");
 		const availability = await pythonBackend.checkAvailability(session, probeOpts);
 		throwIfAborted(probeOpts?.signal);
 		if (!availability.ok) {
@@ -332,7 +332,7 @@ async function resolveBackend(
 		return { backend: pythonBackend };
 	}
 	if (language !== "js") throw new ToolError(`Unsupported eval language: ${String(language)}`);
-	if (!allowJs) throw new ToolError("JavaScript backend is disabled (PI_JS=0 or eval.js = false).");
+	if (!allowJs) throw new ToolError("JavaScript backend is disabled (OMSP_JS=0 or eval.js = false).");
 	return { backend: jsBackend };
 }
 function formatEvalInputLanguage(value: string): string {

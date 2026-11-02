@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { fetchReadUrl } from "@oh-my-pi/pi-coding-agent/tools/fetch";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { fetchReadUrl } from "@oh-my-striped-pi/pi-coding-agent/tools/fetch";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 
 const filler = "Page content that a reader must not silently replace with a site-wide alternate. ".repeat(6);
 const html = (title: string, alternate: string) =>

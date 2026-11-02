@@ -1,7 +1,7 @@
-import * as stats from "@oh-my-pi/omp-stats";
+import * as stats from "@oh-my-striped-pi/omsp-stats";
 import * as openUtils from "../../utils/open";
 
-export const DEFAULT_STATS_DASHBOARD_PORT = 3847;
+export const DEFAULT_STATS_DASHBOARD_PORT = 3848;
 
 interface StatsDashboardServer {
 	hostname: string;

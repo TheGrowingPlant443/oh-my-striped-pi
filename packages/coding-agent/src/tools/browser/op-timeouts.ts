@@ -14,7 +14,7 @@
  * `goto` and `evaluate` stay uncapped: navigation and user code legitimately use the full
  * cell budget.
  */
-import { untilAborted } from "@oh-my-pi/pi-utils";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils";
 import { CELL_BUDGET_SLACK_MS } from "../run-scope";
 
 const QUICK_OP_TIMEOUT_MS = 20_000;

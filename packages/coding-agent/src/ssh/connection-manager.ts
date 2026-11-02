@@ -1,6 +1,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { $which, getRemoteHostDir, getSshControlDir, isEnoent, logger, postmortem, ptree } from "@oh-my-pi/pi-utils";
+import {
+	$which,
+	getRemoteHostDir,
+	getSshControlDir,
+	isEnoent,
+	logger,
+	postmortem,
+	ptree,
+} from "@oh-my-striped-pi/pi-utils";
 import { assertOwnerPrivateDir } from "../utils/owner-private-dir";
 import { buildSshTarget, sanitizeHostName } from "./utils";
 
@@ -26,7 +34,7 @@ export interface SSHHostInfo {
 	os: SSHHostOs;
 	shell: SSHHostShell;
 	/**
-	 * Shell name OMP verified can execute the POSIX transfer snippets
+	 * Shell name OMSP verified can execute the POSIX transfer snippets
 	 * (`head`/`cat`/`mv`/`test`/`ls`) `ssh://` uses. Probed by running
 	 * `sh -lc` / `bash -lc` / `zsh -lc` against the remote and keeping the
 	 * first one that round-trips a known marker. Independent of `shell`
@@ -83,7 +91,7 @@ export function sshControlFallbackDir(canonicalDir: string, uid: number, tmpBase
 		.digest("hex")
 		.slice(0, 20);
 	// Only ControlMaster (POSIX) platforms reach this, so the socket dir is a POSIX path.
-	return path.posix.join(tmpBase, `omp-${key}`);
+	return path.posix.join(tmpBase, `omsp-${key}`);
 }
 
 interface ControlDirChoice {
@@ -185,10 +193,10 @@ async function validateKeyPermissions(keyPath?: string, platform: SshPlatform = 
 }
 
 /**
- * Who owns the ControlPath socket for a host: omp's private control directory,
+ * Who owns the ControlPath socket for a host: omsp's private control directory,
  * or the user's ssh_config (see {@link resolveControlPathOwner}).
  */
-type ControlPathOwner = "omp" | "config";
+type ControlPathOwner = "omsp" | "config";
 
 function buildCommonArgs(host: SSHConnectionTarget, owner: ControlPathOwner, options?: SSHArgsOptions): string[] {
 	const args = options?.allowStdin ? [] : ["-n"];
@@ -196,7 +204,7 @@ function buildCommonArgs(host: SSHConnectionTarget, owner: ControlPathOwner, opt
 	if (supportsSshControlMaster(options?.platform)) {
 		args.push("-o", "ControlMaster=auto");
 		// A config-owned socket keeps the user's ControlPath and ControlPersist.
-		if (owner === "omp") args.push("-o", `ControlPath=${CONTROL_PATH}`, "-o", "ControlPersist=3600");
+		if (owner === "omsp") args.push("-o", `ControlPath=${CONTROL_PATH}`, "-o", "ControlPersist=3600");
 	}
 
 	args.push("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new");
@@ -272,15 +280,15 @@ const controlPathOwners = new Map<string, Promise<ControlPathOwner>>();
  * Decide whose ControlPath socket `host` uses.
  *
  * When the user's ssh_config resolves a `ControlPath` (`ssh -G` reports one
- * other than `none`), omp defers to it instead of injecting its own, so a
+ * other than `none`), omsp defers to it instead of injecting its own, so a
  * master the user already authenticated — e.g. interactively on an MFA host
- * that `BatchMode=yes` can never reach — serves omp too (#15974). Cached per
- * destination for the process lifetime; a failed lookup keeps omp's socket.
+ * that `BatchMode=yes` can never reach — serves omsp too (#15974). Cached per
+ * destination for the process lifetime; a failed lookup keeps omsp's socket.
  *
  * Throws when the username or host would be parsed as an ssh option.
  */
 function resolveControlPathOwner(host: SSHConnectionTarget, platform?: SshPlatform): Promise<ControlPathOwner> {
-	if (!supportsSshControlMaster(platform)) return Promise.resolve("omp");
+	if (!supportsSshControlMaster(platform)) return Promise.resolve("omsp");
 	const target = buildSshTarget(host.username, host.host);
 	const key = `${target}:${host.port ?? ""}`;
 	let owner = controlPathOwners.get(key);
@@ -296,18 +304,18 @@ async function lookupControlPathOwner(target: string, port?: number): Promise<Co
 	try {
 		const { exitCode, stdout, stderr } = await runSshCaptureSync(args);
 		if (exitCode !== 0) {
-			logger.debug("ssh -G failed; using omp ControlPath", { target, error: stderr });
-			return "omp";
+			logger.debug("ssh -G failed; using omsp ControlPath", { target, error: stderr });
+			return "omsp";
 		}
 		for (const line of stdout.split("\n")) {
 			if (!line.startsWith("controlpath ")) continue;
 			const value = line.slice("controlpath ".length).trim();
-			return value && value !== "none" ? "config" : "omp";
+			return value && value !== "none" ? "config" : "omsp";
 		}
-		return "omp";
+		return "omsp";
 	} catch (err) {
-		logger.debug("ssh -G failed; using omp ControlPath", { target, error: String(err) });
-		return "omp";
+		logger.debug("ssh -G failed; using omsp ControlPath", { target, error: String(err) });
+		return "omsp";
 	}
 }
 
@@ -460,10 +468,10 @@ async function persistHostInfo(host: SSHConnectionTarget, info: SSHHostInfo): Pr
  * `motd`, login messages, `Last login: …`) instead of trusting only the first
  * line of stdout. See #3719.
  */
-export const HOST_PROBE_MARKER = "PI_HOST_PROBE=";
+export const HOST_PROBE_MARKER = "OMSP_HOST_PROBE=";
 
 /** Marker for the transfer-shell capability probe. */
-export const TRANSFER_PROBE_MARKER = "PI_TRANSFER_OK|";
+export const TRANSFER_PROBE_MARKER = "OMSP_TRANSFER_OK|";
 
 /** sh / bash / zsh, in the order we'll try as `transferShell` candidates. */
 const TRANSFER_SHELL_CANDIDATES = ["sh", "bash", "zsh"] as const;
@@ -609,12 +617,12 @@ async function probeHostInfo(host: SSHConnectionTarget): Promise<SSHHostInfo> {
 	const hasBash = !unexpandedPosixVars && (Boolean(bashVersion) || shell === "bash");
 	let compatShell: SSHHostInfo["compatShell"];
 	if (os === "windows" && host.compat !== false) {
-		const bashProbe = await runSshCaptureSync(await buildRemoteCommand(host, 'bash -lc "echo PI_BASH_OK"'));
-		if (bashProbe.exitCode === 0 && bashProbe.stdout.includes("PI_BASH_OK")) {
+		const bashProbe = await runSshCaptureSync(await buildRemoteCommand(host, 'bash -lc "echo OMSP_BASH_OK"'));
+		if (bashProbe.exitCode === 0 && bashProbe.stdout.includes("OMSP_BASH_OK")) {
 			compatShell = "bash";
 		} else {
-			const shProbe = await runSshCaptureSync(await buildRemoteCommand(host, 'sh -lc "echo PI_SH_OK"'));
-			if (shProbe.exitCode === 0 && shProbe.stdout.includes("PI_SH_OK")) {
+			const shProbe = await runSshCaptureSync(await buildRemoteCommand(host, 'sh -lc "echo OMSP_SH_OK"'));
+			if (shProbe.exitCode === 0 && shProbe.stdout.includes("OMSP_SH_OK")) {
 				compatShell = "sh";
 			}
 		}
@@ -769,7 +777,7 @@ export async function ensureConnection(host: SSHConnectionTarget): Promise<void>
 		const commonArgs = buildCommonArgs(host, owner);
 		const check = await runSshSync(["-O", "check", ...commonArgs, target]);
 		if (check.exitCode === 0 || owner === "config") {
-			// Only omp-owned sockets need an explicit master. Configured sockets
+			// Only omsp-owned sockets need an explicit master. Configured sockets
 			// use ssh_config's normal connection and ControlPersist policy.
 			activeHosts.set(key, host);
 			if (!hostInfoCache.has(key) && !(await loadHostInfoFromDisk(host))) {
@@ -822,7 +830,7 @@ async function closeConnectionInternal(host: SSHConnectionTarget): Promise<void>
 	const target = buildSshTarget(host.username, host.host);
 	const owner = await resolveControlPathOwner(host);
 	// Configured sockets may have been replaced by a user's master since the
-	// last check. Never exit a socket that omp doesn't own.
+	// last check. Never exit a socket that omsp doesn't own.
 	if (owner === "config") return;
 	await runSshSync(["-O", "exit", ...buildCommonArgs(host, owner), target]);
 }

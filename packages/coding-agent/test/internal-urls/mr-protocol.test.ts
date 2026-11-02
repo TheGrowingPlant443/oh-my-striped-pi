@@ -1,7 +1,7 @@
 /**
  * `mr://` protocol handler tests.
  *
- * Every test isolates `OMP_GITHUB_CACHE_DB` to a temp file and resets the
+ * Every test isolates `OMSP_GITHUB_CACHE_DB` to a temp file and resets the
  * cache, router, and default-project singletons. `gitlab.json` / `gitlab.text`
  * are spied per-test and restored in `afterEach`.
  */
@@ -9,11 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import { resetDefaultGitlabProjectMemoForTests } from "@oh-my-pi/pi-coding-agent/tools/glab-mr";
-import { resetForTests as resetCacheForTests } from "@oh-my-pi/pi-coding-agent/tools/github-cache";
-import { gitlab } from "@oh-my-pi/pi-coding-agent/utils/gitlab";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import { resetDefaultGitlabProjectMemoForTests } from "@oh-my-striped-pi/pi-coding-agent/tools/glab-mr";
+import { resetForTests as resetCacheForTests } from "@oh-my-striped-pi/pi-coding-agent/tools/github-cache";
+import { gitlab } from "@oh-my-striped-pi/pi-coding-agent/utils/gitlab";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const diffText = `diff --git a/src/one.ts b/src/one.ts
 --- a/src/one.ts
@@ -31,7 +31,7 @@ diff --git a/src/two.ts b/src/two.ts
 const secondSection = diffText.slice(diffText.indexOf("diff --git a/src/two.ts"));
 
 const ENV_KEYS = [
-	"OMP_GITHUB_CACHE_DB",
+	"OMSP_GITHUB_CACHE_DB",
 	"GITLAB_TOKEN",
 	"GITLAB_ACCESS_TOKEN",
 	"OAUTH_TOKEN",
@@ -49,7 +49,7 @@ beforeEach(async () => {
 		savedEnv[key] = process.env[key];
 		delete process.env[key];
 	}
-	process.env.OMP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
+	process.env.OMSP_GITHUB_CACHE_DB = path.join(tempDir, "github-cache.db");
 	process.env.GITLAB_TOKEN = "test-token";
 	process.env.GITLAB_HOST = "gitlab.example.com";
 	// Empty dir: no glab config.yml hosts unless a test writes one.

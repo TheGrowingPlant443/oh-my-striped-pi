@@ -1,14 +1,14 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { UserMessageComponent } from "@oh-my-pi/pi-tui/chat/user-message";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { UserMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/user-message";
 import {
 	TranscriptContainer,
 	type TranscriptStableRow,
 	trimBlankEdges,
-} from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { type Component, ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-pi/pi-tui";
+} from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { type Component, ImageProtocol, setTerminalImageProtocol, TERMINAL } from "@oh-my-striped-pi/pi-tui";
 
 class Block implements Component {
 	#rows: string[];

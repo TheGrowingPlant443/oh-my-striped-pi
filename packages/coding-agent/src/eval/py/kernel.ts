@@ -8,7 +8,7 @@
  * timeout.
  */
 import * as path from "node:path";
-import { $env, $flag, isBunTestRuntime, logger, Snowflake } from "@oh-my-pi/pi-utils";
+import { $env, $flag, isBunTestRuntime, logger, Snowflake } from "@oh-my-striped-pi/pi-utils";
 import { Settings } from "../../config/settings";
 import {
 	BaseKernel,
@@ -40,7 +40,7 @@ export type {
 	KernelShutdownResult,
 } from "../kernel-base";
 
-const TRACE_IPC = $flag("PI_PYTHON_IPC_TRACE");
+const TRACE_IPC = $flag("OMSP_PYTHON_IPC_TRACE");
 
 const SHUTDOWN_GRACE_MS = 1_000;
 const STARTUP_TIMEOUT_MS = 10_000;
@@ -55,8 +55,8 @@ const INTERRUPT_ESCALATION_MS = 5_000;
 export const PYTHON_KERNEL_CANCEL_BUDGET_MS = INTERRUPT_ESCALATION_MS + 3 * SHUTDOWN_GRACE_MS;
 
 const PYTHON_RESERVED_PRELUDE_EXPORTS: Record<string, true> = {
-	__omp_tools__: true,
-	_omp_prelude: true,
+	__omsp_tools__: true,
+	_omsp_prelude: true,
 	AgentHandle: true,
 	CompletionHandle: true,
 	JudgmentBatch: true,
@@ -140,7 +140,7 @@ export async function checkPythonKernelAvailability(
 	interpreter?: string,
 	options?: { forceProbe?: boolean } & BackendProbeOptions,
 ): Promise<PythonKernelAvailability> {
-	if (!options?.forceProbe && (isBunTestRuntime() || $flag("PI_PYTHON_SKIP_CHECK"))) {
+	if (!options?.forceProbe && (isBunTestRuntime() || $flag("OMSP_PYTHON_SKIP_CHECK"))) {
 		return { ok: true };
 	}
 	const resolvedCwd = path.resolve(cwd);
@@ -287,8 +287,8 @@ export class PythonKernel extends BaseKernel<PythonKernelExecuteOptions> {
 		const source: string[] = [];
 		if (removedExports.length > 0) {
 			source.push(
-				`for __omp_export in ${JSON.stringify(removedExports)}:\n    globals().pop(__omp_export, None)`,
-				'globals().pop("__omp_export", None)',
+				`for __omsp_export in ${JSON.stringify(removedExports)}:\n    globals().pop(__omsp_export, None)`,
+				'globals().pop("__omsp_export", None)',
 			);
 		}
 		for (const prelude of changed) source.push(prelude.source);
@@ -332,7 +332,7 @@ export class PythonKernel extends BaseKernel<PythonKernelExecuteOptions> {
 		spawnEnv.PYTHONUNBUFFERED = "1";
 		spawnEnv.PYTHONIOENCODING = "utf-8";
 
-		const scriptPath = await stageRunnerScript("omp-python-runner", "py", RUNNER_SCRIPT);
+		const scriptPath = await stageRunnerScript("omsp-python-runner", "py", RUNNER_SCRIPT);
 		const kernel = new PythonKernel(Snowflake.next(), runtime.pythonPath);
 
 		const proc = Bun.spawn([runtime.pythonPath, "-u", scriptPath], {
@@ -423,10 +423,10 @@ function buildInitScript(cwd: string, env?: Record<string, string | undefined>):
 	const envPayload = Object.fromEntries(envEntries);
 	return [
 		"import os, sys",
-		`__omp_cwd = ${JSON.stringify(cwd)}`,
-		"os.chdir(__omp_cwd)",
-		`__omp_env = ${JSON.stringify(envPayload)}`,
-		"for __omp_key, __omp_val in __omp_env.items():\n    os.environ[__omp_key] = __omp_val",
-		"if __omp_cwd not in sys.path:\n    sys.path.insert(0, __omp_cwd)",
+		`__omsp_cwd = ${JSON.stringify(cwd)}`,
+		"os.chdir(__omsp_cwd)",
+		`__omsp_env = ${JSON.stringify(envPayload)}`,
+		"for __omsp_key, __omsp_val in __omsp_env.items():\n    os.environ[__omsp_key] = __omsp_val",
+		"if __omsp_cwd not in sys.path:\n    sys.path.insert(0, __omsp_cwd)",
 	].join("\n");
 }

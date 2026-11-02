@@ -4,7 +4,7 @@ import type {
 	MCPProgress,
 	MCPResourceContent,
 	MCPTextContent,
-} from "@oh-my-pi/pi-tui/tools/mcp";
+} from "@oh-my-striped-pi/pi-tui/tools/mcp";
 /**
  * MCP (Model Context Protocol) type definitions.
  *
@@ -82,14 +82,14 @@ interface MCPServerConfigBase {
 	 * ids instead of per-transport integers. See `RequestIdAllocator` in
 	 * `./request-id`.
 	 *
-	 * OMP-specific, so only the OMP-owned discovery providers parse it (native,
-	 * standalone `mcp.json`, OMP plugins). Providers that translate another
+	 * OMSP-specific, so only the OMSP-owned discovery providers parse it (native,
+	 * standalone `mcp.json`, OMSP plugins). Providers that translate another
 	 * tool's config do not, since the key is not part of those formats.
 	 */
 	requestIdFormat?: MCPRequestIdFormat;
 	/**
 	 * Include server-provided instructions in the system prompt (default: true).
-	 * OMP-specific: only native config, standalone `mcp.json`, and OMP plugins
+	 * OMSP-specific: only native config, standalone `mcp.json`, and OMSP plugins
 	 * parse this option; providers for other tools' formats ignore it.
 	 */
 	instructions?: boolean;
@@ -151,7 +151,7 @@ export interface MCPSseServerConfig extends MCPServerConfigBase {
 export type MCPServerConfig = MCPStdioServerConfig | MCPHttpServerConfig | MCPSseServerConfig;
 
 export const MCP_CONFIG_SCHEMA_URL =
-	"https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json";
+	"https://raw.githubusercontent.com/TheGrowingPlant443/oh-my-striped-pi/main/packages/coding-agent/src/config/mcp-schema.json";
 
 /** Root mcp.json/.mcp.json file structure */
 export interface MCPConfigFile {

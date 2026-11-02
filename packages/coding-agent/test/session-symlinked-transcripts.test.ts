@@ -2,22 +2,22 @@
  * Regression for #15878: a transcript placed in a session directory as a
  * symlink — a launcher's, a supervisor's clean-up tool's — is a transcript
  * like any other. `Bun.Glob` walks no symlink unless it is asked to, so
- * `omp --session-dir <dir> --resume <id>` found nothing where a hardlink, or
+ * `omsp --session-dir <dir> --resume <id>` found nothing where a hardlink, or
  * a copy, resumed the very same bytes.
  */
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { CURRENT_SESSION_VERSION } from "@oh-my-pi/pi-coding-agent/session/session-entries";
+import { CURRENT_SESSION_VERSION } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
 import {
 	findSessionFiles,
 	listAllSessions,
 	listRecentSessions,
 	listSessions,
 	resolveResumableSession,
-} from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { FileSessionStorage } from "@oh-my-pi/pi-coding-agent/session/session-storage";
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { FileSessionStorage } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
 
 const SESSION_ID = "0198aaaa-0000-7000-8000-000000000001";
 const SESSION_NAME = `2026-10-15T00-00-00-000Z_${SESSION_ID}.jsonl`;
@@ -25,7 +25,7 @@ const SESSION_NAME = `2026-10-15T00-00-00-000Z_${SESSION_ID}.jsonl`;
 // This account's filesystem may not be able to make a symlink at all: Windows
 // needs SeCreateSymbolicLink, which an unprivileged account doesn't have.
 const symlinksAvailable = ((): boolean => {
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-symlink-probe-"));
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-symlink-probe-"));
 	try {
 		fs.symlinkSync(path.join(dir, "target"), path.join(dir, "link"));
 		return true;
@@ -41,9 +41,9 @@ describe("a transcript that is a symlink", () => {
 	let real = "";
 
 	beforeEach(async () => {
-		sessionsDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-session-symlink-"));
+		sessionsDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-session-symlink-"));
 		real = path.join(
-			await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-session-symlink-src-")),
+			await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-session-symlink-src-")),
 			"transcript.jsonl",
 		);
 		// a session file as the CLI writes one: its header, then a turn
@@ -131,8 +131,8 @@ describe("resuming through a symlinked transcript", () => {
 	let link = "";
 
 	beforeEach(async () => {
-		sessionsDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-session-symlink-"));
-		staged = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-session-symlink-src-"));
+		sessionsDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-session-symlink-"));
+		staged = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-session-symlink-src-"));
 		real = path.join(staged, "transcript.jsonl");
 		link = path.join(sessionsDir, SESSION_NAME);
 		await fs.promises.writeFile(

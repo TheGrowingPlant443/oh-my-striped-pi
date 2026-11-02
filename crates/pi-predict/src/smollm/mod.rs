@@ -25,7 +25,7 @@
 //! back in the checkpoint's rotate-half order), which
 //! `packages/coding-agent/src/predict/smollm-weights.ts` downloads; both
 //! decoders run those blocks as stored. macOS uses Metal when a GPU is
-//! available; `PI_SMOLLM_DEVICE=cpu|metal` overrides the choice.
+//! available; `OMSP_SMOLLM_DEVICE=cpu|metal` overrides the choice.
 //!
 //! # Parity (research harness, `test-small`, KSR % at quiet / balanced / parity)
 //! A simulated typist replays 600 held-out history.db prompts through N-API;
@@ -42,7 +42,7 @@
 //!   submitted prompt: p50 21.5, p99 48.6); open 0.3 s, first query ~40 ms;
 //!   +250 MiB RSS. A single-token forward is ~2.3 ms at 700 cached tokens, and
 //!   a query averages ~3.9 of them (three alternatives for typed-past).
-//! - CPU (`PI_SMOLLM_DEVICE=cpu`, 8 workers): p50 16 ms, p99 80 ms, +160 MiB
+//! - CPU (`OMSP_SMOLLM_DEVICE=cpu`, 8 workers): p50 16 ms, p99 80 ms, +160 MiB
 //!   RSS; ~1.7 ms per forward at short context, ~3.6 ms at 700 tokens.
 //! - Weights: 145 MB `Q8_0` GGUF download (byte-identical to quantizing the
 //!   upstream bf16 checkpoint), ~145 MB resident.
@@ -122,7 +122,7 @@ pub fn open(config: &Config) -> anyhow::Result<Box<dyn Predictor>> {
 
 /// Load the weights onto Metal when available (macOS), else the CPU.
 fn load_decoder(weights: LlamaWeights<std::fs::File>) -> anyhow::Result<Box<dyn Decoder>> {
-	let requested = std::env::var("PI_SMOLLM_DEVICE").ok();
+	let requested = std::env::var("OMSP_SMOLLM_DEVICE").ok();
 	#[cfg(target_os = "macos")]
 	if requested.as_deref() != Some("cpu") {
 		match candle_core::Device::new_metal(0) {
@@ -135,7 +135,7 @@ fn load_decoder(weights: LlamaWeights<std::fs::File>) -> anyhow::Result<Box<dyn 
 	}
 	anyhow::ensure!(
 		requested.as_deref() != Some("metal"),
-		"PI_SMOLLM_DEVICE=metal needs macOS with a Metal GPU"
+		"OMSP_SMOLLM_DEVICE=metal needs macOS with a Metal GPU"
 	);
 	Ok(Box::new(CpuLlama::load(weights)?))
 }

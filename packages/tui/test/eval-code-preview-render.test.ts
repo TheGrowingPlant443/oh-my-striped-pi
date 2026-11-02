@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { EvalToolDetails } from "@oh-my-pi/pi-tui/tools/eval";
-import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-pi/pi-tui/theme";
-import { evalToolRenderer } from "@oh-my-pi/pi-tui/tools/eval";
-import { previewWindowRows } from "@oh-my-pi/pi-tui/render/render-utils";
+import type { EvalToolDetails } from "@oh-my-striped-pi/pi-tui/tools/eval";
+import { getThemeByName, setThemeInstance, type Theme } from "@oh-my-striped-pi/pi-tui/theme";
+import { evalToolRenderer } from "@oh-my-striped-pi/pi-tui/tools/eval";
+import { previewWindowRows } from "@oh-my-striped-pi/pi-tui/render/render-utils";
 
 /**
  * Defends the bounded code-window contract for eval cells: collapsed views cap

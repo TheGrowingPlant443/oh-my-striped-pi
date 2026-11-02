@@ -1,18 +1,22 @@
 import { clearSubmittedText } from "./helpers/draft";
-import { Spacer } from "@oh-my-pi/pi-tui";
-import { APP_NAME, formatAge } from "@oh-my-pi/pi-utils";
+import { Spacer } from "@oh-my-striped-pi/pi-tui";
+import { APP_NAME, formatAge } from "@oh-my-striped-pi/pi-utils";
 import { CollabGuestLink } from "../collab/guest";
 import type { CollabHost } from "../collab/host";
 import { type CollabHostSnapshot, listCollabHosts } from "../collab/registry";
-import { theme } from "@oh-my-pi/pi-tui/theme";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
 import type { InteractiveModeContext } from "../modes/types";
-import { sanitizeDisplayLine } from "@oh-my-pi/pi-tui/overlays/extensions/display-text";
-import { shortenPath, TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-pi/pi-tui/render/render-utils";
-import { CollabQrCodeComponent, collabBrowserLink } from "@oh-my-pi/pi-tui/chrome/collab-qrcode";
-import { formatKeyHint } from "@oh-my-pi/pi-tui/app-keybindings";
+import { sanitizeDisplayLine } from "@oh-my-striped-pi/pi-tui/overlays/extensions/display-text";
+import { shortenPath, TRUNCATE_LENGTHS, truncateToWidth } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { CollabQrCodeComponent, collabBrowserLink } from "@oh-my-striped-pi/pi-tui/chrome/collab-qrcode";
+import { formatKeyHint } from "@oh-my-striped-pi/pi-tui/app-keybindings";
 import { settings } from "../config/settings";
 import { parseExportArgs } from "../export/html/args";
-import { extractLastCodeBlock, extractLastCommand, extractLastLink } from "@oh-my-pi/pi-tui/overlays/copy-targets";
+import {
+	extractLastCodeBlock,
+	extractLastCommand,
+	extractLastLink,
+} from "@oh-my-striped-pi/pi-tui/overlays/copy-targets";
 import { restartBrowserForModeChange } from "../tools/browser";
 import { openPath } from "../utils/open";
 import { copyToClipboard } from "../utils/clipboard";
@@ -57,7 +61,7 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 		inlineHint: "[start|view|list|stop|status] [relayUrl]",
 		subcommands: [
 			{ name: "view", description: "Create a read-only link (guests can watch, not prompt)" },
-			{ name: "list", description: "List active local Collab hosts (no links; use `omp collab link`)" },
+			{ name: "list", description: "List active local Collab hosts (no links; use `omsp collab link`)" },
 			{ name: "status", description: "Show link + participants" },
 			{ name: "stop", description: "Stop hosting" },
 		],
@@ -377,7 +381,7 @@ export const BUILTIN_COLLABORATION_SLASH_COMMANDS: ReadonlyArray<SlashCommandSpe
 			try {
 				// Lazy: the stats dashboard (server + sqlite) loads on demand only,
 				// matching src/cli/stats-cli.ts, to keep CLI startup fast.
-				const { formatStatsDashboardUrl, startServer } = await import("@oh-my-pi/omp-stats");
+				const { formatStatsDashboardUrl, startServer } = await import("@oh-my-striped-pi/omsp-stats");
 				const { hostname, port } = await startServer();
 				const url = `${formatStatsDashboardUrl(hostname, port)}/#/traces?s=${encodeURIComponent(sessionFile)}`;
 				await runtime.output(url);

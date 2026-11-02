@@ -3,9 +3,9 @@ import {
 	isInvalidThinkingSignatureError,
 	isThinkingPrefixBindingError,
 	maybeAddReplayUnsignedThinkingHint,
-} from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type { Model, ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** Signing-error classification and known Copilot signing-policy remediation. */
 function buildAnthropicMessagesModel(

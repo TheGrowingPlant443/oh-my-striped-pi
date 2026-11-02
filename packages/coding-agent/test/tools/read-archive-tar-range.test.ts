@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import * as ar from "@oh-my-pi/pi-utils/ar";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import * as ar from "@oh-my-striped-pi/pi-utils/ar";
 
 afterEach(() => vi.restoreAllMocks());
 

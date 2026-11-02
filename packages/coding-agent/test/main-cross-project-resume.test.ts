@@ -11,29 +11,29 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type Args, parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import * as modelResolverModule from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as pluginHelpers from "@oh-my-pi/pi-coding-agent/discovery/helpers";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { createSessionManager, runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import type { SessionHeader } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import * as sessionListingModule from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { loadEntriesFromFile } from "@oh-my-pi/pi-coding-agent/session/session-loader";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { type Args, parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import * as modelResolverModule from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as pluginHelpers from "@oh-my-striped-pi/pi-coding-agent/discovery/helpers";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { createSessionManager, runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import type { SessionHeader } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import * as sessionListingModule from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { loadEntriesFromFile } from "@oh-my-striped-pi/pi-coding-agent/session/session-loader";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import {
 	__resetDirsFromEnvForTests,
 	getProjectDir,
 	normalizePathForComparison,
 	setAgentDir,
 	setProjectDir,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-const originalPiProfile = process.env.PI_PROFILE;
-const originalOmpProfile = process.env.OMP_PROFILE;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+const originalPiProfile = process.env.OMSP_PROFILE;
+const originalOmpProfile = process.env.OMSP_PROFILE;
 let agentDirRoot: string | undefined;
 
 function restoreEnv(key: string, value: string | undefined): void {
@@ -45,16 +45,16 @@ function restoreEnv(key: string, value: string | undefined): void {
 }
 
 beforeEach(async () => {
-	agentDirRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-xproj-agent-dir-"));
+	agentDirRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-xproj-agent-dir-"));
 	setAgentDir(path.join(agentDirRoot, "agent"));
 });
 
 afterEach(async () => {
 	// `runRootCommand` registers the CLI's extension roots (`--no-extensions` → explicit-only) process-wide.
 	clearOmpExtensionCliRoots();
-	restoreEnv("PI_CODING_AGENT_DIR", originalAgentDir);
-	restoreEnv("PI_PROFILE", originalPiProfile);
-	restoreEnv("OMP_PROFILE", originalOmpProfile);
+	restoreEnv("OMSP_CODING_AGENT_DIR", originalAgentDir);
+	restoreEnv("OMSP_PROFILE", originalPiProfile);
+	restoreEnv("OMSP_PROFILE", originalOmpProfile);
 	__resetDirsFromEnvForTests();
 	if (agentDirRoot) {
 		await fsp.rm(agentDirRoot, { recursive: true, force: true });
@@ -97,7 +97,7 @@ describe("createSessionManager — cross-project --resume", () => {
 	let existingProject: string;
 
 	beforeEach(async () => {
-		existingProject = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-xproj-"));
+		existingProject = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-xproj-"));
 		const match = buildGlobalMatch(existingProject);
 		await Bun.write(
 			match.session.path,
@@ -135,7 +135,7 @@ describe("createSessionManager — cross-project --resume", () => {
 
 describe("SessionManager.open — recorded cwd adoption", () => {
 	it("keeps the launch cwd when the recorded cwd cannot be probed", async () => {
-		const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-xproj-denied-"));
+		const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-xproj-denied-"));
 		const launchProject = path.join(root, "launch");
 		const deniedProject = path.join(root, "denied");
 		await fsp.mkdir(launchProject);
@@ -178,7 +178,7 @@ describe("SessionManager.open — recorded cwd adoption", () => {
 	});
 
 	it("keeps the launch cwd when the recorded cwd denies search permission", async () => {
-		const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-xproj-noexec-"));
+		const root = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-xproj-noexec-"));
 		const launchProject = path.join(root, "launch");
 		const deniedProject = path.join(root, "denied");
 		await fsp.mkdir(launchProject);
@@ -225,7 +225,7 @@ describe("runRootCommand — cross-project --resume", () => {
 
 	beforeEach(async () => {
 		originalProject = getProjectDir();
-		root = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-xproj-root-"));
+		root = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-xproj-root-"));
 		launchProject = path.join(root, "launch");
 		resumedProject = path.join(root, "resumed");
 		await Promise.all([fsp.mkdir(launchProject), fsp.mkdir(resumedProject)]);
@@ -451,7 +451,7 @@ describe("createSessionManager — cross-project --resume relocation (moved work
 	let missingProject: string;
 
 	beforeEach(async () => {
-		missingRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-moved-xproj-"));
+		missingRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-moved-xproj-"));
 		missingProject = path.join(missingRoot, "worktree-gone");
 	});
 

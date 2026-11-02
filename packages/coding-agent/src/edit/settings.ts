@@ -2,19 +2,19 @@
  * Settings declared by this domain (see `config/registry.ts`). Declaration order is the
  * settings-panel order; `config/all-settings.ts` registers every domain.
  */
-import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
+import type { EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import { register } from "../config/registry";
 
 const EMPTY_STRING_RECORD: Record<string, string> = {};
 
-/** `PI_EDIT_FUZZY`: `1`/`true` force fuzzy matching, `0`/`false` disable it; `auto`/other text defers to the setting. */
+/** `OMSP_EDIT_FUZZY`: `1`/`true` force fuzzy matching, `0`/`false` disable it; `auto`/other text defers to the setting. */
 function parseEditFuzzyEnv(raw: string): boolean | undefined {
 	if (raw === "1" || raw === "true") return true;
 	if (raw === "0" || raw === "false") return false;
 	return undefined;
 }
 
-/** Every edit tool variant, as accepted by `edit.mode` and `PI_EDIT_VARIANT`. */
+/** Every edit tool variant, as accepted by `edit.mode` and `OMSP_EDIT_VARIANT`. */
 export const EDIT_MODES = [
 	"apply_patch",
 	"hashline",
@@ -39,7 +39,7 @@ export const cfgEditMode = register({
 	values: EDIT_MODES,
 	default: "hashline",
 	// Pins the variant: it also skips the per-model hashline fallback (see `utils/edit-mode.ts`).
-	env: "PI_EDIT_VARIANT",
+	env: "OMSP_EDIT_VARIANT",
 	ui: {
 		tab: "files",
 		group: "Editing",
@@ -69,7 +69,7 @@ export const cfgEditFuzzyMatch = register({
 	id: "edit.fuzzyMatch",
 	type: "boolean",
 	default: true,
-	env: { name: "PI_EDIT_FUZZY", parse: parseEditFuzzyEnv },
+	env: { name: "OMSP_EDIT_FUZZY", parse: parseEditFuzzyEnv },
 	ui: {
 		tab: "files",
 		group: "Editing",
@@ -83,7 +83,7 @@ export const cfgEditFuzzyThreshold = register({
 	type: "number",
 	default: 0.95,
 	env: {
-		name: "PI_EDIT_FUZZY_THRESHOLD",
+		name: "OMSP_EDIT_FUZZY_THRESHOLD",
 		parse: raw => {
 			const threshold = Number.parseFloat(raw);
 			return threshold >= 0 && threshold <= 1 ? threshold : undefined;

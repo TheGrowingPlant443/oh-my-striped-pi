@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
-import { Terminal as VirtualTerminal } from "@oh-my-pi/pi-utils/vterm";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
+import { Terminal as VirtualTerminal } from "@oh-my-striped-pi/pi-utils/vterm";
 
 type Scenario =
 	| "auto"
@@ -21,15 +21,15 @@ interface Observation {
 
 /** Run real CLI/SDK startup in a process whose config, leases and registries cannot escape the fixture. */
 async function runScenario(scenario: Scenario): Promise<Observation> {
-	using temp = TempDir.createSync("@omp-auto-resume-model-");
+	using temp = TempDir.createSync("@omsp-auto-resume-model-");
 	const home = temp.join("home");
-	const agentDir = path.join(home, ".omp", "agent");
+	const agentDir = path.join(home, ".omsp", "agent");
 	const sourceDir = path.resolve(import.meta.dir, "../src");
 	const extension = temp.join("provider.ts");
 	await Bun.write(
 		extension,
 		`export default pi => pi.registerProvider("resume-fixture", {
-			baseUrl: process.env.OMP_TEST_BASE_URL, api: "openai-completions", apiKey: "fixture-only",
+			baseUrl: process.env.OMSP_TEST_BASE_URL, api: "openai-completions", apiKey: "fixture-only",
 			models: [{ id: "fresh", name: "Fresh", reasoning: false, input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 				contextWindow: 131072, maxTokens: 1024 }]
@@ -57,7 +57,7 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
 					{ headers: { "Content-Type": "text/event-stream" } });
 			}
 		});
-		process.env.OMP_TEST_BASE_URL = providerServer.url.origin + "/v1";
+		process.env.OMSP_TEST_BASE_URL = providerServer.url.origin + "/v1";
 		const readClock = Date.now;
 		const savedModel = scenario === "restorable" ? "resume-fixture/fresh" : "lost/missing";
 		const stamp = "2026-10-22T09:00:00+09:00";
@@ -150,7 +150,7 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
 			PATH: process.env.PATH,
 			HOME: home,
 			USERPROFILE: home,
-			PI_CODING_AGENT_DIR: agentDir,
+			OMSP_CODING_AGENT_DIR: agentDir,
 			TMPDIR: process.env.TMPDIR,
 			TMP: process.env.TMP,
 			TEMP: process.env.TEMP,
@@ -230,19 +230,18 @@ describe("implicit auto-resume model restoration", () => {
 	test.skipIf(process.platform === "win32")(
 		"keeps saved model controls and oversized names out of the startup terminal",
 		async () => {
-			using temp = TempDir.createSync("@omp-auto-resume-warning-");
+			using temp = TempDir.createSync("@omsp-auto-resume-warning-");
 			const home = temp.join("home");
-			const agentDir = path.join(home, ".omp", "agent");
+			const agentDir = path.join(home, ".omsp", "agent");
 			const sourceDir = path.resolve(import.meta.dir, "../src");
 			const env = {
 				PATH: process.env.PATH,
 				HOME: home,
 				USERPROFILE: home,
-				PI_CODING_AGENT_DIR: agentDir,
+				OMSP_CODING_AGENT_DIR: agentDir,
 				TZ: "Asia/Tokyo",
 				TERM: "xterm-256color",
-				OMP_TUI_NATIVE: "0",
-				PI_TUI_NATIVE: "0",
+				OMSP_TUI_NATIVE: "0",
 				AWS_EC2_METADATA_DISABLED: "true",
 			};
 			await Bun.write(

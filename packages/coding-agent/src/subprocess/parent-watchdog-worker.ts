@@ -6,8 +6,8 @@
  * dies with its parent instead of lingering as a PPID-1 orphan (issue #14340).
  */
 import { parentPort } from "node:worker_threads";
-import type * as Natives from "@oh-my-pi/pi-natives";
-import { consumeWorkerInbox } from "@oh-my-pi/pi-utils/worker-host";
+import type * as Natives from "@oh-my-striped-pi/pi-natives";
+import { consumeWorkerInbox } from "@oh-my-striped-pi/pi-utils/worker-host";
 
 const POLL_INTERVAL_MS = 250;
 
@@ -21,16 +21,16 @@ function die(): never {
 }
 
 async function watch(parentPid: number): Promise<void> {
-	// Reparent baseline. omp often runs as PID 1 in containers, so a ppid of 1
+	// Reparent baseline. omsp often runs as PID 1 in containers, so a ppid of 1
 	// alone is not an orphan signal; only a change is. A parent that died before
 	// this snapshot is still caught by the exit probes on `parentPid` below.
 	const initialPpid = process.ppid;
 	let natives: typeof Natives | null = null;
 	let parent: Natives.Process | null = null;
 	try {
-		if (!process.env.PI_TEST_NO_NATIVES) {
-			// Dynamic: PI_TEST_NO_NATIVES hosts must never load the addon.
-			natives = await import("@oh-my-pi/pi-natives");
+		if (!process.env.OMSP_TEST_NO_NATIVES) {
+			// Dynamic: OMSP_TEST_NO_NATIVES hosts must never load the addon.
+			natives = await import("@oh-my-striped-pi/pi-natives");
 			// Null when pidfd_open is blocked (pre-5.3 kernels, restrictive
 			// seccomp) even for a live parent; the probes below cover that.
 			parent = natives.Process.fromPid(parentPid);

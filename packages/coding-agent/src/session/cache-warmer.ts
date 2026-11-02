@@ -25,8 +25,8 @@ import {
 	resolveCacheRetention,
 	type SimpleStreamOptions,
 	type Usage,
-} from "@oh-my-pi/pi-ai";
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-ai";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
 import type { CacheWarmingDecisionEvent, CacheWarmingDecisionEventResult } from "../extensibility/shared-events";
 
 export type { CacheWarmingDecisionEvent, CacheWarmingDecisionEventResult };

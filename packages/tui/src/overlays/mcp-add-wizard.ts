@@ -6,10 +6,10 @@
 import { Container, matchesKey, replaceTabs, Spacer, Text, truncateToWidth, wrapTextWithAnsi } from "../index";
 import type { Component } from "../tui";
 import * as path from "node:path";
-import { getMCPConfigPath, getProjectDir } from "@oh-my-pi/pi-utils";
+import { getMCPConfigPath, getProjectDir } from "@oh-my-striped-pi/pi-utils";
 import { shortenPath } from "../render/render-utils";
 import { getSelectListTheme, theme } from "../theme/theme";
-import type { TspText } from "@oh-my-pi/pi-wire";
+import type { TspText } from "@oh-my-striped-pi/pi-wire";
 import { matchesAppInterrupt, matchesSelectDown, matchesSelectUp } from "../keybinding-matchers";
 import { formatKeyHint } from "../app-keybindings";
 import { boundKeys, editorKey, editorKeys, interruptKey } from "../chrome/keybinding-hints";
@@ -225,7 +225,7 @@ const TRANSPORTS: readonly TransportType[] = ["stdio", "http", "sse"];
 
 /** How each transport reads as a choice and in the review. */
 const TRANSPORT_CHOICES: Readonly<Record<TransportType, { icon: string; label: string; description: string }>> = {
-	stdio: { icon: "terminal", label: "Local command", description: "omp starts it on this machine" },
+	stdio: { icon: "terminal", label: "Local command", description: "omsp starts it on this machine" },
 	http: { icon: "globe", label: "Remote server", description: "Streamable HTTP endpoint" },
 	sse: { icon: "broadcast", label: "Server-sent events", description: "Older HTTP servers" },
 };
@@ -242,7 +242,7 @@ function statusRow(state: "busy" | "ok" | "warn" | "error" | "off", label: TspTe
 	if (state === "busy") {
 		return node(
 			"row",
-			{ role: "omp.mcpAdd.status", gap: "sm", align: "center" },
+			{ role: "omsp.mcpAdd.status", gap: "sm", align: "center" },
 			[node("spinner", { style: "orbit", tone: "accent" }), text(label, { wrap: "word" })],
 			key,
 		);
@@ -257,7 +257,7 @@ function statusRow(state: "busy" | "ok" | "warn" | "error" | "off", label: TspTe
 	)[state];
 	return node(
 		"row",
-		{ role: "omp.mcpAdd.status", tone, gap: "sm", align: "center" },
+		{ role: "omsp.mcpAdd.status", tone, gap: "sm", align: "center" },
 		[node("icon", { name: icon, tone }), text(label, { wrap: "word" })],
 		key,
 	);
@@ -265,7 +265,7 @@ function statusRow(state: "busy" | "ok" | "warn" | "error" | "off", label: TspTe
 
 /** A tool's own error message, whole, in a quiet mono well. */
 function errorBlock(message: string, key = "error"): NativeNode {
-	return { ...text(message, { role: "omp.mcpAdd.error", wrap: "word" }), key };
+	return { ...text(message, { role: "omsp.mcpAdd.error", wrap: "word" }), key };
 }
 
 /** Footer buttons of a native step: what Esc runs (`undefined`: Esc cancels) and what Enter runs (`undefined`: nothing). */
@@ -390,7 +390,7 @@ export class MCPAddWizard extends OverlayPanel {
 		onRender?: () => void,
 		initialName?: string,
 	) {
-		super("Add MCP Server", "omp.overlay.mcpAdd");
+		super("Add MCP Server", "omsp.overlay.mcpAdd");
 		this.#deps = deps;
 		this.#onCompleteCallback = onComplete;
 		this.#onCancelCallback = onCancel;
@@ -475,9 +475,9 @@ export class MCPAddWizard extends OverlayPanel {
 		field.input.placeholder = options.placeholder;
 		this.#inputField = field;
 		const caption = options.error
-			? text([span(plainText(options.error), "error")], { role: "omp.mcpAdd.note", wrap: "word" })
+			? text([span(plainText(options.error), "error")], { role: "omsp.mcpAdd.note", wrap: "word" })
 			: options.note
-				? text(options.note, { role: "omp.mcpAdd.note", wrap: "word" })
+				? text(options.note, { role: "omsp.mcpAdd.note", wrap: "word" })
 				: undefined;
 		const cancelKey = getKeybindings().getKeys("tui.select.cancel")[0] ?? "escape";
 		this.#show(
@@ -490,7 +490,7 @@ export class MCPAddWizard extends OverlayPanel {
 				body: [
 					node(
 						"col",
-						{ role: "omp.mcpAdd.field", gap: "xs", ...(options.error ? { tone: "error" as const } : {}) },
+						{ role: "omsp.mcpAdd.field", gap: "xs", ...(options.error ? { tone: "error" as const } : {}) },
 						compact([field.input, caption]),
 						"field",
 					),
@@ -603,15 +603,18 @@ export class MCPAddWizard extends OverlayPanel {
 		const step = this.#nativeStep;
 		const title = row(
 			compact([
-				text(step.title, { role: "omp.mcpAdd.title", wrap: "word" }),
-				step.optional && text("Optional", { role: "omp.mcpAdd.tag" }),
+				text(step.title, { role: "omsp.mcpAdd.title", wrap: "word" }),
+				step.optional && text("Optional", { role: "omsp.mcpAdd.tag" }),
 			]),
 			{ gap: "sm", align: "center" },
 		);
-		const head = compact([title, step.lead ? text(step.lead, { role: "omp.mcpAdd.lead", wrap: "word" }) : undefined]);
+		const head = compact([
+			title,
+			step.lead ? text(step.lead, { role: "omsp.mcpAdd.lead", wrap: "word" }) : undefined,
+		]);
 		const children: NativeChild[] = [
 			this.#describeProgress(step.phase),
-			node("col", { role: "omp.mcpAdd.head", gap: "xs" }, head, "head"),
+			node("col", { role: "omsp.mcpAdd.head", gap: "xs" }, head, "head"),
 			...step.body,
 		];
 		if (step.choices) {
@@ -632,7 +635,7 @@ export class MCPAddWizard extends OverlayPanel {
 			children.push(
 				node(
 					"list",
-					{ selected: String(this.#selectedIndex), role: "omp.mcpAdd.choices" },
+					{ selected: String(this.#selectedIndex), role: "omsp.mcpAdd.choices" },
 					items,
 					`choices-${this.#currentStep}`,
 				),
@@ -658,12 +661,12 @@ export class MCPAddWizard extends OverlayPanel {
 			const tone = index === phase ? "accent" : index > phase ? "muted" : skipped ? "neutral" : "success";
 			return node(
 				"col",
-				{ role: "omp.mcpAdd.phase", tone, ...(skipped ? { title: "Auth · not needed" } : {}) },
+				{ role: "omsp.mcpAdd.phase", tone, ...(skipped ? { title: "Auth · not needed" } : {}) },
 				[text(label)],
 				label,
 			);
 		});
-		return node("row", { role: "omp.mcpAdd.progress", gap: "xs" }, segments, "progress");
+		return node("row", { role: "omsp.mcpAdd.progress", gap: "xs" }, segments, "progress");
 	}
 
 	/** Cancel on the left; Back and the step's one primary action on the right. Keys live in the tooltips. */
@@ -805,8 +808,8 @@ export class MCPAddWizard extends OverlayPanel {
 
 	#renderTransportStep(): void {
 		this.#choiceStep({
-			title: "How does omp reach it?",
-			lead: `Pick how ${this.#state.name} talks to omp.`,
+			title: "How does omsp reach it?",
+			lead: `Pick how ${this.#state.name} talks to omsp.`,
 			choices: TRANSPORTS.map(transport => ({ ...TRANSPORT_CHOICES[transport], tag: transport })),
 			escape: "go back",
 		});
@@ -815,7 +818,7 @@ export class MCPAddWizard extends OverlayPanel {
 	#renderCommandStep(): void {
 		this.#inputStep({
 			title: "Command",
-			lead: "The program omp starts for this server.",
+			lead: "The program omsp starts for this server.",
 			initial: this.#state.command,
 			placeholder: "npx",
 			escape: "go back",
@@ -826,7 +829,7 @@ export class MCPAddWizard extends OverlayPanel {
 	#renderArgsStep(): void {
 		this.#inputStep({
 			title: "Arguments",
-			lead: `Passed to ${this.#state.command}, separated by spaces. omp tries the connection next.`,
+			lead: `Passed to ${this.#state.command}, separated by spaces. omsp tries the connection next.`,
 			initial: this.#state.args,
 			placeholder: "-y @modelcontextprotocol/server-github",
 			optional: true,
@@ -836,7 +839,7 @@ export class MCPAddWizard extends OverlayPanel {
 	#renderUrlStep(): void {
 		this.#inputStep({
 			title: "Server URL",
-			lead: `Where ${this.#state.name} listens. omp tries the connection next.`,
+			lead: `Where ${this.#state.name} listens. omsp tries the connection next.`,
 			initial: this.#state.url,
 			placeholder: "https://mcp.example.com/mcp",
 			note: "Starts with http:// or https://",
@@ -964,11 +967,11 @@ export class MCPAddWizard extends OverlayPanel {
 			{
 				phase: PHASE_REVIEW,
 				title: "Review and save",
-				lead: "omp connects to the server as soon as it is saved.",
+				lead: "omsp connects to the server as soon as it is saved.",
 				body: [
 					node(
 						"kv",
-						{ role: "omp.mcpAdd.summary", items: entries.map(entry => ({ k: entry.k, v: entry.v })) },
+						{ role: "omsp.mcpAdd.summary", items: entries.map(entry => ({ k: entry.k, v: entry.v })) },
 						undefined,
 						"summary",
 					),
@@ -1327,7 +1330,7 @@ export class MCPAddWizard extends OverlayPanel {
 	#renderAuthMethodStep(): void {
 		this.#choiceStep({
 			title: "How does it authenticate?",
-			lead: `${this.#state.name} needs credentials before omp can use it.`,
+			lead: `${this.#state.name} needs credentials before omsp can use it.`,
 			choices: [
 				{ icon: "log-in", label: "Sign in with OAuth", description: "Opens your browser" },
 				{ icon: "key", label: "API key or token", description: "Paste it, or run a command that prints it" },
@@ -1382,7 +1385,7 @@ export class MCPAddWizard extends OverlayPanel {
 	#renderOAuthScopesStep(): void {
 		this.#inputStep({
 			title: "Scopes",
-			lead: "What omp may access, separated by spaces. Sign-in starts next.",
+			lead: "What omsp may access, separated by spaces. Sign-in starts next.",
 			initial: this.#state.oauthScopes,
 			placeholder: "read write",
 			escape: "go back",
@@ -1405,7 +1408,7 @@ export class MCPAddWizard extends OverlayPanel {
 		intro.addChild(new Text("Choose next action:", 0, 0));
 		const body = compact([
 			failure && !cancelled ? errorBlock(failure.message) : undefined,
-			failure?.tip ? { ...text(failure.tip, { role: "omp.mcpAdd.note", wrap: "word" }), key: "tip" } : undefined,
+			failure?.tip ? { ...text(failure.tip, { role: "omsp.mcpAdd.note", wrap: "word" }), key: "tip" } : undefined,
 		]);
 		this.#choiceStep({
 			title: cancelled ? "Sign-in cancelled" : "Sign-in failed",
@@ -1455,7 +1458,7 @@ export class MCPAddWizard extends OverlayPanel {
 			phase: PHASE_CONNECTION,
 			title: "Trying the connection",
 			tone: "accent",
-			lead: "omp connects once to see whether the server needs credentials.",
+			lead: "omsp connects once to see whether the server needs credentials.",
 			ansi: new Text(theme.fg("muted", `Connecting to ${sanitize(target)}…`), 0, 0),
 			native: [statusRow("busy", [span("Connecting to "), span(replaceTabs(target), "mono")])],
 		});
@@ -1546,7 +1549,7 @@ export class MCPAddWizard extends OverlayPanel {
 					phase: PHASE_CONNECTION,
 					title: "Couldn't connect",
 					tone: "warning",
-					lead: "omp saves the server anyway; fix it later with /mcp.",
+					lead: "omsp saves the server anyway; fix it later with /mcp.",
 					ansi: failureBody,
 					native: [errorBlock(nativeErrorText(error)), statusRow("busy", "Adding the server anyway…")],
 				});
@@ -1724,12 +1727,12 @@ export class MCPAddWizard extends OverlayPanel {
 			healthBody.addChild(healthText);
 			const signedIn = statusRow("ok", "Signed in", "signed-in");
 			const checks = (health: NativeNode) =>
-				node("col", { role: "omp.mcpAdd.checks", gap: "sm" }, [signedIn, health], "checks");
+				node("col", { role: "omsp.mcpAdd.checks", gap: "sm" }, [signedIn, health], "checks");
 			this.#asyncStep({
 				phase: PHASE_AUTH,
 				title: "Checking the server",
 				tone: "success",
-				lead: "omp tries the new credentials before saving.",
+				lead: "omsp tries the new credentials before saving.",
 				ansi: healthBody,
 				native: [checks(statusRow("busy", "Waiting for the server to answer…", "health"))],
 			});
@@ -1783,7 +1786,7 @@ export class MCPAddWizard extends OverlayPanel {
 				healthBody.addChild(new Spacer(1));
 				healthBody.addChild(new Text(theme.fg("muted", healthError), 0, 0));
 				this.#setNativeBody([
-					checks(statusRow("warn", "The server didn't answer; omp saves it anyway", "health")),
+					checks(statusRow("warn", "The server didn't answer; omsp saves it anyway", "health")),
 					errorBlock(nativeHealthError),
 				]);
 			}

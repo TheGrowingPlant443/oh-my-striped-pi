@@ -2,12 +2,12 @@ import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { getOverviewStats } from "@oh-my-pi/omp-stats/aggregator";
-import { initDb, insertMessageStats } from "@oh-my-pi/omp-stats/db";
-import { getStatsByAgentType } from "@oh-my-pi/omp-stats/rollup";
-import { classifyAgentType } from "@oh-my-pi/omp-stats/parser";
-import type { AgentType, MessageStats } from "@oh-my-pi/omp-stats/types";
-import { getConfigRootDir, getSessionsDir, getStatsDbPath } from "@oh-my-pi/pi-utils";
+import { getOverviewStats } from "@oh-my-striped-pi/omsp-stats/aggregator";
+import { initDb, insertMessageStats } from "@oh-my-striped-pi/omsp-stats/db";
+import { getStatsByAgentType } from "@oh-my-striped-pi/omsp-stats/rollup";
+import { classifyAgentType } from "@oh-my-striped-pi/omsp-stats/parser";
+import type { AgentType, MessageStats } from "@oh-my-striped-pi/omsp-stats/types";
+import { getConfigRootDir, getSessionsDir, getStatsDbPath } from "@oh-my-striped-pi/pi-utils";
 import { installStatsTestIsolation } from "./helpers/temp-agent";
 
 installStatsTestIsolation("@pi-stats-agent-type-");

@@ -1,19 +1,19 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionList } from "@oh-my-pi/pi-tui/overlays/extensions/extension-list";
-import type { Extension } from "@oh-my-pi/pi-tui/overlays/extensions/types";
-import { HistorySearchComponent } from "@oh-my-pi/pi-tui/overlays/history-search";
-import { RewindSelectorComponent } from "@oh-my-pi/pi-tui/overlays/rewind-selector";
-import { SessionSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-selector";
-import { TreeSelectorComponent } from "@oh-my-pi/pi-tui/overlays/tree-selector";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
-import type { SessionMessageEntry, SessionTreeNode } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
-import { setKeybindings, type TUI } from "@oh-my-pi/pi-tui";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ExtensionList } from "@oh-my-striped-pi/pi-tui/overlays/extensions/extension-list";
+import type { Extension } from "@oh-my-striped-pi/pi-tui/overlays/extensions/types";
+import { HistorySearchComponent } from "@oh-my-striped-pi/pi-tui/overlays/history-search";
+import { RewindSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/rewind-selector";
+import { SessionSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/session-selector";
+import { TreeSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/tree-selector";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { HistoryStorage } from "@oh-my-striped-pi/pi-coding-agent/session/history-storage";
+import type { SessionMessageEntry, SessionTreeNode } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
+import { setKeybindings, type TUI } from "@oh-my-striped-pi/pi-tui";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const CTRL_N = "\x0e";
 const CTRL_P = "\x10";
@@ -116,7 +116,7 @@ function createExtension(id: string, displayName: string): Extension {
 }
 
 async function createHistoryStorage(prompts: string[]): Promise<HistoryStorage> {
-	const dir = TempDir.createSync("@omp-history-nav-");
+	const dir = TempDir.createSync("@omsp-history-nav-");
 	tempDirs.push(dir);
 	HistoryStorage.close();
 	const storage = HistoryStorage.open(dir.join("history.db"));

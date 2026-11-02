@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import type { AuthStorage } from "@oh-my-pi/pi-ai";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { runSearchQuery } from "@oh-my-pi/pi-coding-agent/web/search";
-import * as provider from "@oh-my-pi/pi-coding-agent/web/search/provider";
-import { SearchProvider } from "@oh-my-pi/pi-coding-agent/web/search/provider";
-import type { SearchParams } from "@oh-my-pi/pi-coding-agent/web/search/providers/base";
-import { DEFAULT_SEARCH_CHAIN } from "@oh-my-pi/pi-coding-agent/web/search/selection";
-import type { SearchResponse } from "@oh-my-pi/pi-coding-agent/web/search/types";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-ai";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { runSearchQuery } from "@oh-my-striped-pi/pi-coding-agent/web/search";
+import * as provider from "@oh-my-striped-pi/pi-coding-agent/web/search/provider";
+import { SearchProvider } from "@oh-my-striped-pi/pi-coding-agent/web/search/provider";
+import type { SearchParams } from "@oh-my-striped-pi/pi-coding-agent/web/search/providers/base";
+import { DEFAULT_SEARCH_CHAIN } from "@oh-my-striped-pi/pi-coding-agent/web/search/selection";
+import type { SearchResponse } from "@oh-my-striped-pi/pi-coding-agent/web/search/types";
 import { createInMemoryAuthStorage } from "../../helpers/agent-session-setup";
 
 /** Records each independent selector and fails so the chain keeps walking. */

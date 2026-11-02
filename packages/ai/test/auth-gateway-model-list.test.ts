@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { startAuthGateway } from "@oh-my-pi/pi-ai/auth-gateway";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import { classifyGatewayError, MissingApiKeyError, OAuthRefreshUnavailableError } from "@oh-my-pi/pi-ai/error";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { startAuthGateway } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { classifyGatewayError, MissingApiKeyError, OAuthRefreshUnavailableError } from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { resolveGatewayApiKey } from "../src/auth-gateway/dispatch";
 
 test("model listing exposes one provider-qualified route per upstream model", async () => {

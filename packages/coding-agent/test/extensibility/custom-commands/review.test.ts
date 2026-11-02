@@ -2,22 +2,22 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type 
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings, withActiveSettings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ReviewCommand } from "@oh-my-pi/pi-coding-agent/extensibility/custom-commands/bundled/review";
-import type { CustomCommandAPI } from "@oh-my-pi/pi-coding-agent/extensibility/custom-commands/types";
-import type { HookCommandContext } from "@oh-my-pi/pi-coding-agent/extensibility/hooks/types";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls";
-import type { SessionEntry } from "@oh-my-pi/pi-coding-agent/session/session-entries";
-import type { PrDiffPayload, ViewLookupResult } from "@oh-my-pi/pi-coding-agent/tools/gh";
-import * as gh from "@oh-my-pi/pi-coding-agent/tools/gh";
-import { parsePrUnifiedDiff } from "@oh-my-pi/pi-coding-agent/tools/gh-pr-diff";
-import * as glab from "@oh-my-pi/pi-coding-agent/tools/glab-mr";
-import { resetForTests as resetCacheForTests } from "@oh-my-pi/pi-coding-agent/tools/github-cache";
-import { github } from "@oh-my-pi/pi-coding-agent/utils/github";
-import { gitlab } from "@oh-my-pi/pi-coding-agent/utils/gitlab";
-import type { VcsGitRepo, VcsRepo } from "@oh-my-pi/pi-natives";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { Settings, withActiveSettings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { ReviewCommand } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-commands/bundled/review";
+import type { CustomCommandAPI } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-commands/types";
+import type { HookCommandContext } from "@oh-my-striped-pi/pi-coding-agent/extensibility/hooks/types";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls";
+import type { SessionEntry } from "@oh-my-striped-pi/pi-coding-agent/session/session-entries";
+import type { PrDiffPayload, ViewLookupResult } from "@oh-my-striped-pi/pi-coding-agent/tools/gh";
+import * as gh from "@oh-my-striped-pi/pi-coding-agent/tools/gh";
+import { parsePrUnifiedDiff } from "@oh-my-striped-pi/pi-coding-agent/tools/gh-pr-diff";
+import * as glab from "@oh-my-striped-pi/pi-coding-agent/tools/glab-mr";
+import { resetForTests as resetCacheForTests } from "@oh-my-striped-pi/pi-coding-agent/tools/github-cache";
+import { github } from "@oh-my-striped-pi/pi-coding-agent/utils/github";
+import { gitlab } from "@oh-my-striped-pi/pi-coding-agent/utils/gitlab";
+import type { VcsGitRepo, VcsRepo } from "@oh-my-striped-pi/pi-natives";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 import { $ } from "bun";
 
 const SAMPLE_JJ_DIFF = `diff --git a/src/workspace.ts b/src/workspace.ts
@@ -90,7 +90,7 @@ describe("ReviewCommand", () => {
 	let retainGeneration!: Mock<typeof gh.retainPrDiffGeneration>;
 
 	beforeAll(async () => {
-		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-review-command-"));
+		tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-review-command-"));
 	});
 
 	beforeEach(() => {
@@ -313,10 +313,10 @@ describe("ReviewCommand", () => {
 	it("does not retain a review snapshot when the GitHub cache is disabled", async () => {
 		const dir = createTempDir();
 		const previousToken = process.env.GH_TOKEN;
-		const previousCacheDb = process.env.OMP_GITHUB_CACHE_DB;
-		const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-review-cache-off-"));
+		const previousCacheDb = process.env.OMSP_GITHUB_CACHE_DB;
+		const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-review-cache-off-"));
 		process.env.GH_TOKEN = "review-cache-disabled";
-		process.env.OMP_GITHUB_CACHE_DB = path.join(cacheDir, "github-cache.db");
+		process.env.OMSP_GITHUB_CACHE_DB = path.join(cacheDir, "github-cache.db");
 		resetCacheForTests();
 		const settings = Settings.isolated({ "github.cache.enabled": false });
 		spyOn(github, "text").mockResolvedValue(SAMPLE_PR_DIFF);
@@ -335,8 +335,8 @@ describe("ReviewCommand", () => {
 			resetCacheForTests();
 			if (previousToken === undefined) delete process.env.GH_TOKEN;
 			else process.env.GH_TOKEN = previousToken;
-			if (previousCacheDb === undefined) delete process.env.OMP_GITHUB_CACHE_DB;
-			else process.env.OMP_GITHUB_CACHE_DB = previousCacheDb;
+			if (previousCacheDb === undefined) delete process.env.OMSP_GITHUB_CACHE_DB;
+			else process.env.OMSP_GITHUB_CACHE_DB = previousCacheDb;
 			resetCacheForTests();
 			await removeWithRetries(cacheDir);
 		}
@@ -348,10 +348,10 @@ describe("ReviewCommand", () => {
 	])(
 		"links each PR file to its actual diff slice with $fileCount reviewable files",
 		async ({ fileCount, lastIndex }) => {
-			const previousCacheDb = process.env.OMP_GITHUB_CACHE_DB;
+			const previousCacheDb = process.env.OMSP_GITHUB_CACHE_DB;
 			const previousGhToken = process.env.GH_TOKEN;
-			const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-review-cache-"));
-			process.env.OMP_GITHUB_CACHE_DB = path.join(cacheDir, "github-cache.db");
+			const cacheDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-review-cache-"));
+			process.env.OMSP_GITHUB_CACHE_DB = path.join(cacheDir, "github-cache.db");
 			process.env.GH_TOKEN = "review-test-token";
 			retainGeneration.mockRestore();
 			resetCacheForTests();
@@ -411,8 +411,8 @@ describe("ReviewCommand", () => {
 				}
 			} finally {
 				resetCacheForTests();
-				if (previousCacheDb === undefined) delete process.env.OMP_GITHUB_CACHE_DB;
-				else process.env.OMP_GITHUB_CACHE_DB = previousCacheDb;
+				if (previousCacheDb === undefined) delete process.env.OMSP_GITHUB_CACHE_DB;
+				else process.env.OMSP_GITHUB_CACHE_DB = previousCacheDb;
 				if (previousGhToken === undefined) delete process.env.GH_TOKEN;
 				else process.env.GH_TOKEN = previousGhToken;
 				resetCacheForTests();
@@ -916,7 +916,7 @@ describe("ReviewCommand", () => {
 	});
 
 	it("resolves base-branch review against a real repo without a range revspec", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-review-real-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-review-real-"));
 		try {
 			await $`git init -q -b main`.cwd(dir).quiet();
 			await $`git config user.email test@example.com`.cwd(dir).quiet();
@@ -968,7 +968,7 @@ describe("ReviewCommand", () => {
 	});
 
 	it("rejects base-branch review when histories share no merge base", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-review-orphan-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-review-orphan-"));
 		try {
 			await $`git init -q -b main`.cwd(dir).quiet();
 			await $`git config user.email test@example.com`.cwd(dir).quiet();

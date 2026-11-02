@@ -42,7 +42,7 @@ describe("JSON query in read tool", () => {
 	let readTool: ReadTool;
 
 	beforeAll(async () => {
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-json-test-"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-json-test-"));
 		jsonFile = path.join(tempDir, "data.json");
 		jsonlFile = path.join(tempDir, "events.jsonl");
 		numbersFile = path.join(tempDir, "numbers.json");
@@ -271,7 +271,7 @@ describe("JSON query in read tool", () => {
 		]);
 	});
 
-	// Holds for the bundled jq and, with PI_DISABLE_UUTILS_BUILTINS set, for a system jq.
+	// Holds for the bundled jq and, with OMSP_DISABLE_UUTILS_BUILTINS set, for a system jq.
 	it("reports a line that fails mid-file alongside the other lines' results", async () => {
 		const text = getText(await readTool.execute("call_mid_error", { path: `${failingLineFile}?q=.n + 1` }));
 		expect(text).toStartWith("[jq stderr: ");

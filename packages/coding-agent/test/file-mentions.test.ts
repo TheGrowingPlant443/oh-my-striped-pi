@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { EditStore } from "@oh-my-pi/pi-natives";
-import { encodeArchive } from "@oh-my-pi/pi-utils/ar";
-import { extractFileMentions, generateFileMentionMessages } from "@oh-my-pi/pi-coding-agent/utils/file-mentions";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { EditStore } from "@oh-my-striped-pi/pi-natives";
+import { encodeArchive } from "@oh-my-striped-pi/pi-utils/ar";
+import {
+	extractFileMentions,
+	generateFileMentionMessages,
+} from "@oh-my-striped-pi/pi-coding-agent/utils/file-mentions";
+import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { restoreEnvValue } from "./helpers/settings-test-state";
 
 const tempDirs: string[] = [];
@@ -14,17 +17,17 @@ let originalOmpProfile: string | undefined;
 let originalPiProfile: string | undefined;
 
 beforeEach(async () => {
-	originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	originalOmpProfile = process.env.OMP_PROFILE;
-	originalPiProfile = process.env.PI_PROFILE;
+	originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+	originalOmpProfile = process.env.OMSP_PROFILE;
+	originalPiProfile = process.env.OMSP_PROFILE;
 	const agentDir = await createTempDir();
 	setAgentDir(agentDir);
 });
 
 afterEach(async () => {
-	restoreEnvValue("PI_CODING_AGENT_DIR", originalAgentDir);
-	restoreEnvValue("OMP_PROFILE", originalOmpProfile);
-	restoreEnvValue("PI_PROFILE", originalPiProfile);
+	restoreEnvValue("OMSP_CODING_AGENT_DIR", originalAgentDir);
+	restoreEnvValue("OMSP_PROFILE", originalOmpProfile);
+	restoreEnvValue("OMSP_PROFILE", originalPiProfile);
 	__resetDirsFromEnvForTests();
 	for (const dir of tempDirs.splice(0, tempDirs.length)) {
 		await removeWithRetries(dir);

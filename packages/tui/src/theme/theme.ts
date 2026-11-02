@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { detectMacOSAppearance, MacAppearanceObserver } from "@oh-my-pi/pi-natives";
+import { detectMacOSAppearance, MacAppearanceObserver } from "@oh-my-striped-pi/pi-natives";
 import type { Terminal, TerminalAppearance } from "../terminal";
-import { colorLuma } from "@oh-my-pi/pi-utils/color";
-import { getCustomThemesDir } from "@oh-my-pi/pi-utils/dirs";
-import * as logger from "@oh-my-pi/pi-utils/logger";
+import { colorLuma } from "@oh-my-striped-pi/pi-utils/color";
+import { getCustomThemesDir } from "@oh-my-striped-pi/pi-utils/dirs";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
 import { isTerminalBackgroundQueryTrusted } from "../terminal-multiplexer";
 import { setActiveSymbolTheme } from "./active-symbols";
 import { ansi256ToHex, resolveThemeColors, resolveVarRefs } from "./color";

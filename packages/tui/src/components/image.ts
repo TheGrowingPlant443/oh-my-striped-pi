@@ -1,4 +1,4 @@
-import { encodeSixelAsync } from "@oh-my-pi/pi-natives";
+import { encodeSixelAsync } from "@oh-my-striped-pi/pi-natives";
 import { getKittyGraphics } from "../kitty-graphics";
 import { ensureSixelRasterWidth } from "../sixel";
 import {

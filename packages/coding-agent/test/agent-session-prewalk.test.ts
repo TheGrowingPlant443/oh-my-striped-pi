@@ -1,31 +1,31 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { type } from "@oh-my-pi/omptype";
-import { Agent, type AgentTool, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { type Api, Effort, type Model } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockResponse } from "@oh-my-pi/pi-ai/providers/mock";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { CustomToolAdapter } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/wrapper";
-import { DeferredMCPTool } from "@oh-my-pi/pi-coding-agent/mcp/tool-bridge";
-import { dispatchXdevTool, type XdevDispatch, type XdevState } from "@oh-my-pi/pi-coding-agent/tools/xdev";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { getRestorableSessionModels } from "@oh-my-pi/pi-coding-agent/session/session-context";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { type } from "@oh-my-striped-pi/omptype";
+import { Agent, type AgentTool, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import { type Api, Effort, type Model } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockResponse } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { CustomToolAdapter } from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/wrapper";
+import { DeferredMCPTool } from "@oh-my-striped-pi/pi-coding-agent/mcp/tool-bridge";
+import { dispatchXdevTool, type XdevDispatch, type XdevState } from "@oh-my-striped-pi/pi-coding-agent/tools/xdev";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { getRestorableSessionModels } from "@oh-my-striped-pi/pi-coding-agent/session/session-context";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import { toProviderModelConfig } from "./helpers/model-fixtures";
 import {
 	cfgPrewalkEnabled,
 	cfgRetryBaseDelayMs,
 	cfgRetryFallbackChains,
 	cfgRetryFallbackRevertPolicy,
-} from "@oh-my-pi/pi-coding-agent/session/settings";
-import { executeBuiltinSlashCommand } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import type { TuiSlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-commands/types";
-import { AUTO_THINKING } from "@oh-my-pi/pi-tui/thinking";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { executeBuiltinSlashCommand } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import type { TuiSlashCommandRuntime } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/types";
+import { AUTO_THINKING } from "@oh-my-striped-pi/pi-tui/thinking";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { mockSchedulerWaitWithClock } from "./helpers/mock-scheduler-clock";
 
@@ -1187,7 +1187,7 @@ describe("AgentSession prewalk", () => {
 		const sessionManager = SessionManager.inMemory();
 		sessionManager.appendCustomMessageEntry(
 			"prewalk-plan",
-			"legacy plan nudge written by an older OMP version",
+			"legacy plan nudge written by an older OMSP version",
 			false,
 			undefined,
 			"agent",

@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { runCommitAgentSession } from "@oh-my-pi/pi-coding-agent/commit/agentic/agent";
-import * as toolsModule from "@oh-my-pi/pi-coding-agent/commit/agentic/tools";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { PromptOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+import { runCommitAgentSession } from "@oh-my-striped-pi/pi-coding-agent/commit/agentic/agent";
+import * as toolsModule from "@oh-my-striped-pi/pi-coding-agent/commit/agentic/tools";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { PromptOptions } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
 import { getTestModel } from "./helpers/model-fixtures";
 
 describe("commit agent prompt attribution", () => {

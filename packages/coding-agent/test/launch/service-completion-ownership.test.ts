@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { Process } from "@oh-my-pi/pi-natives";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Process } from "@oh-my-striped-pi/pi-natives";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { Settings } from "../../src/config/settings";
 import { startDaemonBrokerFromEnvironment } from "../../src/launch/broker";
 import * as brokerClients from "../../src/launch/client";
@@ -49,7 +49,7 @@ async function startBroker(projectDir: string, runtimeDir: string): Promise<Embe
 
 describe("session-owned supervised services", () => {
 	it("delivers a failed service only to its session when another session shares the broker", async () => {
-		using tempDir = TempDir.createSync("@omp-service-completion-");
+		using tempDir = TempDir.createSync("@omsp-service-completion-");
 		const projectDir = path.join(tempDir.path(), "project");
 		const runtimeDir = path.join(tempDir.path(), "runtime");
 		await fs.mkdir(projectDir);
@@ -104,7 +104,7 @@ describe("session-owned supervised services", () => {
 	}, 15_000);
 
 	it("replays a completion to its session when that session is resumed after a switch", async () => {
-		using tempDir = TempDir.createSync("@omp-service-transition-");
+		using tempDir = TempDir.createSync("@omsp-service-transition-");
 		const projectDir = path.join(tempDir.path(), "project");
 		const runtimeDir = path.join(tempDir.path(), "runtime");
 		await fs.mkdir(projectDir);
@@ -171,7 +171,7 @@ describe("session-owned supervised services", () => {
 	}, 15_000);
 
 	it("replays a detached service exit only when its original session resumes after broker restart", async () => {
-		using tempDir = TempDir.createSync("@omp-service-detached-");
+		using tempDir = TempDir.createSync("@omsp-service-detached-");
 		const projectDir = path.join(tempDir.path(), "project");
 		const runtimeDir = path.join(tempDir.path(), "runtime");
 		await fs.mkdir(projectDir);
@@ -271,7 +271,7 @@ describe("session-owned supervised services", () => {
 	}, 20_000);
 
 	it("starts a bash `name` service with the session identity", async () => {
-		using tempDir = TempDir.createSync("@omp-service-env-");
+		using tempDir = TempDir.createSync("@omsp-service-env-");
 		const projectDir = path.join(tempDir.path(), "project");
 		const runtimeDir = path.join(tempDir.path(), "runtime");
 		await fs.mkdir(projectDir);
@@ -291,7 +291,7 @@ describe("session-owned supervised services", () => {
 		try {
 			vi.spyOn(brokerClients, "daemonClientForProject").mockResolvedValue(client);
 			const result = await new BashTool(session).execute("svc-env", {
-				command: `echo "env=$PI_SESSION_ID|$PI_SESSION_FILE"; read answer`,
+				command: `echo "env=$OMSP_SESSION_ID|$OMSP_SESSION_FILE"; read answer`,
 				name: "env-service",
 				pty: false,
 				ready: { log: `env=session-svc\\|${sessionFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, timeout: 5 },

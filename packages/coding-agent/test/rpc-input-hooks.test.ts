@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import type { RpcPromptResultFrame } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import type { RpcPromptResultFrame } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 function userTexts(messages: AgentMessage[]): string[] {
 	return messages.flatMap(message => {
@@ -20,11 +20,11 @@ describe("RPC native input handlers", () => {
 	let directory: string;
 
 	beforeEach(async () => {
-		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-input-hook-"));
+		directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-input-hook-"));
 		client = new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "input-hook-rpc-agent.ts")],
 			cwd: directory,
-			env: { PI_CODING_AGENT_DIR: directory, PI_NO_TITLE: "1" },
+			env: { OMSP_CODING_AGENT_DIR: directory, OMSP_NO_TITLE: "1" },
 		});
 		await client.start();
 	});

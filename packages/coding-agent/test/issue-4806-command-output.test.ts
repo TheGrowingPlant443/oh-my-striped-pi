@@ -1,19 +1,19 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InteractiveMode } from "@oh-my-pi/pi-coding-agent/modes/interactive-mode";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { InputController } from "@oh-my-pi/pi-coding-agent/modes/controllers/input-controller";
-import { Text } from "@oh-my-pi/pi-tui";
-import { isNativeRendering, setNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InteractiveMode } from "@oh-my-striped-pi/pi-coding-agent/modes/interactive-mode";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { HistoryStorage } from "@oh-my-striped-pi/pi-coding-agent/session/history-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { InputController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/input-controller";
+import { Text } from "@oh-my-striped-pi/pi-tui";
+import { isNativeRendering, setNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 describe("issue #4806 command output during streaming", () => {
 	let authStorage: AuthStorage;
@@ -95,7 +95,7 @@ describe("issue #4806 command output during streaming", () => {
 			const sheet = () => mode.ui.overlayStack.at(-1)?.component;
 
 			mode.handleToolsCommand();
-			expect(sheet()?.nativeOverlay).toMatchObject({ role: "omp.overlay.report", size: "lg" });
+			expect(sheet()?.nativeOverlay).toMatchObject({ role: "omsp.overlay.report", size: "lg" });
 			expect(mode.ui.getFocused()).toBe(sheet() ?? null);
 			expect(mode.chatContainer.children).toHaveLength(0);
 			expect(mode.reportContainer.children).toHaveLength(0);

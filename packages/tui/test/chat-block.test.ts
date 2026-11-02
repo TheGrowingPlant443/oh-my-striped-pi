@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import { ChatBlock, type ChatBlockHost } from "@oh-my-pi/pi-tui/chrome/chat-block";
-import type { Component } from "@oh-my-pi/pi-tui";
+import { ChatBlock, type ChatBlockHost } from "@oh-my-striped-pi/pi-tui/chrome/chat-block";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
 
 /** Concrete subclass exposing the protected lifecycle seams for assertions. */
 class TestBlock extends ChatBlock {

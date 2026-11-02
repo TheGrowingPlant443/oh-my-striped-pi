@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { getRoleInfo } from "@oh-my-pi/pi-coding-agent/config/model-roles";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { getSearchEngineModel } from "@oh-my-pi/pi-coding-agent/web/search/provider";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { getRoleInfo } from "@oh-my-striped-pi/pi-coding-agent/config/model-roles";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { getSearchEngineModel } from "@oh-my-striped-pi/pi-coding-agent/web/search/provider";
 
 function makeModel(id: string, metadata: Partial<Pick<Model, "api" | "kind">> = {}): Model {
 	return buildModel({

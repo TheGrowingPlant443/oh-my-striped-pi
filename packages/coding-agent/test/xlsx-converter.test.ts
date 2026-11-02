@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { encodeArchive } from "@oh-my-pi/pi-utils/ar";
+import { encodeArchive } from "@oh-my-striped-pi/pi-utils/ar";
 import { XlsxConverter } from "../src/markit/converters/xlsx";
 
 const NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";

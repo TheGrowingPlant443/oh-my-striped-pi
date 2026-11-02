@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import * as path from "node:path";
-import { isRecord, readJsonl } from "@oh-my-pi/pi-utils";
+import { isRecord, readJsonl } from "@oh-my-striped-pi/pi-utils";
 import { getTestModel } from "./helpers/model-fixtures";
 
 async function expectRpcOwnsStdin(): Promise<void> {
@@ -22,7 +22,7 @@ async function expectRpcOwnsStdin(): Promise<void> {
 		],
 		{
 			cwd: path.join(import.meta.dir, ".."),
-			env: { ...Bun.env, PI_NO_TITLE: "1" },
+			env: { ...Bun.env, OMSP_NO_TITLE: "1" },
 			stdin: "pipe",
 			stdout: "pipe",
 			stderr: "pipe",

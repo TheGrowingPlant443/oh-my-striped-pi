@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { type RawSettings, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { SelectorController } from "@oh-my-pi/pi-coding-agent/modes/controllers/selector-controller";
-import { SecretObfuscator } from "@oh-my-pi/pi-coding-agent/secrets";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import * as modelHubModule from "@oh-my-pi/pi-tui/overlays/model-hub";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { type RawSettings, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { SelectorController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/selector-controller";
+import { SecretObfuscator } from "@oh-my-striped-pi/pi-coding-agent/secrets";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import * as modelHubModule from "@oh-my-striped-pi/pi-tui/overlays/model-hub";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "../../helpers/settings-test-state";
@@ -97,7 +97,7 @@ describe("SelectorController model hub writes", () => {
 	it("switches the session to the project default when its already-assigned chip is picked", async () => {
 		const agentDir = tempDir.join("agent");
 		await Bun.write(
-			tempDir.join(".omp", "config.yml"),
+			tempDir.join(".omsp", "config.yml"),
 			YAML.stringify({ modelRoles: { default: "github-copilot/claude-opus-4.5" } }),
 		);
 		const settings = await Settings.init({ agentDir, cwd: tempDir.path() });

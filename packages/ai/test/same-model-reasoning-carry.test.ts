@@ -11,11 +11,11 @@
  * Model lineage comes from KDL; native reasoning slots are explicit fixture capabilities.
  */
 import { describe, expect, it } from "bun:test";
-import { convertMessages } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { stream } from "@oh-my-pi/pi-ai/stream";
-import type { Api, AssistantMessage, Message, Model, ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { convertMessages } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { stream } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Api, AssistantMessage, Message, Model, ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const TRACE = "Earlier reasoning: read foo.ts, then patch bar().";
 const THINK = `<think>\n${TRACE}\n</think>`;
@@ -82,7 +82,7 @@ function completionsAssistant(model: Model<"openai-completions">, messages: Mess
 }
 
 /**
- * The assistant-side input items of the Responses request omp sends on a fresh
+ * The assistant-side input items of the Responses request omsp sends on a fresh
  * provider session (the state right after a host switch), captured before any
  * network call.
  */
@@ -273,7 +273,7 @@ describe("same-model reasoning carry", () => {
 
 	it("keeps demoting a family that is not declared portable, even with a matching identity", async () => {
 		// gpt-5.6-sol and gpt-5.6-terra share class/family/revision; GPT reasoning
-		// reaches omp as summaries plus encrypted content, so it is not declared.
+		// reaches omsp as summaries plus encrypted content, so it is not declared.
 		const terra: Source = { provider: "github-copilot", api: "openai-responses", model: "gpt-5.6-terra" };
 
 		const items = await responsesAssistantItems(

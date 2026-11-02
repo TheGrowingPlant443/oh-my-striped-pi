@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { BUILTIN_SLASH_COMMANDS } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-registry";
-import * as piUtils from "@oh-my-pi/pi-utils";
+import { BUILTIN_SLASH_COMMANDS } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-registry";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
 
 describe("/move directory completion", () => {
 	let tempDir: string;
 	const move = BUILTIN_SLASH_COMMANDS.find(c => c.name === "move");
 
 	beforeEach(async () => {
-		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-move-completion-"));
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-move-completion-"));
 		vi.spyOn(piUtils, "getProjectDir").mockReturnValue(tempDir);
 	});
 

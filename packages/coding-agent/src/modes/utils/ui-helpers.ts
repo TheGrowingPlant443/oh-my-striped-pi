@@ -1,46 +1,46 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, ImageContent, Usage } from "@oh-my-pi/pi-ai";
-import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { StatusNotice } from "@oh-my-pi/pi-tui/chrome/status-notice";
-import { QueuedMessagesBand } from "@oh-my-pi/pi-tui/prompt/queued-messages";
-import { logger } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, ImageContent, Usage } from "@oh-my-striped-pi/pi-ai";
+import { getStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { StatusNotice } from "@oh-my-striped-pi/pi-tui/chrome/status-notice";
+import { QueuedMessagesBand } from "@oh-my-striped-pi/pi-tui/prompt/queued-messages";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import type { AdvisorMessageDetails } from "../../advisor";
 import { InternalUrlRouter } from "../../internal-urls";
 import { COLLAB_PROMPT_MESSAGE_TYPE, type CollabPromptDetails } from "../../collab/protocol";
 import { settings } from "../../config/settings";
-import { createAdvisorMessageCard } from "@oh-my-pi/pi-tui/chat/advisor-message";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { readMediaPath } from "@oh-my-pi/pi-tui/native/blobs";
-import { createBackgroundTanDispatchBlock } from "@oh-my-pi/pi-tui/chat/background-tan-message";
-import { BashExecutionComponent } from "@oh-my-pi/pi-tui/chat/bash-execution";
-import { detectCacheInvalidation } from "@oh-my-pi/pi-tui/chat/cache-invalidation-marker";
-import { ServedModelTracker } from "@oh-my-pi/pi-tui/chat/served-model-marker";
-import { CollabPromptMessageComponent } from "@oh-my-pi/pi-tui/chat/collab-prompt-message";
+import { createAdvisorMessageCard } from "@oh-my-striped-pi/pi-tui/chat/advisor-message";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { readMediaPath } from "@oh-my-striped-pi/pi-tui/native/blobs";
+import { createBackgroundTanDispatchBlock } from "@oh-my-striped-pi/pi-tui/chat/background-tan-message";
+import { BashExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/bash-execution";
+import { detectCacheInvalidation } from "@oh-my-striped-pi/pi-tui/chat/cache-invalidation-marker";
+import { ServedModelTracker } from "@oh-my-striped-pi/pi-tui/chat/served-model-marker";
+import { CollabPromptMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/collab-prompt-message";
 import {
 	BranchSummaryMessageComponent,
 	CompactionSummaryMessageComponent,
 	createHandoffSummaryMessageComponent,
-} from "@oh-my-pi/pi-tui/chat/compaction-summary-message";
-import { CustomMessageComponent } from "@oh-my-pi/pi-tui/chat/custom-message";
-import { EvalExecutionComponent } from "@oh-my-pi/pi-tui/chat/eval-execution";
+} from "@oh-my-striped-pi/pi-tui/chat/compaction-summary-message";
+import { CustomMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/custom-message";
+import { EvalExecutionComponent } from "@oh-my-striped-pi/pi-tui/chat/eval-execution";
 import {
 	type LateDiagnosticsFile,
 	LateDiagnosticsMessageComponent,
 	routeLateDiagnostics,
-} from "@oh-my-pi/pi-tui/chat/late-diagnostics-message";
+} from "@oh-my-striped-pi/pi-tui/chat/late-diagnostics-message";
 import {
 	groupedReadUsageCallIds,
 	ReadToolGroupComponent,
 	readArgsCollapseIntoGroup,
-} from "@oh-my-pi/pi-tui/chat/read-tool-group";
-import { ReplyWriteComponent, replyDisplayMessage, toolResultReplies } from "@oh-my-pi/pi-tui/chat/reply-write";
-import { SkillMessageComponent } from "@oh-my-pi/pi-tui/chat/skill-message";
-import { StrippedToolCallsPlaceholder } from "@oh-my-pi/pi-tui/chat/stripped-tool-calls-placeholder";
-import { imageContent, textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
-import { ToolActivityContainer } from "@oh-my-pi/pi-tui/chrome/tool-activity";
+} from "@oh-my-striped-pi/pi-tui/chat/read-tool-group";
+import { ReplyWriteComponent, replyDisplayMessage, toolResultReplies } from "@oh-my-striped-pi/pi-tui/chat/reply-write";
+import { SkillMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/skill-message";
+import { StrippedToolCallsPlaceholder } from "@oh-my-striped-pi/pi-tui/chat/stripped-tool-calls-placeholder";
+import { imageContent, textContent } from "@oh-my-striped-pi/pi-tui/chat/transcript-entry";
+import { ToolActivityContainer } from "@oh-my-striped-pi/pi-tui/chrome/tool-activity";
 import {
 	isSettledJobFrame,
 	parksAsBackground,
@@ -48,20 +48,20 @@ import {
 	ToolExecutionComponent,
 	type ToolExecutionHandle,
 	toolRenderName,
-} from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { TranscriptContainer } from "@oh-my-pi/pi-tui/chrome/transcript-container";
-import { TranscriptNotice } from "@oh-my-pi/pi-tui/chrome/transcript-notice";
-import { createUsageRowBlock, turnElapsedMs } from "@oh-my-pi/pi-tui/overlays/usage-row";
-import { UserMessageComponent } from "@oh-my-pi/pi-tui/chat/user-message";
+} from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { TranscriptContainer } from "@oh-my-striped-pi/pi-tui/chrome/transcript-container";
+import { TranscriptNotice } from "@oh-my-striped-pi/pi-tui/chrome/transcript-notice";
+import { createUsageRowBlock, turnElapsedMs } from "@oh-my-striped-pi/pi-tui/overlays/usage-row";
+import { UserMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/user-message";
 import { decodeStreamedToolArgs, streamingStringKeysForTool } from "../../modes/controllers/tool-args-reveal";
 import { createToolCallBlock } from "../../modes/controllers/tool-call-block";
 import {
 	materializeImageReferenceLinks,
 	materializeImageReferenceLinksSync,
-} from "@oh-my-pi/pi-tui/prompt/image-references";
-import { normalizeBlobExtension } from "@oh-my-pi/pi-tui/prompt/image-format";
-import { imageAttachmentSource } from "@oh-my-pi/pi-tui/prompt/image-source";
-import { theme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-tui/prompt/image-references";
+import { normalizeBlobExtension } from "@oh-my-striped-pi/pi-tui/prompt/image-format";
+import { imageAttachmentSource } from "@oh-my-striped-pi/pi-tui/prompt/image-source";
+import { theme } from "@oh-my-striped-pi/pi-tui/theme";
 import type {
 	CompactionQueuedMessage,
 	InteractiveModeContext,
@@ -85,7 +85,7 @@ import {
 	createAssistantMessageComponent,
 	getAssistantMessageLinkTargets,
 	refreshAssistantMessageLinkTargets,
-} from "@oh-my-pi/pi-tui/prompt/interactive-context-helpers";
+} from "@oh-my-striped-pi/pi-tui/prompt/interactive-context-helpers";
 import {
 	assistantHasVisibleContent,
 	assistantUsageIsBilled,
@@ -96,7 +96,7 @@ import {
 	normalizeToolArgs,
 	resolveAssistantErrorPresentation,
 	splitAssistantMessageToolTimeline,
-} from "@oh-my-pi/pi-tui/chat/transcript-render-helpers";
+} from "@oh-my-striped-pi/pi-tui/chat/transcript-render-helpers";
 
 import {
 	cfgComposerRecallClearedDrafts,

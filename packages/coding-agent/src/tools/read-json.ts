@@ -1,11 +1,16 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { Shell } from "@oh-my-pi/pi-natives";
-import type { ReadToolDetails } from "@oh-my-pi/pi-tui/tools/read";
-import { DEFAULT_MAX_LINES, truncateHead, truncateMiddle, truncateTail } from "@oh-my-pi/pi-tui/tools/streaming-output";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { Shell } from "@oh-my-striped-pi/pi-natives";
+import type { ReadToolDetails } from "@oh-my-striped-pi/pi-tui/tools/read";
+import {
+	DEFAULT_MAX_LINES,
+	truncateHead,
+	truncateMiddle,
+	truncateTail,
+} from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import {
 	IMAGE_METADATA_HEADER_BYTES,
 	isEnoent,
@@ -13,8 +18,8 @@ import {
 	parseImageMetadata,
 	sanitizeText,
 	TempDir,
-} from "@oh-my-pi/pi-utils";
-import { peekFile } from "@oh-my-pi/pi-utils/peek-file";
+} from "@oh-my-striped-pi/pi-utils";
+import { peekFile } from "@oh-my-striped-pi/pi-utils/peek-file";
 import type { ToolSession } from "../sdk";
 import { quotePosixArgument } from "../utils/shell-quote";
 import { resolveReadPath } from "./path-utils";
@@ -279,7 +284,7 @@ async function runJq(
 	const { signal, stopAfterLines } = options;
 	throwIfAborted(signal);
 
-	const stderrPath = path.join(os.tmpdir(), `omp-jq-${crypto.randomUUID()}.err`);
+	const stderrPath = path.join(os.tmpdir(), `omsp-jq-${crypto.randomUUID()}.err`);
 	// jaq parses any argument starting with `-` as flags even when shell-quoted;
 	// `--` keeps filters such as `-.price` positional.
 	const command = `jq ${flags.join(" ")} -- ${quotePosixArgument(query)} ${quotePosixArgument(filePath)} 2>${quotePosixArgument(stderrPath)}`;
@@ -463,7 +468,7 @@ export async function readJson(
 
 	let queryOutput: string;
 	if ("url" in resolvedJsonPath) {
-		await using scratch = await TempDir.create("@omp-read-json-");
+		await using scratch = await TempDir.create("@omsp-read-json-");
 		const inputPath = scratch.join("input.json");
 		await Bun.write(inputPath, resolvedJsonPath.content);
 		queryOutput = await executeJsonQuery(inputPath, resolvedJsonPath.selector, signal);

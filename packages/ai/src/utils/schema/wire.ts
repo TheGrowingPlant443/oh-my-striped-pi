@@ -6,8 +6,8 @@
  * validators see the same JSON Schema dialect.
  */
 
-import type { Type } from "@oh-my-pi/omptype";
-import { isRecord, structuredCloneJSON } from "@oh-my-pi/pi-utils";
+import type { Type } from "@oh-my-striped-pi/omptype";
+import { isRecord, structuredCloneJSON } from "@oh-my-striped-pi/pi-utils";
 import type { Tool, TSchema } from "../../types";
 import { upgradeJsonSchemaTo202012 } from "./draft";
 import { stamp } from "./stamps";
@@ -109,9 +109,9 @@ function arkJsonAstToWire(value: unknown): unknown {
 }
 
 /** `stamp` cache keys; the entries themselves live in a weak side table keyed by schema identity. */
-const kJsonWireSchema = Symbol("omp.schema.json.wire");
-const kArkWireSchema = Symbol("omp.schema.ark.wire");
-const kStrippedSchema = Symbol("omp.schema.descriptions.stripped");
+const kJsonWireSchema = Symbol("omsp.schema.json.wire");
+const kArkWireSchema = Symbol("omsp.schema.ark.wire");
+const kStrippedSchema = Symbol("omsp.schema.descriptions.stripped");
 
 function postProcessJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
 	walk(schema);

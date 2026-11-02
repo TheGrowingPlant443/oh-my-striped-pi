@@ -897,9 +897,9 @@ async fn create_session_for_run(
 		}
 	}
 	// Process inspection and control (see `pi_builtins::process_builtins`).
-	// `nohup` is withheld when PI_DISABLE_NOHUP_BUILTIN asks for the system one;
-	// `kill` already comes from the default set, where our richer implementation
-	// replaced brush's.
+	// `nohup` is withheld when OMSP_DISABLE_NOHUP_BUILTIN asks for the system
+	// one; `kill` already comes from the default set, where our richer
+	// implementation replaced brush's.
 	for (name, registration) in pi_builtins::process_builtins() {
 		if name == "nohup" && nohup_builtin_disabled(config) {
 			continue;
@@ -910,14 +910,14 @@ async fn create_session_for_run(
 	// `pi_builtins::utility_builtins`): consistent, cross-platform
 	// implementations that run without spawning a process and resolve paths
 	// against the shell working directory. The whole set can be disabled
-	// (falling back to system binaries) via PI_DISABLE_UUTILS_BUILTINS; the
+	// (falling back to system binaries) via OMSP_DISABLE_UUTILS_BUILTINS; the
 	// destructive set (`rm`, `mv`, `cp`, `ln`, `dd`, `rsync`) additionally
-	// honors PI_DISABLE_UUTILS_DESTRUCTIVE, and `rm`/`mv` have their own
+	// honors OMSP_DISABLE_UUTILS_DESTRUCTIVE, and `rm`/`mv` have their own
 	// switches.
-	if !env_flag(config, "PI_DISABLE_UUTILS_BUILTINS") {
-		let destructive_disabled = env_flag(config, "PI_DISABLE_UUTILS_DESTRUCTIVE");
-		let rm_disabled = destructive_disabled || env_flag(config, "PI_DISABLE_RM_BUILTIN");
-		let mv_disabled = destructive_disabled || env_flag(config, "PI_DISABLE_MV_BUILTIN");
+	if !env_flag(config, "OMSP_DISABLE_UUTILS_BUILTINS") {
+		let destructive_disabled = env_flag(config, "OMSP_DISABLE_UUTILS_DESTRUCTIVE");
+		let rm_disabled = destructive_disabled || env_flag(config, "OMSP_DISABLE_RM_BUILTIN");
+		let mv_disabled = destructive_disabled || env_flag(config, "OMSP_DISABLE_MV_BUILTIN");
 		for (name, registration) in pi_builtins::utility_builtins() {
 			let disabled = match name {
 				"rm" => rm_disabled,
@@ -934,13 +934,13 @@ async fn create_session_for_run(
 		}
 	}
 
-	// Opt-in `git` layers (see `crate::git`): PI_SMART_GIT makes `git worktree
-	// add` a copy-on-write clone through pi-vcs; PI_GIT_GUARD refuses commands
+	// Opt-in `git` layers (see `crate::git`): OMSP_SMART_GIT makes `git worktree
+	// add` a copy-on-write clone through pi-vcs; OMSP_GIT_GUARD refuses commands
 	// that discard or move work in a shared checkout. Anything a layer does not
 	// take reaches the binary unchanged.
 	if let Some(git) = git_builtin(GitLayers {
-		smart_worktree: env_flag(config, "PI_SMART_GIT"),
-		guard:          env_flag(config, "PI_GIT_GUARD"),
+		smart_worktree: env_flag(config, "OMSP_SMART_GIT"),
+		guard:          env_flag(config, "OMSP_GIT_GUARD"),
 	}) {
 		shell.register_builtin("git", git);
 	}
@@ -2265,13 +2265,13 @@ fn pipe_to_files(label: &str) -> Result<(fs::File, fs::File)> {
 /// The builtin detaches its operand into a new session so a backgrounded server
 /// survives this embedded shell's kill-on-drop teardown, which a system `nohup`
 /// does not do. It therefore shadows the real one unless
-/// `PI_DISABLE_NOHUP_BUILTIN` (session env or process env) asks otherwise.
+/// `OMSP_DISABLE_NOHUP_BUILTIN` (session env or process env) asks otherwise.
 fn nohup_builtin_disabled(config: &ShellConfig) -> bool {
-	env_flag(config, "PI_DISABLE_NOHUP_BUILTIN")
+	env_flag(config, "OMSP_DISABLE_NOHUP_BUILTIN")
 }
 
-/// Reads a boolean builtin switch (`PI_DISABLE_*`, `PI_SMART_GIT`,
-/// `PI_GIT_GUARD`) from the session environment (preferred) then the process
+/// Reads a boolean builtin switch (`OMSP_DISABLE_*`, `OMSP_SMART_GIT`,
+/// `OMSP_GIT_GUARD`) from the session environment (preferred) then the process
 /// environment. Truthy = present and not "", "0", or "false".
 fn env_flag(config: &ShellConfig, key: &str) -> bool {
 	let raw = config
@@ -2641,7 +2641,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn shell_initializes_after_process_cwd_is_deleted() {
-		const MARKER: &str = "PI_SHELL_TEST_DELETED_CWD";
+		const MARKER: &str = "OMSP_SHELL_TEST_DELETED_CWD";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::shell_initializes_after_process_cwd_is_deleted",
@@ -2794,7 +2794,7 @@ mod tests {
 		let out = dir.path().join("probe");
 		let mut env = HashMap::new();
 		env.insert("GIT_DIR".to_string(), "/primary/.git".to_string());
-		env.insert("OMP_GIT_ENV_PROBE".to_string(), "kept".to_string());
+		env.insert("OMSP_GIT_ENV_PROBE".to_string(), "kept".to_string());
 		let config = ShellConfig {
 			session_env:   Some(env),
 			snapshot_path: None,
@@ -2809,7 +2809,7 @@ mod tests {
 		params.set_fd(OpenFiles::STDERR_FD, null_file().expect("null stderr"));
 
 		let command = format!(
-			"printf '%s|%s' \"${{GIT_DIR-unset}}\" \"$OMP_GIT_ENV_PROBE\" > {}",
+			"printf '%s|%s' \"${{GIT_DIR-unset}}\" \"$OMSP_GIT_ENV_PROBE\" > {}",
 			quote_arg(out.to_str().expect("utf8 probe path"))
 		);
 		session
@@ -2875,7 +2875,7 @@ mod tests {
 		let mut child = Command::new(command);
 		child
 			.args(["--ignored", "--exact", "shell::tests::process_test_sleeper"])
-			.env("PI_SHELL_PROCESS_TEST_SLEEP_MS", duration_ms.to_string())
+			.env("OMSP_SHELL_PROCESS_TEST_SLEEP_MS", duration_ms.to_string())
 			.stdout(std::process::Stdio::null())
 			.stderr(std::process::Stdio::null());
 		child
@@ -2885,7 +2885,7 @@ mod tests {
 	#[test]
 	#[ignore = "spawned by process-control tests"]
 	fn process_test_sleeper() {
-		let Ok(duration_ms) = std::env::var("PI_SHELL_PROCESS_TEST_SLEEP_MS") else {
+		let Ok(duration_ms) = std::env::var("OMSP_SHELL_PROCESS_TEST_SLEEP_MS") else {
 			return;
 		};
 		let duration_ms = duration_ms
@@ -3772,7 +3772,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn kill_builtin_signals_every_process_in_a_jobspec_pipeline() {
-		const MARKER: &str = "PI_SHELL_TEST_KILL_JOBSPEC_PIPELINE";
+		const MARKER: &str = "OMSP_SHELL_TEST_KILL_JOBSPEC_PIPELINE";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::kill_builtin_signals_every_process_in_a_jobspec_pipeline",
@@ -3860,7 +3860,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn stopped_later_detached_pipeline_stage_stops_pipeline() {
-		const MARKER: &str = "PI_SHELL_TEST_STOPPED_LATER_DETACHED_STAGE";
+		const MARKER: &str = "OMSP_SHELL_TEST_STOPPED_LATER_DETACHED_STAGE";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::stopped_later_detached_pipeline_stage_stops_pipeline",
@@ -3902,7 +3902,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn stopped_later_interactive_detached_stage_stops_pipeline() {
-		const MARKER: &str = "PI_SHELL_TEST_STOPPED_LATER_INTERACTIVE_STAGE";
+		const MARKER: &str = "OMSP_SHELL_TEST_STOPPED_LATER_INTERACTIVE_STAGE";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::stopped_later_interactive_detached_stage_stops_pipeline",
@@ -3945,7 +3945,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn resumed_pipeline_drains_every_selected_stop_report() {
-		const MARKER: &str = "PI_SHELL_TEST_DRAINED_STOP_REPORTS";
+		const MARKER: &str = "OMSP_SHELL_TEST_DRAINED_STOP_REPORTS";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::resumed_pipeline_drains_every_selected_stop_report",
@@ -4064,7 +4064,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn child_wait_reports_a_stop_that_precedes_the_wait() {
-		const MARKER: &str = "PI_SHELL_TEST_CHILD_STOP_BEFORE_WAIT";
+		const MARKER: &str = "OMSP_SHELL_TEST_CHILD_STOP_BEFORE_WAIT";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::child_wait_reports_a_stop_that_precedes_the_wait",
@@ -4105,7 +4105,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn stopped_background_job_does_not_stop_foreground_process() {
-		const MARKER: &str = "PI_SHELL_TEST_STOPPED_BACKGROUND_JOB";
+		const MARKER: &str = "OMSP_SHELL_TEST_STOPPED_BACKGROUND_JOB";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::stopped_background_job_does_not_stop_foreground_process",
@@ -4239,7 +4239,7 @@ mod tests {
 	/// refused without terminating command execution.
 	#[tokio::test(flavor = "multi_thread")]
 	async fn kill_builtin_refuses_own_pid() {
-		const MARKER: &str = "PI_SHELL_TEST_KILL_OWN_PID";
+		const MARKER: &str = "OMSP_SHELL_TEST_KILL_OWN_PID";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test("shell::tests::kill_builtin_refuses_own_pid", MARKER, false).await;
 			return;
@@ -4263,7 +4263,7 @@ mod tests {
 	#[cfg(unix)]
 	#[tokio::test(flavor = "multi_thread")]
 	async fn kill_builtin_refuses_own_process_group() {
-		const MARKER: &str = "PI_SHELL_TEST_KILL_OWN_GROUP";
+		const MARKER: &str = "OMSP_SHELL_TEST_KILL_OWN_GROUP";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test(
 				"shell::tests::kill_builtin_refuses_own_process_group",
@@ -4323,7 +4323,7 @@ mod tests {
 	/// selected signal, even when that PID is requested explicitly.
 	#[tokio::test(flavor = "multi_thread")]
 	async fn pkill_builtin_excludes_own_pid() {
-		const MARKER: &str = "PI_SHELL_TEST_PKILL_OWN_PID";
+		const MARKER: &str = "OMSP_SHELL_TEST_PKILL_OWN_PID";
 		if std::env::var_os(MARKER).is_none() {
 			run_isolated_kill_test("shell::tests::pkill_builtin_excludes_own_pid", MARKER, false)
 				.await;
@@ -5677,8 +5677,8 @@ mod tests {
 		session
 			.shell
 			.run_string(
-				"export PI_EXEC_ENV=zed; find . -name keep.log -exec sh -c 'echo \"$PI_EXEC_ENV $1\"' \
-				 sh {} ';' > cap.txt",
+				"export OMSP_EXEC_ENV=zed; find . -name keep.log -exec sh -c 'echo \"$OMSP_EXEC_ENV \
+				 $1\"' sh {} ';' > cap.txt",
 				&si,
 				&params,
 			)
@@ -5742,9 +5742,10 @@ mod tests {
 	/// trace attribute (`-t`).
 	#[tokio::test(flavor = "multi_thread")]
 	async fn declare_readonly_listing_does_not_require_trace() {
-		let (result, output) =
-			execute_captured("readonly OMP_DECLARE_RO=1; declare -r | grep -c OMP_DECLARE_RO".into())
-				.await;
+		let (result, output) = execute_captured(
+			"readonly OMSP_DECLARE_RO=1; declare -r | grep -c OMSP_DECLARE_RO".into(),
+		)
+		.await;
 		assert_eq!(result.exit_code, Some(0), "{output}");
 		assert_eq!(output.trim(), "1");
 	}
@@ -6055,14 +6056,14 @@ mod tests {
 		assert!(default.shell.builtin_mut("rm").is_some(), "rm registered by default");
 		assert!(default.shell.builtin_mut("mv").is_some(), "mv registered by default");
 
-		let mut all_off = create_session(&session_with(&[("PI_DISABLE_UUTILS_BUILTINS", "1")]))
+		let mut all_off = create_session(&session_with(&[("OMSP_DISABLE_UUTILS_BUILTINS", "1")]))
 			.await
 			.expect("create_session");
 		assert!(all_off.shell.builtin_mut("head").is_none(), "kill-switch drops head");
 		assert!(all_off.shell.builtin_mut("rg").is_none(), "kill-switch drops rg");
 		assert!(all_off.shell.builtin_mut("rm").is_none(), "kill-switch drops rm");
 
-		let mut rm_off = create_session(&session_with(&[("PI_DISABLE_RM_BUILTIN", "1")]))
+		let mut rm_off = create_session(&session_with(&[("OMSP_DISABLE_RM_BUILTIN", "1")]))
 			.await
 			.expect("create_session");
 		assert!(rm_off.shell.builtin_mut("rm").is_none(), "rm disabled individually");
@@ -7095,9 +7096,9 @@ replace = [{ pattern = "hello", replacement = "HI" }]
 				.expect("run")
 				.exit_code
 		};
-		let state_intact = "test \"$PI_KEPT\" = kept && pi_kept_fn";
+		let state_intact = "test \"$OMSP_KEPT\" = kept && pi_kept_fn";
 
-		assert_eq!(exit_code("set -e; PI_KEPT=kept; pi_kept_fn() { true; }").await, Some(0));
+		assert_eq!(exit_code("set -e; OMSP_KEPT=kept; pi_kept_fn() { true; }").await, Some(0));
 		assert_eq!(exit_code("false; true").await, Some(1), "errexit stops the command");
 		assert_eq!(exit_code(state_intact).await, Some(0), "state lost after errexit");
 		assert_eq!(exit_code("exit 3").await, Some(3));
@@ -7215,7 +7216,7 @@ replace = [{ pattern = "hello", replacement = "HI" }]
 				cwd: Some(root.to_string_lossy().into_owned()),
 				// the built-in jq even when the environment turns builtins off
 				session_env: Some(HashMap::from([(
-					"PI_DISABLE_UUTILS_BUILTINS".to_string(),
+					"OMSP_DISABLE_UUTILS_BUILTINS".to_string(),
 					"0".to_string(),
 				)])),
 				minimizer: Some(minimizer::MinimizerOptions {
@@ -7911,7 +7912,7 @@ replace = [{ pattern = "^.+$", replacement = "PWD" }]
 	/// Regression for the `suspended (tty input)` bug: an **interactive child
 	/// inside a pipeline** (`zsh -i ... | awk`) used to stay in the host
 	/// session, open `/dev/tty`, `tcsetpgrp` itself to the foreground, and
-	/// leave the embedded host (OMP) stopped on its next tty read. The earlier
+	/// leave the embedded host (OMSP) stopped on its next tty read. The earlier
 	/// embedded-host fix carved pipelines out of `detach_session` because a
 	/// later stage that `setpgid`-joined a detached leader failed with EPERM.
 	///

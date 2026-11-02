@@ -1,4 +1,4 @@
-import type { Agent, AgentMessage, AgentTool, StreamFn, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import type { Agent, AgentMessage, AgentTool, StreamFn, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	AssistantMessage,
 	Context,
@@ -11,9 +11,9 @@ import type {
 	ServiceTierByFamily,
 	SimpleStreamOptions,
 	ToolChoice,
-} from "@oh-my-pi/pi-ai";
-import type { postmortem } from "@oh-my-pi/pi-utils";
-import type { AdvisorConfig } from "@oh-my-pi/pi-tui/overlays/advisor-config";
+} from "@oh-my-striped-pi/pi-ai";
+import type { postmortem } from "@oh-my-striped-pi/pi-utils";
+import type { AdvisorConfig } from "@oh-my-striped-pi/pi-tui/overlays/advisor-config";
 import type { AsyncJob, AsyncJobDeliveryState, AsyncJobManager } from "../async";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import type { AgentDefinition } from "../task/types";
@@ -22,7 +22,7 @@ import type { ModelRegistry } from "../config/model-registry";
 import type { PromptTemplate } from "../config/prompt-templates";
 import type { Settings } from "../config/settings";
 import type { SkillsSettings } from "../extensibility/settings";
-import type { RawSseDebugBuffer } from "@oh-my-pi/pi-tui/apps/debug/raw-sse-buffer";
+import type { RawSseDebugBuffer } from "@oh-my-striped-pi/pi-tui/apps/debug/raw-sse-buffer";
 import type { EvalPreludeDefinition } from "../eval/preludes";
 import type { TtsrManager } from "../export/ttsr";
 import type { LoadedCustomCommand } from "../extensibility/custom-commands";
@@ -34,8 +34,8 @@ import type { SkillDescriptionCatalog } from "../extensibility/skill-description
 import type { Skill, SkillWarning } from "../extensibility/skills";
 import type { FileSlashCommand } from "../extensibility/slash-commands";
 import type { SecretObfuscator } from "../secrets/obfuscator";
-import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
-import type { JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
+import type { ConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
+import type { JobWidgetView } from "@oh-my-striped-pi/pi-tui/tools/job-widget";
 import type { ToolSession } from "../tools";
 import type { XdevState } from "../tools/xdev";
 import type { SettingsGatedToolDelta } from "./session-tools";
@@ -497,8 +497,8 @@ export interface RoleModelCycleResult {
 	role: string;
 }
 
-import type { ResolvedRoleModel } from "@oh-my-pi/pi-tui/overlays/model-picker";
-export type { ResolvedRoleModel } from "@oh-my-pi/pi-tui/overlays/model-picker";
+import type { ResolvedRoleModel } from "@oh-my-striped-pi/pi-tui/overlays/model-picker";
+export type { ResolvedRoleModel } from "@oh-my-striped-pi/pi-tui/overlays/model-picker";
 
 /** Resolvable role models and the currently active index. */
 export interface RoleModelCycle {

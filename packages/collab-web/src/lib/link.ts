@@ -1,6 +1,6 @@
 /**
  * Collab link + wire-envelope handling (browser-safe vendored mirror of the
- * link/envelope half of `@oh-my-pi/pi-coding-agent/src/collab/protocol.ts`;
+ * link/envelope half of `@oh-my-striped-pi/pi-coding-agent/src/collab/protocol.ts`;
  * base64url goes through atob/btoa instead of Buffer).
  *
  * Link format: `wss://<host[:port]>/r/<roomId>.<base64url-32-byte-key>`
@@ -8,10 +8,10 @@
  * sends peerId 0; the relay rewrites it to the sender's id.
  */
 
-import type { ParsedCollabLink } from "@oh-my-pi/pi-wire";
-import { ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES, ROOM_KEY_BYTES, WRITE_TOKEN_BYTES } from "@oh-my-pi/pi-wire";
+import type { ParsedCollabLink } from "@oh-my-striped-pi/pi-wire";
+import { ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES, ROOM_KEY_BYTES, WRITE_TOKEN_BYTES } from "@oh-my-striped-pi/pi-wire";
 
-export { COLLAB_PROTO } from "@oh-my-pi/pi-wire";
+export { COLLAB_PROTO } from "@oh-my-striped-pi/pi-wire";
 export type { ParsedCollabLink };
 export { ENVELOPE_HEADER_LENGTH, ROOM_ID_BYTES };
 

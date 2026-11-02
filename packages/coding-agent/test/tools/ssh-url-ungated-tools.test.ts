@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import * as os from "node:os";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InternalUrlRouter } from "@oh-my-pi/pi-coding-agent/internal-urls/router";
-import { InternalUrlFilesystem } from "@oh-my-pi/pi-coding-agent/internal-urls/url-filesystem";
-import { resolveToolSearchScope } from "@oh-my-pi/pi-coding-agent/tools/path-utils";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InternalUrlRouter } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/router";
+import { InternalUrlFilesystem } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/url-filesystem";
+import { resolveToolSearchScope } from "@oh-my-striped-pi/pi-coding-agent/tools/path-utils";
 
 // `ast_edit` resolves internal URLs through a filesystem bounded by its write
 // tier, and `glob`/`ast_grep`/`find` bound theirs by the approved tier, so a

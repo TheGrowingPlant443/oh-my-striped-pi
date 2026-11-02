@@ -4,11 +4,13 @@
 
 ### Changed
 
-- Improved `omp stats` session synchronization performance by approximately 2–5× on large histories. The first sync after upgrading may take up to a minute while the stats database is optimized.
+- Improved `omsp stats` session synchronization performance by approximately 2–5× on large histories. The first sync after upgrading may take up to a minute while the stats database is optimized.
+- Moved the dashboard's default port to 3848 so `omsp` and `omp` dashboards can run side by side.
 
 ### Fixed
 
-- Fixed `/stats` and `omp stats` failing when another dashboard was syncing sessions or the configured port was already in use; busy dashboards are now reused, and a free port is selected when necessary.
+- Fixed `/stats` and `omsp stats` failing when another dashboard was syncing sessions or the configured port was already in use; busy dashboards are now reused, and a free port is selected when necessary.
+- Left upstream and unrelated source dashboards running when a custom port is occupied; reclaiming a listener now requires `omsp` command identity or the fork's dashboard protocol.
 
 ## [18.13.3] - 2026-10-28
 

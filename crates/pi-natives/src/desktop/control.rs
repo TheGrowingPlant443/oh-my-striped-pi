@@ -930,7 +930,7 @@ pub(crate) fn own_for_test() -> CoreResult<impl Sized> {
 /// in this process take its one input ownership to send input.
 #[cfg(all(test, target_os = "macos"))]
 pub(crate) fn alone(test: &str) -> bool {
-	const ALONE: &str = "PI_DESKTOP_TEST_ALONE";
+	const ALONE: &str = "OMSP_DESKTOP_TEST_ALONE";
 	if std::env::var_os(ALONE).is_some() {
 		return true;
 	}
@@ -1189,11 +1189,11 @@ mod tests {
 	#[cfg(unix)]
 	#[test]
 	fn kernel_child_probe() {
-		let Some(path) = std::env::var_os("PI_CONTROL_TEST_LOCK") else {
+		let Some(path) = std::env::var_os("OMSP_CONTROL_TEST_LOCK") else {
 			return;
 		};
 		let acquired = KernelLease::at(std::path::Path::new(&path));
-		assert_eq!(acquired.is_ok(), std::env::var_os("PI_CONTROL_TEST_FREE").is_some());
+		assert_eq!(acquired.is_ok(), std::env::var_os("OMSP_CONTROL_TEST_FREE").is_some());
 		if acquired.is_ok() {
 			// Deliberately skip Rust destructors, as on a crashed host.
 			std::process::exit(0);
@@ -1206,10 +1206,10 @@ mod tests {
 		let mut command = std::process::Command::new(std::env::current_exe().expect("test binary"));
 		command
 			.args(["--exact", "desktop::control::tests::kernel_child_probe"])
-			.env("PI_CONTROL_TEST_LOCK", path)
-			.env_remove("PI_CONTROL_TEST_FREE");
+			.env("OMSP_CONTROL_TEST_LOCK", path)
+			.env_remove("OMSP_CONTROL_TEST_FREE");
 		if free {
-			command.env("PI_CONTROL_TEST_FREE", "1");
+			command.env("OMSP_CONTROL_TEST_FREE", "1");
 		}
 		assert!(command.status().expect("child probe").success());
 	}

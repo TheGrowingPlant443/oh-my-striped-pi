@@ -2,19 +2,23 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AssistantMessage, ImageContent, Message, Usage } from "@oh-my-pi/pi-ai";
-import { BtwHistoryPanel } from "@oh-my-pi/pi-tui/overlays/btw-history-panel";
-import { BtwController } from "@oh-my-pi/pi-coding-agent/modes/controllers/btw-controller";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { type BtwHistoryRecord, BtwHistoryStore, getBtwTurns } from "@oh-my-pi/pi-coding-agent/session/btw-history";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TRUNCATE_LENGTHS } from "@oh-my-pi/pi-tui/render/render-utils";
-import * as clipboard from "@oh-my-pi/pi-coding-agent/utils/clipboard";
-import * as atomicFile from "@oh-my-pi/pi-coding-agent/utils/atomic-file";
-import { Container, Input, type KeyId, type TUI } from "@oh-my-pi/pi-tui";
-import type { DictationTarget } from "@oh-my-pi/pi-coding-agent/stt/push-to-talk";
-import { SPACE_HOLD_MECHANICAL_RUN, type SpaceHoldHandler } from "@oh-my-pi/pi-tui/space-hold";
+import type { AssistantMessage, ImageContent, Message, Usage } from "@oh-my-striped-pi/pi-ai";
+import { BtwHistoryPanel } from "@oh-my-striped-pi/pi-tui/overlays/btw-history-panel";
+import { BtwController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/btw-controller";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import {
+	type BtwHistoryRecord,
+	BtwHistoryStore,
+	getBtwTurns,
+} from "@oh-my-striped-pi/pi-coding-agent/session/btw-history";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TRUNCATE_LENGTHS } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import * as clipboard from "@oh-my-striped-pi/pi-coding-agent/utils/clipboard";
+import * as atomicFile from "@oh-my-striped-pi/pi-coding-agent/utils/atomic-file";
+import { Container, Input, type KeyId, type TUI } from "@oh-my-striped-pi/pi-tui";
+import type { DictationTarget } from "@oh-my-striped-pi/pi-coding-agent/stt/push-to-talk";
+import { SPACE_HOLD_MECHANICAL_RUN, type SpaceHoldHandler } from "@oh-my-striped-pi/pi-tui/space-hold";
 
 interface TurnArgs {
 	promptText: string;
@@ -83,7 +87,7 @@ async function records(manager: SessionManager): Promise<readonly BtwHistoryReco
 }
 
 async function harness(spaceHoldKeys: readonly KeyId[] = ["space"]) {
-	const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-btw-follow-up-"));
+	const directory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-btw-follow-up-"));
 	const manager = SessionManager.create(directory, directory);
 	const managers = [manager];
 	const requests: PendingTurn[] = [];

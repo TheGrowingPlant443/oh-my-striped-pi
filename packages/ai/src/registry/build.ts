@@ -1,5 +1,5 @@
-import type { CompiledAuthProvider } from "@oh-my-pi/pi-catalog/compat/types";
-import { $pickenv } from "@oh-my-pi/pi-utils";
+import type { CompiledAuthProvider } from "@oh-my-striped-pi/pi-catalog/compat/types";
+import { $pickenv } from "@oh-my-striped-pi/pi-utils";
 import * as AIError from "../error";
 import { createApiKeyLogin } from "./engine/api-key";
 import { HOOKS } from "./hooks";

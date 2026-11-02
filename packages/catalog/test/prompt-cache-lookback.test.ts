@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { resolvePromptCacheLookback } from "@oh-my-pi/pi-catalog/compat/prompt-cache-lookback";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { resolvePromptCacheLookback } from "@oh-my-striped-pi/pi-catalog/compat/prompt-cache-lookback";
 
 const base = {
 	reasoning: true,

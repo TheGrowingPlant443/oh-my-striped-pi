@@ -7,12 +7,15 @@
  * the producing model still is.
  */
 import { describe, expect, it } from "bun:test";
-import { Agent, type AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, Model, ProviderSessionState } from "@oh-my-pi/pi-ai";
-import { buildParams } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { SessionMaintenance, type SessionMaintenanceHost } from "@oh-my-pi/pi-coding-agent/session/session-maintenance";
+import { Agent, type AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai";
+import { buildParams } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	SessionMaintenance,
+	type SessionMaintenanceHost,
+} from "@oh-my-striped-pi/pi-coding-agent/session/session-maintenance";
 
 const active = getBundledModel<"openai-responses">("github-copilot", "gpt-5.4");
 // Same encoding, another model: it gets the turns re-encoded without their reasoning.

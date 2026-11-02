@@ -1,11 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { disposeAllVmContexts } from "@oh-my-pi/pi-coding-agent/eval/js/context-manager";
-import { createBrowserPrelude } from "@oh-my-pi/pi-coding-agent/tools/browser";
-import { releaseAllTabs } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-supervisor";
-import type { ScreenshotResult } from "@oh-my-pi/pi-coding-agent/tools/browser/tab-protocol";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools/index";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { disposeAllVmContexts } from "@oh-my-striped-pi/pi-coding-agent/eval/js/context-manager";
+import { createBrowserPrelude } from "@oh-my-striped-pi/pi-coding-agent/tools/browser";
+import { releaseAllTabs } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-supervisor";
+import type { ScreenshotResult } from "@oh-my-striped-pi/pi-coding-agent/tools/browser/tab-protocol";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools/index";
 import { chromiumAvailable } from "./chromium-probe";
 
 const CHROMIUM_AVAILABLE = await chromiumAvailable();
@@ -216,7 +216,7 @@ button { margin: 80px; width: 180px; height: 60px; }
 		async scale => {
 			// Backend overrides would send this open to a relay or cmux surface instead of headless Chromium.
 			const savedEnv = { ...process.env };
-			for (const key of ["PI_BROWSER_RELAY", "PI_BROWSER_CMUX", "PI_BROWSER_TERN"]) delete process.env[key];
+			for (const key of ["OMSP_BROWSER_RELAY", "OMSP_BROWSER_CMUX", "OMSP_BROWSER_TERN"]) delete process.env[key];
 			const invoke = createHost();
 			const name = `screenshot-click-factor-${crypto.randomUUID()}`;
 			const html = `<!doctype html><html><head><style>

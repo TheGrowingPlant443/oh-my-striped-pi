@@ -5,8 +5,8 @@ import { matchesKey } from "../keys";
 import { centerLine, padding } from "../utils";
 import { padToWidth } from "../render/utils";
 import { routeSgrMouseInput, type SgrMouseEvent } from "../mouse";
-import { APP_NAME } from "@oh-my-pi/pi-utils";
-import { gradientLogo, PI_LOGO } from "../prompt/welcome";
+import { APP_NAME } from "@oh-my-striped-pi/pi-utils";
+import { gradientLogo, OMSP_LOGO } from "../prompt/welcome";
 import { theme } from "../theme/theme";
 import { col, keyed, node, row, span, text } from "../native/describe";
 import type { DescribeContext, NativeChild, NativeNode, NativeScreen, NativeUiEvent } from "../native/node";
@@ -55,12 +55,12 @@ const STEP_TONE = { done: "success", current: "accent", next: "muted" } as const
 function stepNode(label: string, position: number, state: StepState): NativeNode {
 	const disc =
 		state === "done"
-			? node("icon", { name: "check", role: "omp.setup.step.disc" })
-			: text(String(position + 1), { wrap: "none", role: "omp.setup.step.disc" });
+			? node("icon", { name: "check", role: "omsp.setup.step.disc" })
+			: text(String(position + 1), { wrap: "none", role: "omsp.setup.step.disc" });
 	return node(
 		"row",
-		{ align: "center", gap: "xs", role: "omp.setup.step", tone: STEP_TONE[state] },
-		[disc, text(label, { wrap: "none", role: "omp.setup.step.label" })],
+		{ align: "center", gap: "xs", role: "omsp.setup.step", tone: STEP_TONE[state] },
+		[disc, text(label, { wrap: "none", role: "omsp.setup.step.label" })],
 		`step:${position}`,
 	);
 }
@@ -276,7 +276,7 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 		return this.#nativeRoot.get([content], () =>
 			col([{ ...content, key: this.#phase === "transition" ? "scene" : this.#phase }], {
 				grow: 1,
-				role: "omp.setup",
+				role: "omsp.setup",
 			}),
 		);
 	}
@@ -305,7 +305,7 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 
 	/**
 	 * The setup header, a fixed-height row: the compact brand lockup (the
-	 * builtin `omp` mark and wordmark), the stepper of the applicable scenes
+	 * builtin `omsp` mark and wordmark), the stepper of the applicable scenes
 	 * (done = check in the success tone, current = accent, upcoming = muted,
 	 * hairline connectors between), and a quiet Exit setup button (⌃C).
 	 */
@@ -318,7 +318,7 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 					steps.push(
 						node(
 							"rule",
-							{ role: "omp.setup.step.line", tone: position <= current ? "success" : "muted" },
+							{ role: "omsp.setup.step.line", tone: position <= current ? "success" : "muted" },
 							undefined,
 							`line:${position}`,
 						),
@@ -336,27 +336,27 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 								[
 									node(
 										"image",
-										{ builtin: "omp", alt: APP_NAME, w: 22, role: "omp.setup.mark" },
+										{ builtin: "omsp", alt: APP_NAME, w: 22, role: "omsp.setup.mark" },
 										undefined,
 										"logo",
 									),
 									keyed(
-										text([span(APP_NAME, "strong")], { wrap: "none", role: "omp.setup.brand.name" }),
+										text([span(APP_NAME, "strong")], { wrap: "none", role: "omsp.setup.brand.name" }),
 										"name",
 									),
 									keyed(
-										text([span("Setup", "muted")], { wrap: "none", role: "omp.setup.brand.label" }),
+										text([span("Setup", "muted")], { wrap: "none", role: "omsp.setup.brand.label" }),
 										"label",
 									),
 								],
-								{ align: "center", role: "omp.setup.brand" },
+								{ align: "center", role: "omsp.setup.brand" },
 							),
 							"brand",
 						),
-						keyed(row(steps, { align: "center", role: "omp.setup.steps" }), "steps"),
+						keyed(row(steps, { align: "center", role: "omsp.setup.steps" }), "steps"),
 						actionButton("Exit setup", "exit", { keys: "ctrl+c" }),
 					],
-					{ align: "center", role: "omp.setup.head" },
+					{ align: "center", role: "omsp.setup.head" },
 				),
 				"head",
 			);
@@ -378,17 +378,18 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 		return this.#nativeScene.get([head, active, title, subtitle, pickers], () => {
 			const body: NativeChild[] = [];
 			if (!pickers) {
-				body.push(keyed(text([span(title, "strong")], { role: "omp.setup.title" }), "title"));
-				if (subtitle) body.push(keyed(text([span(subtitle, "muted")], { role: "omp.setup.subtitle" }), "subtitle"));
+				body.push(keyed(text([span(title, "strong")], { role: "omsp.setup.title" }), "title"));
+				if (subtitle)
+					body.push(keyed(text([span(subtitle, "muted")], { role: "omsp.setup.subtitle" }), "subtitle"));
 			}
 			if (active) body.push(active);
 			return col(
 				[
 					head,
 					// Keyed by scene so a new scene's nodes never reuse the previous one's ids.
-					node("col", { grow: 1, role: "omp.setup.body" }, body, `body:${scene?.id ?? this.#sceneIndex}`),
+					node("col", { grow: 1, role: "omsp.setup.body" }, body, `body:${scene?.id ?? this.#sceneIndex}`),
 				],
-				{ grow: 1, role: "omp.setup.scene" },
+				{ grow: 1, role: "omsp.setup.scene" },
 			);
 		});
 	}
@@ -405,7 +406,7 @@ export class SetupWizardComponent implements Component, OverlayFocusOwner {
 		const subtitle = this.#activeScene?.subtitle;
 		const { scenes: steps, current } = this.#steps();
 		const contentWidth = Math.max(MIN_CONTENT_WIDTH, width - SCENE_MARGIN_X * 2);
-		const logo = gradientLogo(PI_LOGO, 0);
+		const logo = gradientLogo(OMSP_LOGO, 0);
 		const header = [
 			"",
 			...logo.map(line => centerLine(line, width)),

@@ -1,4 +1,4 @@
-import { escapeXmlText, parseJsonWithRepair } from "@oh-my-pi/pi-utils";
+import { escapeXmlText, parseJsonWithRepair } from "@oh-my-striped-pi/pi-utils";
 import type { Message, ToolCall } from "../types";
 import dialectPrompt from "./anthropic.md" with { type: "text" };
 import { buildArgShapes, buildStringArgsResolver, mintToolCallId } from "./coercion";

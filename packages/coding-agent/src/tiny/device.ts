@@ -1,9 +1,9 @@
 import type { DeviceType } from "@huggingface/transformers";
-import { $env } from "@oh-my-pi/pi-utils";
+import { $env } from "@oh-my-striped-pi/pi-utils";
 
 /** ONNX Runtime execution provider accepted by transformers.js pipelines. */
 export type TinyOnnxDevice = DeviceType;
-/** `PI_TINY_DEVICE` value selecting the mlx-lm Python backend (Apple silicon). */
+/** `OMSP_TINY_DEVICE` value selecting the mlx-lm Python backend (Apple silicon). */
 export const MLX_DEVICE = "mlx";
 export type TinyModelDevice = TinyOnnxDevice | typeof MLX_DEVICE;
 
@@ -47,12 +47,12 @@ export function normalizeTinyModelDevice(value: string | undefined): TinyModelDe
 	if (raw === "metal") return MLX_DEVICE;
 	if (raw in DEVICE_VALUES) return raw as TinyModelDevice;
 	throw new Error(
-		`Unsupported PI_TINY_DEVICE=${JSON.stringify(value)}. Use cpu, gpu, mlx, metal, webgpu, auto, cuda, dml, coreml, wasm, webnn, webnn-gpu, webnn-cpu, or webnn-npu.`,
+		`Unsupported OMSP_TINY_DEVICE=${JSON.stringify(value)}. Use cpu, gpu, mlx, metal, webgpu, auto, cuda, dml, coreml, wasm, webnn, webnn-gpu, webnn-cpu, or webnn-npu.`,
 	);
 }
 
 export function resolveTinyModelDevicePreference(
-	value: string | undefined = $env.PI_TINY_DEVICE,
+	value: string | undefined = $env.OMSP_TINY_DEVICE,
 ): TinyModelDevicePreference {
 	return {
 		device: normalizeTinyModelDevice(value) ?? CPU_DEVICE,
@@ -117,7 +117,7 @@ export const TINY_MODEL_DEVICE_SETTING_OPTIONS = [
 }>;
 
 /**
- * Map a `providers.tinyModelDevice` setting value onto a `PI_TINY_DEVICE` env
+ * Map a `providers.tinyModelDevice` setting value onto a `OMSP_TINY_DEVICE` env
  * value for the worker. Returns `undefined` for the default sentinel so the
  * worker keeps its built-in CPU default; the worker still validates the
  * forwarded value via {@link normalizeTinyModelDevice}.

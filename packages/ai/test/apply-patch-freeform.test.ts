@@ -1,19 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import {
 	buildParams,
 	convertTools,
 	mapOpenAIResponsesToolChoiceForTools,
 	supportsFreeformApplyPatch,
-} from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { ResponseStreamEvent } from "@oh-my-pi/pi-ai/providers/openai-responses-wire";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { ResponseStreamEvent } from "@oh-my-striped-pi/pi-ai/providers/openai-responses-wire";
 import {
 	appendResponsesToolResultMessages,
 	convertResponsesAssistantMessage,
 	processResponsesStream,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
-import type { AssistantMessage, Model, ModelSpec, Tool, ToolResultMessage } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
+import type { AssistantMessage, Model, ModelSpec, Tool, ToolResultMessage } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const GRAMMAR = [
 	"// top-level comment",

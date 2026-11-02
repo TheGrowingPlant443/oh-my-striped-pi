@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { toolWireSchema } from "@oh-my-pi/pi-ai";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { jsBackend, pythonBackend } from "@oh-my-pi/pi-coding-agent/eval";
-import type { ExecutorBackendResult } from "@oh-my-pi/pi-coding-agent/eval/backend";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EvalTool } from "@oh-my-pi/pi-coding-agent/tools/eval";
-import { cfgToolsMaxTimeout } from "@oh-my-pi/pi-coding-agent/tools/settings";
+import { toolWireSchema } from "@oh-my-striped-pi/pi-ai";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { jsBackend, pythonBackend } from "@oh-my-striped-pi/pi-coding-agent/eval";
+import type { ExecutorBackendResult } from "@oh-my-striped-pi/pi-coding-agent/eval/backend";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EvalTool } from "@oh-my-striped-pi/pi-coding-agent/tools/eval";
+import { cfgToolsMaxTimeout } from "@oh-my-striped-pi/pi-coding-agent/tools/settings";
 
 function makeSession(settings: Settings, asyncJobManager?: AsyncJobManager): ToolSession {
 	return {

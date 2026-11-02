@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Message } from "@oh-my-pi/pi-ai";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { getAgentDir, setAgentDir } from "@oh-my-pi/pi-utils";
-import * as snapcompact from "@oh-my-pi/snapcompact";
+import type { Message } from "@oh-my-striped-pi/pi-ai";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { getAgentDir, setAgentDir } from "@oh-my-striped-pi/pi-utils";
+import * as snapcompact from "@oh-my-striped-pi/snapcompact";
 
 const TRUNCATION_NOTICE = "[Session persistence truncated large content]";
 const NEWEST_SENTINEL = "NEWEST ARCHIVED TURN SENTINEL";
@@ -34,7 +34,7 @@ describe("snapcompact archive persistence", () => {
 	const originalAgentDir = getAgentDir();
 
 	async function makeTempDir(): Promise<string> {
-		const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "omp-archive-persist-"));
+		const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "omsp-archive-persist-"));
 		tempDirs.push(dir);
 		return dir;
 	}

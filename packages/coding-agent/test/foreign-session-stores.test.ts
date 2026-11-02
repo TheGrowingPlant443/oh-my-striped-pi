@@ -15,7 +15,7 @@ let tempRoot: string;
 let originalClaudeConfigDir: string | undefined;
 
 beforeEach(async () => {
-	tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-foreign-sessions-"));
+	tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-foreign-sessions-"));
 	originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
 	delete process.env.CLAUDE_CONFIG_DIR;
 });
@@ -514,9 +514,9 @@ describe("CodexSessionStore", () => {
 });
 
 describe("foreign session persistence", () => {
-	it("writes a fresh OMP identity with source provenance", async () => {
+	it("writes a fresh OMSP identity with source provenance", async () => {
 		const { info, store } = await createClaudeFixture();
-		const sessionDir = path.join(tempRoot, "omp-sessions");
+		const sessionDir = path.join(tempRoot, "omsp-sessions");
 
 		const persisted = await persistForeignSession(store, info, { sessionDir, suppressBreadcrumb: true });
 		const sessionFile = persisted.getSessionFile();

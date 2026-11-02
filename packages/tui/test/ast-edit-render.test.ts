@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
-import { sanitizeText, sanitizeTextDeep } from "@oh-my-pi/pi-utils";
+import { sanitizeText, sanitizeTextDeep } from "@oh-my-striped-pi/pi-utils";
 import { applyHyperlinkSetting } from "../src/render/hyperlink";
 import { astEditToolRenderer, type AstEditToolDetails } from "../src/tools/ast-edit";
 import { getThemeByName, initTheme, type Theme } from "../src/theme";

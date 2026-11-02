@@ -2,7 +2,7 @@
  * Opt-in background session compression (`gc.autoCompress`).
  *
  * An interactive launch calls {@link scheduleGcAutoCompress}, which starts a
- * detached, low-priority `omp gc --compress --apply` at most once per
+ * detached, low-priority `omsp gc --compress --apply` at most once per
  * {@link GC_AUTO_COMPRESS_INTERVAL_MS}. The child's output log doubles as the
  * last-run stamp: spawning truncates it and the run writes its summary there,
  * so its mtime is when the latest run started or finished. The launch only
@@ -18,7 +18,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { Subprocess } from "bun";
-import { getSessionsDir, isEnoent, tryAcquireFileLock } from "@oh-my-pi/pi-utils";
+import { getSessionsDir, isEnoent, tryAcquireFileLock } from "@oh-my-striped-pi/pi-utils";
 import { spawnDetached } from "../subprocess/shared-worker";
 import { resolveCliEntryCmd, workerEnvFromParent } from "../subprocess/worker-client";
 import { compressMethod } from "./gc-compress";
@@ -30,7 +30,7 @@ export const GC_AUTO_COMPRESS_INTERVAL_MS = 24 * 60 * 60 * 1000;
 export const GC_AUTO_COMPRESS_LOG = "gc-auto-compress.log";
 
 /**
- * Start a detached `omp gc --compress --apply` for `agentDir` when the last
+ * Start a detached `omsp gc --compress --apply` for `agentDir` when the last
  * background run is at least a day old and the sessions directory sits on a
  * volume with transparent compression (APFS, NTFS). Returns the child, or
  * undefined when no run was due or possible, or another launch is claiming it.

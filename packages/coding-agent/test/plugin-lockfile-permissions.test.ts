@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PluginManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/manager";
-import { MarketplaceManager } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace/manager";
-import * as piUtils from "@oh-my-pi/pi-utils";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { PluginManager } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/manager";
+import { MarketplaceManager } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/marketplace/manager";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 /** POSIX mode bits of a file; meaningless on Windows, where the tests are skipped. */
 async function modeOf(file: string): Promise<number> {
@@ -18,9 +18,9 @@ describe("plugin runtime lockfile permissions", () => {
 	let lockfile: string;
 
 	beforeEach(async () => {
-		tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omp-plugin-lock-"));
+		tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-plugin-lock-"));
 		pluginsDir = path.join(tmpRoot, "plugins");
-		lockfile = path.join(pluginsDir, "omp-plugins.lock.json");
+		lockfile = path.join(pluginsDir, "omsp-plugins.lock.json");
 
 		spyOn(piUtils, "getPluginsDir").mockReturnValue(pluginsDir);
 		spyOn(piUtils, "getPluginsLockfile").mockReturnValue(lockfile);
@@ -44,7 +44,7 @@ describe("plugin runtime lockfile permissions", () => {
 			await fs.chmod(lockfile, 0o644);
 			const before = (await fs.stat(lockfile)).ino;
 
-			await new PluginManager(tmpRoot).setPluginSetting("omp-commit", "apiToken", "sk-live-secret");
+			await new PluginManager(tmpRoot).setPluginSetting("omsp-commit", "apiToken", "sk-live-secret");
 
 			expect(await fs.readFile(lockfile, "utf8")).toContain("sk-live-secret");
 			expect(await modeOf(lockfile)).toBe(0o600);
@@ -56,11 +56,11 @@ describe("plugin runtime lockfile permissions", () => {
 	test.skipIf(process.platform === "win32")(
 		"the marketplace plugin state is written to an owner-only lockfile",
 		async () => {
-			const installPath = path.join(pluginsDir, "cache", "omp-commit");
+			const installPath = path.join(pluginsDir, "cache", "omsp-commit");
 			await fs.mkdir(installPath, { recursive: true });
 			await fs.writeFile(
 				path.join(installPath, "package.json"),
-				JSON.stringify({ name: "omp-commit", version: "1.0.0" }),
+				JSON.stringify({ name: "omsp-commit", version: "1.0.0" }),
 			);
 			const installedRegistryPath = path.join(pluginsDir, "installed_plugins.json");
 			await fs.writeFile(
@@ -68,7 +68,7 @@ describe("plugin runtime lockfile permissions", () => {
 				JSON.stringify({
 					version: 2,
 					plugins: {
-						"omp-commit@sample": [
+						"omsp-commit@sample": [
 							{
 								scope: "user",
 								installPath,
@@ -86,8 +86,8 @@ describe("plugin runtime lockfile permissions", () => {
 			await fs.writeFile(
 				lockfile,
 				JSON.stringify({
-					plugins: { "omp-commit": { version: "1.0.0", enabledFeatures: null, enabled: true } },
-					settings: { "omp-commit": { apiToken: "sk-live-secret" } },
+					plugins: { "omsp-commit": { version: "1.0.0", enabledFeatures: null, enabled: true } },
+					settings: { "omsp-commit": { apiToken: "sk-live-secret" } },
 				}),
 			);
 			await fs.chmod(lockfile, 0o644);
@@ -98,12 +98,12 @@ describe("plugin runtime lockfile permissions", () => {
 				marketplacesCacheDir: path.join(pluginsDir, "cache", "marketplaces"),
 				pluginsCacheDir: path.join(pluginsDir, "cache", "plugins"),
 			});
-			await manager.setPluginEnabled("omp-commit@sample", false);
+			await manager.setPluginEnabled("omsp-commit@sample", false);
 
 			expect(await modeOf(lockfile)).toBe(0o600);
 			const runtime = JSON.parse(await fs.readFile(lockfile, "utf8"));
-			expect(runtime.plugins["omp-commit"].enabled).toBe(false);
-			expect(runtime.settings["omp-commit"].apiToken).toBe("sk-live-secret");
+			expect(runtime.plugins["omsp-commit"].enabled).toBe(false);
+			expect(runtime.settings["omsp-commit"].apiToken).toBe("sk-live-secret");
 		},
 	);
 });

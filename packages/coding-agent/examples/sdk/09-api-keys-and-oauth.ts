@@ -1,7 +1,7 @@
 /**
  * Copilot Credentials
  *
- * Run `omp login github-copilot` first to populate the auth store.
+ * Run `omsp login github-copilot` first to populate the auth store.
  */
 import {
 	AuthStorage,
@@ -10,10 +10,10 @@ import {
 	discoverModels,
 	ModelRegistry,
 	SessionManager,
-} from "@oh-my-pi/pi-coding-agent";
+} from "@oh-my-striped-pi/pi-coding-agent";
 
-// Default: discoverAuthStorage() uses ~/.omp/agent/agent.db
-// discoverModels() loads built-in models and overrides from ~/.omp/agent/models.yml.
+// Default: discoverAuthStorage() uses ~/.omsp/agent/agent.db
+// discoverModels() loads built-in models and overrides from ~/.omsp/agent/models.yml.
 const authStorage = await discoverAuthStorage();
 const modelRegistry = await discoverModels(authStorage);
 

@@ -57,7 +57,9 @@ describe("validation", () => {
 
 	it("string.url validates parseability", () => {
 		const s = type("string.url");
-		expect(s("https://omp.sh/x")).toBe("https://omp.sh/x");
+		expect(s("https://github.com/TheGrowingPlant443/oh-my-striped-pi/x")).toBe(
+			"https://github.com/TheGrowingPlant443/oh-my-striped-pi/x",
+		);
 		expect(s("not a url")).toBeInstanceOf(OmpErrors);
 	});
 
@@ -434,7 +436,7 @@ describe("advanced ArkType compatibility", () => {
 		expect(type.string.uuid.v4("550e8400-e29b-41d4-a716-446655440000")).toBe("550e8400-e29b-41d4-a716-446655440000");
 		expect(type.string.trim.preformatted("trimmed")).toBe("trimmed");
 		expect(type.string.date.iso.parse("2024-01-02")).toBeInstanceOf(Date);
-		expect(type.parse.url("https://omp.sh")).toBeInstanceOf(URL);
+		expect(type.parse.url("https://github.com/TheGrowingPlant443/oh-my-striped-pi")).toBeInstanceOf(URL);
 
 		// ArkType applies `.configure()` to the node it is called on (and its shallow
 		// descendants), so the constraint that should carry the config owns it here.

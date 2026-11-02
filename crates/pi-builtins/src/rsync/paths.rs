@@ -1005,7 +1005,7 @@ fn operator_open(
 		return Ok(pi_vfs::File::from(std::fs::File::from(fd)));
 	}
 	// Path-based: provider paths everywhere, and native paths on Windows.
-	// Mounted descriptors (`omp-descriptor://N`) are neither and open as-is.
+	// Mounted descriptors (`omsp-descriptor://N`) are neither and open as-is.
 	if fs.is_native_local(path) || pi_vfs::is_virtual_path(path) {
 		virtual_owner_walk(fs, path, &trusted_owner)?;
 		if let Some(confine) = opts.confine {

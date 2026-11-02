@@ -8,17 +8,17 @@ import type {
 	ArchiveRecap,
 	ArchiveSession,
 	ArchiveSessionDetail,
-} from "@oh-my-pi/pi-coding-agent/archive/archive";
-import { createArchivePrelude } from "@oh-my-pi/pi-coding-agent/archive/prelude-definition";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
-import { recordSessionRecap, closeSessionIndex } from "@oh-my-pi/pi-coding-agent/session/session-index";
-import { sessionDirForCwd } from "@oh-my-pi/pi-coding-agent/session/session-paths";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { getConfigRootDir, removeSyncWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/archive/archive";
+import { createArchivePrelude } from "@oh-my-striped-pi/pi-coding-agent/archive/prelude-definition";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { HistoryStorage } from "@oh-my-striped-pi/pi-coding-agent/session/history-storage";
+import { recordSessionRecap, closeSessionIndex } from "@oh-my-striped-pi/pi-coding-agent/session/session-index";
+import { sessionDirForCwd } from "@oh-my-striped-pi/pi-coding-agent/session/session-paths";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { getConfigRootDir, removeSyncWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { makeAssistantMessage } from "./session-manager/helpers";
 
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 let root: string;
 let app: string;
 let lib: string;
@@ -59,7 +59,7 @@ async function call<T>(params: Record<string, unknown>, cwd = app): Promise<T> {
 }
 
 beforeEach(() => {
-	root = fs.mkdtempSync(path.join(os.tmpdir(), "omp-archive-"));
+	root = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-archive-"));
 	app = path.join(root, "app");
 	lib = path.join(root, "lib");
 	HistoryStorage.close();
@@ -74,7 +74,7 @@ afterEach(() => {
 		setAgentDir(originalAgentDir);
 	} else {
 		setAgentDir(path.join(getConfigRootDir(), "agent"));
-		delete process.env.PI_CODING_AGENT_DIR;
+		delete process.env.OMSP_CODING_AGENT_DIR;
 	}
 	removeSyncWithRetries(root);
 });

@@ -1,6 +1,6 @@
 # Natives Text/Search Pipeline
 
-This document maps the `@oh-my-pi/pi-natives` text/search/code surface from generated JS/TS exports to Rust N-API modules and back to JS result objects.
+This document maps the `@oh-my-striped-pi/pi-natives` text/search/code surface from generated JS/TS exports to Rust N-API modules and back to JS result objects.
 
 Terminology follows `docs/natives-architecture.md`:
 
@@ -80,7 +80,7 @@ Terminology follows `docs/natives-architecture.md`:
 
 ### Search/collection semantics
 
-- Matcher selection: the Rust regex engine is tried first, then PCRE2 for features such as lookaround/backreferences. `OMP_PCRE2_JIT=0`/`false` disables PCRE2 JIT and `1` enables it; when unset, JIT is enabled except on macOS.
+- Matcher selection: the Rust regex engine is tried first, then PCRE2 for features such as lookaround/backreferences. `OMSP_PCRE2_JIT=0`/`false` disables PCRE2 JIT and `1` enables it; when unset, JIT is enabled except on macOS.
 - Filesystem grep defaults to `hidden=true`, `gitignore=true`, and `recursive=true` for simple glob filters. Directory walks skip `.git` and skip `node_modules` unless the glob mentions it.
 - Context resolution:
    - `contextBefore/contextAfter` override legacy `context`.
@@ -188,7 +188,7 @@ These exports are direct native APIs used by tooling; they are not mediated by a
 
 The cache is process-wide and stores per-directory listings, not per-root entry lists: every walk that enables caching shares them regardless of root or traversal options, and the walker re-applies hidden/ignore policy, pruning, and filters on each walk. Only native-filesystem walks with `Detail::Minimal` and `walk::Options::cache = true` participate, and only on filesystems with stable stamps (APFS; ext4/XFS/Btrfs/tmpfs/F2FS/ZFS/bcachefs; NTFS/ReFS). Any injected filesystem provider disables caching, even if its root redirects to a host path.
 
-Walk parallelism: pi-walker has no runtime of its own. Each walk starts `walk::Options::parallelism` long-lived workers on the current tokio runtime. Workers share a directory queue and retain their own sessions and buffers; no task is spawned per directory or file. `PI_WALK_WORKERS` set to a positive `N` uses `N` workers; unset or `0` uses the per-filesystem default (4 on macOS, 8 on Linux, 4 elsewhere and for providers), capped by available parallelism.
+Walk parallelism: pi-walker has no runtime of its own. Each walk starts `walk::Options::parallelism` long-lived workers on the current tokio runtime. Workers share a directory queue and retain their own sessions and buffers; no task is spawned per directory or file. `OMSP_WALK_WORKERS` set to a positive `N` uses `N` workers; unset or `0` uses the per-filesystem default (4 on macOS, 8 on Linux, 4 elsewhere and for providers), capped by available parallelism.
 
 ### Cache state transitions
 
@@ -223,7 +223,7 @@ These are pure, in-memory utilities.
 - `sliceWithWidth`: returns `{ text, width }` for a column slice; strict width enforcement defaults to `false`.
 - `extractSegments`: extracts before/after segments around an overlay while restoring ANSI state for the `after` segment.
 - `setHangulCompatJamoWidthOverride(value)` controls U+3131–U+318E width correction for client-terminal compatibility: `0` uses the platform fallback, `1` forces one cell, `2` forces two, and `3` follows Unicode width.
-- `sanitizeText` is not a native export. It lives in `@oh-my-pi/pi-utils` (`packages/utils/src/sanitize-text.ts`) and uses `Bun.stripANSI`, control-character removal, and malformed-surrogate cleanup.
+- `sanitizeText` is not a native export. It lives in `@oh-my-striped-pi/pi-utils` (`packages/utils/src/sanitize-text.ts`) and uses `Bun.stripANSI`, control-character removal, and malformed-surrogate cleanup.
 - `visibleWidth`: counts visible terminal cells using caller-supplied tab width. Width-sensitive exports clamp tab width to `1..16`; tabs occupy that fixed width rather than expanding to tab stops.
 - Text processing uses JS UTF-16 directly, with an ASCII fast path and grapheme segmentation for non-ASCII. OSC 66 scaled-text payloads contribute visible width instead of being treated as zero-width escapes.
 

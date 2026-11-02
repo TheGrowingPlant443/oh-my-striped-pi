@@ -1,6 +1,6 @@
 # Custom Tools Examples
 
-Example custom tools for omp-coding-agent.
+Example custom tools for omsp-coding-agent.
 
 ## Examples
 
@@ -13,28 +13,28 @@ registers one tool named `hello` that takes a name and returns a greeting.
 
 ## Usage
 
-omp discovers custom tools in two places: `.omp/tools/` in the current project
-and `~/.omp/agent/tools/` in your home directory. Both locations pick up `.ts`
+omsp discovers custom tools in two places: `.omsp/tools/` in the current project
+and `~/.omsp/agent/tools/` in your home directory. Both locations pick up `.ts`
 and `.js` modules, plus any immediate subdirectory that contains an `index.ts`.
 
 From this directory, install the example into one project:
 
 ```bash
-mkdir -p /path/to/your-project/.omp/tools
-cp -r hello /path/to/your-project/.omp/tools/
+mkdir -p /path/to/your-project/.omsp/tools
+cp -r hello /path/to/your-project/.omsp/tools/
 cd /path/to/your-project
-omp --tools hello
+omsp --tools hello
 ```
 
 Or install it for every project (default profile):
 
 ```bash
-mkdir -p ~/.omp/agent/tools
-cp -r hello ~/.omp/agent/tools/
+mkdir -p ~/.omsp/agent/tools
+cp -r hello ~/.omsp/agent/tools/
 ```
 
-With a named profile (`OMP_PROFILE` or `--profile`), use that profile's tools
-dir instead: `~/.omp/profiles/<name>/agent/tools`.
+With a named profile (`OMSP_PROFILE` or `--profile`), use that profile's tools
+dir instead: `~/.omsp/profiles/<name>/agent/tools`.
 
 `--tools` selects registered tool names, never file paths. `hello` is the name
 the factory in `hello/index.ts` returns. Without the flag the tool is still
@@ -43,7 +43,7 @@ the session's tools to just `hello`, which keeps the demo focused but drops
 built-ins such as `read` and `bash`; list them too (`--tools read,bash,hello`)
 to keep them.
 
-Then in omp:
+Then in omsp:
 
 ```
 > greet Ada with the hello tool
@@ -58,8 +58,8 @@ See [docs/custom-tools.md](../../../../docs/custom-tools.md) for full documentat
 **Factory pattern:**
 
 ```typescript
-import { Text } from "@oh-my-pi/pi-tui";
-import type { CustomToolFactory } from "@oh-my-pi/pi-coding-agent";
+import { Text } from "@oh-my-striped-pi/pi-tui";
+import type { CustomToolFactory } from "@oh-my-striped-pi/pi-coding-agent";
 
 const factory: CustomToolFactory = pi => ({
 	name: "my_tool",

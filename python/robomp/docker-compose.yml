@@ -20,11 +20,11 @@ services:
       args:
         # Tag of the pre-built pi-base image produced by `bun run pi:image`
         # (sources: pi root /Dockerfile). Override per-environment as needed.
-        PI_BASE: oh-my-pi/pi:dev
+        OMSP_BASE: oh-my-striped-pi/pi:dev
     image: robomp:dev
     container_name: robomp
     # Stable hostname: os.hostname() inside the container feeds usage
-    # attribution (x-omp-hostname → broker `clients.hostname`); without this
+    # attribution (x-omsp-hostname → broker `clients.hostname`); without this
     # it reports the random docker container id.
     hostname: robomp
     # Phase B (graceful shutdown): gives the orchestrator at least
@@ -79,17 +79,17 @@ services:
       ROBOMP_REPLAY_TOKEN: ${ROBOMP_REPLAY_TOKEN:-}
 
       # --- container-fixed paths ---
-      ROBOMP_OMP_COMMAND: omp
+      ROBOMP_OMSP_COMMAND: omsp
       ROBOMP_WORKSPACE_ROOT: /data/workspaces
       ROBOMP_SQLITE_PATH: /data/robomp.sqlite
       ROBOMP_LOG_DIR: /data/logs
       ROBOMP_BIND_HOST: ${ROBOMP_BIND_HOST:-0.0.0.0}
       ROBOMP_BIND_PORT: ${ROBOMP_BIND_PORT:-8080}
-      PI_ROOT: /work/pi
+      OMSP_ROOT: /work/pi
     depends_on:
       gh-proxy:
         condition: service_started
-    # Resolve `llm-gateway.internal` (used in /srv/agent-home/.omp/agent/models.yml) to the
+    # Resolve `llm-gateway.internal` (used in /srv/agent-home/.omsp/agent/models.yml) to the
     # Docker host. The actual gateway listens on 127.0.0.1:4000 on the host;
     # `host-gateway` is Docker's alias for the host bridge IP.
     extra_hosts:
@@ -98,14 +98,14 @@ services:
       - default
       - robomp_internal
     volumes:
-      - ${PI_ROOT:-../..}:/work/pi:ro
+      - ${OMSP_ROOT:-../..}:/work/pi:ro
       - robomp_data:/data
       # Host agent config is mounted read-only under /srv/agent-home-stage
       # with host-controlled permissions. The entrypoint copies it into
       # root-owned, world-readable files under /srv/agent-home; the agent
-      # subprocess runs with HOME=/srv/agent-home, so ~/.omp and ~/.agent
+      # subprocess runs with HOME=/srv/agent-home, so ~/.omsp and ~/.agent
       # resolve there without exposing mutable host mounts.
-      - ${HOME}/.omp/agent/models.container.yml:/srv/agent-home-stage/.omp/agent/models.yml:ro
+      - ${HOME}/.omsp/agent/models.container.yml:/srv/agent-home-stage/.omsp/agent/models.yml:ro
       - ${HOME}/.agent/AGENTS.md:/srv/agent-home-stage/.agent/AGENTS.md:ro
       - ${HOME}/.agent/rules:/srv/agent-home-stage/.agent/rules:ro
     ports:

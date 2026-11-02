@@ -7,8 +7,8 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
-import { isEnoent, logger } from "@oh-my-pi/pi-utils";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
+import { isEnoent, logger } from "@oh-my-striped-pi/pi-utils";
 
 import {
 	isValidNameSegment,
@@ -218,10 +218,14 @@ export function parseMarketplaceCatalog(content: string, filePath: string): Mark
 // ── fetchMarketplace ──────────────────────────────────────────────────
 
 /**
- * Catalog paths tried in priority order: omp-namespaced override first, then
- * the Claude Code-compatible fallback so existing marketplaces keep loading.
+ * Catalog paths tried in priority order: fork override, legacy OMP format,
+ * then the Claude Code-compatible fallback.
  */
-const CATALOG_RELATIVE_PATHS: readonly string[] = [".omp-plugin/marketplace.json", ".claude-plugin/marketplace.json"];
+const CATALOG_RELATIVE_PATHS: readonly string[] = [
+	".omsp-plugin/marketplace.json",
+	".omp-plugin/marketplace.json",
+	".claude-plugin/marketplace.json",
+];
 
 async function readMarketplaceCatalog(
 	root: string,

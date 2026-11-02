@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import * as path from "node:path";
-import type { Api, Model } from "@oh-my-pi/pi-ai";
-import { modelKind } from "@oh-my-pi/pi-catalog/types";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { cfgDisabledProviders } from "@oh-my-pi/pi-coding-agent/config/model-settings";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { Api, Model } from "@oh-my-striped-pi/pi-ai";
+import { modelKind } from "@oh-my-striped-pi/pi-catalog/types";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { cfgDisabledProviders } from "@oh-my-striped-pi/pi-coding-agent/config/model-settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const probePath = path.join(import.meta.dir, "fixtures", "model-registry-construction-build-probe.ts");
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import type { ApiKeyResolution, ApiKeyResolveContext } from "@oh-my-pi/pi-ai";
+import type { ApiKeyResolution, ApiKeyResolveContext } from "@oh-my-striped-pi/pi-ai";
 import {
 	getCustomApi,
 	type RegisteredCustomApi,
@@ -7,12 +7,12 @@ import {
 	resolveApiKeyOnce,
 	seedApiKeyResolver,
 	unregisterCustomApis,
-} from "@oh-my-pi/pi-ai";
-import { MissingApiKeyError, OAuthError, ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { classify } from "@oh-my-pi/pi-ai/error/flags";
-import { streamSimple } from "@oh-my-pi/pi-ai/stream";
-import type { Api, AssistantMessage, Context, Model, SimpleStreamOptions, Usage } from "@oh-my-pi/pi-ai/types";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
+} from "@oh-my-striped-pi/pi-ai";
+import { MissingApiKeyError, OAuthError, ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import { classify } from "@oh-my-striped-pi/pi-ai/error/flags";
+import { streamSimple } from "@oh-my-striped-pi/pi-ai/stream";
+import type { Api, AssistantMessage, Context, Model, SimpleStreamOptions, Usage } from "@oh-my-striped-pi/pi-ai/types";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
 
 const SOURCE_ID = "stream-auth-retry-test";
 const API = "openai-completions" as const;

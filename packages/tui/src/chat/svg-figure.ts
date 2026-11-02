@@ -12,8 +12,8 @@
  * cells, and redrawn when the room it is shown in changes, so the terminal
  * places it 1:1: any resampling, even 0.99×, blurs every glyph edge.
  */
-import { rasterizeSvg } from "@oh-my-pi/pi-natives";
-import { hexToOklch, hueDistance, logger, oklchCusp, oklchToHex } from "@oh-my-pi/pi-utils";
+import { rasterizeSvg } from "@oh-my-striped-pi/pi-natives";
+import { hexToOklch, hueDistance, logger, oklchCusp, oklchToHex } from "@oh-my-striped-pi/pi-utils";
 import { Image, type ImageBudget, imageMaxColumns } from "../components/image";
 import { fencedCode, type Markdown } from "../components/markdown";
 import { type CellDimensions, getCellDimensions, getImageDimensions } from "../terminal-capabilities";

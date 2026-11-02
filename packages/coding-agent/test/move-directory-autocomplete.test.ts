@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildDirectoryArgumentCompletions } from "@oh-my-pi/pi-coding-agent/slash-commands/builtin-completions";
-import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-pi/pi-utils";
+import { buildDirectoryArgumentCompletions } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/builtin-completions";
+import { getProjectDir, removeWithRetries, setProjectDir } from "@oh-my-striped-pi/pi-utils";
 
 const originalProjectDir = getProjectDir();
 
@@ -14,7 +14,7 @@ describe("/move directory autocomplete", () => {
 	const values = async (prefix: string) => (await complete(prefix))?.map(item => item.value) ?? null;
 
 	beforeEach(async () => {
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-move-autocomplete-"));
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-move-autocomplete-"));
 		projectDir = path.join(root, "project");
 		await fs.mkdir(path.join(projectDir, "alpha"), { recursive: true });
 		await fs.mkdir(path.join(projectDir, "beta"));

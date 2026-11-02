@@ -7,14 +7,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { clearMemoryData, getMemoryRoot } from "@oh-my-pi/pi-coding-agent/memories";
+import { clearMemoryData, getMemoryRoot } from "@oh-my-striped-pi/pi-coding-agent/memories";
 import {
 	closeMemoryDb,
 	enqueueGlobalWatermark,
 	openMemoryDb,
 	upsertThreads,
-} from "@oh-my-pi/pi-coding-agent/memories/storage";
-import { getAgentDbPath, TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/memories/storage";
+import { getAgentDbPath, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 const CWD_A = "/projects/alpha";
 const CWD_B = "/projects/beta";

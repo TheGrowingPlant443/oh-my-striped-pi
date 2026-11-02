@@ -2,7 +2,7 @@
  * `!command` config values must not leak inherited file descriptors into the
  * credential-resolving child.
  *
- * A launcher can legitimately hand omp an open descriptor (for example a
+ * A launcher can legitimately hand omsp an open descriptor (for example a
  * credential bundle) that is meant to stay single-consumer. The child spawned
  * for `auth.broker.url` / header `!command` resolution used to run through the
  * natives brush shell (executeShell), whose children inherit every inheritable
@@ -33,9 +33,9 @@ afterEach(async () => {
 });
 
 test.skipIf(process.platform === "win32")(
-	"config !command children cannot read descriptors the launcher passed omp",
+	"config !command children cannot read descriptors the launcher passed omsp",
 	async () => {
-		const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-config-fd-"));
+		const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-config-fd-"));
 		roots.push(root);
 		const canaryPath = path.join(root, "canary.txt");
 		await fs.promises.writeFile(canaryPath, "CANARY-THAT-MUST-NOT-RESOLVE");
@@ -81,7 +81,7 @@ test.skipIf(process.platform === "win32")("resolves !commands when PATH omits th
 	const script = `import { runShellCommand } from ${JSON.stringify(resolverUrl)};
 const value = await runShellCommand("echo pathless-ok", 5_000);
 console.log(value === "pathless-ok" ? "PATHLESS-OK" : "PATHLESS-BAD:" + value);`;
-	const emptyPathDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-no-sh-in-path-"));
+	const emptyPathDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-no-sh-in-path-"));
 	roots.push(emptyPathDir);
 	const proc = Bun.spawn({
 		cmd: [process.execPath, "--eval", script],

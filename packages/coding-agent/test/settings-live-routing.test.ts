@@ -3,16 +3,16 @@ import { EventEmitter } from "node:events";
 import * as fsSync from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
-import { resolveAgentModelSelection } from "@oh-my-pi/pi-coding-agent/config/model-resolver";
-import { cfgModelRoles } from "@oh-my-pi/pi-coding-agent/config/model-settings";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import { createAuthStorageSettingsSync } from "@oh-my-pi/pi-coding-agent/session/auth-broker-config";
-import { getRetryFallbackChains } from "@oh-my-pi/pi-coding-agent/session/retry-fallback-chains";
-import { cfgRetryUsageReservePct } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { cfgTaskAgentModelOverrides } from "@oh-my-pi/pi-coding-agent/task/settings";
-import { logger, TempDir } from "@oh-my-pi/pi-utils";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
+import { resolveAgentModelSelection } from "@oh-my-striped-pi/pi-coding-agent/config/model-resolver";
+import { cfgModelRoles } from "@oh-my-striped-pi/pi-coding-agent/config/model-settings";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import { createAuthStorageSettingsSync } from "@oh-my-striped-pi/pi-coding-agent/session/auth-broker-config";
+import { getRetryFallbackChains } from "@oh-my-striped-pi/pi-coding-agent/session/retry-fallback-chains";
+import { cfgRetryUsageReservePct } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { cfgTaskAgentModelOverrides } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
+import { logger, TempDir } from "@oh-my-striped-pi/pi-utils";
 import { YAML } from "bun";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "./helpers/settings-test-state";
 
@@ -60,7 +60,7 @@ describe("live routing config files", () => {
 
 	beforeEach(() => {
 		state = beginSettingsTest();
-		delete process.env.PI_CONFIG_FILES;
+		delete process.env.OMSP_CONFIG_FILES;
 		tempDir = TempDir.createSync("@pi-live-routing-");
 	});
 

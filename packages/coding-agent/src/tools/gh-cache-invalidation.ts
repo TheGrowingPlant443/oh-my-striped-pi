@@ -21,8 +21,8 @@
  * dwarfs the cost of one cache miss.
  */
 import * as path from "node:path";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
-import { logger } from "@oh-my-pi/pi-utils";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import { parseGitUrl } from "../extensibility/plugins/git-url";
 import { formatRepoRef } from "./gh-common";
 import { invalidateAllForNumber, invalidateAllForRepo, invalidatePullRequestsForRepo } from "./github-cache";

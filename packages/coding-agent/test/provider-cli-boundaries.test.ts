@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "bun:test";
-import { runLoginCommand } from "@oh-my-pi/pi-coding-agent/cli/login-cli";
-import AuthBroker from "@oh-my-pi/pi-coding-agent/commands/auth-broker";
-import Token from "@oh-my-pi/pi-coding-agent/commands/token";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as sdk from "@oh-my-pi/pi-coding-agent/sdk";
-import type { CliConfig } from "@oh-my-pi/pi-utils/cli";
+import { runLoginCommand } from "@oh-my-striped-pi/pi-coding-agent/cli/login-cli";
+import AuthBroker from "@oh-my-striped-pi/pi-coding-agent/commands/auth-broker";
+import Token from "@oh-my-striped-pi/pi-coding-agent/commands/token";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as sdk from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { CliConfig } from "@oh-my-striped-pi/pi-utils/cli";
 
-const config: CliConfig = { bin: "omp", version: "test", commands: new Map() };
+const config: CliConfig = { bin: "omsp", version: "test", commands: new Map() };
 
 afterEach(() => vi.restoreAllMocks());
 

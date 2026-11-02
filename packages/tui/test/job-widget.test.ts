@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "bun:test";
-import type { TspChartProps, TspPropNode } from "@oh-my-pi/pi-wire";
-import type { NativeChild, NativeNode } from "@oh-my-pi/pi-tui/native/node";
-import { initTheme, theme } from "@oh-my-pi/pi-tui/theme";
+import type { TspChartProps, TspPropNode } from "@oh-my-striped-pi/pi-wire";
+import type { NativeChild, NativeNode } from "@oh-my-striped-pi/pi-tui/native/node";
+import { initTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
 import {
 	describeJobTile,
 	describeJobWidget,
@@ -11,8 +11,8 @@ import {
 	type JobWidgetView,
 	renderJobTileLines,
 	renderJobWidgetLines,
-} from "@oh-my-pi/pi-tui/tools/job-widget";
-import { visibleWidth } from "@oh-my-pi/pi-tui/utils";
+} from "@oh-my-striped-pi/pi-tui/tools/job-widget";
+import { visibleWidth } from "@oh-my-striped-pi/pi-tui/utils";
 import { ciRun, DECODE_VALUES, decodeBench, FIXTURE_VIEWS, modelEval, trialSweep } from "./fixtures/job-widget-views";
 
 /** Every described node under `root`, depth first. */
@@ -75,13 +75,13 @@ describe("describeJobWidget", () => {
 			["docs", "muted", "queued"],
 		]);
 
-		const stat = nodes(describeJobWidget(decodeBench)).find(node => prop(node, "role") === "omp.job.widget.stat");
+		const stat = nodes(describeJobWidget(decodeBench)).find(node => prop(node, "role") === "omsp.job.widget.stat");
 		expect(prop(stat, "spans")).toContainEqual({ t: " ▼ 3.2%", s: "success" });
 		expect(texts(stat!)).toBe("p50 41 ms · p99 212 ms ▼ 3.2% · errors 0");
 	});
 
 	it("puts the headline and a sanitized stage in the head row", () => {
-		const head = nodes(describeJobWidget(ciRun)).find(node => prop(node, "role") === "omp.job.widget.head")!;
+		const head = nodes(describeJobWidget(ciRun)).find(node => prop(node, "role") === "omsp.job.widget.head")!;
 		expect(texts(head).trim()).toBe("CI · pull/4821\ntest (macos-14) running");
 		const decodeHead = describeJobWidget(decodeBench).c?.[0] as NativeNode;
 		expect(texts(decodeHead)).toContain("decode 186 tok/s ▲ 15%");
@@ -95,9 +95,9 @@ describe("describeJobWidget", () => {
 			view,
 		}));
 		const card = describeJobWidgetsHovercard(entries)!;
-		expect(card).toMatchObject({ k: "col", p: { role: "omp.jobs.hovercard" } });
+		expect(card).toMatchObject({ k: "col", p: { role: "omsp.jobs.hovercard" } });
 		const [strip] = card.c ?? [];
-		expect(strip).toMatchObject({ k: "row", p: { role: "omp.job.tiles", wrap: true } });
+		expect(strip).toMatchObject({ k: "row", p: { role: "omsp.job.tiles", wrap: true } });
 		expect(strip?.c).toHaveLength(4);
 		// Tern draws the card only when hovered: a clock would start from the program's last write.
 		expect(JSON.stringify(strip)).not.toContain('"k":"elapsed"');
@@ -122,24 +122,24 @@ describe("describeJobTile", () => {
 
 	it("puts status, title, id and clock over the split figure, the small primary chart, stats and stage", () => {
 		const described = describeJobTile(tile({ widget: decodeBench }));
-		expect(texts(role(described, "omp.job.tile.head")!).split("\n").filter(Boolean)).toEqual([
+		expect(texts(role(described, "omsp.job.tile.head")!).split("\n").filter(Boolean)).toEqual([
 			"●",
 			"verb-bench · decode throughput",
 			"bg_1",
 		]);
-		expect(ofKind(role(described, "omp.job.tile.head")!, "elapsed")).toHaveLength(1);
-		expect(prop(role(described, "omp.job.tile.dot"), "spans")).toEqual([{ t: "●", s: "accent", fx: "pulse" }]);
-		expect(prop(role(described, "omp.job.tile.figure"), "spans")).toEqual([
+		expect(ofKind(role(described, "omsp.job.tile.head")!, "elapsed")).toHaveLength(1);
+		expect(prop(role(described, "omsp.job.tile.dot"), "spans")).toEqual([{ t: "●", s: "accent", fx: "pulse" }]);
+		expect(prop(role(described, "omsp.job.tile.figure"), "spans")).toEqual([
 			{ t: "decode ", s: "dim" },
 			{ t: "186" },
 			{ t: " tok/s", s: "dim" },
 			{ t: " ▲ 15%", s: "success" },
 		]);
-		const chart = role(described, "omp.job.tile.chart")!.p as TspChartProps;
+		const chart = role(described, "omsp.job.tile.chart")!.p as TspChartProps;
 		expect(chart).toMatchObject({ kind: "bars", size: "sm", max: 220 });
 		expect(chart.marks).toHaveLength(1);
-		expect(texts(role(described, "omp.job.tile.stats")!)).toBe("p50 41 ms · p99 212 ms ▼ 3.2% · errors 0");
-		expect(texts(role(described, "omp.job.tile.stage")!)).toBe("nvfp4 b1 run 32/48");
+		expect(texts(role(described, "omsp.job.tile.stats")!)).toBe("p50 41 ms · p99 212 ms ▼ 3.2% · errors 0");
+		expect(texts(role(described, "omsp.job.tile.stage")!)).toBe("nvfp4 b1 run 32/48");
 	});
 
 	it("names a subagent's tile by the subagent, its estimate a labelled ring beside the widget's figure", () => {
@@ -152,16 +152,16 @@ describe("describeJobTile", () => {
 				completionPercent: 68.4,
 			}),
 		);
-		expect(texts(role(described, "omp.job.tile.title")!)).toBe("ConsumersMigration");
-		expect(role(described, "omp.job.tile.id")).toBeUndefined();
-		expect(texts(role(described, "omp.job.tile.figure")!)).toBe("decode 186 tok/s ▲ 15%");
-		expect(role(described, "omp.job.tile.ring")?.p).toMatchObject({ style: "ring", value: 0.68, label: "68%" });
+		expect(texts(role(described, "omsp.job.tile.title")!)).toBe("ConsumersMigration");
+		expect(role(described, "omsp.job.tile.id")).toBeUndefined();
+		expect(texts(role(described, "omsp.job.tile.figure")!)).toBe("decode 186 tok/s ▲ 15%");
+		expect(role(described, "omsp.job.tile.ring")?.p).toMatchObject({ style: "ring", value: 0.68, label: "68%" });
 	});
 
 	it("splits a ratio figure, lists the first keys of a bars block and counts the rest", () => {
 		const described = describeJobTile(tile({ widget: modelEval }));
-		expect(texts(role(described, "omp.job.tile.figure")!)).toBe("passed 71 / 90");
-		const bars = ofKind(role(described, "omp.job.tile.bars")!, "meter");
+		expect(texts(role(described, "omsp.job.tile.figure")!)).toBe("passed 71 / 90");
+		const bars = ofKind(role(described, "omsp.job.tile.bars")!, "meter");
 		expect(bars.map(meter => prop(meter, "value"))).toEqual([26 / 30, 24 / 30, 21 / 30]);
 	});
 
@@ -174,27 +174,27 @@ describe("describeJobTile", () => {
 			updatedAt: 0,
 		};
 		expect(jobWidgetGlance(build)?.text).toBe("140/190");
-		expect(texts(role(describeJobTile(tile({ widget: build })), "omp.job.tile.figure")!)).toBe("140 / 190");
+		expect(texts(role(describeJobTile(tile({ widget: build })), "omsp.job.tile.figure")!)).toBe("140 / 190");
 		// A headline of another quantity still wins over the meter's figure.
 		expect(jobWidgetGlance(trialSweep)?.text).toBe("0.842");
 	});
 
 	it("gives a tile with nothing to chart its stage as the body, never a clock for a figure", () => {
 		const plain = describeJobTile(tile({ status: "failed", live: false, exitCode: 101 }));
-		expect(role(plain, "omp.job.tile.figure")).toBeUndefined();
-		expect(ofKind(role(plain, "omp.job.tile.head")!, "elapsed")).toHaveLength(1);
-		expect(prop(role(plain, "omp.job.tile.dot"), "spans")).toEqual([{ t: "✕", s: "error" }]);
-		expect(texts(role(plain, "omp.job.tile.lead")!)).toBe("exit 101");
+		expect(role(plain, "omsp.job.tile.figure")).toBeUndefined();
+		expect(ofKind(role(plain, "omsp.job.tile.head")!, "elapsed")).toHaveLength(1);
+		expect(prop(role(plain, "omsp.job.tile.dot"), "spans")).toEqual([{ t: "✕", s: "error" }]);
+		expect(texts(role(plain, "omsp.job.tile.lead")!)).toBe("exit 101");
 
 		const task = describeJobTile(
 			tile({ id: "Tuner", type: "task", label: "Tuner", completionPercent: 68, stage: "driver edits done" }),
 		);
-		expect(role(task, "omp.job.tile.lead")?.p).toMatchObject({ wrap: "word" });
-		expect(texts(role(task, "omp.job.tile.lead")!)).toBe("driver edits done");
+		expect(role(task, "omsp.job.tile.lead")?.p).toMatchObject({ wrap: "word" });
+		expect(texts(role(task, "omsp.job.tile.lead")!)).toBe("driver edits done");
 		// A command's long last line is cut to a few lines of the tile.
 		const long = describeJobTile(tile({ stage: "x".repeat(200) }));
-		expect(texts(role(long, "omp.job.tile.lead")!)).toHaveLength(120);
-		expect(prop(role(task, "omp.job.tile.ring"), "value")).toBeCloseTo(0.68);
+		expect(texts(role(long, "omsp.job.tile.lead")!)).toHaveLength(120);
+		expect(prop(role(task, "omsp.job.tile.ring"), "value")).toBeCloseTo(0.68);
 	});
 
 	it("draws nothing of a widget no spec drives, and no text line the stage repeats", () => {
@@ -214,8 +214,8 @@ describe("describeJobTile", () => {
 		const repeated = describeJobTile(
 			tile({ widget: { ...trialSweep, stage: "trial 8: lr=3e-4\twarmup=500 seed=7" } }),
 		);
-		expect(role(repeated, "omp.job.tile.note")).toBeUndefined();
-		expect(texts(role(repeated, "omp.job.tile.stage")!)).toBe("trial 8: lr=3e-4 warmup=500 seed=7");
+		expect(role(repeated, "omsp.job.tile.note")).toBeUndefined();
+		expect(texts(role(repeated, "omsp.job.tile.stage")!)).toBe("trial 8: lr=3e-4 warmup=500 seed=7");
 	});
 });
 

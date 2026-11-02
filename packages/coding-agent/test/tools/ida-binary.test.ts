@@ -2,10 +2,15 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { cfgIdaAvailable, cfgIdaInstall } from "@oh-my-pi/pi-coding-agent/ida/install";
-import { isExecutableHeader, parseFatSlices, selectSlice, splitSliceRef } from "@oh-my-pi/pi-coding-agent/ida/store";
-import { type BinaryView, parseBinaryView } from "@oh-my-pi/pi-coding-agent/tools/read-binary";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { cfgIdaAvailable, cfgIdaInstall } from "@oh-my-striped-pi/pi-coding-agent/ida/install";
+import {
+	isExecutableHeader,
+	parseFatSlices,
+	selectSlice,
+	splitSliceRef,
+} from "@oh-my-striped-pi/pi-coding-agent/ida/store";
+import { type BinaryView, parseBinaryView } from "@oh-my-striped-pi/pi-coding-agent/tools/read-binary";
 
 describe("isExecutableHeader", () => {
 	const cases: Array<[string, number[], boolean]> = [

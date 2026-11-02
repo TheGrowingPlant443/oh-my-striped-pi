@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { Terminal as VirtualTerminal } from "@oh-my-pi/pi-utils/vterm";
+import { Terminal as VirtualTerminal } from "@oh-my-striped-pi/pi-utils/vterm";
 
 const COLUMNS = 120;
 const ROWS = 30;
@@ -35,19 +35,18 @@ describe.skipIf(process.platform === "win32")("fatal stderr terminal handoff", (
 				cwd: process.cwd(),
 				// This is a real-terminal contract test: shed the test-runtime markers so
 				// the fixture's ProcessTerminal paints instead of going headless
-				// (ci-test-ts children inherit PI_TEST_RUNTIME=1).
+				// (ci-test-ts children inherit OMSP_TEST_RUNTIME=1).
 				env: {
 					...process.env,
-					OMP_TUI_DEBUG: undefined,
-					PI_TEST_RUNTIME: undefined,
+					OMSP_TUI_DEBUG: undefined,
+					OMSP_TEST_RUNTIME: undefined,
 					BUN_ENV: undefined,
 					NODE_ENV: undefined,
 					// Bun's PTY and the VT parser do not implement native TSP surfaces.
 					// A parent running in Tern must not turn the fixture's rows into APC JSON.
 					TERM: "xterm-256color",
 					TERM_PROGRAM: undefined,
-					OMP_TUI_NATIVE: "0",
-					PI_TUI_NATIVE: "0",
+					OMSP_TUI_NATIVE: "0",
 				},
 				terminal,
 			});

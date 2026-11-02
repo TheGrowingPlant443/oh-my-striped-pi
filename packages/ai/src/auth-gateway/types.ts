@@ -1,4 +1,4 @@
-import type { Effort } from "@oh-my-pi/pi-catalog/effort";
+import type { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
 import type { AuthGatewayClient } from "./clients";
 import type {
 	AssistantMessage,
@@ -12,9 +12,9 @@ import type {
 } from "../types";
 
 /**
- * Wire types for the omp auth-gateway.
+ * Wire types for the omsp auth-gateway.
  *
- * The gateway sits between unauthenticated clients (containerized omp,
+ * The gateway sits between unauthenticated clients (containerized omsp,
  * llm-git, …) and the broker. It accepts provider-format HTTP requests
  * (OpenAI chat-completions / Anthropic messages / OpenAI Responses),
  * dispatches them through pi-ai's `streamSimple()`, and translates the
@@ -23,7 +23,7 @@ import type {
  */
 
 /** Default bind. Loopback-only — front with reverse proxy for remote access. */
-export const DEFAULT_AUTH_GATEWAY_BIND = "127.0.0.1:4000";
+export const DEFAULT_AUTH_GATEWAY_BIND = "127.0.0.1:4001";
 
 export type AuthGatewayToolChoice = "auto" | "none" | "required" | { name: string } | { type: "computer" };
 
@@ -149,7 +149,7 @@ export interface AuthGatewayFormatModule {
 }
 
 export interface AuthGatewayServerOptions {
-	/** Listen address. Default `127.0.0.1:4000`. */
+	/** Listen address. Default `127.0.0.1:4001`. */
 	bind?: string;
 	/** Accept any of these bearer tokens. Empty allows unauthenticated calls unless `clients` is set. */
 	bearerTokens: string[];

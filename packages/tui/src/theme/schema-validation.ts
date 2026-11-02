@@ -1,4 +1,4 @@
-import { type } from "@oh-my-pi/omptype";
+import { type } from "@oh-my-striped-pi/omptype";
 import type { SpinnerFramesOverride } from "./symbols";
 import type { ThemeJson } from "./schema";
 

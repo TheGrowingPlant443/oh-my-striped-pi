@@ -7,13 +7,13 @@
  * spinning intra-op thread per core. The baseline session below is that
  * configuration, so this script is the measurement behind the budget.
  *
- * Run from the repo root (downloads the model into omp's shared fastembed cache
+ * Run from the repo root (downloads the model into omsp's shared fastembed cache
  * on first use): `bun packages/mnemopi/bench/embed-session-threads.bench.ts`
  * `MNEMOPI_EMBEDDING_MODEL` selects another bundled model.
  */
 import { createRequire } from "node:module";
 import * as os from "node:os";
-import { getFastembedCacheDir } from "@oh-my-pi/pi-utils";
+import { getFastembedCacheDir } from "@oh-my-striped-pi/pi-utils";
 import type * as Fastembed from "fastembed";
 import type * as Ort from "onnxruntime-node";
 import { currentEmbeddingModel, fastembedModelName } from "../src/core/embeddings";

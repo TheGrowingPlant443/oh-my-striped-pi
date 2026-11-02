@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { streamAnthropic } from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { AnthropicMessagesClientLike } from "@oh-my-pi/pi-ai/providers/anthropic-client";
-import type { RawMessageStreamEvent } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import { streamOpenAICompletions } from "@oh-my-pi/pi-ai/providers/openai-completions";
-import { streamOpenAIResponses } from "@oh-my-pi/pi-ai/providers/openai-responses";
-import type { Context, FetchImpl, Model, RawSseEvent } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { streamAnthropic } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type { AnthropicMessagesClientLike } from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
+import type { RawMessageStreamEvent } from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
+import { streamOpenAICompletions } from "@oh-my-striped-pi/pi-ai/providers/openai-completions";
+import { streamOpenAIResponses } from "@oh-my-striped-pi/pi-ai/providers/openai-responses";
+import type { Context, FetchImpl, Model, RawSseEvent } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 const context: Context = {
 	messages: [{ role: "user", content: "Say hello", timestamp: Date.now() }],

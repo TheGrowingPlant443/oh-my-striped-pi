@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { loadPage } from "@oh-my-pi/pi-coding-agent/web/scrapers/types";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { loadPage } from "@oh-my-striped-pi/pi-coding-agent/web/scrapers/types";
 
 function makeSession(): ToolSession {
 	const cwd = process.cwd();
@@ -89,12 +89,12 @@ describe("read URL refused for one user agent", () => {
 		servers.push(server);
 
 		for (const name of ["User-Agent", "user-agent"]) {
-			const result = await loadPage(`http://127.0.0.1:${server.port}/api`, { headers: { [name]: "omp/test" } });
+			const result = await loadPage(`http://127.0.0.1:${server.port}/api`, { headers: { [name]: "omsp/test" } });
 			expect(result.ok).toBe(false);
 			expect(result.status).toBe(403);
 		}
 
-		expect(agents).toEqual(["omp/test", "omp/test"]);
+		expect(agents).toEqual(["omsp/test", "omsp/test"]);
 	});
 
 	it("still retries a caller's own User-Agent after a transport error", async () => {
@@ -111,12 +111,12 @@ describe("read URL refused for one user agent", () => {
 		servers.push(server);
 
 		const result = await loadPage(`http://127.0.0.1:${server.port}/api`, {
-			headers: { "User-Agent": "omp/test" },
+			headers: { "User-Agent": "omsp/test" },
 			timeout: 0.2,
 		});
 
 		expect(result.ok).toBe(true);
 		expect(result.content).toBe("recovered");
-		expect(agents).toEqual(["omp/test", "omp/test"]);
+		expect(agents).toEqual(["omsp/test", "omsp/test"]);
 	});
 });

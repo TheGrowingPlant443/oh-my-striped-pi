@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "bun:test";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { InputController } from "@oh-my-pi/pi-coding-agent/modes/controllers/input-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { cfgDisplayHideToolActivity } from "@oh-my-pi/pi-coding-agent/modes/settings";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { InputController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/input-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { cfgDisplayHideToolActivity } from "@oh-my-striped-pi/pi-coding-agent/modes/settings";
 
 describe("InputController tool output expansion", () => {
 	it("expands children and forces a full repaint so every live block re-renders", () => {

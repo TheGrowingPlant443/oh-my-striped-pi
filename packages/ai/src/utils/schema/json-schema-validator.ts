@@ -12,8 +12,8 @@
  * Compared to AJV this is single-pass, synchronous, dependency-free, and
  * tolerates non-standard shapes (`nullable`) that LLM-emitted schemas carry.
  */
-import { parseLocalRefPointer } from "@oh-my-pi/omptype";
-import { isRecord, logger } from "@oh-my-pi/pi-utils";
+import { parseLocalRefPointer } from "@oh-my-striped-pi/omptype";
+import { isRecord, logger } from "@oh-my-striped-pi/pi-utils";
 import { areJsonValuesEqual } from "./equality";
 import { stamp } from "./stamps";
 

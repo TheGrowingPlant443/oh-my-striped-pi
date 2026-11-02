@@ -2,14 +2,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
-import { type CustomTool, toolCapability } from "@oh-my-pi/pi-coding-agent/capability/tool";
-import { resetSettingsForTest, Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { initializeWithSettings, loadCapability } from "@oh-my-pi/pi-coding-agent/discovery";
-import { clearClaudePluginRootsCache } from "@oh-my-pi/pi-coding-agent/discovery/helpers";
-import { discoverCustomToolPaths, loadCustomTools } from "@oh-my-pi/pi-coding-agent/extensibility/custom-tools/loader";
-import { __closeExtensionParseCacheForTests } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
-import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import { clearCache as clearFsCache } from "@oh-my-striped-pi/pi-coding-agent/capability/fs";
+import { type CustomTool, toolCapability } from "@oh-my-striped-pi/pi-coding-agent/capability/tool";
+import { resetSettingsForTest, Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { initializeWithSettings, loadCapability } from "@oh-my-striped-pi/pi-coding-agent/discovery";
+import { clearClaudePluginRootsCache } from "@oh-my-striped-pi/pi-coding-agent/discovery/helpers";
+import {
+	discoverCustomToolPaths,
+	loadCustomTools,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/custom-tools/loader";
+import { __closeExtensionParseCacheForTests } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
+import { __resetDirsFromEnvForTests, removeWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { restoreEnvValue } from "../helpers/settings-test-state";
 
 function toolSource(name: string): string {
@@ -36,14 +39,14 @@ describe("native executable custom tool discovery", () => {
 		clearClaudePluginRootsCache();
 		clearFsCache();
 		originalHome = process.env.HOME;
-		originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
-		originalOmpProfileEnv = process.env.OMP_PROFILE;
-		originalPiProfileEnv = process.env.PI_PROFILE;
-		root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-builtin-tools-"));
+		originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
+		originalOmpProfileEnv = process.env.OMSP_PROFILE;
+		originalPiProfileEnv = process.env.OMSP_PROFILE;
+		root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-builtin-tools-"));
 		const home = path.join(root, "home");
 		project = path.join(root, "project");
-		projectTools = path.join(project, ".omp", "tools");
-		userTools = path.join(home, ".omp", "agent", "tools");
+		projectTools = path.join(project, ".omsp", "tools");
+		userTools = path.join(home, ".omsp", "agent", "tools");
 		process.env.HOME = home;
 		vi.spyOn(os, "homedir").mockReturnValue(home);
 		setAgentDir(path.dirname(userTools));
@@ -61,9 +64,9 @@ describe("native executable custom tool discovery", () => {
 		clearFsCache();
 		vi.restoreAllMocks();
 		restoreEnvValue("HOME", originalHome);
-		restoreEnvValue("OMP_PROFILE", originalOmpProfileEnv);
-		restoreEnvValue("PI_PROFILE", originalPiProfileEnv);
-		restoreEnvValue("PI_CODING_AGENT_DIR", originalAgentDirEnv);
+		restoreEnvValue("OMSP_PROFILE", originalOmpProfileEnv);
+		restoreEnvValue("OMSP_PROFILE", originalPiProfileEnv);
+		restoreEnvValue("OMSP_CODING_AGENT_DIR", originalAgentDirEnv);
 		__resetDirsFromEnvForTests();
 		// Loading the fixtures opens the legacy extension parse cache under the temp HOME; Windows can't remove it while open.
 		__closeExtensionParseCacheForTests();

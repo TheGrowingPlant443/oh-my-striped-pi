@@ -1,4 +1,4 @@
-import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
+import type { ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
 
 export type Transferable = Bun.Transferable;
 
@@ -38,18 +38,18 @@ export interface ScreenshotResult {
 export interface SessionSnapshot {
 	cwd: string;
 	browserScreenshotDir?: string;
-	/** Force non-WebP screenshot encoding (e.g. for Ollama). Unset honors `OMP_NO_WEBP`. */
+	/** Force non-WebP screenshot encoding (e.g. for Ollama). Unset honors `OMSP_NO_WEBP`. */
 	excludeWebP?: boolean;
 }
 
 /**
  * The page an attach worker drives. `create`: open a background tab and own it, in the browser of
- * `nearTargetId` (another tab omp drives on the relay) when given. `owned`: a tab omp created, adopted
+ * `nearTargetId` (another tab omsp drives on the relay) when given. `owned`: a tab omsp created, adopted
  * again after a recycle. `borrowed`: a page the user has open; never closed, never focus-emulated.
  */
 export type AttachPage = { kind: "create"; nearTargetId?: string } | { kind: "owned" | "borrowed"; targetId: string };
 
-/** omp created the payload's page (headless, or a relay tab of its own): closing the tab closes the page. */
+/** omsp created the payload's page (headless, or a relay tab of its own): closing the tab closes the page. */
 export function ownsPage(payload: WorkerInitPayload): boolean {
 	return payload.mode === "headless" || payload.page.kind !== "borrowed";
 }
@@ -61,7 +61,7 @@ export type WorkerInitPayload =
 			safeDir: string;
 			/** The tab's upload staging folder, which outlives a recycled worker; see `UploadStaging`. */
 			uploadDir: string;
-			/** Keep the page tied to an OMP-owned worker without pinning a visible window's layout viewport. */
+			/** Keep the page tied to an OMSP-owned worker without pinning a visible window's layout viewport. */
 			emulateViewport?: boolean;
 			viewport?: { width: number; height: number; deviceScaleFactor?: number };
 			dialogs?: "accept" | "dismiss";
@@ -102,7 +102,7 @@ export type WorkerInitPayload =
 			recover?: boolean;
 			/**
 			 * The user drives this browser (connected, relay): downloads keep its one browser-wide folder and real file
-			 * names, since the user's own downloads land there too. Unset means an OMP-launched browser.
+			 * names, since the user's own downloads land there too. Unset means an OMSP-launched browser.
 			 */
 			userDriven?: boolean;
 	  };
@@ -145,7 +145,7 @@ export interface RunErrorPayload {
 	/** The page's renderer crashed; the worker runs nothing more and must be recycled. */
 	rendererCrashed?: boolean;
 	/**
-	 * Chrome ended the debugger attachment the page is driven through (omp browser relay) `during` this run, after
+	 * Chrome ended the debugger attachment the page is driven through (omsp browser relay) `during` this run, after
 	 * its code started, or `before` it, so nothing ran; the worker runs nothing more. `reason` is Chrome's
 	 * (`target_closed`, `canceled_by_user`): after a user cancel the relay hides the tab, otherwise it is re-adopted.
 	 */

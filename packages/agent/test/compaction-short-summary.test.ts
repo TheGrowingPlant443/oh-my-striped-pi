@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type CompactionPreparation,
 	compact,
 	createFileOps,
 	DEFAULT_COMPACTION_SETTINGS,
-} from "@oh-my-pi/pi-agent-core/compaction";
-import type { AssistantMessage, Model, StopReason } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { AssistantMessage, Model, StopReason } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 // The short summary is a display-only field. These tests pin that its failure
 // modes no longer discard a completed full summary, while cancellation still

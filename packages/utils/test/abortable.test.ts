@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { untilAborted } from "@oh-my-pi/pi-utils/abortable";
+import { untilAborted } from "@oh-my-striped-pi/pi-utils/abortable";
 
 describe("untilAborted with an already-aborted signal", () => {
 	const unhandled: unknown[] = [];

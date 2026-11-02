@@ -1,6 +1,6 @@
-# @oh-my-pi/pi-mnemopi
+# @oh-my-striped-pi/pi-mnemopi
 
-Local SQLite memory engine for omp agents.
+Local SQLite memory engine for omsp agents.
 
 This package is the Bun/TypeScript port of the Mnemosyne memory engine. It provides:
 
@@ -14,7 +14,7 @@ The package has no public hosted inference default or fallback and does not bund
 ## Basic use
 
 ```ts
-import { Mnemopi } from "@oh-my-pi/pi-mnemopi";
+import { Mnemopi } from "@oh-my-striped-pi/pi-mnemopi";
 
 const memory = new Mnemopi({ dbPath: "./mnemopi.db", bank: "project" });
 const id = memory.remember("The deployment target is stable-cluster.", {
@@ -36,8 +36,8 @@ Lexical recall matches whole tokens, declared synonyms, underscore-separated ide
 `Mnemopi` accepts host-managed LLMs, callbacks, local embeddings, and explicit private HTTP endpoints. Dedicated `MNEMOPI_*` environment variables remain fallbacks when the matching constructor option is omitted.
 
 ```ts
-import { Mnemopi } from "@oh-my-pi/pi-mnemopi";
-import type { Model } from "@oh-my-pi/pi-ai";
+import { Mnemopi } from "@oh-my-striped-pi/pi-mnemopi";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
 
 const ftsOnly = new Mnemopi({ noEmbeddings: true });
 
@@ -73,7 +73,7 @@ Optional dedicated `apiKey` values may be strings or managed key resolvers. Unau
 
 `Mnemopi` itself exposes banks directly through constructor options such as `bank`; it does not hard-code coding-agent project scoping.
 
-The omp coding-agent wrapper adds `mnemopi.scoping` on top of those constructor options:
+The omsp coding-agent wrapper adds `mnemopi.scoping` on top of those constructor options:
 
 - `global`: one shared bank
 - `per-project`: isolated project memory

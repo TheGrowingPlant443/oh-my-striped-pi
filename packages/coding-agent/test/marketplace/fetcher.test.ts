@@ -6,9 +6,9 @@ import {
 	classifySource,
 	fetchMarketplace,
 	parseMarketplaceCatalog,
-} from "@oh-my-pi/pi-coding-agent/extensibility/plugins/marketplace";
-import * as vcs from "@oh-my-pi/pi-natives/vcs";
-import { removeSyncWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/marketplace";
+import * as vcs from "@oh-my-striped-pi/pi-natives/vcs";
+import { removeSyncWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 // Fixture lives at test/marketplace/fixtures/valid-marketplace/
 const FIXTURE_DIR = path.join(import.meta.dir, "fixtures", "valid-marketplace");
@@ -180,7 +180,7 @@ describe("fetchMarketplace", () => {
 	let tmpDir: string;
 
 	beforeEach(() => {
-		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omp-fetcher-test-"));
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "omsp-fetcher-test-"));
 	});
 
 	afterEach(() => {
@@ -202,27 +202,39 @@ describe("fetchMarketplace", () => {
 		await expect(fetchMarketplace(missing, tmpDir)).rejects.toThrow(/Marketplace catalog not found/);
 	});
 
-	it("loads catalog from .omp-plugin/marketplace.json when present", async () => {
-		const root = path.join(tmpDir, "omp-only");
-		fs.mkdirSync(path.join(root, ".omp-plugin"), { recursive: true });
+	it("loads catalog from .omsp-plugin/marketplace.json when present", async () => {
+		const root = path.join(tmpDir, "omsp-only");
+		fs.mkdirSync(path.join(root, ".omsp-plugin"), { recursive: true });
 		const catalog = {
-			name: "omp-only-marketplace",
+			name: "omsp-only-marketplace",
 			owner: { name: "Test" },
-			plugins: [{ name: "omp-plugin", source: "./plugins/omp-plugin", description: "x" }],
+			plugins: [{ name: "omsp-plugin", source: "./plugins/omsp-plugin", description: "x" }],
 		};
-		fs.writeFileSync(path.join(root, ".omp-plugin", "marketplace.json"), JSON.stringify(catalog));
+		fs.writeFileSync(path.join(root, ".omsp-plugin", "marketplace.json"), JSON.stringify(catalog));
 
 		const result = await fetchMarketplace(root, tmpDir);
-		expect(result.catalog.name).toBe("omp-only-marketplace");
-		expect(result.catalog.plugins[0].name).toBe("omp-plugin");
+		expect(result.catalog.name).toBe("omsp-only-marketplace");
+		expect(result.catalog.plugins[0].name).toBe("omsp-plugin");
 	});
 
-	it("prefers .omp-plugin/marketplace.json over .claude-plugin/marketplace.json when both exist", async () => {
+	it("loads published .omp-plugin catalogs when no fork override exists", async () => {
+		const root = path.join(tmpDir, "published-catalog");
+		fs.mkdirSync(path.join(root, ".omp-plugin"), { recursive: true });
+		fs.writeFileSync(
+			path.join(root, ".omp-plugin", "marketplace.json"),
+			JSON.stringify({ name: "published", owner: { name: "Test" }, plugins: [] }),
+		);
+		const result = await fetchMarketplace(root, tmpDir);
+		expect(result.catalog.name).toBe("published");
+	});
+
+	it("prefers .omsp-plugin catalogs over legacy OMP and Claude catalogs", async () => {
 		const root = path.join(tmpDir, "both-catalogs");
+		fs.mkdirSync(path.join(root, ".omsp-plugin"), { recursive: true });
 		fs.mkdirSync(path.join(root, ".omp-plugin"), { recursive: true });
 		fs.mkdirSync(path.join(root, ".claude-plugin"), { recursive: true });
 		const ompCatalog = {
-			name: "from-omp-plugin",
+			name: "from-omsp-plugin",
 			owner: { name: "Test" },
 			plugins: [{ name: "p", source: "./p", description: "x" }],
 		};
@@ -231,18 +243,19 @@ describe("fetchMarketplace", () => {
 			owner: { name: "Test" },
 			plugins: [{ name: "p", source: "./p", description: "x" }],
 		};
-		fs.writeFileSync(path.join(root, ".omp-plugin", "marketplace.json"), JSON.stringify(ompCatalog));
+		fs.writeFileSync(path.join(root, ".omsp-plugin", "marketplace.json"), JSON.stringify(ompCatalog));
 		fs.writeFileSync(path.join(root, ".claude-plugin", "marketplace.json"), JSON.stringify(claudeCatalog));
+		fs.writeFileSync(path.join(root, ".omp-plugin", "marketplace.json"), JSON.stringify(claudeCatalog));
 
 		const result = await fetchMarketplace(root, tmpDir);
-		expect(result.catalog.name).toBe("from-omp-plugin");
+		expect(result.catalog.name).toBe("from-omsp-plugin");
 	});
 
-	it("error message names both candidate paths when neither exists", async () => {
+	it("error message names all candidate paths when none exists", async () => {
 		const empty = path.join(tmpDir, "empty-dir");
 		fs.mkdirSync(empty, { recursive: true });
 		await expect(fetchMarketplace(empty, tmpDir)).rejects.toThrow(
-			/\.omp-plugin[\\/]marketplace\.json.*\.claude-plugin[\\/]marketplace\.json/,
+			/\.omsp-plugin[\\/]marketplace\.json.*\.omp-plugin[\\/]marketplace\.json.*\.claude-plugin[\\/]marketplace\.json/,
 		);
 	});
 
@@ -279,9 +292,9 @@ describe("fetchMarketplace", () => {
 
 	it("keeps simultaneous clone checkouts isolated", async () => {
 		const cloneSpy = spyOn(vcs, "clone").mockImplementation(async (_url, targetDir) => {
-			fs.mkdirSync(path.join(targetDir, ".omp-plugin"));
+			fs.mkdirSync(path.join(targetDir, ".omsp-plugin"));
 			fs.writeFileSync(
-				path.join(targetDir, ".omp-plugin", "marketplace.json"),
+				path.join(targetDir, ".omsp-plugin", "marketplace.json"),
 				JSON.stringify({ name: "test-marketplace", owner: { name: "Test" }, plugins: [] }),
 			);
 		});
@@ -291,8 +304,8 @@ describe("fetchMarketplace", () => {
 				fetchMarketplace("owner/repo", tmpDir),
 			]);
 			expect(first.clonePath).not.toBe(second.clonePath);
-			expect(fs.existsSync(path.join(first.clonePath!, ".omp-plugin", "marketplace.json"))).toBe(true);
-			expect(fs.existsSync(path.join(second.clonePath!, ".omp-plugin", "marketplace.json"))).toBe(true);
+			expect(fs.existsSync(path.join(first.clonePath!, ".omsp-plugin", "marketplace.json"))).toBe(true);
+			expect(fs.existsSync(path.join(second.clonePath!, ".omsp-plugin", "marketplace.json"))).toBe(true);
 		} finally {
 			cloneSpy.mockRestore();
 		}

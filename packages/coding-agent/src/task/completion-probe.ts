@@ -15,7 +15,7 @@
  * agent is still streaming: a long `write` is invisible in history until it
  * finishes, so without it the estimate stalls near 0% for minutes.
  */
-import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
+import { getStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
 import {
 	formatDuration,
 	isInteractiveHost,
@@ -24,7 +24,7 @@ import {
 	logger,
 	prompt,
 	sanitizeText,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import completionProbePrompt from "../prompts/system/subagent-completion-probe.md" with { type: "text" };
 import type { AgentSession } from "../session/agent-session";

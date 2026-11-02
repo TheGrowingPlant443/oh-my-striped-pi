@@ -1,7 +1,8 @@
 //! Shared-checkout guard layered into the `git` builtin.
 //!
-//! Opt-in: active only when `PI_GIT_GUARD` is truthy in the session or process
-//! environment (the coding agent sets it from its `bash.gitGuard` setting).
+//! Opt-in: active only when `OMSP_GIT_GUARD` is truthy in the session or
+//! process environment (the coding agent sets it from its `bash.gitGuard`
+//! setting).
 //!
 //! Agents sharing one checkout lose work when one of them runs a git command
 //! that discards uncommitted changes or moves HEAD. The guard judges every
@@ -46,7 +47,7 @@ pub(super) const REFUSED_EXIT: u8 = 1;
 /// Ref whose reflog records uncommitted changes before a command in a
 /// one-agent checkout discards them. Git expires entries other than the
 /// latest with every reflog (`gc.reflogExpireUnreachable`, 30 days).
-const DISCARDED_REF: &str = "refs/omp/discarded";
+const DISCARDED_REF: &str = "refs/omsp/discarded";
 
 /// Where to take a command the guard refuses in a shared checkout.
 const OWN_WORKTREE: &str = "In a worktree of your own (git worktree add <path> [<branch>]) it \
@@ -1168,7 +1169,7 @@ mod tests {
 
 	#[cfg(unix)]
 	async fn guarded(repo: &Path, command: &str) -> (Option<i32>, String) {
-		run_with(repo, command, &["PI_GIT_GUARD"]).await
+		run_with(repo, command, &["OMSP_GIT_GUARD"]).await
 	}
 
 	/// The guard sees the command as the shell runs it, so an expanded
@@ -1193,7 +1194,7 @@ mod tests {
 		assert_eq!(git(&repo, &["stash", "list"]), "");
 
 		// Off unless asked for, also beside the worktree layer.
-		let (code, output) = run_with(&repo, "git stash -q", &["PI_SMART_GIT"]).await;
+		let (code, output) = run_with(&repo, "git stash -q", &["OMSP_SMART_GIT"]).await;
 		assert_eq!(code, Some(0), "{output}");
 		assert_eq!(std::fs::read_to_string(repo.join("tracked.txt")).expect("read"), "tracked\n");
 	}
@@ -1533,8 +1534,8 @@ mod tests {
 		git(&repo, &["worktree", "add", "-q", "-b", "topic", &worktree.to_string_lossy()]);
 		git(&worktree, &["merge", "-q", "--no-commit", "--no-ff", "side"]);
 		std::fs::write(worktree.join("tracked.txt"), "mine\n").expect("edit");
-		let lock = repo.join(".git/refs/omp/discarded.lock");
-		std::fs::create_dir_all(lock.parent().expect("refs/omp")).expect("refs/omp");
+		let lock = repo.join(".git/refs/omsp/discarded.lock");
+		std::fs::create_dir_all(lock.parent().expect("refs/omsp")).expect("refs/omsp");
 		std::fs::write(&lock, "").expect("stale lock");
 
 		let (code, output) = guarded(&worktree, "git restore tracked.txt").await;

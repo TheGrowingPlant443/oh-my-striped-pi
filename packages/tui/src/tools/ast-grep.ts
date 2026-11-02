@@ -1,4 +1,4 @@
-import { isRecord, sanitizeText } from "@oh-my-pi/pi-utils";
+import { isRecord, sanitizeText } from "@oh-my-striped-pi/pi-utils";
 import type { Component } from "../tui";
 import { Text } from "../components/text";
 import type { Theme } from "../theme/theme";

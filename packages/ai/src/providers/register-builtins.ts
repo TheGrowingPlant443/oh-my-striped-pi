@@ -2,7 +2,7 @@
  * First-use provider loading with shared stream error, cancellation, and timeout handling.
  */
 
-import type { CompatOf } from "@oh-my-pi/pi-catalog/types";
+import type { CompatOf } from "@oh-my-striped-pi/pi-catalog/types";
 import * as AIError from "../error";
 import type { Api, AssistantMessage, AssistantMessageEvent, Context, Model, OptionsForApi } from "../types";
 import { type AbortSourceTracker, createAbortSourceTracker } from "../utils/abort";
@@ -36,9 +36,9 @@ function hasFinalResult(
 
 /**
  * floor used when neither caller option nor env var pins a value. Generic env
- * vars (`PI_STREAM_FIRST_EVENT_TIMEOUT_MS`, `PI_STREAM_IDLE_TIMEOUT_MS`) still
+ * vars (`OMSP_STREAM_FIRST_EVENT_TIMEOUT_MS`, `OMSP_STREAM_IDLE_TIMEOUT_MS`) still
  * take precedence unless a provider opts into OpenAI-family idle flooring for
- * local backends that users historically tuned with `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS`.
+ * local backends that users historically tuned with `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS`.
  */
 interface StreamLimits {
 	defaultFirstEventTimeoutMs?: number;
@@ -56,7 +56,7 @@ interface StreamLimits {
 	/**
 	 * Apply OpenAI-family idle timeout precedence in the shared wrapper. Used by
 	 * local backends whose users historically tune slow prompt-processing gaps
-	 * with `PI_OPENAI_STREAM_IDLE_TIMEOUT_MS`.
+	 * with `OMSP_OPENAI_STREAM_IDLE_TIMEOUT_MS`.
 	 */
 	openAIIdleEnvFloorsFirstEvent?: boolean;
 }

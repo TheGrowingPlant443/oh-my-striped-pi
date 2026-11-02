@@ -2,11 +2,11 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { classifyTerminalMultiplexer, type TerminalMultiplexer } from "@oh-my-pi/pi-tui/terminal-multiplexer";
-import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { CommandController } from "@oh-my-pi/pi-coding-agent/modes/controllers/command-controller";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
+import { classifyTerminalMultiplexer, type TerminalMultiplexer } from "@oh-my-striped-pi/pi-tui/terminal-multiplexer";
+import type { ConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { CommandController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/command-controller";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
 import { Settings } from "../../../src/config/settings";
 import {
 	createTerminalLauncher,
@@ -22,7 +22,7 @@ let tempDirectory: string;
 let sourceSessionFile: string;
 
 beforeEach(async () => {
-	tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "omp-fork-command-"));
+	tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-fork-command-"));
 	sourceSessionFile = path.join(tempDirectory, "current-session.jsonl");
 	await Bun.write(sourceSessionFile, '{"type":"session"}\n');
 });
@@ -98,7 +98,7 @@ function createContext(
 		classifyTerminalMultiplexer: options.classifyTerminalMultiplexer ?? classifyTerminalMultiplexer,
 		environment: options.environment ?? (() => ({ TMUX: "server,1,0", TMUX_PANE: "%1" })),
 		launchTerminal,
-		resolveCliEntryCmd: () => ["omp-entry"],
+		resolveCliEntryCmd: () => ["omsp-entry"],
 		getActiveProfile: () =>
 			options.activeProfile === null ? undefined : (options.activeProfile ?? "active-profile"),
 		argv: () => options.argv ?? ["--model", "provider/model", "prompt text"],
@@ -174,10 +174,10 @@ describe("/fork terminal placement", () => {
 		expect(request).toMatchObject({ multiplexer: "tmux", placement: "pane" });
 		const command = request?.command ?? [];
 		expect(command[0]).toBe("env");
-		expect(command).toContain("PI_CODING_AGENT_DIR=/user/agent");
-		expect(command).toContain("OMP_PROFILE=active-profile");
-		expect(command).toContain("PI_PROFILE=active-profile");
-		expect(command.slice(command.indexOf("omp-entry") + 1)).toEqual([
+		expect(command).toContain("OMSP_CODING_AGENT_DIR=/user/agent");
+		expect(command).toContain("OMSP_PROFILE=active-profile");
+		expect(command).toContain("OMSP_PROFILE=active-profile");
+		expect(command.slice(command.indexOf("omsp-entry") + 1)).toEqual([
 			"--profile",
 			"active-profile",
 			"--model",
@@ -206,7 +206,7 @@ describe("/fork terminal placement", () => {
 		});
 		await controller.handleForkCommand("pane");
 		const command = launchTerminal.mock.calls[0]?.[0].command ?? [];
-		const appArgs = command.slice(command.indexOf("omp-entry") + 1);
+		const appArgs = command.slice(command.indexOf("omsp-entry") + 1);
 		expect(appArgs).toContain("--no-tools");
 		expect(appArgs).not.toContain("--goal");
 		expect(appArgs).not.toContain("ship the release");
@@ -220,16 +220,16 @@ describe("/fork terminal placement", () => {
 		const { controller, launchTerminal } = createContext({
 			activeProfile: null,
 			environment: () =>
-				({ TMUX: "server,1,0", TMUX_PANE: "%1", PI_CODING_AGENT_SESSION_DIR: sessionsDir }) as NodeJS.ProcessEnv,
+				({ TMUX: "server,1,0", TMUX_PANE: "%1", OMSP_CODING_AGENT_SESSION_DIR: sessionsDir }) as NodeJS.ProcessEnv,
 		});
 		await controller.handleForkCommand("pane");
 		const command = launchTerminal.mock.calls[0]?.[0].command ?? [];
-		const envArgs = command.slice(0, command.indexOf("omp-entry"));
-		for (const name of ["XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "OMP_PROFILE", "PI_PROFILE"]) {
+		const envArgs = command.slice(0, command.indexOf("omsp-entry"));
+		for (const name of ["XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "OMSP_PROFILE"]) {
 			expect(envArgs[envArgs.indexOf(name) - 1]).toBe("-u");
 			expect(envArgs.some(arg => arg.startsWith(`${name}=`))).toBe(false);
 		}
-		expect(envArgs).toContain(`PI_CODING_AGENT_SESSION_DIR=${sessionsDir}`);
+		expect(envArgs).toContain(`OMSP_CODING_AGENT_SESSION_DIR=${sessionsDir}`);
 		// `env` rejects `-u` after the first assignment.
 		const lastUnset = envArgs.lastIndexOf("-u");
 		const firstAssignment = envArgs.findIndex(arg => arg.includes("="));
@@ -241,7 +241,7 @@ describe("/fork terminal placement", () => {
 		const controller = new CommandController(ctx, {
 			environment: () => ({ ZELLIJ: "session" }),
 			launchTerminal,
-			resolveCliEntryCmd: () => ["omp-entry"],
+			resolveCliEntryCmd: () => ["omsp-entry"],
 			getActiveProfile: () => "active-profile",
 			argv: () => ["--profile", "launch-profile", "--fork", "stale-source", "prompt"],
 		});
@@ -271,10 +271,9 @@ describe("/fork terminal placement", () => {
 				({
 					TMUX: "server,1,0",
 					TMUX_PANE: "%1",
-					OMP_PROFILE: "stale-server-profile",
-					PI_PROFILE: "stale-server-profile",
-					PI_CODING_AGENT_DIR: "/stale/server/agent",
-					PI_CONFIG_FILES: configFiles,
+					OMSP_PROFILE: "stale-server-profile",
+					OMSP_CODING_AGENT_DIR: "/stale/server/agent",
+					OMSP_CONFIG_FILES: configFiles,
 					XDG_DATA_HOME: dataDir,
 					XDG_STATE_HOME: stateDir,
 					XDG_CACHE_HOME: cacheDir,
@@ -295,8 +294,8 @@ describe("/fork terminal placement", () => {
 		await controller.handleForkCommand("pane");
 
 		const command = launchTerminal.mock.calls[0]?.[0].command ?? [];
-		expect(command).toContain(`PI_CODING_AGENT_DIR=${agentDir}`);
-		expect(command).toContain(`PI_CONFIG_FILES=${configFiles}`);
+		expect(command).toContain(`OMSP_CODING_AGENT_DIR=${agentDir}`);
+		expect(command).toContain(`OMSP_CONFIG_FILES=${configFiles}`);
 		expect(command).toContain(`XDG_DATA_HOME=${dataDir}`);
 		expect(command).toContain(`XDG_STATE_HOME=${stateDir}`);
 		expect(command).toContain(`XDG_CACHE_HOME=${cacheDir}`);
@@ -304,7 +303,7 @@ describe("/fork terminal placement", () => {
 		expect(command).not.toContain("stale-server-profile");
 		expect(command).not.toContain("old-profile");
 
-		const appArgs = command.slice(command.indexOf("omp-entry") + 1);
+		const appArgs = command.slice(command.indexOf("omsp-entry") + 1);
 		const modelIndex = appArgs.indexOf("--model");
 		expect(appArgs[modelIndex + 1]).toBe("current-provider/model-b");
 		expect(appArgs).not.toContain("old-provider");
@@ -339,7 +338,7 @@ describe("/fork terminal placement", () => {
 				({
 					TMUX: "server,1,0",
 					TMUX_PANE: "%1",
-					PI_CONFIG_FILES: staleConfigPath,
+					OMSP_CONFIG_FILES: staleConfigPath,
 					OPENAI_API_KEY: secret,
 				}) as NodeJS.ProcessEnv,
 			argv: ["--cwd", oldCwd, "--config", "./stale-startup-overlay.yml", "--thinking", "low", "prompt"],
@@ -350,12 +349,12 @@ describe("/fork terminal placement", () => {
 		const request = launchTerminal.mock.calls[0]?.[0];
 		expect(request?.cwd).toBe(newCwd);
 		const command = request?.command ?? [];
-		const configFilesEnv = command.find(arg => arg.startsWith("PI_CONFIG_FILES="));
-		expect(configFilesEnv?.slice("PI_CONFIG_FILES=".length).split(path.delimiter)).toContain(overlayPath);
+		const configFilesEnv = command.find(arg => arg.startsWith("OMSP_CONFIG_FILES="));
+		expect(configFilesEnv?.slice("OMSP_CONFIG_FILES=".length).split(path.delimiter)).toContain(overlayPath);
 		expect(configFilesEnv).not.toContain(staleConfigPath);
 		expect(command.join("\0")).not.toContain(secret);
 
-		const appArgs = command.slice(command.indexOf("omp-entry") + 1);
+		const appArgs = command.slice(command.indexOf("omsp-entry") + 1);
 		expect(appArgs).not.toContain("--cwd");
 		expect(appArgs).not.toContain(oldCwd);
 		expect(appArgs).not.toContain("--config");
@@ -409,7 +408,7 @@ describe("/fork terminal placement", () => {
 		const controller = new CommandController(ctx, {
 			environment,
 			launchTerminal: createTerminalLauncher({ environment }),
-			resolveCliEntryCmd: () => ["omp-entry"],
+			resolveCliEntryCmd: () => ["omsp-entry"],
 			getActiveProfile: () => undefined,
 			argv: () => [],
 		});

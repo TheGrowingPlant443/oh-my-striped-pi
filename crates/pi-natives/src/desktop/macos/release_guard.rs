@@ -36,7 +36,7 @@ use foreign_types::ForeignType;
 use super::release::{self, Input, Record, Route, Transition};
 use crate::desktop::{control, error::CoreResult, native_helper::HelperDirectory};
 
-const HELPER: &[u8] = include_bytes!(env!("OMP_INPUT_RELEASE_HELPER"));
+const HELPER: &[u8] = include_bytes!(env!("OMSP_INPUT_RELEASE_HELPER"));
 /// How long a request on the shared HID route waits, as it starts, for the
 /// helper to start observing the user's keys and buttons.
 const READY_TIMEOUT: Duration = Duration::from_millis(250);
@@ -433,10 +433,10 @@ fn spawn() -> io::Result<Helper> {
 		if let Some((_, path)) = executable {
 			return Ok(path.clone());
 		}
-		let directory = HelperDirectory::create("omp-input-release")
+		let directory = HelperDirectory::create("omsp-input-release")
 			.map_err(|error| io::Error::other(error.message))?;
 		let path = directory
-			.write("omp-input-release", HELPER, 0o700)
+			.write("omsp-input-release", HELPER, 0o700)
 			.map_err(|error| io::Error::other(error.message))?;
 		*executable = Some((directory, path.clone()));
 		Ok::<_, io::Error>(path)
@@ -561,7 +561,7 @@ mod tests {
 	fn stand_in() -> PathBuf {
 		STAND_IN.with_borrow_mut(|stand_in| {
 			let (_, path) = stand_in.get_or_insert_with(|| {
-				let directory = HelperDirectory::create("omp-release-test").expect("directory");
+				let directory = HelperDirectory::create("omsp-release-test").expect("directory");
 				// Long enough that a request that does not wait finds it
 				// running. Starting a shell under a parallel test run can take
 				// longer than EXIT_TIMEOUT, so tests that need it to finish
@@ -591,7 +591,7 @@ mod tests {
 		}
 		let path = STUCK.with_borrow_mut(|stuck| {
 			let (_, path) = stuck.get_or_insert_with(|| {
-				let directory = HelperDirectory::create("omp-release-test").expect("directory");
+				let directory = HelperDirectory::create("omsp-release-test").expect("directory");
 				let path = directory
 					.write("helper", b"#!/bin/sh\nexec sleep 5\n", 0o700)
 					.expect("stand-in helper");
@@ -1001,7 +1001,7 @@ mod tests {
 	#[test]
 	fn the_helper_keeps_input_ownership_until_it_exits() {
 		let path = std::env::temp_dir()
-			.join(format!("omp-release-ownership-test-{}.lock", std::process::id()));
+			.join(format!("omsp-release-ownership-test-{}.lock", std::process::id()));
 		let open = || {
 			OpenOptions::new()
 				.read(true)
@@ -1030,7 +1030,7 @@ mod tests {
 
 	#[test]
 	fn an_abandoned_helper_is_asked_to_stop_before_it_is_killed() {
-		let directory = HelperDirectory::create("omp-release-test").expect("directory");
+		let directory = HelperDirectory::create("omsp-release-test").expect("directory");
 		// Answers once its SIGTERM trap is set, and records the signal beside
 		// itself before it exits.
 		let script = concat!(
@@ -1066,9 +1066,9 @@ mod tests {
 
 	#[test]
 	fn the_helper_exits_itself_on_its_deadline_or_when_asked_to_stop() {
-		let directory = HelperDirectory::create("omp-release-test").expect("directory");
+		let directory = HelperDirectory::create("omsp-release-test").expect("directory");
 		let executable = directory
-			.write("omp-input-release", HELPER, 0o700)
+			.write("omsp-input-release", HELPER, 0o700)
 			.expect("helper executable");
 		for signal in [libc::SIGALRM, libc::SIGTERM] {
 			let Helper { child, socket, .. } = spawn_at(&executable, None).expect("helper");

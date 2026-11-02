@@ -1,7 +1,14 @@
 import { describe, expect, it } from "bun:test";
-import { convertAnthropicMessages } from "@oh-my-pi/pi-ai/providers/anthropic";
-import type { AssistantMessage, DeveloperMessage, Message, Model, ModelSpec, UserMessage } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { convertAnthropicMessages } from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import type {
+	AssistantMessage,
+	DeveloperMessage,
+	Message,
+	Model,
+	ModelSpec,
+	UserMessage,
+} from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 
 /** Explicit mid-conversation-system overrides must still respect placement and attribution. */
 

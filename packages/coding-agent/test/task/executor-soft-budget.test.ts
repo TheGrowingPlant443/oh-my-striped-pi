@@ -1,26 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import type { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { LoadExtensionsResult } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import { IrcBus } from "@oh-my-pi/pi-coding-agent/irc/bus";
-import { RpcSubagentRegistry } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-subagents";
-import type { RpcSubagentFrame } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { registerPersistedSubagents } from "@oh-my-pi/pi-coding-agent/registry/persisted-agents";
-import type { CreateAgentSessionResult } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as sdkModule from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession, AgentSessionEvent, PromptOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { CustomMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { buildBudgetNotice, resolveSoftRequestBudget, runSubprocess } from "@oh-my-pi/pi-coding-agent/task/executor";
-import { cfgTaskAgentSoftRequestBudget } from "@oh-my-pi/pi-coding-agent/task/settings";
-import type { AgentDefinition } from "@oh-my-pi/pi-coding-agent/task/types";
-import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-pi/pi-coding-agent/task/types";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import type { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { LoadExtensionsResult } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import { IrcBus } from "@oh-my-striped-pi/pi-coding-agent/irc/bus";
+import { RpcSubagentRegistry } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-subagents";
+import type { RpcSubagentFrame } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { registerPersistedSubagents } from "@oh-my-striped-pi/pi-coding-agent/registry/persisted-agents";
+import type { CreateAgentSessionResult } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as sdkModule from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type {
+	AgentSession,
+	AgentSessionEvent,
+	PromptOptions,
+} from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { CustomMessage } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import {
+	buildBudgetNotice,
+	resolveSoftRequestBudget,
+	runSubprocess,
+} from "@oh-my-striped-pi/pi-coding-agent/task/executor";
+import { cfgTaskAgentSoftRequestBudget } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
+import type { AgentDefinition } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import { TASK_SUBAGENT_LIFECYCLE_CHANNEL } from "@oh-my-striped-pi/pi-coding-agent/task/types";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createSessionDefaults } from "../helpers/session-defaults";
 
 /**
@@ -733,16 +741,16 @@ describe("task.agentSoftRequestBudget", () => {
 		await Bun.write(overlay, JSON.stringify({ task: { agentSoftRequestBudget: { scout: null } } }));
 
 		// Ambient overlays would join the layers under test.
-		const previousConfigFiles = process.env.PI_CONFIG_FILES;
-		delete process.env.PI_CONFIG_FILES;
+		const previousConfigFiles = process.env.OMSP_CONFIG_FILES;
+		delete process.env.OMSP_CONFIG_FILES;
 		try {
 			const settings = await Settings.loadReadOnly({ agentDir, cwd: tempDir.path(), configFiles: [overlay] });
 			const agentBudgets = cfgTaskAgentSoftRequestBudget.get(settings);
 			expect(resolveSoftRequestBudget("scout", 200, agentBudgets)).toBe(100);
 			expect(resolveSoftRequestBudget("lead", 200, agentBudgets)).toBe(400);
 		} finally {
-			if (previousConfigFiles === undefined) delete process.env.PI_CONFIG_FILES;
-			else process.env.PI_CONFIG_FILES = previousConfigFiles;
+			if (previousConfigFiles === undefined) delete process.env.OMSP_CONFIG_FILES;
+			else process.env.OMSP_CONFIG_FILES = previousConfigFiles;
 		}
 	});
 });

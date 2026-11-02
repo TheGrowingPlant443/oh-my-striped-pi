@@ -1,10 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { hasFsCode, isEacces, isEnoent, isRecord } from "@oh-my-pi/pi-utils";
+import { hasFsCode, isEacces, isEnoent, isRecord } from "@oh-my-striped-pi/pi-utils";
 
 /** Selected extension files and whether a manifest suppresses convention fallback. */
 export interface ExtensionDirectoryResolution {
-	/** Whether package.json declares a non-empty omp/pi extensions array. */
+	/** Whether package.json declares a non-empty omsp/omp/pi extensions array. */
 	declared: boolean;
 	/** Existing files selected by the authoritative manifest or directory conventions. */
 	files: string[];
@@ -66,7 +66,7 @@ function readDeclaredManifestEntries(
 		return { declared: false, files: [] };
 	}
 
-	const manifest = isRecord(pkg) ? (pkg.omp ?? pkg.pi) : undefined;
+	const manifest = isRecord(pkg) ? (pkg.omsp ?? pkg.omp ?? pkg.pi) : undefined;
 	const entries = isRecord(manifest) ? manifest.extensions : undefined;
 	if (!Array.isArray(entries) || entries.length === 0) {
 		return { declared: false, files: [] };

@@ -4,12 +4,12 @@ import type {
 	CreateBankOptions,
 	RetainOptions,
 	RetainResponse,
-} from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import type { HindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import type { MemoryMessage as HindsightMessage } from "@oh-my-pi/pi-coding-agent/memory-backend/content";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
+} from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import { HindsightApi } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import type { HindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import type { MemoryMessage as HindsightMessage } from "@oh-my-striped-pi/pi-coding-agent/memory-backend/content";
+import { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
 
 const makeConfig = (overrides: Partial<HindsightConfig> = {}): HindsightConfig => ({
 	hindsightApiUrl: "http://localhost:8888",
@@ -24,7 +24,7 @@ const makeConfig = (overrides: Partial<HindsightConfig> = {}): HindsightConfig =
 	retainMode: "full-session",
 	retainEveryNTurns: 3,
 	retainOverlapTurns: 2,
-	retainContext: "omp",
+	retainContext: "omsp",
 	recallBudget: "mid",
 	recallMaxTokens: 1024,
 	recallTypes: ["world", "experience"],

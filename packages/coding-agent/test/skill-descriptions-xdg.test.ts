@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import * as agentCore from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { __resetProfileSnapshotForTests, getAgentDir, Snowflake, setAgentDir } from "@oh-my-pi/pi-utils";
+import * as agentCore from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { __resetProfileSnapshotForTests, getAgentDir, Snowflake, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { ModelRegistry } from "../src/config/model-registry";
 import { resolveRoleChain, resolveRoleSelection } from "../src/config/model-resolver";
 import { cfgDisabledProviders } from "../src/config/model-settings";
@@ -22,7 +22,7 @@ import type { AuthStorage } from "../src/session/auth-storage";
 import { createAssistantMessage, createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { getTestModel } from "./helpers/model-fixtures";
 
-const ENV_KEYS = ["PI_CONFIG_DIR", "PI_CODING_AGENT_DIR", "XDG_DATA_HOME"] as const;
+const ENV_KEYS = ["OMSP_CONFIG_DIR", "OMSP_CODING_AGENT_DIR", "XDG_DATA_HOME"] as const;
 
 describe.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 	"skill description cache under XDG",
@@ -37,17 +37,17 @@ describe.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 			originalAgentDir = getAgentDir();
 			originalEnv = {};
 			for (const key of ENV_KEYS) originalEnv[key] = process.env[key];
-			tempRoot = path.join(os.tmpdir(), "omp-skill-descriptions-xdg", Snowflake.next());
+			tempRoot = path.join(os.tmpdir(), "omsp-skill-descriptions-xdg", Snowflake.next());
 			// The legacy database lives under the default agent dir, which resolves from
 			// `os.homedir()`; a temp home keeps the suite off the real (possibly read-only) HOME.
 			const home = path.join(tempRoot, "home");
 			spyOn(os, "homedir").mockReturnValue(home);
-			agentDir = path.join(home, ".omp", "agent");
+			agentDir = path.join(home, ".omsp", "agent");
 			xdgData = path.join(tempRoot, "data");
-			await fs.promises.mkdir(path.join(xdgData, "omp"), { recursive: true });
+			await fs.promises.mkdir(path.join(xdgData, "omsp"), { recursive: true });
 			await fs.promises.mkdir(agentDir, { recursive: true });
-			process.env.PI_CONFIG_DIR = ".omp";
-			delete process.env.PI_CODING_AGENT_DIR;
+			process.env.OMSP_CONFIG_DIR = ".omsp";
+			delete process.env.OMSP_CODING_AGENT_DIR;
 			__resetProfileSnapshotForTests();
 		});
 
@@ -63,7 +63,7 @@ describe.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 		});
 
 		it("adopts a legacy database, including uncheckpointed WAL rows, when XDG relocates it", () => {
-			// An older omp still holds the legacy db open: its latest row lives only in the WAL.
+			// An older omsp still holds the legacy db open: its latest row lives only in the WAL.
 			using legacy = SkillDescriptionStore.open(path.join(agentDir, "skill-descriptions.db"));
 			legacy.put("k", "compressed description");
 
@@ -71,7 +71,7 @@ describe.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 			setAgentDir(agentDir);
 			using store = SkillDescriptionStore.open();
 
-			expect(store.path).toBe(path.join(xdgData, "omp", "skill-descriptions.db"));
+			expect(store.path).toBe(path.join(xdgData, "omsp", "skill-descriptions.db"));
 			expect(store.get("k")).toBe("compressed description");
 		});
 
@@ -93,7 +93,7 @@ describe.skipIf(process.platform !== "linux" && process.platform !== "darwin")(
 		it("keeps an existing XDG database instead of overwriting it with the legacy one", () => {
 			using legacy = SkillDescriptionStore.open(path.join(agentDir, "skill-descriptions.db"));
 			legacy.put("k", "legacy");
-			const xdgDb = new Database(path.join(xdgData, "omp", "skill-descriptions.db"), { create: true });
+			const xdgDb = new Database(path.join(xdgData, "omsp", "skill-descriptions.db"), { create: true });
 			xdgDb.run("CREATE TABLE skill_descriptions (key TEXT PRIMARY KEY, description TEXT NOT NULL)");
 			xdgDb.run("INSERT INTO skill_descriptions VALUES ('k', 'current')");
 			xdgDb.close();
@@ -115,7 +115,7 @@ describe("skill description failure caching and shutdown", () => {
 	const compressed = "Use for planning and reviewing data migrations.";
 
 	beforeEach(async () => {
-		tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omp-skill-description-failures-"));
+		tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "omsp-skill-description-failures-"));
 	});
 
 	afterEach(async () => {
@@ -370,7 +370,7 @@ describe("skill description compressor model selection", () => {
 		const settings = Settings.isolated({ modelRoles });
 		const registry = new ModelRegistry(
 			authStorage,
-			path.join(os.tmpdir(), `omp-skill-models-${Snowflake.next()}.yml`),
+			path.join(os.tmpdir(), `omsp-skill-models-${Snowflake.next()}.yml`),
 			{
 				settings,
 			},

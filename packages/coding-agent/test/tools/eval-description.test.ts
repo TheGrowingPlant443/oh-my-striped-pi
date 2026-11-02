@@ -1,19 +1,19 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import type { AgentTool } from "@oh-my-pi/pi-agent-core";
-import type { Tool as AiTool } from "@oh-my-pi/pi-ai";
-import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { JsRuntime, type RuntimeHooks } from "@oh-my-pi/pi-coding-agent/eval/js/shared/runtime";
-import type { EvalPreludeDefinition } from "@oh-my-pi/pi-coding-agent/eval/preludes";
-import { disposeAllKernelSessions, executePython } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { EvalTool, getEvalDocTopics, getEvalToolDescription } from "@oh-my-pi/pi-coding-agent/tools/eval";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { AgentTool } from "@oh-my-striped-pi/pi-agent-core";
+import type { Tool as AiTool } from "@oh-my-striped-pi/pi-ai";
+import { toolWireSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { JsRuntime, type RuntimeHooks } from "@oh-my-striped-pi/pi-coding-agent/eval/js/shared/runtime";
+import type { EvalPreludeDefinition } from "@oh-my-striped-pi/pi-coding-agent/eval/preludes";
+import { disposeAllKernelSessions, executePython } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { EvalTool, getEvalDocTopics, getEvalToolDescription } from "@oh-my-striped-pi/pi-coding-agent/tools/eval";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
-import { cfgEvalPy } from "@oh-my-pi/pi-coding-agent/eval/settings";
-import { cfgTaskMaxRecursionDepth } from "@oh-my-pi/pi-coding-agent/task/settings";
+import { cfgEvalPy } from "@oh-my-striped-pi/pi-coding-agent/eval/settings";
+import { cfgTaskMaxRecursionDepth } from "@oh-my-striped-pi/pi-coding-agent/task/settings";
 
 function makeSession(opts: {
 	spawns?: string | null;
@@ -200,9 +200,9 @@ describe("eval tool description", () => {
 });
 
 describe("eval tool dynamic schema", () => {
-	// resolveEvalBackends lets PI_* env flags override settings; neutralize them per-test
+	// resolveEvalBackends lets OMSP_* env flags override settings; neutralize them per-test
 	// so the schema is driven purely by the isolated settings (and restore to avoid leaks).
-	const EVAL_ENV_FLAGS = ["PI_PY", "PI_JS"] as const;
+	const EVAL_ENV_FLAGS = ["OMSP_PY", "OMSP_JS"] as const;
 	let savedEnv: Record<string, string | undefined>;
 	beforeEach(() => {
 		savedEnv = {};
@@ -358,15 +358,15 @@ describe("eval tool description await markers", () => {
 					"        value.close()",
 					"        return True",
 					"    return inspect.isawaitable(value)",
-					'saved_artifacts_dir = os.environ.get("PI_ARTIFACTS_DIR")',
-					'os.environ["PI_ARTIFACTS_DIR"] = dir',
+					'saved_artifacts_dir = os.environ.get("OMSP_ARTIFACTS_DIR")',
+					'os.environ["OMSP_ARTIFACTS_DIR"] = dir',
 					"try:",
 					`    res = {name: probe(name) for name in ${JSON.stringify([...documented.keys()])}}`,
 					"finally:",
 					"    if saved_artifacts_dir is None:",
-					'        os.environ.pop("PI_ARTIFACTS_DIR", None)',
+					'        os.environ.pop("OMSP_ARTIFACTS_DIR", None)',
 					"    else:",
-					'        os.environ["PI_ARTIFACTS_DIR"] = saved_artifacts_dir',
+					'        os.environ["OMSP_ARTIFACTS_DIR"] = saved_artifacts_dir',
 					"print(json.dumps(res))",
 				].join("\n");
 				const result = await executePython(code, {

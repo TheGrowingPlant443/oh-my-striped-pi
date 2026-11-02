@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { completeSimple, stream, streamSimple, type Api, type Model } from "../src";
 import { resolveOpenAIRequestSetup } from "../src/providers/openai-shared";
 

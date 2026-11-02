@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { extractRetryHint, fetchWithRetry, isUnexpectedSocketCloseMessage } from "@oh-my-pi/pi-utils/fetch-retry";
+import {
+	extractRetryHint,
+	fetchWithRetry,
+	isUnexpectedSocketCloseMessage,
+} from "@oh-my-striped-pi/pi-utils/fetch-retry";
 
 /** Await a rejection and narrow it to `Error` without asserting a shape. */
 async function rejectionOf(promise: Promise<unknown>): Promise<Error> {

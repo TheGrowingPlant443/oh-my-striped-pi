@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hostMatchesUrl, modelMatchesHost } from "@oh-my-pi/pi-catalog/hosts";
+import { hostMatchesUrl, modelMatchesHost } from "@oh-my-striped-pi/pi-catalog/hosts";
 
 describe("hostMatchesUrl", () => {
 	test("matches Copilot and enterprise URLs case-insensitively", () => {

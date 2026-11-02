@@ -27,12 +27,12 @@
 | `command` | `string`                                                           | Yes      | Shell command text to execute. A leading `cd <path> && ...` is rewritten into `cwd` only when `cwd` was omitted.                                                                                                                                                                                                                   |
 | `timeout` | `number`                                                           | No       | Timeout in seconds. Default `300`. `0` disables the deadline. Nonzero values (including the default) are capped by a positive `tools.maxTimeout`, then clamped to `1..3600`.                                                                                                                                                       |
 | `cwd`     | `string`                                                           | No       | Working directory, resolved against `session.cwd` via `resolveToCwd`, or a registered internal URL directory for embedded-shell execution. Must exist and be a directory.                                                                                                                                                          |
-| `pty`     | `boolean`                                                          | No       | Request PTY mode. Default `false` for finite commands, `true` for named services. Foreground PTY requires a UI and `PI_NO_PTY !== "1"`; named services forward this setting to the broker.                                                                                                                                         |
+| `pty`     | `boolean`                                                          | No       | Request PTY mode. Default `false` for finite commands, `true` for named services. Foreground PTY requires a UI and `OMSP_NO_PTY !== "1"`; named services forward this setting to the broker.                                                                                                                                         |
 | `async`   | `boolean`                                                          | No       | Background execution request. Present only when `async.enabled` is true for the session. Returns immediately with a job id instead of waiting; it does not change the effective deadline, including a disabled deadline from `timeout: 0`.                                                                                         |
 | `name`    | `string`                                                           | No       | Project-unique supervised service name: 1–48 letters, numbers, dots, underscores, or hyphens, starting with a letter or number. Present only when `launch.enabled` and Bash is active. Blank names select finite-command mode. A live name restarts using the new spec. Incompatible with `async: true` or any supplied `timeout`. |
 | `ready`   | `{ log?: string; port?: number; host?: string; timeout?: number }` | No       | Service readiness requires a nonblank log regex and/or integer TCP port `1..65535`; all supplied conditions must pass. Host defaults to `127.0.0.1`, timeout to 30 seconds (clamped to `0.05..3600`). Without `name`, a nonempty spec is ignored with a notice.                                                                    |
 
-There is no `env` input. Every command and named service also gets `PI_SESSION_ID` and `PI_SESSION_FILE` (the transcript's absolute path, empty when the session is not persisted), read when the call starts; see [environment variables](../environment-variables.md#set-by-the-bash-tool). Named services otherwise inherit the configured shell environment; put command-specific assignments in `command`.
+There is no `env` input. Every command and named service also gets `OMSP_SESSION_ID` and `OMSP_SESSION_FILE` (the transcript's absolute path, empty when the session is not persisted), read when the call starts; see [environment variables](../environment-variables.md#set-by-the-bash-tool). Named services otherwise inherit the configured shell environment; put command-specific assignments in `command`.
 
 Without `name`, `pty`, or a client terminal, commands run in the embedded POSIX-compatible brush shell, even when `shellPath` points to PowerShell or another external shell. `shellPath` selects the external shell for named services, supported terminal routes, and interactive `!` commands; a bash path may still supply environment and rc snapshots to the embedded session. To use PowerShell syntax in a plain tool call, invoke `pwsh -Command '...'` explicitly, quoting so brush preserves PowerShell's `$` variables.
 
@@ -176,7 +176,7 @@ Choose the setting by the desired outcome:
    - Streams current terminal output via polling updates with `details.terminalId`.
    - Enforces the same timeout and abort behavior, then releases the terminal handle.
 3. Foreground PTY
-   - Requires `pty: true`, UI context, and `PI_NO_PTY !== "1"`.
+   - Requires `pty: true`, UI context, and `OMSP_NO_PTY !== "1"`.
    - Uses `runInteractiveBashPty()` and a `PtySession` overlay.
    - Supports interactive input; `Esc` kills the session from the overlay.
 4. Explicit background job
@@ -201,7 +201,7 @@ Choose the setting by the desired outcome:
    - `scheme://` paths are served per operation by `InternalUrlFilesystem`: file-backed schemes redirect to their backing files (writes only for mutable file-written schemes such as `local://`, within the approved tier); rendered resources are read-only; `realpath`/`readlink` print the physical backing path of file-backed URLs.
    - A redirect to `out://` (`printf '…' > out://`) opens a write-only handle; on close its text becomes a reply shown to the user as assistant prose after the call. Replies ride every progress frame and the result as `details.replies`, so the transcript draws each once, live and on rebuild. They are accepted only while the call waits on the command (a backgrounded job's writes fail), and a reply past 64 KiB fails with `EFBIG` and is dropped whole.
 - Subprocesses / native bindings / client terminal
-   - Non-PTY local execution uses native shell execution via `@oh-my-pi/pi-natives` (`Shell.run()` or `executeShell()`).
+   - Non-PTY local execution uses native shell execution via `@oh-my-striped-pi/pi-natives` (`Shell.run()` or `executeShell()`).
    - PTY uses native `PtySession.start()`.
    - Client-terminal mode delegates process execution to the connected client terminal capability.
    - Named services run in the project-scoped launch broker and retain logs/status for `proc://`.
@@ -261,7 +261,7 @@ Choose the setting by the desired outcome:
    - `find|fd|locate` with name/type/glob flags -> `glob`
    - `sed -i`, `perl -i`, `awk -i inplace` -> `edit`
    - `echo|printf|cat` whose stdout goes to a file (`echo x > f`, `cat > f`, `cat 2>err > f`, `cat <<EOF > f`) -> `write`; redirects of other fds (`2>err.log`), fd duplication, `/dev` sinks and redirects after `;`, `&&`, `|` or a newline do not count
-- PTY mode is ignored in non-UI contexts and when `PI_NO_PTY=1` (gated by `canUseInteractiveBashPty()`); the tool falls back to non-PTY execution and appends a `pty requested but unavailable in this environment; ran without a terminal` notice.
+- PTY mode is ignored in non-UI contexts and when `OMSP_NO_PTY=1` (gated by `canUseInteractiveBashPty()`); the tool falls back to non-PTY execution and appends a `pty requested but unavailable in this environment; ran without a terminal` notice.
 - Non-PTY runs layer `NON_INTERACTIVE_ENV` via `buildNonInteractiveEnv()`; PTY runs instead get the shell spawn environment (`getShellConfig().env`) minus `GIT_EDITOR`, `GPG_TTY`, `CI`, and `NO_COLOR`, then `TERM=xterm-256color`, then any direnv-provided values, which win.
 - When the shell minimizer rewrites output inside `executeBash()`, the visible output is replaced with minimized text and a `[raw output: artifact://<id>]` footer may be appended if `onMinimizedSave` persisted the original text.
 - For executor internals that are not tool-specific — shell session reuse keys, snapshots, prefix handling, and native timeout behavior — see `docs/bash-tool-runtime.md`.

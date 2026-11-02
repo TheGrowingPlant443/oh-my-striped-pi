@@ -68,7 +68,7 @@ const GROUPS: readonly { readonly title: string; readonly rows: readonly Shortcu
 
 /** The shortcuts overlay; any of `?`, escape or `q` closes it. */
 export class GitHelpSheet implements Component {
-	readonly nativeOverlay = { role: "omp.overlay.hotkeys", head: "Keyboard shortcuts", size: "lg" } as const;
+	readonly nativeOverlay = { role: "omsp.overlay.hotkeys", head: "Keyboard shortcuts", size: "lg" } as const;
 	readonly #close: () => void;
 	#native: NativeNode | undefined;
 
@@ -91,10 +91,10 @@ export class GitHelpSheet implements Component {
 				...GROUPS.map(group =>
 					node(
 						"section",
-						{ head: group.title, role: "omp.hotkeys.group" },
+						{ head: group.title, role: "omsp.hotkeys.group" },
 						[
 							node("table", {
-								role: "omp.hotkeys.table",
+								role: "omsp.hotkeys.table",
 								cols: [
 									{ id: "keys", head: "Keys" },
 									{ id: "does", head: "Action", grow: 1 },
@@ -110,7 +110,7 @@ export class GitHelpSheet implements Component {
 				),
 				actionBar([null, actionButton("Close", "close", { keys: "escape" })]),
 			],
-			{ gap: "lg", role: "omp.app.git.help" },
+			{ gap: "lg", role: "omsp.app.git.help" },
 		);
 		return this.#native;
 	}

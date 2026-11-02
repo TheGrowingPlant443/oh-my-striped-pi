@@ -1,4 +1,4 @@
-import { $flag } from "@oh-my-pi/pi-utils";
+import { $flag } from "@oh-my-striped-pi/pi-utils";
 import type { Model, ProviderSessionState } from "../types";
 import type {
 	OpenAIResponsesChainState,
@@ -36,7 +36,7 @@ let configuredProviderStoreResponses: Readonly<Record<string, boolean>> = {};
  * Set the process-wide storage default per provider id, used when a request
  * leaves `storeResponses` unset. Hosts call this from their settings so every
  * request follows the setting, including direct `streamSimple`/`completeSimple`
- * side calls that do not pass per-request options. `PI_MUSE_STORE_RESPONSES`
+ * side calls that do not pass per-request options. `OMSP_MUSE_STORE_RESPONSES`
  * still overrides it.
  */
 export function configureProviderStoreResponses(byProvider: Readonly<Record<string, boolean>> | undefined): void {
@@ -47,7 +47,7 @@ export function configureProviderStoreResponses(byProvider: Readonly<Record<stri
  * Whether this request stores its result server-side. Only hosts whose rule
  * sets `store-responses` (they finish runs after a client disconnect, so a
  * dropped stream can be resumed) are eligible, and storage is opt-in:
- * `options.storeResponses`, then `PI_MUSE_STORE_RESPONSES`, then the host
+ * `options.storeResponses`, then `OMSP_MUSE_STORE_RESPONSES`, then the host
  * default ({@link configureProviderStoreResponses}), else off. Privacy: stored
  * runs retain prompts and outputs on the provider. Off also disables resume and
  * the `previous_response_id` chaining that needs storage.
@@ -59,7 +59,7 @@ export function storesResponsesServerSide(
 	if (model.compat.storeResponses !== true) return false;
 	return (
 		options?.storeResponses ??
-		$flag("PI_MUSE_STORE_RESPONSES", configuredProviderStoreResponses[model.provider] ?? false)
+		$flag("OMSP_MUSE_STORE_RESPONSES", configuredProviderStoreResponses[model.provider] ?? false)
 	);
 }
 

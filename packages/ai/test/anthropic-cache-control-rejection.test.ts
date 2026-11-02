@@ -24,16 +24,19 @@
  * something else costs one request rather than a session of lost caching.
  */
 import { describe, expect, it } from "bun:test";
-import { isCacheControlUnsupported } from "@oh-my-pi/pi-ai/error";
+import { isCacheControlUnsupported } from "@oh-my-striped-pi/pi-ai/error";
 import {
 	buildAnthropicClientOptions,
 	clearAnthropicFastModeFallback,
 	streamAnthropic,
-} from "@oh-my-pi/pi-ai/providers/anthropic";
-import { AnthropicMessagesClient, type AnthropicMessagesClientLike } from "@oh-my-pi/pi-ai/providers/anthropic-client";
-import type { CacheControlEphemeral, MessageCreateParams } from "@oh-my-pi/pi-ai/providers/anthropic-wire";
-import type { AssistantMessage, Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic";
+import {
+	AnthropicMessagesClient,
+	type AnthropicMessagesClientLike,
+} from "@oh-my-striped-pi/pi-ai/providers/anthropic-client";
+import type { CacheControlEphemeral, MessageCreateParams } from "@oh-my-striped-pi/pi-ai/providers/anthropic-wire";
+import type { AssistantMessage, Context, FetchImpl, Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { withOfficialAnthropicEndpoint } from "./helpers";
 
 const EXTENDED_CACHE_TTL_BETA = "extended-cache-ttl-2025-04-11";

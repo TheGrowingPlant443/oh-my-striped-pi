@@ -1,6 +1,6 @@
 """Harbor agent that runs the upstream `@earendil-works/pi-coding-agent` npm package.
 
-Comparison baseline for `omp_local.py`: same task containers, same host auth
+Comparison baseline for `omsp_local.py`: same task containers, same host auth
 gateway, same output/usage accounting, but the agent under test is upstream pi
 installed from npm on top of a downloaded Node runtime.
 
@@ -14,14 +14,14 @@ else uses `openai-responses` (`/v1/responses`).
 The default upstream system prompt names pi and links its docs, which Anthropic
 classifies as a third-party client on OAuth accounts (billed to extra usage).
 `~/.pi/agent/SYSTEM.md` replaces it with the same text minus the identity line
-and the docs section (`OMP_BENCH_PI_SYSTEM_PROMPT` supplies the template; the
+and the docs section (`OMSP_BENCH_OMSP_SYSTEM_PROMPT` supplies the template; the
 `{{CWD}}` placeholder is rendered per trial).
 
-Env knobs (set by the runner; `OMP_BENCH_*` are shared with `omp_local.py`):
-`OMP_BENCH_GATEWAY_URL`, `OMP_BENCH_GATEWAY_TOKEN`, `OMP_BENCH_PI_MODELS`
-(JSON array of model specs), `OMP_BENCH_PI_SYSTEM_PROMPT` (host path),
-`OMP_BENCH_PI_VERSION`, `OMP_BENCH_NODE_VERSION`, `OMP_BENCH_THINKING`,
-`OMP_BENCH_TOOLS`, `OMP_BENCH_AGENT_ARGS`, `OMP_BENCH_FORWARD_ENV`.
+Env knobs (set by the runner; `OMSP_BENCH_*` are shared with `omsp_local.py`):
+`OMSP_BENCH_GATEWAY_URL`, `OMSP_BENCH_GATEWAY_TOKEN`, `OMSP_BENCH_OMSP_MODELS`
+(JSON array of model specs), `OMSP_BENCH_OMSP_SYSTEM_PROMPT` (host path),
+`OMSP_BENCH_OMSP_VERSION`, `OMSP_BENCH_NODE_VERSION`, `OMSP_BENCH_THINKING`,
+`OMSP_BENCH_TOOLS`, `OMSP_BENCH_AGENT_ARGS`, `OMSP_BENCH_FORWARD_ENV`.
 
 Selected via `harbor run --agent-import-path pi_upstream:PiUpstream`.
 """
@@ -38,7 +38,7 @@ from harbor.agents.installed.base import BaseInstalledAgent, with_prompt_templat
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
-from omp_local import _Usage, _env, _loads
+from omsp_local import _Usage, _env, _loads
 
 _OUTPUT_FILENAME = "pi.txt"
 _MODELS_DST = "/tmp/pi-models.json"
@@ -56,17 +56,17 @@ class PiUpstream(BaseInstalledAgent):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._pkg_version = _env("OMP_BENCH_PI_VERSION", "latest")
-        self._node_version = _env("OMP_BENCH_NODE_VERSION", "22.14.0")
-        self._gateway_url = _env("OMP_BENCH_GATEWAY_URL", "http://host.docker.internal:4000")
-        self._gateway_token = _env("OMP_BENCH_GATEWAY_TOKEN", "no-auth")
-        self._model_specs = json.loads(_env("OMP_BENCH_PI_MODELS", "[]"))
-        self._system_prompt_path = _env("OMP_BENCH_PI_SYSTEM_PROMPT")
-        self._thinking = _env("OMP_BENCH_THINKING")
-        self._tools = [t for t in _env("OMP_BENCH_TOOLS", "").split(",") if t]
-        raw_args = _env("OMP_BENCH_AGENT_ARGS")
+        self._pkg_version = _env("OMSP_BENCH_OMSP_VERSION", "latest")
+        self._node_version = _env("OMSP_BENCH_NODE_VERSION", "22.14.0")
+        self._gateway_url = _env("OMSP_BENCH_GATEWAY_URL", "http://host.docker.internal:4001")
+        self._gateway_token = _env("OMSP_BENCH_GATEWAY_TOKEN", "no-auth")
+        self._model_specs = json.loads(_env("OMSP_BENCH_OMSP_MODELS", "[]"))
+        self._system_prompt_path = _env("OMSP_BENCH_OMSP_SYSTEM_PROMPT")
+        self._thinking = _env("OMSP_BENCH_THINKING")
+        self._tools = [t for t in _env("OMSP_BENCH_TOOLS", "").split(",") if t]
+        raw_args = _env("OMSP_BENCH_AGENT_ARGS")
         self._agent_args = [str(a) for a in json.loads(raw_args)] if raw_args else []
-        raw_env = _env("OMP_BENCH_FORWARD_ENV")
+        raw_env = _env("OMSP_BENCH_FORWARD_ENV")
         self._forward_env = {str(k): str(v) for k, v in json.loads(raw_env).items()} if raw_env else {}
         self._home = "/root"
         self._node_dir = "/root/.pi-bench/node"
@@ -170,7 +170,7 @@ class PiUpstream(BaseInstalledAgent):
         await self.exec_as_agent(
             environment,
             command=(
-                f"cat > {_MODELS_DST} <<'PI_MODELS_EOF'\n{content}\nPI_MODELS_EOF\n"
+                f"cat > {_MODELS_DST} <<'OMSP_MODELS_EOF'\n{content}\nPI_MODELS_EOF\n"
                 f'mkdir -p "$HOME/.pi/agent"; cp {_MODELS_DST} "$HOME/.pi/agent/models.json"'
             ),
         )

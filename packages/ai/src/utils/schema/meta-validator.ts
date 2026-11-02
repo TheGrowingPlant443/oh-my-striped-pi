@@ -1,4 +1,4 @@
-import { isRecord } from "@oh-my-pi/pi-utils";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import { areJsonValuesEqual } from "./equality";
 import { epochNext, once } from "./stamps";
 

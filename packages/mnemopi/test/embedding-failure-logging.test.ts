@@ -3,9 +3,9 @@ import {
 	embed,
 	resetEmbeddingProviderForTests,
 	setLocalModelInitializerForTests,
-} from "@oh-my-pi/pi-mnemopi/core/embeddings";
-import { withMnemopiRuntimeOptions } from "@oh-my-pi/pi-mnemopi/core/runtime-options";
-import { logger } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-mnemopi/core/embeddings";
+import { withMnemopiRuntimeOptions } from "@oh-my-striped-pi/pi-mnemopi/core/runtime-options";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 
 const ENV_KEYS = ["NODE_ENV", "BUN_ENV", "MNEMOPI_NO_EMBEDDINGS", "MNEMOPI_EMBEDDING_MODEL"] as const;
 

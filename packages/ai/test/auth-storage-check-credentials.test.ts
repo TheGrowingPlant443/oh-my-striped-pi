@@ -4,7 +4,7 @@ beforeEachOAuthFixture(() => mockOAuthApiKey());
 afterEachOAuthFixture(() => resetOAuthMocks());
 /**
  * Tests for `AuthStorage.health.check()` — the per-credential auth probe
- * that powers `omp auth-gateway check`. Contract under test:
+ * that powers `omsp auth-gateway check`. Contract under test:
  *
  *   1. A working credential reports `ok: true` and surfaces the probe's
  *      `email`/`accountId` (so the user can identify the row).
@@ -35,8 +35,8 @@ import {
 	type CompletionProbeInput,
 	REMOTE_REFRESH_SENTINEL,
 	type StoredAuthCredential,
-} from "@oh-my-pi/pi-ai/auth-storage";
-import type { UsageProvider } from "@oh-my-pi/pi-ai/usage";
+} from "@oh-my-striped-pi/pi-ai/auth-storage";
+import type { UsageProvider } from "@oh-my-striped-pi/pi-ai/usage";
 import { fixtureUsageProvider } from "./usage-test-utils";
 
 function oauthRow(id: number, email: string, opts?: { expired?: boolean }): StoredAuthCredential {

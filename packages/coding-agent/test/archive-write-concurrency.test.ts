@@ -5,15 +5,15 @@ import * as path from "node:path";
 import { Settings } from "../src/config/settings";
 import type { ToolSession } from "../src/tools";
 import { WriteTool } from "../src/tools/write";
-import * as piUtils from "@oh-my-pi/pi-utils";
-import { readArchiveEntries, writeArchive } from "@oh-my-pi/pi-utils/ar";
+import * as piUtils from "@oh-my-striped-pi/pi-utils";
+import { readArchiveEntries, writeArchive } from "@oh-my-striped-pi/pi-utils/ar";
 
 const workerScript = path.join(import.meta.dir, "fixtures", "archive-write-worker.ts");
 const padding = "x".repeat(8 * 1024 * 1024);
 let root: string;
 
 beforeEach(async () => {
-	root = await fs.mkdtemp(path.join(os.tmpdir(), "omp-archive-write-race-"));
+	root = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-archive-write-race-"));
 });
 afterEach(async () => {
 	vi.restoreAllMocks();

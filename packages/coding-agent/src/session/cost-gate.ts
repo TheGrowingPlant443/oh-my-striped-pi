@@ -1,5 +1,5 @@
-import type { StreamFn } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessageEventStream } from "@oh-my-pi/pi-ai";
+import type { StreamFn } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai";
 import type { Settings } from "../config/settings";
 import { cfgSessionMaxCost, cfgSessionWarnCost } from "./settings";
 

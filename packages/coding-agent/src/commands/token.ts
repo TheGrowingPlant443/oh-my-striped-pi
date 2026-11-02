@@ -2,10 +2,10 @@
  * Get the API key or OAuth token for a provider.
  */
 
-import { PROVIDER_REGISTRY } from "@oh-my-pi/pi-ai";
-import chalk from "@oh-my-pi/pi-utils/chalk";
-import { Args, Command, Flags } from "@oh-my-pi/pi-utils/cli";
-import { getActiveProfile } from "@oh-my-pi/pi-utils/dirs";
+import { PROVIDER_REGISTRY } from "@oh-my-striped-pi/pi-ai";
+import chalk from "@oh-my-striped-pi/pi-utils/chalk";
+import { Args, Command, Flags } from "@oh-my-striped-pi/pi-utils/cli";
+import { getActiveProfile } from "@oh-my-striped-pi/pi-utils/dirs";
 import { tokenHelp as commandHelp } from "../cli/command-help";
 import { isAuthenticated, ModelRegistry } from "../config/model-registry";
 import { refreshStoredManagedMcpOAuthCredential } from "../mcp/oauth-credentials";
@@ -75,11 +75,11 @@ export default class Token extends Command {
 	};
 
 	static examples = [
-		"# Get the Copilot token\n  omp token github-copilot",
-		"# Get raw Copilot credential JSON\n  omp token github-copilot --raw",
-		"# Force refresh the Copilot token\n  omp token github-copilot --force-refresh",
-		"# List Copilot OAuth accounts\n  omp token github-copilot --list",
-		"# Get the 2nd Copilot OAuth account's token\n  omp token github-copilot --account 2",
+		"# Get the Copilot token\n  omsp token github-copilot",
+		"# Get raw Copilot credential JSON\n  omsp token github-copilot --raw",
+		"# Force refresh the Copilot token\n  omsp token github-copilot --force-refresh",
+		"# List Copilot OAuth accounts\n  omsp token github-copilot --list",
+		"# Get the 2nd Copilot OAuth account's token\n  omsp token github-copilot --account 2",
 	];
 
 	async run(): Promise<void> {

@@ -1,4 +1,4 @@
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	AnthropicCompactionPayload,
 	AssistantMessage,
@@ -7,8 +7,8 @@ import type {
 	Message,
 	ProviderPayload,
 	TextContent,
-} from "@oh-my-pi/pi-ai";
-import { isRecord } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import type { SessionContext } from "../session/session-context";
 import type { JsonValue, SecretObfuscator } from "./obfuscator";
 import { collectJsonRegexSecretValues, mapJsonStrings } from "./placeholder-scan";

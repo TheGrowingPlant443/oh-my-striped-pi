@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { ShellFsFileType } from "@oh-my-pi/pi-natives";
+import { ShellFsFileType } from "@oh-my-striped-pi/pi-natives";
 import * as capability from "../../src/capability";
 import type { SSHHost } from "../../src/capability/ssh";
 import type { CapabilityResult, SourceMeta } from "../../src/capability/types";

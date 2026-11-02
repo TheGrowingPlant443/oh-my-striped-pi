@@ -6,18 +6,18 @@ import {
 	heuristicExtractFacts,
 	parseExtractedFactCategories,
 	parseFacts,
-} from "@oh-my-pi/pi-mnemopi/core/extraction";
-import { getExtractionStats, resetExtractionStats } from "@oh-my-pi/pi-mnemopi/core/extraction/diagnostics";
+} from "@oh-my-striped-pi/pi-mnemopi/core/extraction";
+import { getExtractionStats, resetExtractionStats } from "@oh-my-striped-pi/pi-mnemopi/core/extraction/diagnostics";
 import {
 	CallableLlmBackend,
 	resetHostLlmBackendForTests,
 	setHostLlmBackend,
-} from "@oh-my-pi/pi-mnemopi/core/llm-backends";
+} from "@oh-my-striped-pi/pi-mnemopi/core/llm-backends";
 import {
 	type MnemopiLlmCompletionTask,
 	type ResolvedMnemopiRuntimeOptions,
 	withMnemopiRuntimeOptions,
-} from "@oh-my-pi/pi-mnemopi/core/runtime-options";
+} from "@oh-my-striped-pi/pi-mnemopi/core/runtime-options";
 
 const OLD_ENV = { ...process.env };
 function restoreEnv(): void {

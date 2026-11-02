@@ -3,25 +3,25 @@
  * the advisor `Agent` constructed by `#buildAdvisorRuntime` inherits them so
  * its Copilot requests cache and route like the main turn.
  *
- * Regression for can1357/oh-my-pi#3639: before the fix, the advisor was built
+ * Regression for TheGrowingPlant443/oh-my-striped-pi#3639: before the fix, the advisor was built
  * with only `sessionId`/`getApiKey`/telemetry — it dropped the session's
  * `streamFn` wrapper (so `loopGuard` never
  * landed on advisor requests), its `promptCacheKey` (so OpenAI Responses
  * fell back to a different cache shard), and its shared `providerSessionState`.
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
-import { Agent, type StreamFn } from "@oh-my-pi/pi-agent-core";
-import type { Context, Model, SimpleStreamOptions } from "@oh-my-pi/pi-ai";
-import { resolveApiKeyOnce } from "@oh-my-pi/pi-ai/auth-retry";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { SessionAccountPoolScope } from "@oh-my-pi/pi-coding-agent/config/account-pools";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { Agent, type StreamFn } from "@oh-my-striped-pi/pi-agent-core";
+import type { Context, Model, SimpleStreamOptions } from "@oh-my-striped-pi/pi-ai";
+import { resolveApiKeyOnce } from "@oh-my-striped-pi/pi-ai/auth-retry";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { SessionAccountPoolScope } from "@oh-my-striped-pi/pi-coding-agent/config/account-pools";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 /** Provider-facing advisor session ids remain UUIDv7; advisor labels stay local. */
@@ -49,7 +49,7 @@ describe("AgentSession advisor provider-options parity", () => {
 		authStorage = createInMemoryAuthStorage();
 		authStorage.keys.setRuntime("github-copilot", "test-key");
 		// An isolated discovery cache keeps the bundled catalog authoritative; the
-		// developer's `~/.omp` models.db can drop models these tests select.
+		// developer's `~/.omsp` models.db can drop models these tests select.
 		cacheDir = TempDir.createSync("@pi-advisor-parity-cache-");
 		modelRegistry = new ModelRegistry(authStorage, undefined, { cacheDbPath: cacheDir.join("models.db") });
 		const bundled = getBundledModel("github-copilot", "gpt-5.4");

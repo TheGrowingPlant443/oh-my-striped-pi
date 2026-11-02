@@ -5,12 +5,12 @@
  */
 
 import { isPromise } from "node:util/types";
-import type { AgentEvent, AgentMessage, AgentToolResult, ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import type { CompactionResult } from "@oh-my-pi/pi-agent-core/compaction";
-import type { ImageContent, Model } from "@oh-my-pi/pi-ai";
-import { isRecord, ptree, readJsonl } from "@oh-my-pi/pi-utils";
-import type { LogoutAccount } from "@oh-my-pi/pi-tui/overlays/logout-account-selector";
-import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
+import type { AgentEvent, AgentMessage, AgentToolResult, ThinkingLevel } from "@oh-my-striped-pi/pi-agent-core";
+import type { CompactionResult } from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { ImageContent, Model } from "@oh-my-striped-pi/pi-ai";
+import { isRecord, ptree, readJsonl } from "@oh-my-striped-pi/pi-utils";
+import type { LogoutAccount } from "@oh-my-striped-pi/pi-tui/overlays/logout-account-selector";
+import type { TodoPhase } from "@oh-my-striped-pi/pi-tui/tools/todo";
 import type { FileSink } from "bun";
 import type { BashResult } from "../../exec/bash-executor";
 import type { AgentSessionEvent, SessionStats } from "../../session/agent-session";
@@ -985,7 +985,7 @@ export class RpcClient {
 
 	/**
 	 * Selectable thinking levels for the live model, with `off` first.
-	 * OMP-only `auto`/`inherit` selectors are omitted from discovery.
+	 * OMSP-only `auto`/`inherit` selectors are omitted from discovery.
 	 */
 	async getAvailableThinkingLevels(): Promise<ThinkingLevel[]> {
 		const response = await this.#send({ type: "get_available_thinking_levels" });

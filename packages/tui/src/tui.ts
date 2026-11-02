@@ -14,11 +14,11 @@
  */
 import * as fs from "node:fs";
 import { performance } from "node:perf_hooks";
-import { getDebugLogPath } from "@oh-my-pi/pi-utils/dirs";
-import { $flag } from "@oh-my-pi/pi-utils/env";
-import * as logger from "@oh-my-pi/pi-utils/logger";
-import * as postmortem from "@oh-my-pi/pi-utils/postmortem";
-import type { TspFrame, TspNode, TspText } from "@oh-my-pi/pi-wire";
+import { getDebugLogPath } from "@oh-my-striped-pi/pi-utils/dirs";
+import { $flag } from "@oh-my-striped-pi/pi-utils/env";
+import * as logger from "@oh-my-striped-pi/pi-utils/logger";
+import * as postmortem from "@oh-my-striped-pi/pi-utils/postmortem";
+import type { TspFrame, TspNode, TspText } from "@oh-my-striped-pi/pi-wire";
 import { DEFAULT_MAX_INLINE_IMAGES, ImageBudget } from "./components/image";
 import { TuiDebugServer } from "./debug-server";
 import { extractPrintableText, isKeyRelease, matchesKey } from "./keys";
@@ -120,13 +120,13 @@ const ITERM2_CELL_SIZE_REPLY =
 type MouseTrackingState = "off" | "inline" | "full";
 
 /**
- * `PI_TUI_RESIZE_IN_PLACE=1|true` forces in-place resize (no alt-buffer borrow).
+ * `OMSP_TUI_RESIZE_IN_PLACE=1|true` forces in-place resize (no alt-buffer borrow).
  * `0|false` forces the alt-buffer path even on Warp. Unset defers to Warp detection:
  * Warp re-reports its size on CSI ?1049h / CSI ?1049l, which the resize alt-borrow
  * turns into a flicker loop.
  */
 function resizeInPlaceOverride(): boolean | null {
-	const override = Bun.env.PI_TUI_RESIZE_IN_PLACE;
+	const override = Bun.env.OMSP_TUI_RESIZE_IN_PLACE;
 	if (override === "1" || override === "true") return true;
 	if (override === "0" || override === "false") return false;
 	return null;
@@ -277,7 +277,7 @@ export interface Component {
 
 	/**
 	 * Props for the native `overlay` wrapper when this component is shown as
-	 * an overlay: the sheet's `role` (Tern styles `omp.overlay.*` roles as
+	 * an overlay: the sheet's `role` (Tern styles `omsp.overlay.*` roles as
 	 * glass sheets, so the component's own root must not draw a second frame),
 	 * `head` spans for the sheet's title row, and `size`/`anchor` overriding
 	 * the ones derived from the overlay options.
@@ -695,8 +695,8 @@ interface LineClassification {
 // terminal dispatch one SGR instead of several. On a real transcript ~40% of
 // all SGR sequences are collapsible this way, which meaningfully cuts the
 // per-frame byte volume and SGR-dispatch count a slow (xterm.js/WebGL) terminal
-// must process. On by default; `PI_NO_SGR_COALESCE=1` disables it.
-const SGR_COALESCE_ENABLED = !$flag("PI_NO_SGR_COALESCE");
+// must process. On by default; `OMSP_NO_SGR_COALESCE=1` disables it.
+const SGR_COALESCE_ENABLED = !$flag("OMSP_NO_SGR_COALESCE");
 const CC_ESC = 0x1b;
 const CC_KITTY_PLACEHOLDER_HIGH = KITTY_PLACEHOLDER.charCodeAt(0);
 const CC_BRACKET = 0x5b; // [
@@ -999,7 +999,7 @@ export class TUI extends Container {
 	#sixelProbeBuffer = "";
 	#sixelProbeTimeout?: NodeJS.Timeout;
 	#sixelProbeUnsubscribe?: () => void;
-	#showHardwareCursor = $flag("PI_HARDWARE_CURSOR");
+	#showHardwareCursor = $flag("OMSP_HARDWARE_CURSOR");
 	#synchronizedOutputEnabled = shouldEnableSynchronizedOutputByDefault();
 	#paintBeginSequence = this.#synchronizedOutputEnabled ? PAINT_BEGIN : PAINT_BEGIN_NO_SYNC;
 	#paintEndSequence = this.#synchronizedOutputEnabled ? PAINT_END : PAINT_END_NO_SYNC;
@@ -1132,7 +1132,7 @@ export class TUI extends Container {
 		this.#watchdog = new LoopWatchdog();
 	}
 	static #initialResizeScrollbackMode(): ResizeScrollbackMode {
-		const mode = Bun.env.PI_TUI_RESIZE_SCROLLBACK;
+		const mode = Bun.env.OMSP_TUI_RESIZE_SCROLLBACK;
 		return mode === "append" || mode === "rebuild" || mode === "preserve" ? mode : "preserve";
 	}
 
@@ -1535,7 +1535,7 @@ export class TUI extends Container {
 		this.#debugPaint = undefined;
 		this.#debugServer?.stop();
 		this.#debugServer = undefined;
-		const debugPath = process.env.OMP_TUI_DEBUG;
+		const debugPath = process.env.OMSP_TUI_DEBUG;
 		if (debugPath !== undefined && debugPath.length > 0) {
 			this.#debugServer = new TuiDebugServer(this, debugPath);
 			this.#debugServer.start();
@@ -2189,7 +2189,7 @@ export class TUI extends Container {
 		// full timeout, so anchor from the fallback immediately. Two exemptions:
 		// a multiplexer answers DSR from its own grid, so under WSL-in-tmux the
 		// reply is attributable and the width-reflow / hidden-grow / reversed-
-		// burst logic still needs it; and PI_TUI_RESIZE_IN_PLACE=1 forces the
+		// burst logic still needs it; and OMSP_TUI_RESIZE_IN_PLACE=1 forces the
 		// in-place repaint, whose anchor is only as good as this probe, so the
 		// documented escape hatch restores the whole pre-change path.
 		if (
@@ -2337,7 +2337,7 @@ export class TUI extends Container {
 					: reportedTop;
 			top = Math.max(0, Math.min(fallbackTop, height - staleRows));
 		}
-		if ($flag("PI_DEBUG_REDRAW")) {
+		if ($flag("OMSP_DEBUG_REDRAW")) {
 			const msg = `[${new Date().toISOString()}] resize anchor: size=${width}x${height} cpr=${reportedRow ?? "timeout"} park=${probe.offset} stale=${staleRows} old=${this.#providerViewportTop} top=${top}\n`;
 			fs.appendFileSync(getDebugLogPath(), msg);
 		}
@@ -2472,7 +2472,7 @@ export class TUI extends Container {
 
 	#querySixelSupport(): void {
 		// A statically known protocol (Kitty/iTerm2 terminals) or an explicit
-		// PI_FORCE_IMAGE_PROTOCOL choice — including its `off` kill switch — wins
+		// OMSP_FORCE_IMAGE_PROTOCOL choice — including its `off` kill switch — wins
 		// over the probe.
 		if (TERMINAL.imageProtocol) return;
 		// A Tern surface (live, or about to open optimistically at start) sends

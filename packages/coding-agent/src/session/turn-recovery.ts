@@ -4,7 +4,7 @@ import {
 	type AgentMessage,
 	isSyntheticToolResultMessage,
 	type ThinkingLevel,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import type {
 	AssistantMessage,
 	AssistantRetryRecovery,
@@ -14,14 +14,14 @@ import type {
 	ModelUsageHealth,
 	TextContent,
 	ToolChoice,
-} from "@oh-my-pi/pi-ai";
-import { calculateRateLimitBackoffMs, parseRateLimitReason } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { shouldDropTruncatedThinkingOnlyAssistant } from "@oh-my-pi/pi-ai/providers/transform-messages";
-import { extractProviderRetryHint } from "@oh-my-pi/pi-ai/utils/retry-after";
-import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
-import { modelsAreEqual } from "@oh-my-pi/pi-catalog/models";
-import { isUnexpectedSocketCloseMessage, logger, prompt, sleepLong } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai";
+import { calculateRateLimitBackoffMs, parseRateLimitReason } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { shouldDropTruncatedThinkingOnlyAssistant } from "@oh-my-striped-pi/pi-ai/providers/transform-messages";
+import { extractProviderRetryHint } from "@oh-my-striped-pi/pi-ai/utils/retry-after";
+import { resolveModelPolicy } from "@oh-my-striped-pi/pi-catalog/compat/resolve";
+import { modelsAreEqual } from "@oh-my-striped-pi/pi-catalog/models";
+import { isUnexpectedSocketCloseMessage, logger, prompt, sleepLong } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../config/model-registry";
 import { formatModelStringWithRouting, resolveModelOverride } from "../config/model-resolver";
 
@@ -39,8 +39,8 @@ import {
 	clampThinkingLevelToCeiling,
 	modelSupportsEffortCeiling,
 	resolveThinkingLevelForModel,
-} from "@oh-my-pi/pi-tui/thinking";
-import type { EditMode } from "@oh-my-pi/pi-tui/tools/edit";
+} from "@oh-my-striped-pi/pi-tui/thinking";
+import type { EditMode } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import type { AgentSessionEvent } from "./agent-session-events";
 import type {
 	InitialRetryFallbackState,
@@ -1799,7 +1799,7 @@ export class TurnRecovery {
 	 * Re-run fallback-chain validation once background discovery has settled and
 	 * reconcile `configWarnings`. Startup validation suppresses "unknown model"
 	 * warnings for selectors whose config-declared discovery provider had not yet
-	 * populated the registry (a cold cache after `omp update` bumps the discovery
+	 * populated the registry (a cold cache after `omsp update` bumps the discovery
 	 * namespace, #10048). With discovery done, drop any startup warning discovery
 	 * resolved and surface warnings for selectors that stayed unknown.
 	 *

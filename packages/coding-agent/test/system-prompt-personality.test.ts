@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Personality } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { buildSystemPrompt } from "@oh-my-pi/pi-coding-agent/system-prompt";
-import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir } from "@oh-my-pi/pi-utils";
+import type { Personality } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { buildSystemPrompt } from "@oh-my-striped-pi/pi-coding-agent/system-prompt";
+import { __resetDirsFromEnvForTests, removeSyncWithRetries, setAgentDir } from "@oh-my-striped-pi/pi-utils";
 import { restoreEnvValue } from "./helpers/settings-test-state";
 
 const EMPTY_TREE = {
@@ -31,18 +31,18 @@ describe("PERSONALITY.md override", () => {
 	let originalPiProfileEnv: string | undefined;
 
 	beforeEach(() => {
-		originalAgentDirEnv = process.env.PI_CODING_AGENT_DIR;
-		originalOmpProfileEnv = process.env.OMP_PROFILE;
-		originalPiProfileEnv = process.env.PI_PROFILE;
+		originalAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
+		originalOmpProfileEnv = process.env.OMSP_PROFILE;
+		originalPiProfileEnv = process.env.OMSP_PROFILE;
 		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-personality-"));
 		tempAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), "pi-personality-agent-"));
 		setAgentDir(tempAgentDir);
 	});
 
 	afterEach(() => {
-		restoreEnvValue("PI_CODING_AGENT_DIR", originalAgentDirEnv);
-		restoreEnvValue("OMP_PROFILE", originalOmpProfileEnv);
-		restoreEnvValue("PI_PROFILE", originalPiProfileEnv);
+		restoreEnvValue("OMSP_CODING_AGENT_DIR", originalAgentDirEnv);
+		restoreEnvValue("OMSP_PROFILE", originalOmpProfileEnv);
+		restoreEnvValue("OMSP_PROFILE", originalPiProfileEnv);
 		__resetDirsFromEnvForTests();
 		removeSyncWithRetries(tempDir);
 		removeSyncWithRetries(tempAgentDir);

@@ -8,7 +8,7 @@ import {
 	readSseJson,
 	readSseJsonOrText,
 	type ServerSentEvent,
-} from "@oh-my-pi/pi-utils/stream";
+} from "@oh-my-striped-pi/pi-utils/stream";
 
 const encoder = new TextEncoder();
 

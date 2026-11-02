@@ -17,7 +17,7 @@ export interface ProviderDetailsContext {
 	authMode?: string;
 	/**
 	 * Human-readable description of the active credential, e.g.
-	 * `"broker http://omp.internal:8765 · oauth #5 (foo@bar.com)"`.
+	 * `"broker http://omsp.internal:8766 · oauth #5 (foo@bar.com)"`.
 	 * Rendered as a `Source` field; omitted when undefined.
 	 */
 	credentialSource?: string;

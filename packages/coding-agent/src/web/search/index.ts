@@ -4,10 +4,15 @@
  * Independent search engines with provider-specific parameters exposed conditionally.
  */
 
-import { type } from "@oh-my-pi/omptype";
-import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import type { AuthStorage } from "@oh-my-pi/pi-ai";
-import { formatAge, formatCount, prompt, truncate } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type {
+	AgentTool,
+	AgentToolContext,
+	AgentToolResult,
+	AgentToolUpdateCallback,
+} from "@oh-my-striped-pi/pi-agent-core";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-ai";
+import { formatAge, formatCount, prompt, truncate } from "@oh-my-striped-pi/pi-utils";
 import type { ModelRegistry } from "../../config/model-registry";
 import { settings } from "../../config/settings";
 import type { CustomTool, CustomToolContext } from "../../extensibility/custom-tools/types";
@@ -271,7 +276,7 @@ async function executeSearch(
  * Execute a web search query for CLI/testing workflows.
  *
  * `authStorage` may be omitted; in that case we discover one via the standard
- * factory (`discoverAuthStorage`), which honours `OMP_AUTH_BROKER_URL` and
+ * factory (`discoverAuthStorage`), which honours `OMSP_AUTH_BROKER_URL` and
  * otherwise opens the local SQLite credential store.
  */
 export async function runSearchQuery(

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { toolWireSchema } from "@oh-my-pi/pi-ai/utils/schema";
-import { validateToolArguments } from "@oh-my-pi/pi-ai/utils/validation";
+import { toolWireSchema } from "@oh-my-striped-pi/pi-ai/utils/schema";
+import { validateToolArguments } from "@oh-my-striped-pi/pi-ai/utils/validation";
 import { loadCustomTools, type ToolPathWithSource } from "../../src/extensibility/custom-tools/loader";
 
 let tempRoot: string | undefined;
@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 async function writeTool(name: string, source: string): Promise<string> {
-	tempRoot ??= await fs.mkdtemp(path.join(os.tmpdir(), "omp-custom-tool-loader-"));
+	tempRoot ??= await fs.mkdtemp(path.join(os.tmpdir(), "omsp-custom-tool-loader-"));
 	const filePath = path.join(tempRoot, name);
 	await Bun.write(filePath, source);
 	return filePath;
@@ -320,19 +320,24 @@ describe("custom tool host package imports", () => {
 	}
 
 	// Tools live outside any workspace (here a temp dir; in the shipped binary,
-	// anywhere), so `@oh-my-pi/*` and the legacy pi scopes have no node_modules
+	// anywhere), so `@oh-my-striped-pi/*` and the legacy pi scopes have no node_modules
 	// to resolve from. They must resolve to the host's own copy, as extensions do.
-	it.each(["@oh-my-pi/pi-utils", "@mariozechner/pi-utils"])("resolves %s to the host copy", async specifier => {
-		const toolPath = await writeTool(
-			"host_import.ts",
-			esmTool("host_import_tool", '"logger is " + typeof logger.warn', [`import { logger } from "${specifier}";`]),
-		);
+	it.each(["@oh-my-striped-pi/pi-utils", "@mariozechner/pi-utils"])(
+		"resolves %s to the host copy",
+		async specifier => {
+			const toolPath = await writeTool(
+				"host_import.ts",
+				esmTool("host_import_tool", '"logger is " + typeof logger.warn', [
+					`import { logger } from "${specifier}";`,
+				]),
+			);
 
-		const result = await loadCustomTools([{ path: toolPath }], requireTempRoot(), []);
+			const result = await loadCustomTools([{ path: toolPath }], requireTempRoot(), []);
 
-		expect(result.errors).toEqual([]);
-		expect(result.tools[0]?.tool.description).toBe("logger is function");
-	});
+			expect(result.errors).toEqual([]);
+			expect(result.tools[0]?.tool.description).toBe("logger is function");
+		},
+	);
 
 	it("evaluates a tool's modules once and shares them between tools and loads", async () => {
 		const counterKey = `__ompToolHelperEvaluations_${crypto.randomUUID().replaceAll("-", "")}`;

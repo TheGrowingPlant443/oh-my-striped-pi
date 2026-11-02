@@ -16,6 +16,7 @@ export interface BuildLeafManifestInput extends LeafTarget {
 
 export interface LeafManifest {
 	name: string;
+	private: true;
 	version: string;
 	author: string;
 	os: string[];
@@ -90,7 +91,8 @@ export function buildLeafManifest({ tag, os, cpu, files, version }: BuildLeafMan
 	}
 	const main = selectPrimaryAddonFile(tag, addonFiles);
 	return {
-		name: `@oh-my-pi/pi-natives-${tag}`,
+		name: `@oh-my-striped-pi/pi-natives-${tag}`,
+		private: true,
 		version,
 		author: "Stencil Labs, Inc.",
 		os: [os],
@@ -100,7 +102,7 @@ export function buildLeafManifest({ tag, os, cpu, files, version }: BuildLeafMan
 		license: "MIT",
 		repository: {
 			type: "git",
-			url: "git+https://github.com/can1357/oh-my-pi.git",
+			url: "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
 			directory: "packages/natives",
 		},
 		engines: {
@@ -110,7 +112,7 @@ export function buildLeafManifest({ tag, os, cpu, files, version }: BuildLeafMan
 }
 
 function buildReadme(tag: string, manifest: LeafManifest): string {
-	return `# ${manifest.name}\n\nPlatform native addon package for \`@oh-my-pi/pi-natives\` on ${tag}.\n\nThis package is generated during release and installed as an optional dependency of the core package.\n`;
+	return `# ${manifest.name}\n\nPrivate platform native addon package for \`@oh-my-striped-pi/pi-natives\` on ${tag}.\n\nGenerated for local packaging only; this fork does not publish npm packages. Build from the source checkout or with Nix.\n`;
 }
 
 function selectTargets(tags: readonly string[] | undefined): readonly LeafTarget[] {

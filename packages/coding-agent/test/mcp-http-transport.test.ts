@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { connectToServer } from "@oh-my-pi/pi-coding-agent/mcp/client";
-import { MCPTransportError } from "@oh-my-pi/pi-coding-agent/mcp/errors";
-import { analyzeAuthError } from "@oh-my-pi/pi-coding-agent/mcp/oauth-discovery";
-import { HttpTransport } from "@oh-my-pi/pi-coding-agent/mcp/transports/http";
-import type { JsonRpcRequest } from "@oh-my-pi/pi-coding-agent/mcp/types";
-import type { MCPProgress } from "@oh-my-pi/pi-tui/tools/mcp";
-import { postmortem } from "@oh-my-pi/pi-utils";
+import { connectToServer } from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import { MCPTransportError } from "@oh-my-striped-pi/pi-coding-agent/mcp/errors";
+import { analyzeAuthError } from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-discovery";
+import { HttpTransport } from "@oh-my-striped-pi/pi-coding-agent/mcp/transports/http";
+import type { JsonRpcRequest } from "@oh-my-striped-pi/pi-coding-agent/mcp/types";
+import type { MCPProgress } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import { postmortem } from "@oh-my-striped-pi/pi-utils";
 
 const encoder = new TextEncoder();
 const REQUEST_TIMEOUT_MS = 50;

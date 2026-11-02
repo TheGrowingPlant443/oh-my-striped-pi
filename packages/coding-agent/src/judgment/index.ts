@@ -4,7 +4,7 @@ import {
 	type AgentTelemetryConfig,
 	recordJudgmentTelemetry,
 	resolveTelemetry,
-} from "@oh-my-pi/pi-agent-core";
+} from "@oh-my-striped-pi/pi-agent-core";
 import {
 	type Answer,
 	type BoxEdges,
@@ -32,12 +32,12 @@ import {
 	type TextPrompt,
 	TextJudge,
 	type Usage,
-} from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/judgment";
-import { sendsImageInputOnWire } from "@oh-my-pi/pi-ai/providers/vision-guard";
-import { calculateCost } from "@oh-my-pi/pi-catalog/models";
-import { logger, prompt } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { isEmbeddedImageContent } from "@oh-my-striped-pi/pi-ai/judgment";
+import { sendsImageInputOnWire } from "@oh-my-striped-pi/pi-ai/providers/vision-guard";
+import { calculateCost } from "@oh-my-striped-pi/pi-catalog/models";
+import { logger, prompt } from "@oh-my-striped-pi/pi-utils";
 import { normalizeModelContextImages } from "../utils/image-loading";
 import { type FittedImage, fitImage } from "../utils/image-resize";
 import type { ModelRegistry } from "../config/model-registry";

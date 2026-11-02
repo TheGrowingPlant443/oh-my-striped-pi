@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { isEnoent } from "@oh-my-pi/pi-utils";
+import { isEnoent } from "@oh-my-striped-pi/pi-utils";
 import { $ } from "bun";
 import type { TbTask } from "./types";
 

@@ -7,19 +7,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { loadExtensions } from "@oh-my-pi/pi-coding-agent/extensibility/extensions";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { loadExtensions } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions";
 import {
 	partitionStartupExtensions,
 	recordStartupVerdicts,
-} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/startup-deferral";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import { AgentStorage } from "@oh-my-pi/pi-coding-agent/session/agent-storage";
-import type { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/startup-deferral";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import { AgentStorage } from "@oh-my-striped-pi/pi-coding-agent/session/agent-storage";
+import type { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 const DEFERRED_TOOL_EXTENSION = (logPath: string) => `
@@ -42,7 +42,7 @@ describe("startup-deferred extensions", () => {
 	let authStorage: AuthStorage;
 
 	beforeEach(() => {
-		tempDir = TempDir.createSync("@omp-deferred-ext-");
+		tempDir = TempDir.createSync("@omsp-deferred-ext-");
 		authStorage = createInMemoryAuthStorage();
 	});
 

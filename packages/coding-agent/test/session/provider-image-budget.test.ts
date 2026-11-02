@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import type { Context, ImageContent, Message, TextContent } from "@oh-my-pi/pi-ai";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import type { Context, ImageContent, Message, TextContent } from "@oh-my-striped-pi/pi-ai";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	capArchiveFrameBytes,
 	clampProviderContextImageBytes,
 	clampProviderContextImages,
-} from "@oh-my-pi/pi-coding-agent/session/provider-image-budget";
-import { providerImageBudget } from "@oh-my-pi/snapcompact";
+} from "@oh-my-striped-pi/pi-coding-agent/session/provider-image-budget";
+import { providerImageBudget } from "@oh-my-striped-pi/snapcompact";
 
 const MODEL = buildModel({
 	id: "gpt-5.5",

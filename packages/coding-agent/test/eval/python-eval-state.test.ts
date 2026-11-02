@@ -1,16 +1,16 @@
 import * as path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "bun:test";
-import { disposeAllKernelSessions, executePython } from "@oh-my-pi/pi-coding-agent/eval/py/executor";
+import { disposeAllKernelSessions, executePython } from "@oh-my-striped-pi/pi-coding-agent/eval/py/executor";
 import type {
 	KernelExecuteResult,
 	KernelShutdownResult,
 	PythonKernel as PythonKernelInstance,
-} from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import * as pythonKernel from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { PythonKernel } from "@oh-my-pi/pi-coding-agent/eval/py/kernel";
-import { formatEvalStateContext, getEvalState } from "@oh-my-pi/pi-coding-agent/eval/state";
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
+} from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import * as pythonKernel from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { PythonKernel } from "@oh-my-striped-pi/pi-coding-agent/eval/py/kernel";
+import { formatEvalStateContext, getEvalState } from "@oh-my-striped-pi/pi-coding-agent/eval/state";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
 
 const OK_RESULT: KernelExecuteResult = {
 	status: "ok",

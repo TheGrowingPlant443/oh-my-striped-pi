@@ -3,9 +3,9 @@
 //! Registered only when a layer is on (see [`GitLayers`]), each through a
 //! variable truthy in the session or process environment:
 //!
-//! - `PI_SMART_GIT`: `git worktree add` creates linked worktrees through
+//! - `OMSP_SMART_GIT`: `git worktree add` creates linked worktrees through
 //!   [`pi_vcs`], described below.
-//! - `PI_GIT_GUARD`: commands that discard or move work are refused in a
+//! - `OMSP_GIT_GUARD`: commands that discard or move work are refused in a
 //!   checkout other sessions may share, and run after saving what they discard
 //!   in a worktree of one's own; see [`guard`].
 //!
@@ -70,9 +70,9 @@ const LONG_OPTIONS: [&str; 10] = [
 /// Behavior the `git` builtin layers over the binary.
 #[derive(Clone, Copy, Debug)]
 pub struct GitLayers {
-	/// Serve `git worktree add` through copy-on-write clones (`PI_SMART_GIT`).
+	/// Serve `git worktree add` through copy-on-write clones (`OMSP_SMART_GIT`).
 	pub smart_worktree: bool,
-	/// Refuse commands that discard or move shared work (`PI_GIT_GUARD`).
+	/// Refuse commands that discard or move shared work (`OMSP_GIT_GUARD`).
 	pub guard:          bool,
 }
 
@@ -835,7 +835,7 @@ mod tests {
 	}
 
 	/// Runs `command` in a one-shot shell with the builtin layers whose
-	/// variables (`PI_SMART_GIT`, `PI_GIT_GUARD`) are in `layers` on, the
+	/// variables (`OMSP_SMART_GIT`, `OMSP_GIT_GUARD`) are in `layers` on, the
 	/// others off.
 	///
 	/// The shell exports the test process's environment, where any
@@ -849,7 +849,7 @@ mod tests {
 		layers: &[&str],
 	) -> (Option<i32>, String) {
 		let (tx, rx) = flume::unbounded::<String>();
-		let flags = ["PI_SMART_GIT", "PI_GIT_GUARD"]
+		let flags = ["OMSP_SMART_GIT", "OMSP_GIT_GUARD"]
 			.map(|name| (name.to_owned(), if layers.contains(&name) { "1" } else { "0" }.to_owned()));
 		let options = crate::ShellExecuteOptions {
 			command: format!("unset -v \"${{!GIT_CONFIG@}}\"; {command}"),
@@ -865,10 +865,10 @@ mod tests {
 
 	#[cfg(unix)]
 	async fn run(repo: &Path, command: &str) -> (Option<i32>, String) {
-		run_with(repo, command, &["PI_SMART_GIT"]).await
+		run_with(repo, command, &["OMSP_SMART_GIT"]).await
 	}
 
-	/// Without `PI_SMART_GIT`, `git` is the plain binary: no clone, so the
+	/// Without `OMSP_SMART_GIT`, `git` is the plain binary: no clone, so the
 	/// ignored cache stays behind.
 	#[cfg(target_os = "macos")]
 	#[tokio::test(flavor = "multi_thread")]

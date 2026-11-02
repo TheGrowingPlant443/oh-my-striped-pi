@@ -25,10 +25,10 @@ export const frameDefs = {
 			"provider?": "string",
 			"model?": "string",
 			"httpStatus?": "number.integer",
-			retryable: doc("boolean", "Transient: resubmitting later may succeed (omp's own retries are exhausted)."),
+			retryable: doc("boolean", "Transient: resubmitting later may succeed (omsp's own retries are exhausted)."),
 			"code?": doc(
 				"'cost_cap'",
-				"`cost_cap`: the session reached `session.maxCost` (`--max-cost`) and omp did not send the next request.",
+				"`cost_cap`: the session reached `session.maxCost` (`--max-cost`) and omsp did not send the next request.",
 			),
 		},
 		'Failure detail of a `prompt_result` with `status: "error"`.',

@@ -7,9 +7,17 @@
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { WorkProfile } from "@oh-my-pi/pi-natives";
-import { APP_NAME, getLogPath, getLogsDir, getReportsDir, isEnoent, localDay, logger } from "@oh-my-pi/pi-utils";
-import { writeArchive } from "@oh-my-pi/pi-utils/ar";
+import type { WorkProfile } from "@oh-my-striped-pi/pi-natives";
+import {
+	APP_NAME,
+	getLogPath,
+	getLogsDir,
+	getReportsDir,
+	isEnoent,
+	localDay,
+	logger,
+} from "@oh-my-striped-pi/pi-utils";
+import { writeArchive } from "@oh-my-striped-pi/pi-utils/ar";
 import { readSessionHeaderId } from "../session/session-loader";
 import { collectSubSessions } from "../session/sub-sessions";
 import type { CpuProfile, MemoryStats } from "./profiler";
@@ -93,7 +101,7 @@ export async function createReportBundle(options: ReportBundleOptions): Promise<
 	await fs.mkdir(reportsDir, { recursive: true });
 
 	const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-	const outputPath = path.join(reportsDir, `omp-report-${timestamp}.tar.gz`);
+	const outputPath = path.join(reportsDir, `omsp-report-${timestamp}.tar.gz`);
 
 	const data: Record<string, string | Uint8Array> = {};
 	const files: string[] = [];
@@ -238,7 +246,7 @@ async function collectSessionIds(sessionFile: string | undefined): Promise<Set<s
 
 /**
  * Concatenate the tail of every same-day process log so a report generated
- * after a crash still captures the fatal PID's `omp.<date>.<pid>.log`. Files
+ * after a crash still captures the fatal PID's `omsp.<date>.<pid>.log`. Files
  * are ordered oldest-first by mtime and separated by a filename header.
  * `sessionLines` holds every record of those files whose `sessionId` is in
  * `sessionIds`, in the same file order, capped at the last {@link MAX_LOG_LINES}.

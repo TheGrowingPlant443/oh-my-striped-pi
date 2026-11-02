@@ -49,7 +49,7 @@ export function isOpenAICompletionsVisionSupported(model: Model<"openai-completi
  * Completions guard below never runs client-side and the declared input
  * applies. Otherwise the Chat Completions path applies the text-only guard;
  * every other API ships the modalities the model declares. Callers that report
- * or gate on the wire (for example the `omp models` table) read this
+ * or gate on the wire (for example the `omsp models` table) read this
  * predicate; declared capability reads `model.input`.
  */
 export function sendsImageInputOnWire(model: Model<Api>): boolean {

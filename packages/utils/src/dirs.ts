@@ -1,32 +1,32 @@
 /**
- * Centralized path helpers for omp config directories.
+ * Centralized path helpers for omsp config directories.
  *
- * Uses PI_CONFIG_DIR (default ".omp") for the config root and
- * PI_CODING_AGENT_DIR to override the agent directory.
+ * Uses OMSP_CONFIG_DIR (default ".omsp") for the config root and
+ * OMSP_CODING_AGENT_DIR to override the agent directory.
  *
  * On Linux, if XDG_DATA_HOME / XDG_STATE_HOME / XDG_CACHE_HOME environment
  * variables are set, paths are redirected to XDG-compliant locations under
- * $XDG_*_HOME/omp/. This requires running `omp config migrate` first to
+ * $XDG_*_HOME/omsp/. This requires running `omsp config migrate` first to
  * move data to the new locations. No filesystem existence checks are performed
- * — if the env var is set, omp trusts that the migration has been done.
+ * — if the env var is set, omsp trusts that the migration has been done.
  */
 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { expandWindowsLongPath } from "@oh-my-pi/pi-natives/path";
+import { expandWindowsLongPath } from "@oh-my-striped-pi/pi-natives/path";
 import { engines, version } from "../package.json" with { type: "json" };
 import { isEnoent, isEnotdir } from "./fs-error";
 import { isBunTestRuntime } from "./test-runtime";
 
-/** App name (e.g. "omp") */
-export const APP_NAME: string = "omp";
+/** App name (e.g. "omsp") */
+export const APP_NAME: string = "omsp";
 
-/** Public homepage that inference gateways (OpenRouter, Vercel AI Gateway) credit omp traffic to. */
-export const APP_URL: string = "https://omp.sh/";
+/** Public homepage that inference gateways (OpenRouter, Vercel AI Gateway) credit omsp traffic to. */
+export const APP_URL: string = "https://github.com/TheGrowingPlant443/oh-my-striped-pi/";
 
-/** Config directory name (e.g. ".omp") */
-export const CONFIG_DIR_NAME: string = ".omp";
+/** Config directory name (e.g. ".omsp") */
+export const CONFIG_DIR_NAME: string = ".omsp";
 
 /** Ordered main settings filenames: canonical write target first, legacy-compatible YAML fallback second. */
 export const MAIN_CONFIG_FILENAMES = ["config.yml", "config.yaml"] as const;
@@ -34,14 +34,13 @@ export const MAIN_CONFIG_FILENAMES = ["config.yml", "config.yaml"] as const;
 /** Version (e.g. "1.0.0") */
 export const VERSION: string = version;
 
-/** Default User-Agent header string (e.g. "omp/17.2.12") */
-export const USER_AGENT = `omp/${VERSION}`;
+/** Default User-Agent header string (e.g. "omsp/17.2.12") */
+export const USER_AGENT = `omsp/${VERSION}`;
 
 /** Minimum Bun version */
 export const MIN_BUN_VERSION: string = engines.bun.replace(/[^0-9.]/g, "");
 
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
-const PROFILE_ENV_KEYS = ["OMP_PROFILE", "PI_PROFILE"] as const;
 
 /**
  * Names Windows treats as reserved device aliases. Matches the basename
@@ -58,7 +57,7 @@ const WINDOWS_RESERVED_BASENAME_RE = /^(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\
  * default (empty string, whitespace, or the explicit "default" sentinel) and
  * throws for syntactically invalid or platform-reserved names.
  *
- * Exported so consumers of `@oh-my-pi/pi-utils/dirs` (CLI bootstrap, tests,
+ * Exported so consumers of `@oh-my-striped-pi/pi-utils/dirs` (CLI bootstrap, tests,
  * downstream tools) can validate user input without re-deriving the rules.
  */
 export function normalizeProfileName(profile: string | undefined): string | undefined {
@@ -72,7 +71,7 @@ export function normalizeProfileName(profile: string | undefined): string | unde
 		WINDOWS_RESERVED_BASENAME_RE.test(normalized)
 	) {
 		throw new Error(
-			`Invalid OMP profile "${profile}". Profile names must match ${PROFILE_NAME_RE.source}, ` +
+			`Invalid OMSP profile "${profile}". Profile names must match ${PROFILE_NAME_RE.source}, ` +
 				`cannot be "." or "..", cannot end with ".", and cannot be a Windows reserved device name ` +
 				`(CON, PRN, AUX, NUL, COM0-9, LPT0-9, or any of those with an extension).`,
 		);
@@ -80,29 +79,22 @@ export function normalizeProfileName(profile: string | undefined): string | unde
 	return normalized;
 }
 
-/**
- * Resolve the active profile from the two profile env vars. `OMP_PROFILE` is the
- * canonical variable and takes precedence; `PI_PROFILE` is the legacy
- * compatibility fallback, consulted only when `OMP_PROFILE` is undefined. An
- * explicitly-empty `OMP_PROFILE` therefore selects the default profile rather
- * than silently inheriting `PI_PROFILE`. Delegates validation/normalization to
- * {@link normalizeProfileName} (which throws on a syntactically invalid value).
- */
-export function resolveProfileEnv(omp: string | undefined, pi: string | undefined): string | undefined {
-	return normalizeProfileName(omp !== undefined ? omp : pi);
+/** Resolve and validate the canonical `OMSP_PROFILE` environment value. */
+export function resolveProfileEnv(profile: string | undefined): string | undefined {
+	return normalizeProfileName(profile);
 }
 
 function getProfileFromEnv(): string | undefined {
-	return resolveProfileEnv(process.env.OMP_PROFILE, process.env.PI_PROFILE);
+	return resolveProfileEnv(process.env.OMSP_PROFILE);
 }
 
 /**
  * Module-load profile resolution. Unlike {@link getProfileFromEnv}, an invalid
- * OMP_PROFILE/PI_PROFILE value does NOT throw here — a bad env var must not
+ * OMSP_PROFILE value does NOT throw here — a bad env var must not
  * crash a bare `import` of this module with an uncaught stack trace before the
  * CLI's error handling is in scope. The default profile is used instead; the
  * CLI re-validates the env (see `runCli` in coding-agent/src/cli.ts) so the
- * user still gets a clean "Invalid OMP profile" message.
+ * user still gets a clean "Invalid OMSP profile" message.
  */
 function readProfileFromEnvSafe(): string | undefined {
 	try {
@@ -112,7 +104,7 @@ function readProfileFromEnvSafe(): string | undefined {
 	}
 }
 
-/** Profile-independent config root (~/.omp), shared by every omp profile. */
+/** Profile-independent config root (~/.omsp), shared by every omsp profile. */
 export function getBaseConfigRoot(): string {
 	return path.join(os.homedir(), getConfigDirName());
 }
@@ -120,14 +112,6 @@ export function getBaseConfigRoot(): string {
 function getProfileConfigRoot(profile: string | undefined): string {
 	const root = getBaseConfigRoot();
 	return profile ? path.join(root, "profiles", profile) : root;
-}
-
-function readPiProfileFromEnvSafe(): string | undefined {
-	try {
-		return normalizeProfileName(process.env.PI_PROFILE);
-	} catch {
-		return undefined;
-	}
 }
 
 function getProfileAgentDir(profile: string): string {
@@ -325,12 +309,12 @@ export function getSafeProjectCwd(): string {
 	return os.homedir();
 }
 
-/** Get the config directory name relative to home (e.g. ".omp" or PI_CONFIG_DIR override). */
+/** Get the config directory name relative to home (e.g. ".omsp" or OMSP_CONFIG_DIR override). */
 export function getConfigDirName(): string {
-	return process.env.PI_CONFIG_DIR || CONFIG_DIR_NAME;
+	return process.env.OMSP_CONFIG_DIR || CONFIG_DIR_NAME;
 }
 
-/** Get the config agent directory name relative to home (e.g. ".omp/agent" or PI_CONFIG_DIR + "/agent"). */
+/** Get the config agent directory name relative to home (e.g. ".omsp/agent" or OMSP_CONFIG_DIR + "/agent"). */
 export function getConfigAgentDirName(): string {
 	const profile = getActiveProfile();
 	return profile ? path.join(getConfigDirName(), "profiles", profile, "agent") : `${getConfigDirName()}/agent`;
@@ -343,8 +327,8 @@ export function getConfigAgentDirName(): string {
 type XdgCategory = "data" | "state" | "cache";
 
 /**
- * Resolves and caches all omp directory paths. On Linux, when XDG environment
- * variables are set, paths are redirected under $XDG_*_HOME/omp/. A new
+ * Resolves and caches all omsp directory paths. On Linux, when XDG environment
+ * variables are set, paths are redirected under $XDG_*_HOME/omsp/. A new
  * instance is created whenever the agent directory changes, which naturally
  * invalidates all cached paths.
  */
@@ -353,7 +337,7 @@ class DirResolver {
 	readonly agentDir: string;
 
 	// Per-category base dirs. Without XDG, all three equal configRoot / agentDir.
-	// With XDG on Linux, they point to $XDG_*_HOME/omp/.
+	// With XDG on Linux, they point to $XDG_*_HOME/omsp/.
 	readonly #rootDirs: Record<XdgCategory, string>;
 	readonly #agentDirs: Record<XdgCategory, string>;
 	readonly #baseRootDirs: Record<XdgCategory, string>;
@@ -371,14 +355,14 @@ class DirResolver {
 		const isDefault = this.agentDir === defaultAgent;
 
 		// XDG is a Linux convention. On supported platforms, default profile state
-		// resolves under $XDG_*_HOME/omp once `omp config init-xdg` has migrated
+		// resolves under $XDG_*_HOME/omsp once `omsp config init-xdg` has migrated
 		// the user's data. Named profiles follow a stricter rule: the XDG choice
 		// is keyed on the profile-specific XDG path, never the base app root.
 		//
 		// Why: if we consulted the base app root for named profiles too, the same
-		// profile could resolve to `~/.omp/profiles/<name>` on first activation
-		// (when no $XDG_*_HOME/omp exists yet) and then silently move to
-		// `$XDG_*_HOME/omp/profiles/<name>` the moment the base appeared, orphaning
+		// profile could resolve to `~/.omsp/profiles/<name>` on first activation
+		// (when no $XDG_*_HOME/omsp exists yet) and then silently move to
+		// `$XDG_*_HOME/omsp/profiles/<name>` the moment the base appeared, orphaning
 		// the earlier state. Pinning on the profile path means a profile's location
 		// is decided at first activation and stays put until the user explicitly
 		// migrates it (e.g. by mkdir'ing the XDG profile dir).
@@ -408,7 +392,7 @@ class DirResolver {
 
 		// XDG choice for machine-global paths (daemon scopes shared by every
 		// process): keyed only on the base app root, independent of both the
-		// profile and any agent-dir override, so every omp process on the machine
+		// profile and any agent-dir override, so every omsp process on the machine
 		// agrees on one location. These hold process-scoped runtime state
 		// (sockets, tokens), so there is no migration to protect.
 		const resolveBase = (envVar: string) => {
@@ -427,7 +411,7 @@ class DirResolver {
 			state: xdgState ?? this.configRoot,
 			cache: xdgCache ?? this.configRoot,
 		};
-		// XDG flattens the agent/ prefix: ~/.omp/agent/sessions → $XDG_DATA_HOME/omp/sessions
+		// XDG flattens the agent/ prefix: ~/.omsp/agent/sessions → $XDG_DATA_HOME/omsp/sessions
 		this.#agentDirs = {
 			data: xdgData ?? this.agentDir,
 			state: xdgState ?? this.agentDir,
@@ -471,21 +455,15 @@ class DirResolver {
 }
 
 /**
- * Decide which `PI_CODING_AGENT_DIR` value to capture as the pre-profile
+ * Decide which `OMSP_CODING_AGENT_DIR` value to capture as the pre-profile
  * baseline. A value equal to a profile's derived agent dir is profile-derived
  * (propagated by a parent's `setProfile`), so it must NOT be snapshotted as the
  * default-mode baseline — otherwise default mode would resolve to the profile's
- * agent dir. The profile source can be the active profile or a lower-priority
- * `PI_PROFILE` that was bypassed because `OMP_PROFILE` explicitly selected the
- * default profile. Returns `undefined` in those cases so reset falls back to the
- * standard `~/.omp/agent`.
+ * agent dir. Returns `undefined` in that case so reset falls back to the
+ * standard `~/.omsp/agent`.
  */
-function resolvePreProfileAgentDir(
-	profile: string | undefined,
-	agentDirEnv: string | undefined,
-	profileAgentDirSource: string | undefined = profile,
-): string | undefined {
-	return isProfileDerivedAgentDir(profile ?? profileAgentDirSource, agentDirEnv) ? undefined : agentDirEnv;
+function resolvePreProfileAgentDir(profile: string | undefined, agentDirEnv: string | undefined): string | undefined {
+	return isProfileDerivedAgentDir(profile, agentDirEnv) ? undefined : agentDirEnv;
 }
 
 let activeProfile = readProfileFromEnvSafe();
@@ -493,14 +471,12 @@ let activeProfile = readProfileFromEnvSafe();
 /**
  * Resolve the agent-dir override for the current `activeProfile` from the live
  * environment. A named profile derives its own agent dir (no override); default
- * mode honors a non-profile `PI_CODING_AGENT_DIR` (see
+ * mode honors a non-profile `OMSP_CODING_AGENT_DIR` (see
  * {@link resolvePreProfileAgentDir}). Shared by the module-load resolver and
  * {@link refreshDirsFromEnv} so both apply identical logic.
  */
 function resolveActiveAgentDirOverride(): string | undefined {
-	return activeProfile
-		? undefined
-		: resolvePreProfileAgentDir(undefined, process.env.PI_CODING_AGENT_DIR, readPiProfileFromEnvSafe());
+	return activeProfile ? undefined : process.env.OMSP_CODING_AGENT_DIR;
 }
 
 let dirs = new DirResolver({
@@ -508,20 +484,19 @@ let dirs = new DirResolver({
 	profile: activeProfile,
 });
 /**
- * Snapshot of `PI_CODING_AGENT_DIR` from before the first named-profile
+ * Snapshot of `OMSP_CODING_AGENT_DIR` from before the first named-profile
  * activation. Reset paths restore this value (or its absence) instead of
  * unconditionally deleting the env var. Without the snapshot, a process started
- * with `PI_CODING_AGENT_DIR=/custom` then `setProfile("work")` then
+ * with `OMSP_CODING_AGENT_DIR=/custom` then `setProfile("work")` then
  * `setProfile(undefined)` would silently lose `/custom` and fall back to
- * `~/.omp/agent`. Captured at module load — ignoring a profile-derived value
+ * `~/.omsp/agent`. Captured at module load — ignoring a profile-derived value
  * inherited from a parent's `setProfile` (see {@link resolvePreProfileAgentDir})
  * — and refreshed on `setAgentDir`, since that call is the user explicitly
  * redefining the baseline.
  */
 let preProfileAgentDirEnv: string | undefined = resolvePreProfileAgentDir(
 	activeProfile,
-	process.env.PI_CODING_AGENT_DIR,
-	activeProfile ?? readPiProfileFromEnvSafe(),
+	process.env.OMSP_CODING_AGENT_DIR,
 );
 // Anchor home for the resolver. Captured at module load to stay stable across
 // test mocks of `os.homedir()`. `getPluginsDir(home)` compares against this so
@@ -532,7 +507,7 @@ const RESOLVER_HOME = os.homedir();
 /**
  * Rebuild the dirs resolver from the current environment, reusing the profile
  * resolved at module load. Directory-affecting keys (XDG_*_HOME and, in default
- * mode, `PI_CODING_AGENT_DIR`) loaded from a profile/agent `.env` only reach
+ * mode, `OMSP_CODING_AGENT_DIR`) loaded from a profile/agent `.env` only reach
  * `process.env` *after* this module froze the resolver at import time, so
  * `env.ts` calls this once after applying its `.env` files. The agent `.env`
  * location derives from the profile name + home before this runs, so the
@@ -550,7 +525,7 @@ export function refreshDirsFromEnv(): void {
 // Root directories
 // =============================================================================
 
-/** Get the config root directory (~/.omp). */
+/** Get the config root directory (~/.omsp). */
 export function getConfigRootDir(): string {
 	return dirs.configRoot;
 }
@@ -559,15 +534,13 @@ export function getConfigRootDir(): string {
 export function setAgentDir(dir: string): void {
 	activeProfile = undefined;
 	dirs = new DirResolver({ agentDirOverride: dir });
-	process.env.PI_CODING_AGENT_DIR = dir;
+	process.env.OMSP_CODING_AGENT_DIR = dir;
 	preProfileAgentDirEnv = dir;
-	for (const key of PROFILE_ENV_KEYS) {
-		delete process.env[key];
-	}
+	delete process.env.OMSP_PROFILE;
 }
 
 /**
- * Test-only: reset the pre-profile `PI_CODING_AGENT_DIR` snapshot to whatever
+ * Test-only: reset the pre-profile `OMSP_CODING_AGENT_DIR` snapshot to whatever
  * the current environment looks like. Cross-suite test pollution can otherwise
  * leak a stale snapshot through `setAgentDir` and corrupt `setProfile(undefined)`
  * restore semantics. Production code MUST NOT call this — the snapshot's
@@ -575,11 +548,7 @@ export function setAgentDir(dir: string): void {
  * no business clearing it.
  */
 export function __resetProfileSnapshotForTests(): void {
-	preProfileAgentDirEnv = resolvePreProfileAgentDir(
-		activeProfile,
-		process.env.PI_CODING_AGENT_DIR,
-		activeProfile ?? readPiProfileFromEnvSafe(),
-	);
+	preProfileAgentDirEnv = resolvePreProfileAgentDir(activeProfile, process.env.OMSP_CODING_AGENT_DIR);
 }
 
 /**
@@ -599,30 +568,23 @@ export function setProfile(profile: string | undefined): void {
 	const next = normalizeProfileName(profile);
 	if (next && !activeProfile) {
 		// First activation of a named profile in this process: snapshot the
-		// current PI_CODING_AGENT_DIR so a later reset can restore the user's
+		// current OMSP_CODING_AGENT_DIR so a later reset can restore the user's
 		// explicit override. Subsequent profile switches keep the original
 		// snapshot — the "pre-profile" baseline is the state before profiles
 		// entered the picture, not the state between two activations.
-		preProfileAgentDirEnv = resolvePreProfileAgentDir(
-			undefined,
-			process.env.PI_CODING_AGENT_DIR,
-			readPiProfileFromEnvSafe(),
-		);
+		preProfileAgentDirEnv = process.env.OMSP_CODING_AGENT_DIR;
 	}
 	activeProfile = next;
 	if (activeProfile) {
 		dirs = new DirResolver({ profile: activeProfile });
-		process.env.OMP_PROFILE = activeProfile;
-		process.env.PI_PROFILE = activeProfile;
-		process.env.PI_CODING_AGENT_DIR = dirs.agentDir;
+		process.env.OMSP_PROFILE = activeProfile;
+		process.env.OMSP_CODING_AGENT_DIR = dirs.agentDir;
 	} else {
-		for (const key of PROFILE_ENV_KEYS) {
-			delete process.env[key];
-		}
+		delete process.env.OMSP_PROFILE;
 		if (preProfileAgentDirEnv === undefined) {
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		} else {
-			process.env.PI_CODING_AGENT_DIR = preProfileAgentDirEnv;
+			process.env.OMSP_CODING_AGENT_DIR = preProfileAgentDirEnv;
 		}
 		dirs = new DirResolver({ agentDirOverride: preProfileAgentDirEnv });
 	}
@@ -637,42 +599,42 @@ export function getActiveProfile(): string | undefined {
 export function getProfileRootDir(profile: string | undefined): string {
 	return getProfileConfigRoot(normalizeProfileName(profile));
 }
-/** Get the agent config directory (~/.omp/agent). */
+/** Get the agent config directory (~/.omsp/agent). */
 export function getAgentDir(): string {
 	return dirs.agentDir;
 }
 
-/** Get the project-local config directory (.omp). */
+/** Get the project-local config directory (.omsp). */
 export function getProjectAgentDir(cwd: string = getProjectDir()): string {
 	return path.join(cwd, CONFIG_DIR_NAME);
 }
 
 // =============================================================================
-// Config-root subdirectories (~/.omp/*)
+// Config-root subdirectories (~/.omsp/*)
 // =============================================================================
 
-/** Get the reports directory (~/.omp/reports). */
+/** Get the reports directory (~/.omsp/reports). */
 export function getReportsDir(): string {
 	return dirs.rootSubdir("reports", "state");
 }
 
 /**
- * Get the logs directory (~/.omp/logs). `bun test` processes get
- * `<tmpdir>/omp-test-logs-<uid>` instead, so suites never write into the
+ * Get the logs directory (~/.omsp/logs). `bun test` processes get
+ * `<tmpdir>/omsp-test-logs-<uid>` instead, so suites never write into the
  * developer's real logs; the uid suffix (as for the test session-owners dir)
  * keeps users of a shared `/tmp` from owning each other's directory.
  */
 export function getLogsDir(): string {
 	if (isBunTestRuntime()) {
 		const uid = typeof process.getuid === "function" ? process.getuid() : os.userInfo().username;
-		return path.join(os.tmpdir(), `omp-test-logs-${uid}`);
+		return path.join(os.tmpdir(), `omsp-test-logs-${uid}`);
 	}
 	return dirs.rootSubdir("logs", "state");
 }
 
 /**
  * Local-timezone `YYYY-MM-DD` day key (zero-padded), formatted exactly like
- * the rotating log sink's file naming: log files are named `omp.<day>.<pid>.log`
+ * the rotating log sink's file naming: log files are named `omsp.<day>.<pid>.log`
  * with the LOCAL day, not the UTC day `toISOString()` yields. Anything that
  * computes "today's" log path or matches same-day log files by name must use
  * this key, or between local midnight and UTC midnight it points at files that
@@ -682,13 +644,13 @@ export function localDay(date: Date): string {
 	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/** Get this process's dated log path (~/.omp/logs/omp.YYYY-MM-DD.PID.log, local-day named like the rotating sink). */
+/** Get this process's dated log path (~/.omsp/logs/omsp.YYYY-MM-DD.PID.log, local-day named like the rotating sink). */
 export function getLogPath(date = new Date(), pid = process.pid): string {
 	return path.join(getLogsDir(), `${APP_NAME}.${localDay(date)}.${pid}.log`);
 }
 
 /**
- * Get the plugins directory (~/.omp/plugins or its XDG equivalent).
+ * Get the plugins directory (~/.omsp/plugins or its XDG equivalent).
  *
  * No-arg form (production callers) goes through the XDG-aware DirResolver so
  * reads and writes always agree. The optional `home` parameter is for test
@@ -704,22 +666,22 @@ export function getPluginsDir(home?: string): string {
 	return dirs.rootSubdir("plugins", "data");
 }
 
-/** Where npm installs packages (~/.omp/plugins/node_modules). */
+/** Where npm installs packages (~/.omsp/plugins/node_modules). */
 export function getPluginsNodeModules(home?: string): string {
 	return path.join(getPluginsDir(home), "node_modules");
 }
 
-/** Plugin manifest (~/.omp/plugins/package.json). */
+/** Plugin manifest (~/.omsp/plugins/package.json). */
 export function getPluginsPackageJson(home?: string): string {
 	return path.join(getPluginsDir(home), "package.json");
 }
 
-/** Plugin lock file (~/.omp/plugins/omp-plugins.lock.json). */
+/** Plugin lock file (~/.omsp/plugins/omsp-plugins.lock.json). */
 export function getPluginsLockfile(home?: string): string {
-	return path.join(getPluginsDir(home), "omp-plugins.lock.json");
+	return path.join(getPluginsDir(home), "omsp-plugins.lock.json");
 }
 
-/** Get the remote mount directory (~/.omp/remote). */
+/** Get the remote mount directory (~/.omsp/remote). */
 export function getRemoteDir(): string {
 	return dirs.rootSubdir("remote", "data");
 }
@@ -730,9 +692,9 @@ export function getRemoteDir(): string {
  *
  * Worktree bases and the natives directory are process-global: a worktree base
  * is consumed by both creation (PR checkout, task isolation) and cleanup
- * (`omp worktree`), and every launch extracts or loads the native addon from
+ * (`omsp worktree`), and every launch extracts or loads the native addon from
  * the same natives directory. A relative value would resolve against whatever
- * cwd happened to launch `omp`, so those readers could disagree — we refuse it
+ * cwd happened to launch `omsp`, so those readers could disagree — we refuse it
  * rather than silently bind it to cwd.
  */
 function resolveAbsoluteDir(value: string | undefined): string | undefined {
@@ -748,9 +710,9 @@ let worktreesDirOverride: string | undefined;
 
 /**
  * Relocate the base directory for agent-managed worktrees (PR checkouts, task
- * isolation, and `omp worktree` cleanup all read the same base). Driven by the
+ * isolation, and `omsp worktree` cleanup all read the same base). Driven by the
  * `worktree.base` setting in coding-agent; pass `undefined`/empty to clear and
- * fall back to `OMP_WORKTREE_DIR` or the `~/.omp/wt` default.
+ * fall back to `OMSP_WORKTREE_DIR` or the `~/.omsp/wt` default.
  *
  * `~` is expanded and a relative path is rejected (see {@link resolveAbsoluteDir}).
  * Returns the absolute path that took effect, or `undefined` if the input was
@@ -764,46 +726,46 @@ export function setWorktreesDir(dir: string | undefined): string | undefined {
 
 /**
  * Get the agent-managed worktrees directory. Resolution order: the
- * `OMP_WORKTREE_DIR` env var, then the {@link setWorktreesDir} override (the
- * `worktree.base` setting), then the `~/.omp/wt` default. The env var and the
+ * `OMSP_WORKTREE_DIR` env var, then the {@link setWorktreesDir} override (the
+ * `worktree.base` setting), then the `~/.omsp/wt` default. The env var and the
  * override are both `~`-expanded and must be absolute; a relative value is
  * ignored and resolution falls through.
  */
 export function getWorktreesDir(): string {
-	return resolveAbsoluteDir(process.env.OMP_WORKTREE_DIR) ?? worktreesDirOverride ?? dirs.rootSubdir("wt", "data");
+	return resolveAbsoluteDir(process.env.OMSP_WORKTREE_DIR) ?? worktreesDirOverride ?? dirs.rootSubdir("wt", "data");
 }
 
-/** Get the SSH control socket directory (~/.omp/ssh-control). */
+/** Get the SSH control socket directory (~/.omsp/ssh-control). */
 export function getSshControlDir(): string {
 	return dirs.rootSubdir("ssh-control", "state");
 }
 
-/** Get the remote host info directory (~/.omp/remote-host). */
+/** Get the remote host info directory (~/.omsp/remote-host). */
 export function getRemoteHostDir(): string {
 	return dirs.rootSubdir("remote-host", "data");
 }
 
-/** Get the managed Python venv directory (~/.omp/python-env). */
+/** Get the managed Python venv directory (~/.omsp/python-env). */
 export function getPythonEnvDir(): string {
 	return dirs.rootSubdir("python-env", "data");
 }
 
-/** Get the shared Python gateway state directory (~/.omp/agent/python-gateway; XDG default: $XDG_STATE_HOME/omp/python-gateway). */
+/** Get the shared Python gateway state directory (~/.omsp/agent/python-gateway; XDG default: $XDG_STATE_HOME/omsp/python-gateway). */
 export function getPythonGatewayDir(): string {
 	return dirs.agentSubdir(undefined, "python-gateway", "state");
 }
 
-/** Get the puppeteer sandbox directory (~/.omp/puppeteer). */
+/** Get the puppeteer sandbox directory (~/.omsp/puppeteer). */
 export function getPuppeteerDir(): string {
 	return dirs.rootSubdir("puppeteer", "cache");
 }
 
-/** Get the browser relay extension install directory (~/.omp/browser-relay). */
+/** Get the browser relay extension install directory (~/.omsp/browser-relay). */
 export function getBrowserRelayDir(): string {
 	return dirs.rootSubdir("browser-relay", "data");
 }
 
-/** Get the profile root for Chromium browsers the browser tool spawns via `app.path` (~/.omp/browser-profiles). */
+/** Get the profile root for Chromium browsers the browser tool spawns via `app.path` (~/.omsp/browser-profiles). */
 export function getBrowserProfilesDir(): string {
 	return dirs.rootSubdir("browser-profiles", "state");
 }
@@ -817,7 +779,7 @@ export function getDocsRsCacheDir(): string {
  * Stable 7-character hex digest of an absolute filesystem path.
  *
  * Used to pack the project identity into a single short fs-safe segment
- * (e.g. PR-checkout and task-isolation worktree dirs under `~/.omp/wt/`).
+ * (e.g. PR-checkout and task-isolation worktree dirs under `~/.omsp/wt/`).
  * Bun.hash is non-cryptographic — collision space is ~2^28, which is fine
  * for naming a handful of repos on a single machine. Same input on the
  * same Bun runtime yields the same output.
@@ -826,34 +788,34 @@ export function hashPath(absPath: string): string {
 	return Bun.hash(path.resolve(absPath)).toString(16).padStart(16, "0").slice(-7);
 }
 
-/** Get the path to a single worktree directory (~/.omp/wt/<segment>). */
+/** Get the path to a single worktree directory (~/.omsp/wt/<segment>). */
 export function getWorktreeDir(segment: string): string {
 	return path.join(getWorktreesDir(), segment);
 }
 
 /**
- * Get the GitHub view cache database path (~/.omp/cache/github-cache.db).
- * Honors the `OMP_GITHUB_CACHE_DB` env var when set so tests can isolate the
+ * Get the GitHub view cache database path (~/.omsp/cache/github-cache.db).
+ * Honors the `OMSP_GITHUB_CACHE_DB` env var when set so tests can isolate the
  * cache file without touching the rest of the config root.
  */
 export function getGithubCacheDbPath(): string {
-	const override = process.env.OMP_GITHUB_CACHE_DB;
+	const override = process.env.OMSP_GITHUB_CACHE_DB;
 	if (override) return override;
 	return dirs.rootSubdir(path.join("cache", "github-cache.db"), "cache");
 }
 /**
- * Get the conventional commit inference cache database path (~/.omp/cache/commit-inference.db).
- * Honors `OMP_COMMIT_CACHE_DB` so tests and operators can isolate the cache.
+ * Get the conventional commit inference cache database path (~/.omsp/cache/commit-inference.db).
+ * Honors `OMSP_COMMIT_CACHE_DB` so tests and operators can isolate the cache.
  */
 export function getCommitCacheDbPath(): string {
-	const override = process.env.OMP_COMMIT_CACHE_DB;
+	const override = process.env.OMSP_COMMIT_CACHE_DB;
 	if (override) return override;
 	return dirs.rootSubdir(path.join("cache", "commit-inference.db"), "cache");
 }
 
 /** Judgment-cache override keeps tests and alternate profiles isolated. */
 export function getJudgmentCacheDbPath(): string {
-	const override = process.env.OMP_JUDGMENT_CACHE_DB;
+	const override = process.env.OMSP_JUDGMENT_CACHE_DB;
 	if (override) return override;
 	return dirs.rootSubdir(path.join("cache", "judgment-cache.db"), "cache");
 }
@@ -864,82 +826,82 @@ export function getLegacyPiExtensionCacheDbPath(): string {
 }
 
 /**
- * Get the encrypted auth-broker snapshot cache path (~/.omp/cache/auth-broker-snapshot.enc).
- * Honors the `OMP_AUTH_BROKER_SNAPSHOT_CACHE` env var when set so tests and
+ * Get the encrypted auth-broker snapshot cache path (~/.omsp/cache/auth-broker-snapshot.enc).
+ * Honors the `OMSP_AUTH_BROKER_SNAPSHOT_CACHE` env var when set so tests and
  * operators can isolate or relocate the cache file.
  */
 export function getAuthBrokerSnapshotCachePath(): string {
-	const override = process.env.OMP_AUTH_BROKER_SNAPSHOT_CACHE;
+	const override = process.env.OMSP_AUTH_BROKER_SNAPSHOT_CACHE;
 	if (override) return override;
 	return dirs.rootSubdir(path.join("cache", "auth-broker-snapshot.enc"), "cache");
 }
 
-/** Get the commit-author avatar cache directory (~/.omp/cache/avatars). */
+/** Get the commit-author avatar cache directory (~/.omsp/cache/avatars). */
 export function getAvatarCacheDir(): string {
 	return dirs.rootSubdir(path.join("cache", "avatars"), "cache");
 }
 
-/** Get the local FastEmbed model cache directory (~/.omp/cache/fastembed). */
+/** Get the local FastEmbed model cache directory (~/.omsp/cache/fastembed). */
 export function getFastembedCacheDir(): string {
 	return dirs.rootSubdir(path.join("cache", "fastembed"), "cache");
 }
 
-/** Get the on-demand fastembed runtime install root (~/.omp/cache/fastembed-runtime). */
+/** Get the on-demand fastembed runtime install root (~/.omsp/cache/fastembed-runtime). */
 export function getFastembedRuntimeDir(): string {
 	return dirs.rootSubdir(path.join("cache", "fastembed-runtime"), "cache");
 }
 
 /**
  * Get the directory the native addon loads downloaded tree-sitter wasm grammars
- * from (`<natives dir>/grammars`, ~/.omp/natives/grammars). The natives loader
+ * from (`<natives dir>/grammars`, ~/.omsp/natives/grammars). The natives loader
  * configures the addon with the same path.
  */
 export function getNativeGrammarsDir(): string {
 	return path.join(getNativesDir(), "grammars");
 }
 
-/** Get the natives directory. PI_NATIVES_DIR overrides the usual cache root; relative values are ignored. */
+/** Get the natives directory. OMSP_NATIVES_DIR overrides the usual cache root; relative values are ignored. */
 export function getNativesDir(): string {
-	return resolveAbsoluteDir(process.env.PI_NATIVES_DIR) ?? dirs.rootSubdir("natives", "cache");
+	return resolveAbsoluteDir(process.env.OMSP_NATIVES_DIR) ?? dirs.rootSubdir("natives", "cache");
 }
 
-/** Get the stats database path (~/.omp/stats.db). */
+/** Get the stats database path (~/.omsp/stats.db). */
 export function getStatsDbPath(): string {
 	return dirs.rootSubdir("stats.db", "data");
 }
 
-/** Get the autoresearch state directory (~/.omp/autoresearch). */
+/** Get the autoresearch state directory (~/.omsp/autoresearch). */
 export function getAutoresearchDir(): string {
 	return dirs.rootSubdir("autoresearch", "state");
 }
 
-/** Get the per-project autoresearch state directory (~/.omp/autoresearch/<encoded-project>). */
+/** Get the per-project autoresearch state directory (~/.omsp/autoresearch/<encoded-project>). */
 export function getAutoresearchProjectDir(encodedProject: string): string {
 	return path.join(getAutoresearchDir(), encodedProject);
 }
 
-/** Get the per-project autoresearch SQLite database path (~/.omp/autoresearch/<encoded-project>.db). */
+/** Get the per-project autoresearch SQLite database path (~/.omsp/autoresearch/<encoded-project>.db). */
 export function getAutoresearchDbPath(encodedProject: string): string {
 	return path.join(getAutoresearchDir(), `${encodedProject}.db`);
 }
 
-/** Get the per-run artifact directory (~/.omp/autoresearch/<encoded-project>/runs/<runId>). */
+/** Get the per-run artifact directory (~/.omsp/autoresearch/<encoded-project>/runs/<runId>). */
 export function getAutoresearchRunDir(encodedProject: string, runId: number): string {
 	return path.join(getAutoresearchProjectDir(encodedProject), "runs", String(runId).padStart(4, "0"));
 }
 
-/** Get the security-analysis state directory (~/.omp/security). */
+/** Get the security-analysis state directory (~/.omsp/security). */
 export function getSecurityDir(): string {
 	return dirs.rootSubdir("security", "state");
 }
 
-/** Get one project's security-analysis state directory (~/.omp/security/<project-key>). */
+/** Get one project's security-analysis state directory (~/.omsp/security/<project-key>). */
 export function getSecurityProjectDir(projectKey: string): string {
 	return path.join(getSecurityDir(), projectKey);
 }
 
 // =============================================================================
-// Agent subdirectories (~/.omp/agent/*)
+// Agent subdirectories (~/.omsp/agent/*)
 // =============================================================================
 
 /** Get the path to agent.db (SQLite database for settings and auth storage). */
@@ -947,7 +909,7 @@ export function getAgentDbPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "agent.db", "data");
 }
 
-/** Get the last-seen-changelog-version marker file (~/.omp/agent/last-changelog-version). */
+/** Get the last-seen-changelog-version marker file (~/.omsp/agent/last-changelog-version). */
 export function getLastChangelogVersionPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "last-changelog-version", "state");
 }
@@ -962,24 +924,24 @@ export function getModelDbPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "models.db", "data");
 }
 
-/** Get the tiny title model cache directory (~/.omp/agent/cache/tiny-models). */
+/** Get the tiny title model cache directory (~/.omsp/agent/cache/tiny-models). */
 export function getTinyModelsCacheDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, path.join("cache", "tiny-models"), "cache");
 }
 
-/** Get the document conversion cache directory (~/.omp/agent/cache/document-conversions; XDG default: $XDG_CACHE_HOME/omp/cache/document-conversions). */
+/** Get the document conversion cache directory (~/.omsp/agent/cache/document-conversions; XDG default: $XDG_CACHE_HOME/omsp/cache/document-conversions). */
 export function getDocumentConversionCacheDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, path.join("cache", "document-conversions"), "cache");
 }
-/** Get the composer speculative cache database (~/.omp/agent/cache/composer.db; XDG default: $XDG_CACHE_HOME/omp/cache/composer.db). */
+/** Get the composer speculative cache database (~/.omsp/agent/cache/composer.db; XDG default: $XDG_CACHE_HOME/omsp/cache/composer.db). */
 export function getComposerCacheDbPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, path.join("cache", "composer.db"), "cache");
 }
-/** Get the skill descriptions database (~/.omp/agent/skill-descriptions.db; XDG default: $XDG_DATA_HOME/omp/skill-descriptions.db). */
+/** Get the skill descriptions database (~/.omsp/agent/skill-descriptions.db; XDG default: $XDG_DATA_HOME/omsp/skill-descriptions.db). */
 export function getSkillDescriptionsDbPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "skill-descriptions.db", "data");
 }
-/** Get the text-predict engine state directory (~/.omp/agent/predict/<method>; XDG default: $XDG_DATA_HOME/omp/predict/<method>). Adopts legacy engine state on first XDG resolution. */
+/** Get the text-predict engine state directory (~/.omsp/agent/predict/<method>; XDG default: $XDG_DATA_HOME/omsp/predict/<method>). Adopts legacy engine state on first XDG resolution. */
 export function getPredictStateDir(agentDir: string | undefined, method: string): string {
 	const subdir = path.join("predict", method);
 	const stateDir = dirs.agentSubdir(agentDir, subdir, "data");
@@ -987,54 +949,54 @@ export function getPredictStateDir(agentDir: string | undefined, method: string)
 	return stateDir;
 }
 
-/** Get the sessions directory (~/.omp/agent/sessions). */
+/** Get the sessions directory (~/.omsp/agent/sessions). */
 export function getSessionsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "sessions", "data");
 }
 
-/** Get the content-addressed blob store directory (~/.omp/agent/blobs). */
+/** Get the content-addressed blob store directory (~/.omsp/agent/blobs). */
 export function getBlobsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "blobs", "data");
 }
 
-/** Get the custom themes directory (~/.omp/agent/themes). */
+/** Get the custom themes directory (~/.omsp/agent/themes). */
 export function getCustomThemesDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "themes");
 }
 
-/** Get the tools directory (~/.omp/agent/tools). */
+/** Get the tools directory (~/.omsp/agent/tools). */
 export function getToolsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "tools");
 }
 
-/** Get the slash commands directory (~/.omp/agent/commands). */
+/** Get the slash commands directory (~/.omsp/agent/commands). */
 export function getCommandsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "commands");
 }
 
-/** Get the prompts directory (~/.omp/agent/prompts). */
+/** Get the prompts directory (~/.omsp/agent/prompts). */
 export function getPromptsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "prompts");
 }
 
-/** Get the user-level Python modules directory (~/.omp/agent/modules). */
+/** Get the user-level Python modules directory (~/.omsp/agent/modules). */
 export function getAgentModulesDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "modules");
 }
 
-/** Get the memories directory (~/.omp/agent/memories). */
+/** Get the memories directory (~/.omsp/agent/memories). */
 export function getMemoriesDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "memories", "state");
 }
 
-/** Get the terminal sessions directory (~/.omp/agent/terminal-sessions). */
+/** Get the terminal sessions directory (~/.omsp/agent/terminal-sessions). */
 export function getTerminalSessionsDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "terminal-sessions", "state");
 }
 
 /**
  * Get the persistent registry of custom session files
- * (~/.omp/agent/custom-session-files). Each `--session-dir`/`--session`
+ * (~/.omsp/agent/custom-session-files). Each `--session-dir`/`--session`
  * transcript is recorded here as one marker file so storage GC can scan its
  * exact path after its terminal breadcrumb is overwritten by a later session.
  */
@@ -1042,12 +1004,12 @@ export function getCustomSessionFilesDir(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, "custom-session-files", "state");
 }
 
-/** Get the crash log path (~/.omp/agent/omp-crash.log). */
+/** Get the crash log path (~/.omsp/agent/omsp-crash.log). */
 export function getCrashLogPath(agentDir?: string): string {
-	return dirs.agentSubdir(agentDir, "omp-crash.log", "state");
+	return dirs.agentSubdir(agentDir, "omsp-crash.log", "state");
 }
 
-/** Get the debug log path (~/.omp/agent/omp-debug.log). */
+/** Get the debug log path (~/.omsp/agent/omsp-debug.log). */
 export function getDebugLogPath(agentDir?: string): string {
 	return dirs.agentSubdir(agentDir, `${APP_NAME}-debug.log`, "state");
 }
@@ -1056,7 +1018,7 @@ export function getDebugLogPath(agentDir?: string): string {
  * Best-effort one-time copy of a legacy config-root file to its redirected XDG
  * location. Existing installs that enable XDG after the file was created keep
  * their data (e.g. a placeholder key whose loss would break deobfuscation of
- * persisted transcripts). The legacy file is left in place for older omp
+ * persisted transcripts). The legacy file is left in place for older omsp
  * versions sharing the profile.
  */
 function adoptLegacyFile(legacyPath: string, targetPath: string): void {
@@ -1076,7 +1038,7 @@ function adoptLegacyFile(legacyPath: string, targetPath: string): void {
  * location, so learned state survives enabling XDG. The copy is staged next to
  * the target and renamed into place, so a reader never sees a partial tree and
  * a concurrent adopter cannot clobber a finished one. The legacy directory is
- * left in place for older omp versions sharing the profile.
+ * left in place for older omsp versions sharing the profile.
  */
 function adoptLegacyDir(legacyPath: string, targetPath: string): void {
 	if (targetPath === legacyPath) return;
@@ -1094,35 +1056,35 @@ function adoptLegacyDir(legacyPath: string, targetPath: string): void {
 	}
 }
 
-/** Get the secret placeholder key path (~/.omp/agent/secret-placeholder.key; XDG default: $XDG_STATE_HOME/omp/secret-placeholder.key). Adopts a legacy key on first XDG resolution. */
+/** Get the secret placeholder key path (~/.omsp/agent/secret-placeholder.key; XDG default: $XDG_STATE_HOME/omsp/secret-placeholder.key). Adopts a legacy key on first XDG resolution. */
 export function getSecretPlaceholderKeyPath(): string {
 	const keyPath = dirs.agentSubdir(undefined, "secret-placeholder.key", "state");
 	adoptLegacyFile(path.join(dirs.agentDir, "secret-placeholder.key"), keyPath);
 	return keyPath;
 }
 
-/** Directory holding the per-model tiny-worker sockets and logs (~/.omp/run/tiny; XDG default: $XDG_STATE_HOME/omp/run/tiny). */
+/** Directory holding the per-model tiny-worker sockets and logs (~/.omsp/run/tiny; XDG default: $XDG_STATE_HOME/omsp/run/tiny). */
 export function getTinyWorkerRuntimeDir(): string {
 	return dirs.rootSubdir(path.join("run", "tiny"), "state");
 }
 
-/** Directory holding the per-model mnemopi embedding server endpoints and logs (~/.omp/run/mnemopi; XDG default: $XDG_STATE_HOME/omp/run/mnemopi). */
+/** Directory holding the per-model mnemopi embedding server endpoints and logs (~/.omsp/run/mnemopi; XDG default: $XDG_STATE_HOME/omsp/run/mnemopi). */
 export function getMnemopiEmbedRuntimeDir(): string {
 	return dirs.rootSubdir(path.join("run", "mnemopi"), "state");
 }
 
-/** Root directory containing every per-project daemon runtime scope (~/.omp/run/daemons; XDG default: $XDG_STATE_HOME/omp/run/daemons). */
+/** Root directory containing every per-project daemon runtime scope (~/.omsp/run/daemons; XDG default: $XDG_STATE_HOME/omsp/run/daemons). */
 export function getDaemonRuntimeRoot(): string {
 	return dirs.rootSubdir(path.join("run", "daemons"), "state");
 }
 
-/** Get the daemon runtime directory for a project (~/.omp/run/daemons/<hash>; XDG default: $XDG_STATE_HOME/omp/run/daemons/<hash>). */
+/** Get the daemon runtime directory for a project (~/.omsp/run/daemons/<hash>; XDG default: $XDG_STATE_HOME/omsp/run/daemons/<hash>). */
 export function getDaemonRuntimeDir(projectDir: string): string {
 	const key = Bun.hash.wyhash(path.resolve(projectDir)).toString(16).padStart(16, "0");
 	return path.join(getDaemonRuntimeRoot(), key);
 }
 
-/** Root directory containing every machine-global daemon service scope (~/.omp/run/daemons/global; XDG default: $XDG_STATE_HOME/omp/run/daemons/global). Shared across profiles. */
+/** Root directory containing every machine-global daemon service scope (~/.omsp/run/daemons/global; XDG default: $XDG_STATE_HOME/omsp/run/daemons/global). Shared across profiles. */
 export function getGlobalDaemonRuntimeRoot(): string {
 	return dirs.baseRootSubdir(path.join("run", "daemons", "global"), "state");
 }
@@ -1136,20 +1098,20 @@ export function getGlobalDaemonRuntimeDir(service: string): string {
 }
 
 /**
- * Directory naming session ownership leases (~/.omp/run/session-owners; XDG
- * default: $XDG_STATE_HOME/omp/run/session-owners). Shared across profiles:
- * every omp process that opens a session must meet the same lease.
+ * Directory naming session ownership leases (~/.omsp/run/session-owners; XDG
+ * default: $XDG_STATE_HOME/omsp/run/session-owners). Shared across profiles:
+ * every omsp process that opens a session must meet the same lease.
  */
 export function getSessionOwnersDir(): string {
 	return dirs.baseRootSubdir(path.join("run", "session-owners"), "state");
 }
 
-/** Get the provider in-flight root directory (~/.omp/run/provider-inflight; XDG default: $XDG_STATE_HOME/omp/run/provider-inflight). */
+/** Get the provider in-flight root directory (~/.omsp/run/provider-inflight; XDG default: $XDG_STATE_HOME/omsp/run/provider-inflight). */
 export function getProviderInFlightRoot(): string {
 	return dirs.rootSubdir(path.join("run", "provider-inflight"), "state");
 }
 
-/** Get the marketplaces registry path (~/.omp/marketplaces.json; XDG default: $XDG_DATA_HOME/omp/marketplaces.json). Adopts a legacy registry on first XDG resolution. */
+/** Get the marketplaces registry path (~/.omsp/marketplaces.json; XDG default: $XDG_DATA_HOME/omsp/marketplaces.json). Adopts a legacy registry on first XDG resolution. */
 export function getMarketplacesRegistryPath(): string {
 	const registryPath = dirs.rootSubdir("marketplaces.json", "data");
 	adoptLegacyFile(path.join(dirs.configRoot, "marketplaces.json"), registryPath);
@@ -1157,20 +1119,20 @@ export function getMarketplacesRegistryPath(): string {
 }
 
 // =============================================================================
-// Project subdirectories (.omp/*)
+// Project subdirectories (.omsp/*)
 // =============================================================================
 
-/** Get the project-level Python modules directory (.omp/modules). */
+/** Get the project-level Python modules directory (.omsp/modules). */
 export function getProjectModulesDir(cwd: string = getProjectDir()): string {
 	return path.join(getProjectAgentDir(cwd), "modules");
 }
 
-/** Get the project-level prompts directory (.omp/prompts). */
+/** Get the project-level prompts directory (.omsp/prompts). */
 export function getProjectPromptsDir(cwd: string = getProjectDir()): string {
 	return path.join(getProjectAgentDir(cwd), "prompts");
 }
 
-/** Get the project-level plugin overrides path (.omp/plugin-overrides.json). */
+/** Get the project-level plugin overrides path (.omsp/plugin-overrides.json). */
 export function getProjectPluginOverridesPath(cwd: string = getProjectDir()): string {
 	return path.join(getProjectAgentDir(cwd), "plugin-overrides.json");
 }
@@ -1203,28 +1165,28 @@ let cachedInstallId: string | null = null;
 
 const INSTALL_ID_FILE = "install-id";
 /**
- * Application label for usage attribution (`OMP_APP_NAME`), defaulting to
- * `omp`. Embedders that drive omp programmatically (robomp, CI bots, …) set
+ * Application label for usage attribution (`OMSP_APP_NAME`), defaulting to
+ * `omsp`. Embedders that drive omsp programmatically (robomp, CI bots, …) set
  * the env var so broker-side per-client burn tracking can answer "what did
  * app X use" instead of folding everything into one install-wide bucket.
  */
 export function getAppName(): string {
-	const value = process.env.OMP_APP_NAME?.trim();
-	return value ? value : "omp";
+	const value = process.env.OMSP_APP_NAME?.trim();
+	return value ? value : "omsp";
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Persistent per-install UUID stored at `~/.omp/install-id`.
+ * Persistent per-install UUID stored at `~/.omsp/install-id`.
  *
  * Generated lazily on first call and persisted with `O_CREAT|O_EXCL` so
  * concurrent first-call races don't clobber each other (loser re-reads the
  * winner's id). Survives independently of agent state: deleting
- * `~/.omp/agent/` does not regenerate it. Auth-broker and gateway usage
+ * `~/.omsp/agent/` does not regenerate it. Auth-broker and gateway usage
  * attribution use this identity.
  *
- * Anchored to the base config root (`~/.omp/install-id`) regardless of the
+ * Anchored to the base config root (`~/.omsp/install-id`) regardless of the
  * active profile: install identity is per-install, not per-profile, so every
  * profile shares one id and the global cache stays correct no matter the
  * profile / `getInstallId` call order.

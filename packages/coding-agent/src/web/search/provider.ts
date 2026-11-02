@@ -1,4 +1,4 @@
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import type { SearchProvider } from "./providers/base";
 import { getSearchProviderLabel, type SearchEngineId, SearchProviderError } from "./types";
 

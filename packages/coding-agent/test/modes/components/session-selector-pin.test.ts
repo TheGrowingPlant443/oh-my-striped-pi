@@ -1,9 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
-import { getKeybindings, type KeybindingsManager as TuiKeybindingsManager, setKeybindings } from "@oh-my-pi/pi-tui";
-import { KeybindingsManager } from "@oh-my-pi/pi-tui/app-keybindings";
-import { SessionSelectorComponent } from "@oh-my-pi/pi-tui/overlays/session-selector";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import type { SessionInfo } from "@oh-my-pi/pi-coding-agent/session/session-listing";
+import {
+	getKeybindings,
+	type KeybindingsManager as TuiKeybindingsManager,
+	setKeybindings,
+} from "@oh-my-striped-pi/pi-tui";
+import { KeybindingsManager } from "@oh-my-striped-pi/pi-tui/app-keybindings";
+import { SessionSelectorComponent } from "@oh-my-striped-pi/pi-tui/overlays/session-selector";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import type { SessionInfo } from "@oh-my-striped-pi/pi-coding-agent/session/session-listing";
 
 const ALT_K = "\x1bk";
 const ALT_SHIFT_K = "\x1bK";

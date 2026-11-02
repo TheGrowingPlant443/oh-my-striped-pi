@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { Effort } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { resolvePrimaryModel, resolveSmolModel } from "@oh-my-pi/pi-coding-agent/commit/model-selection";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import { Effort } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { resolvePrimaryModel, resolveSmolModel } from "@oh-my-striped-pi/pi-coding-agent/commit/model-selection";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 
 function getModelOrThrow(id: string) {

@@ -4,10 +4,10 @@
  * transcript rows from persisted message entries; holding the row construction
  * here keeps the two byte-for-byte identical.
  */
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import { type Component } from "../tui";
-import { formatBytes, formatCount, formatDuration } from "@oh-my-pi/pi-utils";
+import { formatBytes, formatCount, formatDuration } from "@oh-my-striped-pi/pi-utils";
 import { span } from "../native/describe";
 import type { JobSnapshot } from "../tools/wait";
 import type { DaemonSnapshot } from "../tools/daemon";

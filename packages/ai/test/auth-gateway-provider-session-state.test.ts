@@ -13,18 +13,18 @@ import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearCustomApis } from "@oh-my-pi/pi-ai/api-registry";
+import { clearCustomApis } from "@oh-my-striped-pi/pi-ai/api-registry";
 import {
 	AUTH_GATEWAY_MAX_SESSION_STATES,
 	AuthGatewaySessionStateStore,
 	startAuthGateway,
-} from "@oh-my-pi/pi-ai/auth-gateway";
-import type { AuthGatewayServerHandle, AuthGatewaySessionStateRequest } from "@oh-my-pi/pi-ai/auth-gateway";
-import { AuthStorage } from "@oh-my-pi/pi-ai/auth-storage";
-import { ProviderHttpError } from "@oh-my-pi/pi-ai/error";
-import { createMockModel, registerMockApi } from "@oh-my-pi/pi-ai/providers/mock";
-import type { Api, Context, Model, ProviderSessionState } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+} from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import type { AuthGatewayServerHandle, AuthGatewaySessionStateRequest } from "@oh-my-striped-pi/pi-ai/auth-gateway";
+import { AuthStorage } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import { ProviderHttpError } from "@oh-my-striped-pi/pi-ai/error";
+import { createMockModel, registerMockApi } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import type { Api, Context, Model, ProviderSessionState } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import { withOfficialAnthropicEndpoint } from "./helpers";
 
 function makeAnthropicModel(baseUrl: string): Model<"anthropic-messages"> {

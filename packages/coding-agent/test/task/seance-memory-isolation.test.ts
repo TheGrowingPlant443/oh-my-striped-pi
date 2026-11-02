@@ -1,23 +1,23 @@
 import { afterEach, expect, it, vi } from "bun:test";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { hindsightBackend } from "@oh-my-pi/pi-coding-agent/hindsight/backend";
-import { HindsightApi } from "@oh-my-pi/pi-coding-agent/hindsight/client";
-import { loadHindsightConfig } from "@oh-my-pi/pi-coding-agent/hindsight/config";
-import { HindsightSessionState } from "@oh-my-pi/pi-coding-agent/hindsight/state";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { seanceIsolationOptions } from "@oh-my-pi/pi-coding-agent/task/seance-policy";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { hindsightBackend } from "@oh-my-striped-pi/pi-coding-agent/hindsight/backend";
+import { HindsightApi } from "@oh-my-striped-pi/pi-coding-agent/hindsight/client";
+import { loadHindsightConfig } from "@oh-my-striped-pi/pi-coding-agent/hindsight/config";
+import { HindsightSessionState } from "@oh-my-striped-pi/pi-coding-agent/hindsight/state";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { seanceIsolationOptions } from "@oh-my-striped-pi/pi-coding-agent/task/seance-policy";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 
 afterEach(() => {
 	vi.restoreAllMocks();
 });
 
 it("does not attach the live parent's Hindsight bank to an isolated historical session", async () => {
-	using dir = TempDir.createSync("@omp-seance-memory-isolation-");
+	using dir = TempDir.createSync("@omsp-seance-memory-isolation-");
 	const settings = Settings.isolated({
 		"memory.backend": "hindsight",
 		"hindsight.autoRetain": false,

@@ -2,8 +2,8 @@ import { afterAll, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { loadLegacyPiModule } from "@oh-my-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+import { loadLegacyPiModule } from "@oh-my-striped-pi/pi-coding-agent/extensibility/plugins/legacy-pi-compat";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 const tempRoots: string[] = [];
 
@@ -14,7 +14,7 @@ afterAll(async () => {
 });
 
 async function writePackage(files: Record<string, string>): Promise<string> {
-	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-cjs-classification-"));
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-cjs-classification-"));
 	tempRoots.push(dir);
 	for (const rel in files) {
 		const abs = path.join(dir, rel);

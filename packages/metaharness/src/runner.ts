@@ -2,12 +2,12 @@
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type GeneratedProvider, getBundledModel } from "@oh-my-pi/pi-catalog/models";
+import { type GeneratedProvider, getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 /**
- * Harbor benchmark runner for the local `omp` build.
+ * Harbor benchmark runner for the local `omsp` build.
  *
  * Orchestrates Harbor (`harbor run`) against any Harbor dataset (default
- * terminal-bench-2) using a custom agent (`agent/omp_local.py`) that installs
+ * terminal-bench-2) using a custom agent (`agent/omsp_local.py`) that installs
  * the working tree at /work/pi and routes all model auth through the host pm2
  * auth-gateway (no provider keys ever enter the task containers).
  *
@@ -28,27 +28,27 @@ const REPO_ROOT = path.resolve(import.meta.dir, "..", "..", "..");
 const PKG_DIR = path.resolve(import.meta.dir, "..");
 const AGENT_DIR = path.join(PKG_DIR, "agent");
 const CODING_AGENT_DIR = path.join(REPO_ROOT, "packages", "coding-agent");
-const AGENT_IMPORT_PATH = "omp_local:OmpLocal";
-const PI_UPSTREAM_IMPORT_PATH = "pi_upstream:PiUpstream";
+const AGENT_IMPORT_PATH = "omsp_local:OmpLocal";
+const OMSP_UPSTREAM_IMPORT_PATH = "pi_upstream:PiUpstream";
 /** Upstream `@earendil-works/pi-coding-agent` version pinned for `--agent pi`. */
-const PI_UPSTREAM_VERSION = "0.86.1";
-/** Agents this runner installs itself (config + secrets travel via `OMP_BENCH_*`). */
-const MANAGED_AGENTS: Record<string, true> = { omp: true, pi: true };
+const OMSP_UPSTREAM_VERSION = "0.86.1";
+/** Agents this runner installs itself (config + secrets travel via `OMSP_BENCH_*`). */
+const MANAGED_AGENTS: Record<string, true> = { omsp: true, pi: true };
 
-/** Container-side mount points for `--install source` (must match omp_local.py defaults). */
-const SOURCE_SRC_MOUNT = "/opt/omp/src";
-const SOURCE_BIN_MOUNT = "/opt/omp/bin";
+/** Container-side mount points for `--install source` (must match omsp_local.py defaults). */
+const SOURCE_SRC_MOUNT = "/opt/omsp/src";
+const SOURCE_BIN_MOUNT = "/opt/omsp/bin";
 
 /** Host address containers see on Apple Container's vmnet (bridge) network. */
 const VMNET_HOST_IP = "192.168.64.1";
-const DOCKER_GATEWAY_URL = "http://host.docker.internal:4000";
-const VMNET_GATEWAY_URL = `http://${VMNET_HOST_IP}:4000`;
+const DOCKER_GATEWAY_URL = "http://host.docker.internal:4001";
+const VMNET_GATEWAY_URL = `http://${VMNET_HOST_IP}:4001`;
 /**
- * Resolver injected into Apple Container runs (OMP_BENCH_CONTAINER_DNS overrides).
+ * Resolver injected into Apple Container runs (OMSP_BENCH_CONTAINER_DNS overrides).
  * The vmnet gateway resolver (192.168.64.1:53) is unreachable when VPN/DNS
  * agents on the host intercept port 53, so containers get an explicit one.
  */
-const CONTAINER_DNS = process.env.OMP_BENCH_CONTAINER_DNS || "1.1.1.1";
+const CONTAINER_DNS = process.env.OMSP_BENCH_CONTAINER_DNS || "1.1.1.1";
 
 export interface Config {
 	models: string[];
@@ -59,11 +59,11 @@ export interface Config {
 	include: string[];
 	exclude: string[];
 	thinking: string | null;
-	/** Extra args forwarded verbatim to the in-container omp CLI invocation (repeatable). */
+	/** Extra args forwarded verbatim to the in-container omsp CLI invocation (repeatable). */
 	agentArgs: string[];
-	/** omp tool allowlist (`--tools`); `null` keeps omp's default tool set. */
+	/** omsp tool allowlist (`--tools`); `null` keeps omsp's default tool set. */
 	tools: string[] | null;
-	/** Extra omp settings written into the container config (dotted key → JSON value). */
+	/** Extra omsp settings written into the container config (dotted key → JSON value). */
 	settings: Record<string, unknown>;
 
 	agent: string;
@@ -111,7 +111,7 @@ function defaultConfig(): Config {
 		tools: null,
 		settings: {},
 
-		agent: "omp",
+		agent: "omsp",
 		install: "source",
 		version: null,
 		tarball: null,
@@ -140,7 +140,7 @@ function defaultConfig(): Config {
 	};
 }
 
-const HELP = `metaharness runner (local omp)
+const HELP = `metaharness runner (local omsp)
 
 Usage: metaharness harbor [options] [-- <extra harbor args>]
 
@@ -149,20 +149,20 @@ Commands:
 
 Model / agent:
   -m, --model <provider/model>   Model (repeatable). Default anthropic/claude-sonnet-4-6
-      --agent <name>             omp (default) | oracle | nop | any harbor agent
-      --install <source|local|published> omp install mode (default: source).
+      --agent <name>             omsp (default) | oracle | nop | any harbor agent
+      --install <source|local|published> omsp install mode (default: source).
                                  source = mount /work/pi read-only + prebuilt linux deps tree; TS changes
                                  apply per-trial with no rebuild. local = pack a tarball. published = npm.
-      --version <v>              omp version for published install (default: latest)
+      --version <v>              omsp version for published install (default: latest)
       --thinking <level>         off|minimal|low|medium|high|xhigh|max
 
-      --tarball <path>           Reuse a prebuilt omp tarball (implies --install local, --no-build)
+      --tarball <path>           Reuse a prebuilt omsp tarball (implies --install local, --no-build)
       --no-build                 Skip packing; reuse newest tarball in bench dir (--install local)
-      --agent-arg <arg>          Extra arg forwarded verbatim to the in-container omp CLI (repeatable)
-      --tools <a,b,c>            omp tool allowlist; enables the find tool when listed
-      --setting <key=value>      omp setting for the container config, e.g. edit.mode=sloppy (repeatable; JSON values)
-      --env <KEY[=VALUE]>        Forward env into omp container (repeatable).
-                                 KEY alone forwards host value; host PI_* auto-forwarded.
+      --agent-arg <arg>          Extra arg forwarded verbatim to the in-container omsp CLI (repeatable)
+      --tools <a,b,c>            omsp tool allowlist; enables the find tool when listed
+      --setting <key=value>      omsp setting for the container config, e.g. edit.mode=sloppy (repeatable; JSON values)
+      --env <KEY[=VALUE]>        Forward env into omsp container (repeatable).
+                                 KEY alone forwards host value; host OMSP_* auto-forwarded.
 
 Dataset / scale:
   -l, --tasks <N>                Max tasks (default 20)
@@ -173,11 +173,11 @@ Dataset / scale:
   -d, --dataset <name@ver>       Default terminal-bench@2.0
 
 Gateway (auth, no keys in container):
-      --gateway-url <url>        Default http://host.docker.internal:4000
+      --gateway-url <url>        Default http://host.docker.internal:4001
       --gateway-token <tok>      Default "no-auth" (gateway runs --no-auth)
       --providers <csv>          Providers to route (default: model provider + anthropic,openai-codex)
       --no-gateway               Pass host provider API keys into containers instead
-      --web-search               Enable omp web_search (off by default; can't auth via gateway)
+      --web-search               Enable omsp web_search (off by default; can't auth via gateway)
       --allow-host <host>        harbor --allow-agent-host (repeatable)
 
 Environment:
@@ -607,7 +607,7 @@ function probeLine(line: string, probe: CostProbe): void {
 
 /**
  * Realtime usage for a still-running trial, read incrementally from its
- * `agent/omp.txt` JSONL. Only bytes appended since the previous call are read
+ * `agent/omsp.txt` JSONL. Only bytes appended since the previous call are read
  * and parsed — both this runner's render loop and the manager's 2s sync tick
  * call this for every live trial, and a full-file reread used to block the
  * event loop for seconds (and OOM outright on runaway multi-GB transcripts).
@@ -681,8 +681,8 @@ function parseTrial(dir: string, name: string): Trial | null {
 			/* ignore */
 		}
 
-		// Realtime cost from the live agent omp.txt log, parsed incrementally.
-		const probe = probeTrialCost(path.join(dir, "agent", "omp.txt"));
+		// Realtime cost from the live agent omsp.txt log, parsed incrementally.
+		const probe = probeTrialCost(path.join(dir, "agent", "omsp.txt"));
 		const costUsd = probe?.costUsd ?? 0;
 		const tokIn = probe?.tokIn ?? 0;
 		const tokOut = probe?.tokOut ?? 0;
@@ -701,7 +701,7 @@ function parseTrial(dir: string, name: string): Trial | null {
 		};
 	}
 	// Trial finished: usage now comes from result.json; drop the live-parse state.
-	costProbes.delete(path.join(dir, "agent", "omp.txt"));
+	costProbes.delete(path.join(dir, "agent", "omsp.txt"));
 	const raw = readJson(resultPath);
 	if (!raw || typeof raw !== "object") return null;
 	const r = raw as Record<string, unknown>;
@@ -959,7 +959,7 @@ function writeReport(st: RenderState, benchDir: string, exitCode: number): strin
 	const tot = aggregate(trials, readJobResult(st.jobDir), st.expected);
 	const successPct = tot.done > 0 ? (tot.pass / tot.done) * 100 : 0;
 	const lines: string[] = [];
-	const isOmp = st.cfg.agent === "omp";
+	const isOmp = st.cfg.agent === "omsp";
 	const argsLabel = agentArgsLabel(st.cfg);
 	const baseModelLine = st.cfg.models.join(", ");
 	const modelLine = argsLabel ? `${baseModelLine} (${argsLabel})` : baseModelLine;
@@ -1020,7 +1020,7 @@ function readPkgVersion(): string {
 }
 
 function buildTarball(benchDir: string): string {
-	process.stdout.write(dim("packing local omp (bun pm pack)…\n"));
+	process.stdout.write(dim("packing local omsp (bun pm pack)…\n"));
 	const r = spawnSync("bun", ["pm", "pack", "--destination", benchDir], {
 		cwd: CODING_AGENT_DIR,
 		encoding: "utf8",
@@ -1054,7 +1054,7 @@ function newestTarball(benchDir: string): string | null {
 
 // ─────────────────────────────────────────────────────── source mount (--install source)
 
-/** Linux deps tree + mount plan for running omp straight from the mounted repo. */
+/** Linux deps tree + mount plan for running omsp straight from the mounted repo. */
 export interface SourceMount {
 	arch: "arm64" | "x64";
 	/** Host dir holding the linux `bin/bun` + skeleton `node_modules` trees. */
@@ -1227,7 +1227,7 @@ function writeComposeOverlay(benchDir: string, cfg: Config, source: SourceMount 
 		lines.push(`      - ${path.join(source.depsDir, "bin")}:${SOURCE_BIN_MOUNT}:ro`);
 	}
 	if (lines.length === 0) return null;
-	const file = path.join(benchDir, "omp-compose-overlay.yaml");
+	const file = path.join(benchDir, "omsp-compose-overlay.yaml");
 	fs.writeFileSync(file, `${["services:", "  main:", ...lines].join("\n")}\n`);
 	return file;
 }
@@ -1255,12 +1255,12 @@ function buildMountsJson(source: SourceMount | null): string | null {
 }
 
 /** Neutralized upstream system prompt template uploaded into `pi` trials (see pi_upstream.py). */
-const PI_UPSTREAM_SYSTEM_PROMPT = path.join(AGENT_DIR, "pi-upstream-system.md");
+const OMSP_UPSTREAM_SYSTEM_PROMPT = path.join(AGENT_DIR, "pi-upstream-system.md");
 
 /**
  * Catalog facts for each `provider/model` the upstream agent needs in its
  * `models.json`: wire api, limits, modalities and cost, so its usage accounting
- * matches omp's for the same model.
+ * matches omsp's for the same model.
  */
 function upstreamModelSpecs(cfg: Config): Array<Record<string, unknown>> {
 	return cfg.models.map(spec => {
@@ -1390,8 +1390,8 @@ function buildHarborArgs(
 	if (mountsJson) a.push("--mounts", mountsJson);
 
 	if (MANAGED_AGENTS[cfg.agent]) {
-		// Config + secrets travel via env (OMP_BENCH_*); the agent reads os.environ.
-		a.push("--agent-import-path", cfg.agent === "pi" ? PI_UPSTREAM_IMPORT_PATH : AGENT_IMPORT_PATH);
+		// Config + secrets travel via env (OMSP_BENCH_*); the agent reads os.environ.
+		a.push("--agent-import-path", cfg.agent === "pi" ? OMSP_UPSTREAM_IMPORT_PATH : AGENT_IMPORT_PATH);
 		void modelsYaml;
 		void tarball;
 	} else {
@@ -1416,27 +1416,27 @@ export function buildResumeArgs(cfg: Config, jobDir: string): string[] {
 }
 
 const FORWARD_ENV_DENYLIST = new Set([
-	"PI_CODING_AGENT_DIR",
-	"PI_CONFIG_DIR",
-	"PI_PROFILE",
-	"PI_PACKAGE_DIR",
-	"PI_SESSION_FILE",
-	"PI_ARTIFACTS_DIR",
-	"PI_TOOL_BRIDGE_URL",
-	"PI_TOOL_BRIDGE_TOKEN",
-	"PI_TOOL_BRIDGE_SESSION",
-	"PI_EVAL_LOCAL_ROOTS",
+	"OMSP_CODING_AGENT_DIR",
+	"OMSP_CONFIG_DIR",
+	"OMSP_PROFILE",
+	"OMSP_PACKAGE_DIR",
+	"OMSP_SESSION_FILE",
+	"OMSP_ARTIFACTS_DIR",
+	"OMSP_TOOL_BRIDGE_URL",
+	"OMSP_TOOL_BRIDGE_TOKEN",
+	"OMSP_TOOL_BRIDGE_SESSION",
+	"OMSP_EVAL_LOCAL_ROOTS",
 ]);
 
 /**
- * Env vars injected into the in-container omp run: every host `PI_*` knob (minus
+ * Env vars injected into the in-container omsp run: every host `OMSP_*` knob (minus
  * container-hostile dir/profile/session keys) plus explicit `--env` entries,
  * which always win and bypass the denylist.
  */
 export function collectForwardEnv(cfg: Config): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const [k, v] of Object.entries(process.env)) {
-		if (v === undefined || !k.startsWith("PI_") || FORWARD_ENV_DENYLIST.has(k)) continue;
+		if (v === undefined || !k.startsWith("OMSP_") || FORWARD_ENV_DENYLIST.has(k)) continue;
 		out[k] = v;
 	}
 	for (const [k, v] of Object.entries(cfg.env)) out[k] = v;
@@ -1451,44 +1451,44 @@ export function buildHarborEnv(
 	source: SourceMount | null = null,
 ): Record<string, string> {
 	const env: Record<string, string> = { ...(process.env as Record<string, string>) };
-	// Drop any stale OMP_BENCH_FORWARD_ENV inherited from the caller's shell before
+	// Drop any stale OMSP_BENCH_FORWARD_ENV inherited from the caller's shell before
 	// the agent-type early return, so it never leaks (incl. into the dry-run dump).
-	delete env.OMP_BENCH_FORWARD_ENV;
+	delete env.OMSP_BENCH_FORWARD_ENV;
 	if (!MANAGED_AGENTS[cfg.agent]) return env;
 	const prepend = (k: string, v: string): void => {
 		env[k] = env[k] ? `${v}:${env[k]}` : v;
 	};
 	prepend("PYTHONPATH", AGENT_DIR);
 	if (cfg.agent === "pi") {
-		env.OMP_BENCH_PI_VERSION = cfg.version ?? PI_UPSTREAM_VERSION;
-		env.OMP_BENCH_PI_MODELS = JSON.stringify(upstreamModelSpecs(cfg));
-		env.OMP_BENCH_PI_SYSTEM_PROMPT = PI_UPSTREAM_SYSTEM_PROMPT;
+		env.OMSP_BENCH_OMSP_VERSION = cfg.version ?? OMSP_UPSTREAM_VERSION;
+		env.OMSP_BENCH_OMSP_MODELS = JSON.stringify(upstreamModelSpecs(cfg));
+		env.OMSP_BENCH_OMSP_SYSTEM_PROMPT = OMSP_UPSTREAM_SYSTEM_PROMPT;
 	}
-	env.OMP_BENCH_INSTALL = cfg.install;
-	env.OMP_BENCH_VERSION = cfg.version ?? version;
-	if (tarball) env.OMP_BENCH_TARBALL = tarball;
+	env.OMSP_BENCH_INSTALL = cfg.install;
+	env.OMSP_BENCH_VERSION = cfg.version ?? version;
+	if (tarball) env.OMSP_BENCH_TARBALL = tarball;
 	if (source) {
-		env.OMP_BENCH_SOURCE_DIR = SOURCE_SRC_MOUNT;
-		env.OMP_BENCH_SOURCE_BUN = `${SOURCE_BIN_MOUNT}/bun`;
-		env.OMP_BENCH_SOURCE_ARCH = source.arch;
+		env.OMSP_BENCH_SOURCE_DIR = SOURCE_SRC_MOUNT;
+		env.OMSP_BENCH_SOURCE_BUN = `${SOURCE_BIN_MOUNT}/bun`;
+		env.OMSP_BENCH_SOURCE_ARCH = source.arch;
 	}
-	if (cfg.binaryArm64) env.OMP_BENCH_BINARY_ARM64 = cfg.binaryArm64;
-	if (cfg.binaryX64) env.OMP_BENCH_BINARY_X64 = cfg.binaryX64;
-	if (cfg.thinking) env.OMP_BENCH_THINKING = cfg.thinking;
-	if (cfg.agentArgs.length > 0) env.OMP_BENCH_AGENT_ARGS = JSON.stringify(cfg.agentArgs);
-	if (cfg.tools) env.OMP_BENCH_TOOLS = cfg.tools.join(",");
-	if (Object.keys(cfg.settings).length > 0) env.OMP_BENCH_SETTINGS = JSON.stringify(cfg.settings);
-	if (cfg.webSearch) env.OMP_BENCH_WEB_SEARCH = "1";
-	env.OMP_BENCH_GATEWAY = cfg.gateway ? "1" : "0";
+	if (cfg.binaryArm64) env.OMSP_BENCH_BINARY_ARM64 = cfg.binaryArm64;
+	if (cfg.binaryX64) env.OMSP_BENCH_BINARY_X64 = cfg.binaryX64;
+	if (cfg.thinking) env.OMSP_BENCH_THINKING = cfg.thinking;
+	if (cfg.agentArgs.length > 0) env.OMSP_BENCH_AGENT_ARGS = JSON.stringify(cfg.agentArgs);
+	if (cfg.tools) env.OMSP_BENCH_TOOLS = cfg.tools.join(",");
+	if (Object.keys(cfg.settings).length > 0) env.OMSP_BENCH_SETTINGS = JSON.stringify(cfg.settings);
+	if (cfg.webSearch) env.OMSP_BENCH_WEB_SEARCH = "1";
+	env.OMSP_BENCH_GATEWAY = cfg.gateway ? "1" : "0";
 	if (cfg.gateway) {
-		env.OMP_BENCH_MODELS_YAML = modelsYaml;
-		env.OMP_BENCH_GATEWAY_URL = cfg.gatewayUrl;
-		env.OMP_BENCH_GATEWAY_TOKEN = cfg.gatewayToken;
-		env.OMP_BENCH_GATEWAY_PROVIDERS = deriveProviders(cfg).join(",");
+		env.OMSP_BENCH_MODELS_YAML = modelsYaml;
+		env.OMSP_BENCH_GATEWAY_URL = cfg.gatewayUrl;
+		env.OMSP_BENCH_GATEWAY_TOKEN = cfg.gatewayToken;
+		env.OMSP_BENCH_GATEWAY_PROVIDERS = deriveProviders(cfg).join(",");
 	}
-	if (cfg.envType === "apple-container") env.OMP_BENCH_CONTAINER_DNS = CONTAINER_DNS;
+	if (cfg.envType === "apple-container") env.OMSP_BENCH_CONTAINER_DNS = CONTAINER_DNS;
 	const forward = collectForwardEnv(cfg);
-	if (Object.keys(forward).length > 0) env.OMP_BENCH_FORWARD_ENV = JSON.stringify(forward);
+	if (Object.keys(forward).length > 0) env.OMSP_BENCH_FORWARD_ENV = JSON.stringify(forward);
 	return env;
 }
 
@@ -1612,7 +1612,7 @@ async function runBenchmark(cfg: Config): Promise<BenchmarkRun> {
 	if (!which("harbor")) {
 		throw new Error("harbor not found on PATH. Install with: uv tool install harbor");
 	}
-	if (cfg.agent === "omp" && cfg.envType === "docker" && !which("docker")) {
+	if (cfg.agent === "omsp" && cfg.envType === "docker" && !which("docker")) {
 		throw new Error("docker not found on PATH (required to run task containers).");
 	}
 	if (cfg.envType === "apple-container" && !which("container")) {
@@ -1635,7 +1635,7 @@ async function runBenchmark(cfg: Config): Promise<BenchmarkRun> {
 
 	// tarball (local install only)
 	let tarball: string | null = cfg.tarball;
-	if (cfg.agent === "omp" && cfg.install === "local" && !cfg.binaryArm64 && !cfg.binaryX64) {
+	if (cfg.agent === "omsp" && cfg.install === "local" && !cfg.binaryArm64 && !cfg.binaryX64) {
 		if (tarball) {
 			process.stdout.write(dim(`using tarball ${tarball}\n`));
 		} else if (cfg.build) {
@@ -1648,18 +1648,18 @@ async function runBenchmark(cfg: Config): Promise<BenchmarkRun> {
 
 	// source mount (default): repo bind-mounted read-only + cached linux deps tree
 	let source: SourceMount | null = null;
-	if (cfg.agent === "omp" && cfg.install === "source" && !cfg.binaryArm64 && !cfg.binaryX64) {
+	if (cfg.agent === "omsp" && cfg.install === "source" && !cfg.binaryArm64 && !cfg.binaryX64) {
 		source = prepareSourceDeps(cfg);
 	}
 
 	// models.yml (gateway)
 	let modelsYaml = "";
-	if (cfg.agent === "omp" && cfg.gateway) {
+	if (cfg.agent === "omsp" && cfg.gateway) {
 		modelsYaml = writeModelsYaml(benchDir, cfg);
 		if (!gatewayHealthOk(cfg.gatewayUrl)) {
 			process.stderr.write(
 				yellow(
-					`warning: gateway ${cfg.gatewayUrl} health check failed (continuing). Is the pm2 'omp-auth-gateway' running?\n`,
+					`warning: gateway ${cfg.gatewayUrl} health check failed (continuing). Is the pm2 'omsp-auth-gateway' running?\n`,
 				),
 			);
 		}
@@ -1679,17 +1679,18 @@ async function runBenchmark(cfg: Config): Promise<BenchmarkRun> {
 			process.stdout.write(bold("models.yml:\n"));
 			process.stdout.write(`${fs.readFileSync(modelsYaml, "utf8")}\n`);
 		}
-		process.stdout.write(bold("omp env:\n"));
+		process.stdout.write(bold("omsp env:\n"));
 		for (const key in harborEnv) {
-			if (key === "OMP_BENCH_FORWARD_ENV") continue;
-			if (key.startsWith("OMP_BENCH_") || key === "PYTHONPATH") process.stdout.write(`  ${key}=${harborEnv[key]}\n`);
+			if (key === "OMSP_BENCH_FORWARD_ENV") continue;
+			if (key.startsWith("OMSP_BENCH_") || key === "PYTHONPATH")
+				process.stdout.write(`  ${key}=${harborEnv[key]}\n`);
 		}
-		if (harborEnv.OMP_BENCH_FORWARD_ENV) {
-			const parsedForwardEnv: unknown = JSON.parse(harborEnv.OMP_BENCH_FORWARD_ENV);
+		if (harborEnv.OMSP_BENCH_FORWARD_ENV) {
+			const parsedForwardEnv: unknown = JSON.parse(harborEnv.OMSP_BENCH_FORWARD_ENV);
 			if (parsedForwardEnv !== null && typeof parsedForwardEnv === "object" && !Array.isArray(parsedForwardEnv)) {
 				const keys: string[] = [];
 				for (const key in parsedForwardEnv) keys.push(key);
-				process.stdout.write(`  OMP_BENCH_FORWARD_ENV=${keys.join(",")} (values hidden)\n`);
+				process.stdout.write(`  OMSP_BENCH_FORWARD_ENV=${keys.join(",")} (values hidden)\n`);
 			}
 		}
 		process.stdout.write(`\njob dir: ${jobDir}\nbench dir: ${benchDir}\n`);

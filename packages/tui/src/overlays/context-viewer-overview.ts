@@ -2,8 +2,8 @@
  * Overview model: usage attribution, legend rows, and the occupancy map. Legend and
  * map rows have an ANSI form (`render`) and a native form (`describe`); keep the twins visually identical.
  */
-import { formatNumber } from "@oh-my-pi/pi-utils";
-import type { TspSpan } from "@oh-my-pi/pi-wire";
+import { formatNumber } from "@oh-my-striped-pi/pi-utils";
+import type { TspSpan } from "@oh-my-striped-pi/pi-wire";
 import type { ContextBreakdown } from "../status-line/context-usage";
 import { type ContextMapCell, planContextMap } from "../chrome/context-map";
 import { CONTEXT_PRESENTATION, type ContextPresentationId } from "../chrome/context-presentation";
@@ -350,14 +350,14 @@ export function describeContextMeter(breakdown: ContextMeterData): [NativeNode, 
 	const labels = contextUsageSummary(breakdown);
 	const summary = node(
 		"row",
-		{ role: "omp.context.summary", align: "baseline", wrap: true },
+		{ role: "omsp.context.summary", align: "baseline", wrap: true },
 		[
 			text([span(labels.used, "strong"), span(labels.detail, "dim")], {
-				role: "omp.context.used",
+				role: "omsp.context.used",
 				grow: 1,
 				wrap: "none",
 			}),
-			text(labels.room, { role: "omp.context.room", wrap: "none" }),
+			text(labels.room, { role: "omsp.context.room", wrap: "none" }),
 		],
 		"summary",
 	);

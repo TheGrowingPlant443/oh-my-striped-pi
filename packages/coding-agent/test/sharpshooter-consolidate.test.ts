@@ -1,25 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import * as ai from "@oh-my-pi/pi-ai";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	renderSharpshooterSessions,
 	runSharpshooterConsolidation,
-} from "@oh-my-pi/pi-coding-agent/sharpshooter/consolidate";
+} from "@oh-my-striped-pi/pi-coding-agent/sharpshooter/consolidate";
 import {
 	readSharpshooterState,
 	sharpshooterBankDir,
 	sharpshooterMemoryFilePath,
 	writeSharpshooterState,
-} from "@oh-my-pi/pi-coding-agent/sharpshooter/paths";
+} from "@oh-my-striped-pi/pi-coding-agent/sharpshooter/paths";
 import {
 	appendSharpshooterDelta,
 	listSharpshooterDeltas,
 	type SharpshooterSessionDeltas,
-} from "@oh-my-pi/pi-coding-agent/sharpshooter/queue";
-import type { SharpshooterDelta } from "@oh-my-pi/pi-coding-agent/sharpshooter/types";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/sharpshooter/queue";
+import type { SharpshooterDelta } from "@oh-my-striped-pi/pi-coding-agent/sharpshooter/types";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createInMemoryAuthStorage } from "./helpers/agent-session-setup";
 import { getTestModel } from "./helpers/model-fixtures";
 

@@ -2,16 +2,19 @@ import { afterEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { RpcClient } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-client";
-import { RpcDictationBridge, type RpcDictationController } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-dictation";
-import type { RpcDictationFrame } from "@oh-my-pi/pi-coding-agent/modes/rpc/rpc-types";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import * as asr from "@oh-my-pi/pi-coding-agent/stt/asr-client";
-import * as downloader from "@oh-my-pi/pi-coding-agent/stt/downloader";
-import { STTController, type SttCallbacks, type SttState, type SttTarget } from "@oh-my-pi/pi-coding-agent/stt";
-import { readLines, removeWithRetries } from "@oh-my-pi/pi-utils";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { RpcClient } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-client";
+import {
+	RpcDictationBridge,
+	type RpcDictationController,
+} from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-dictation";
+import type { RpcDictationFrame } from "@oh-my-striped-pi/pi-coding-agent/modes/rpc/rpc-types";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import * as asr from "@oh-my-striped-pi/pi-coding-agent/stt/asr-client";
+import * as downloader from "@oh-my-striped-pi/pi-coding-agent/stt/downloader";
+import { STTController, type SttCallbacks, type SttState, type SttTarget } from "@oh-my-striped-pi/pi-coding-agent/stt";
+import { readLines, removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 class FakeController implements RpcDictationController {
 	state: SttState = "idle";
@@ -259,13 +262,13 @@ describe("RpcDictationBridge", () => {
 });
 
 async function rpcHarness(options: { slow?: boolean; fail?: boolean; failDispose?: boolean; disabled?: boolean } = {}) {
-	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-dictation-"));
+	const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-dictation-"));
 	const child = Bun.spawn([process.execPath, path.join(import.meta.dir, "fixtures", "dictation-rpc-agent.ts")], {
 		cwd: dir,
 		env: {
 			...process.env,
-			PI_CODING_AGENT_DIR: dir,
-			PI_NO_TITLE: "1",
+			OMSP_CODING_AGENT_DIR: dir,
+			OMSP_NO_TITLE: "1",
 			RPC_SLOW_DICTATION: options.slow ? "1" : "",
 			RPC_FAIL_DICTATION: options.fail ? "1" : "",
 			RPC_FAIL_DICTATION_DISPOSE: options.failDispose ? "1" : "",
@@ -569,11 +572,11 @@ describe("dictation over RPC", () => {
 	}, 60_000);
 
 	test("typed client sends commands and dispatches subscribed frames", async () => {
-		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-rpc-dictation-client-"));
+		const dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-rpc-dictation-client-"));
 		using client = new RpcClient({
 			command: [process.execPath, path.join(import.meta.dir, "fixtures", "dictation-rpc-agent.ts")],
 			cwd: dir,
-			env: { PI_CODING_AGENT_DIR: dir, PI_NO_TITLE: "1", RPC_SLOW_DICTATION: "" },
+			env: { OMSP_CODING_AGENT_DIR: dir, OMSP_NO_TITLE: "1", RPC_SLOW_DICTATION: "" },
 		});
 		try {
 			const frames: RpcDictationFrame[] = [];

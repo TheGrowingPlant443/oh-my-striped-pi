@@ -12,15 +12,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import * as mcpClient from "@oh-my-pi/pi-coding-agent/mcp/client";
-import * as oauthDiscovery from "@oh-my-pi/pi-coding-agent/mcp/oauth-discovery";
-import * as oauthFlow from "@oh-my-pi/pi-coding-agent/mcp/oauth-flow";
-import * as openUtil from "@oh-my-pi/pi-coding-agent/utils/open";
-import { handleMcpAcp } from "@oh-my-pi/pi-coding-agent/slash-commands/helpers/mcp";
-import type { ParsedSlashCommand, SlashCommandRuntime } from "@oh-my-pi/pi-coding-agent/slash-commands/types";
-import { cfgMcpEnableProjectConfig } from "@oh-my-pi/pi-coding-agent/mcp/settings";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import * as mcpClient from "@oh-my-striped-pi/pi-coding-agent/mcp/client";
+import * as oauthDiscovery from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-discovery";
+import * as oauthFlow from "@oh-my-striped-pi/pi-coding-agent/mcp/oauth-flow";
+import * as openUtil from "@oh-my-striped-pi/pi-coding-agent/utils/open";
+import { handleMcpAcp } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/helpers/mcp";
+import type { ParsedSlashCommand, SlashCommandRuntime } from "@oh-my-striped-pi/pi-coding-agent/slash-commands/types";
+import { cfgMcpEnableProjectConfig } from "@oh-my-striped-pi/pi-coding-agent/mcp/settings";
 import {
 	getConfigRootDir,
 	getMCPConfigPath,
@@ -28,7 +28,7 @@ import {
 	removeWithRetries,
 	setAgentDir,
 	setProjectDir,
-} from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-utils";
 
 const RAW_SERVER_URL = `https://\${MCP_HOST}/mcp`;
 const EXPANDED_SERVER_URL = "https://mcp.example.com/mcp";
@@ -48,7 +48,7 @@ type SavedServer = {
 };
 
 const originalProjectDir = getProjectDir();
-const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
 const fallbackAgentDir = path.join(getConfigRootDir(), "agent");
 
 function restoreEnvValue(name: string, value: string | undefined): void {
@@ -166,8 +166,8 @@ describe("/mcp reauth (ACP dispatcher)", () => {
 	beforeEach(async () => {
 		outputs.length = 0;
 		outputWaiters.length = 0;
-		projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-reauth-acp-project-"));
-		agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-mcp-reauth-acp-agent-"));
+		projectDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-reauth-acp-project-"));
+		agentDir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-mcp-reauth-acp-agent-"));
 		configPath = getMCPConfigPath("project", projectDir);
 		originalMcpHost = Bun.env.MCP_HOST;
 		Bun.env.MCP_HOST = "mcp.example.com";
@@ -187,7 +187,7 @@ describe("/mcp reauth (ACP dispatcher)", () => {
 			setAgentDir(originalAgentDir);
 		} else {
 			setAgentDir(fallbackAgentDir);
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		}
 		await removeWithRetries(projectDir);
 		await removeWithRetries(agentDir);

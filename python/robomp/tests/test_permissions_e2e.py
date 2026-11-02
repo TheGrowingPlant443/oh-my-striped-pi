@@ -28,7 +28,7 @@ pytestmark = pytest.mark.skipif(
 
 _SLOT_ONE = 2001
 _SLOT_TWO = 2002
-_SHARED_OMP_GID = 2000
+_SHARED_OMSP_GID = 2000
 _AUTHOR_NAME = "robomp-bot"
 _AUTHOR_EMAIL = "robomp-bot@example.invalid"
 _REPO = "octo/permission-e2e"
@@ -36,7 +36,7 @@ _REPO = "octo/permission-e2e"
 
 def _require_linux_root_toolchain() -> None:
     if platform.system() != "Linux" or os.geteuid() != 0:
-        pytest.skip("slot permission e2e tests require Linux root so subprocesses can drop to omp-N UIDs")
+        pytest.skip("slot permission e2e tests require Linux root so subprocesses can drop to omsp-N UIDs")
     missing = [cmd for cmd in ("git", "bun", "cargo", "python3") if shutil.which(cmd) is None]
     if missing:
         pytest.skip(f"slot permission e2e tests require tools on PATH: {', '.join(missing)}")
@@ -107,16 +107,16 @@ def slot_tmp_path() -> Iterator[Path]:
 def _share_tree_with_slots(path: Path) -> None:
     for root, dirs, files in os.walk(path):
         root_path = Path(root)
-        os.chown(root_path, 0, _SHARED_OMP_GID)
+        os.chown(root_path, 0, _SHARED_OMSP_GID)
         root_path.chmod(0o2770)
         for dirname in dirs:
             child = root_path / dirname
-            os.chown(child, 0, _SHARED_OMP_GID)
+            os.chown(child, 0, _SHARED_OMSP_GID)
             child.chmod(0o2770)
         for filename in files:
             child = root_path / filename
             executable = child.stat().st_mode & 0o111
-            os.chown(child, 0, _SHARED_OMP_GID)
+            os.chown(child, 0, _SHARED_OMSP_GID)
             child.chmod(0o770 if executable else 0o660)
 
 
@@ -241,7 +241,7 @@ def _prepare_shared_cargo_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     cargo_target = tmp_path / "shared-cache" / "cargo-target"
     for path in (cargo_home, cargo_target):
         path.mkdir(parents=True)
-        os.chown(path, 0, _SHARED_OMP_GID)
+        os.chown(path, 0, _SHARED_OMSP_GID)
         path.chmod(0o2770)
     monkeypatch.setenv("CARGO_HOME", str(cargo_home))
     monkeypatch.setenv("CARGO_TARGET_DIR", str(cargo_target))
@@ -260,7 +260,7 @@ def test_slot_workspace_runs_bun_biome_cargo_and_git_after_root_reentry(
     workspaces = slot_tmp_path / "workspaces"
 
     first = _ensure_workspace(workspaces, upstream_repo, number=101, slot_uid=_SLOT_ONE)
-    stale_bun_cache = first.root / ".omp-xdg" / "cache" / "bun-install" / "root-owned-stale"
+    stale_bun_cache = first.root / ".omsp-xdg" / "cache" / "bun-install" / "root-owned-stale"
     stale_bun_cache.mkdir(parents=True, exist_ok=True)
     stale_marker = stale_bun_cache / "marker.txt"
     stale_marker.write_text("root-owned\n", encoding="utf-8")
@@ -287,7 +287,7 @@ def test_slot_workspace_runs_bun_biome_cargo_and_git_after_root_reentry(
     assert bun_cache.stat().st_uid == _SLOT_ONE
     assert stale_marker.stat().st_uid == _SLOT_ONE
     assert (cargo_target / "debug").is_dir()
-    assert (cargo_target / "debug").stat().st_gid == _SHARED_OMP_GID
+    assert (cargo_target / "debug").stat().st_gid == _SHARED_OMSP_GID
 
     _write_as_slot(bindings, "src/slot-generated.ts", "export const generatedBySlot = true;\n")
     _run_ok(bindings, ["git", "add", "src/slot-generated.ts", "Cargo.lock", "bun.lock"])

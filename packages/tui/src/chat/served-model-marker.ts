@@ -1,5 +1,5 @@
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { classifyModel } from "@oh-my-pi/pi-catalog/identity";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { classifyModel } from "@oh-my-striped-pi/pi-catalog/identity";
 import { MessageDividerComponent } from "../chrome/message-divider";
 import { theme } from "../theme";
 
@@ -86,7 +86,7 @@ export class ServedModelMarkerComponent extends MessageDividerComponent {
 			labelColor: "warning",
 			ruleColor: "dim",
 			ruleWidth: 10,
-			role: "omp.marker.served-model",
+			role: "omsp.marker.served-model",
 			native: {
 				icon: "warn",
 				label: () => {

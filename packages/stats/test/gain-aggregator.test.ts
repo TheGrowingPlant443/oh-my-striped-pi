@@ -1,10 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { initDb, insertMessageStats } from "@oh-my-pi/omp-stats/db";
-import { dedupeProjects, getGainDashboardStats, normalizeProjectPath } from "@oh-my-pi/omp-stats/gain-aggregator";
-import type { MessageStats } from "@oh-my-pi/omp-stats/types";
-import { getStatsDbPath } from "@oh-my-pi/pi-utils";
+import { initDb, insertMessageStats } from "@oh-my-striped-pi/omsp-stats/db";
+import {
+	dedupeProjects,
+	getGainDashboardStats,
+	normalizeProjectPath,
+} from "@oh-my-striped-pi/omsp-stats/gain-aggregator";
+import type { MessageStats } from "@oh-my-striped-pi/omsp-stats/types";
+import { getStatsDbPath } from "@oh-my-striped-pi/pi-utils";
 import { installStatsTestIsolation } from "./helpers/temp-agent";
 
 installStatsTestIsolation("@pi-stats-gain-");

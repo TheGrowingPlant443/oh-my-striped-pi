@@ -38,7 +38,7 @@ declare module "*.applescript" {
 	export default content;
 }
 
-// Package license files imported as text by `omp --license` (coding-agent src/cli/license.ts).
+// Package license files imported as text by `omsp --license` (coding-agent src/cli/license.ts).
 declare module "*/LICENSE" {
 	const content: string;
 	export default content;

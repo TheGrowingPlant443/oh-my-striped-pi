@@ -1,30 +1,30 @@
-import type { AssistantMessage, ImageContent } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { getStreamingPartialJson } from "@oh-my-pi/pi-ai/utils/block-symbols";
-import { type Component, Loader, TERMINAL } from "@oh-my-pi/pi-tui";
-import { formatDuration, isRecord, logger, sanitizeText } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+import type { AssistantMessage, ImageContent } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { getStreamingPartialJson } from "@oh-my-striped-pi/pi-ai/utils/block-symbols";
+import { type Component, Loader, TERMINAL } from "@oh-my-striped-pi/pi-tui";
+import { formatDuration, isRecord, logger, sanitizeText } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import { extractTextContent } from "../../commit/utils";
 import { settings } from "../../config/settings";
-import { AssistantMessageComponent } from "@oh-my-pi/pi-tui/chat/assistant-message";
-import { detectCacheInvalidation } from "@oh-my-pi/pi-tui/chat/cache-invalidation-marker";
+import { AssistantMessageComponent } from "@oh-my-striped-pi/pi-tui/chat/assistant-message";
+import { detectCacheInvalidation } from "@oh-my-striped-pi/pi-tui/chat/cache-invalidation-marker";
 import {
 	groupedReadUsageCallIds,
 	ReadToolGroupComponent,
 	readArgsCollapseIntoGroup,
 	readArgsHaveTarget,
-} from "@oh-my-pi/pi-tui/chat/read-tool-group";
-import { RecapNotice } from "@oh-my-pi/pi-tui/chat/recap-notice";
+} from "@oh-my-striped-pi/pi-tui/chat/read-tool-group";
+import { RecapNotice } from "@oh-my-striped-pi/pi-tui/chat/recap-notice";
 import {
 	isReplyWrite,
 	ReplyWriteComponent,
 	replyDisplayMessage,
 	toolResultReplies,
-} from "@oh-my-pi/pi-tui/chat/reply-write";
-import { readMediaPath } from "@oh-my-pi/pi-tui/native/blobs";
-import { TodoReminderComponent } from "@oh-my-pi/pi-tui/chat/todo-reminder";
-import { isNativeRendering } from "@oh-my-pi/pi-tui/native/state";
-import { textContent } from "@oh-my-pi/pi-tui/chat/transcript-entry";
+} from "@oh-my-striped-pi/pi-tui/chat/reply-write";
+import { readMediaPath } from "@oh-my-striped-pi/pi-tui/native/blobs";
+import { TodoReminderComponent } from "@oh-my-striped-pi/pi-tui/chat/todo-reminder";
+import { isNativeRendering } from "@oh-my-striped-pi/pi-tui/native/state";
+import { textContent } from "@oh-my-striped-pi/pi-tui/chat/transcript-entry";
 import {
 	asyncJobState,
 	isSettledJobFrame,
@@ -33,13 +33,13 @@ import {
 	ToolExecutionComponent,
 	type ToolExecutionHandle,
 	toolRenderName,
-} from "@oh-my-pi/pi-tui/chat/tool-execution";
-import { TtsrNotificationComponent } from "@oh-my-pi/pi-tui/chat/ttsr-notification";
-import { createUsageRowBlock, TurnUsageTally, turnElapsedMs } from "@oh-my-pi/pi-tui/overlays/usage-row";
-import { appKey } from "@oh-my-pi/pi-tui/chrome/keybinding-hints";
-import { getSymbolTheme, theme } from "@oh-my-pi/pi-tui/theme";
+} from "@oh-my-striped-pi/pi-tui/chat/tool-execution";
+import { TtsrNotificationComponent } from "@oh-my-striped-pi/pi-tui/chat/ttsr-notification";
+import { createUsageRowBlock, TurnUsageTally, turnElapsedMs } from "@oh-my-striped-pi/pi-tui/overlays/usage-row";
+import { appKey } from "@oh-my-striped-pi/pi-tui/chrome/keybinding-hints";
+import { getSymbolTheme, theme } from "@oh-my-striped-pi/pi-tui/theme";
 import type { InteractiveModeContext } from "../../modes/types";
-import type { TodoPhase } from "@oh-my-pi/pi-tui/tools/todo";
+import type { TodoPhase } from "@oh-my-striped-pi/pi-tui/tools/todo";
 import type { AgentSessionEvent } from "../../session/agent-session";
 import {
 	isSilentAbort,
@@ -57,24 +57,24 @@ import {
 } from "../../tools/approval";
 import { getApprovalGrants } from "../../tools/approval-cache";
 import { recoverAskQuestions } from "../../tools/ask";
-import { previewLine, PREVIEW_LIMITS, TRUNCATE_LENGTHS } from "@oh-my-pi/pi-tui/render/render-utils";
-import { PROPOSE_DEVICE_NAME } from "@oh-my-pi/pi-tui/tools/resolve";
+import { previewLine, PREVIEW_LIMITS, TRUNCATE_LENGTHS } from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { PROPOSE_DEVICE_NAME } from "@oh-my-striped-pi/pi-tui/tools/resolve";
 import { writeDeviceDispatch } from "../../tools/resolve";
 import { SpeechEnhancer } from "../../tts/speech-enhancer";
 import { vocalizer } from "../../tts/vocalizer";
-import { canonicalizeMessage } from "@oh-my-pi/pi-tui/chat/thinking-display";
+import { canonicalizeMessage } from "@oh-my-striped-pi/pi-tui/chat/thinking-display";
 import { type RunStatus, setRunStatus } from "../../utils/run-status";
 import { setTerminalTitleState } from "../../utils/title-generator";
 import {
 	assistantMessageLinkTargets,
 	createAssistantMessageComponent,
 	refreshAssistantMessageLinkTargets,
-} from "@oh-my-pi/pi-tui/prompt/interactive-context-helpers";
+} from "@oh-my-striped-pi/pi-tui/prompt/interactive-context-helpers";
 import {
 	assistantHasVisibleContent,
 	assistantUsageIsBilled,
 	splitAssistantMessageToolTimeline,
-} from "@oh-my-pi/pi-tui/chat/transcript-render-helpers";
+} from "@oh-my-striped-pi/pi-tui/chat/transcript-render-helpers";
 import { isWarpCliAgentProtocolActive } from "../warp-events";
 import { ComposerPredictionController } from "./composer-prediction-controller";
 import { StreamingRevealController } from "./streaming-reveal";
@@ -2938,7 +2938,7 @@ export class EventController {
 
 		const sessionName = this.ctx.sessionManager.getSessionName();
 		TERMINAL.sendNotification({
-			title: sessionName || "omp",
+			title: sessionName || "omsp",
 			body: "Stopped with error",
 			type: "error",
 			actions: "focus",
@@ -2963,7 +2963,7 @@ export class EventController {
 
 		const sessionName = this.ctx.sessionManager.getSessionName();
 		TERMINAL.sendNotification({
-			title: sessionName || "omp",
+			title: sessionName || "omsp",
 			body: "Complete",
 			type: "completion",
 			actions: "focus",

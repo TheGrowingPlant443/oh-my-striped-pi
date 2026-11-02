@@ -1,15 +1,15 @@
 /** Configured OpenAI-compatible model-list discovery. Built-in discovery lives in pi-catalog. */
-import { type ApiKey, withAuth } from "@oh-my-pi/pi-ai/auth-retry";
-import { getAppleFoundationModelsAvailability } from "@oh-my-pi/pi-ai/providers/apple-foundation-models";
-import type { Api, FetchImpl, Model, RemoteCompactionConfig } from "@oh-my-pi/pi-ai/types";
-import { buildDiscoveredModel, buildModel } from "@oh-my-pi/pi-catalog/build";
-import { resolveModelPolicy } from "@oh-my-pi/pi-catalog/compat/resolve";
+import { type ApiKey, withAuth } from "@oh-my-striped-pi/pi-ai/auth-retry";
+import { getAppleFoundationModelsAvailability } from "@oh-my-striped-pi/pi-ai/providers/apple-foundation-models";
+import type { Api, FetchImpl, Model, RemoteCompactionConfig } from "@oh-my-striped-pi/pi-ai/types";
+import { buildDiscoveredModel, buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { resolveModelPolicy } from "@oh-my-striped-pi/pi-catalog/compat/resolve";
 import {
 	getBundledModelReferenceIndex,
 	inheritReferenceThinking,
 	resolveModelReference,
 	stripBracketedModelIdAffixes,
-} from "@oh-my-pi/pi-catalog/identity";
+} from "@oh-my-striped-pi/pi-catalog/identity";
 import {
 	fetchLiteLLMRichModels,
 	fetchLmStudioNativeModelMetadata,
@@ -17,16 +17,16 @@ import {
 	resolveLiteLLMApi,
 	OPENAI_COMPAT_DISCOVERY_DEFAULT_CONTEXT_WINDOW,
 	OPENAI_COMPAT_DISCOVERY_DEFAULT_MAX_TOKENS,
-} from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
+} from "@oh-my-striped-pi/pi-catalog/provider-models/openai-compat";
 import {
 	type KindApiKind,
 	type ModelKind,
 	type ModelSpec,
 	type OpenAICompat,
 	runnerApiKind,
-} from "@oh-my-pi/pi-catalog/types";
-import { Effort } from "@oh-my-pi/pi-catalog/effort";
-import { isRecord } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-catalog/types";
+import { Effort } from "@oh-my-striped-pi/pi-catalog/effort";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
 import type { ProviderDiscovery } from "./models-config-schema";
 
 // A conservative fallback when a configured model list omits token limits.
@@ -451,7 +451,7 @@ export function discoverModelsByProviderType(
 
 /**
  * Offers Apple's on-device model when the in-process bridge reports it usable;
- * an ineligible device, disabled Apple Intelligence, or an omp build without
+ * an ineligible device, disabled Apple Intelligence, or an omsp build without
  * the bridge yields no models.
  */
 async function discoverAppleFoundationModels(providerConfig: DiscoveryProviderConfig): Promise<Model<Api>[]> {
@@ -892,10 +892,10 @@ function extractOpenAIModelsListOutputTask(item: {
 	}
 }
 /**
- * Reasoning tiers omp can send as `reasoning_effort` on OpenAI-compatible
+ * Reasoning tiers omsp can send as `reasoning_effort` on OpenAI-compatible
  * chat routes. `none` is the wire off-switch rather than an effort tier,
  * `minimal` is rejected upstream by the GPT-6 generation, and `ultra` has no
- * omp effort equivalent (it fans out to subagents), so all three are dropped
+ * omsp effort equivalent (it fans out to subagents), so all three are dropped
  * from server-advertised ladders.
  */
 const ADVERTISED_REASONING_EFFORTS: readonly Effort[] = [

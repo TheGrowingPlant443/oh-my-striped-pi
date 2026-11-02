@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { JobWidgetBlock, JobWidgetView } from "@oh-my-pi/pi-tui/tools/job-widget";
+import type { JobWidgetBlock, JobWidgetView } from "@oh-my-striped-pi/pi-tui/tools/job-widget";
 import {
 	JobWidgetRuntime,
 	type JobTextChunk,
@@ -722,7 +722,7 @@ describe("job widget spec validation", () => {
 		expect(validateJobWidgetSpec(base, [{ id: "out", lines: ["rps=56"] }]).ok).toBe(true);
 	});
 
-	it("rejects rules reading omp's tool-call markers in a subagent's tool results", () => {
+	it("rejects rules reading omsp's tool-call markers in a subagent's tool results", () => {
 		const tools = [{ id: "tools", lines: ["» bash run the bench", "BENCH tok_s=171", "» read src/decode.rs"] }];
 		const counted = validateJobWidgetSpec(
 			{

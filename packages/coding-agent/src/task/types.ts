@@ -1,17 +1,17 @@
-import type { AgentSource } from "@oh-my-pi/pi-tui/tools/task";
+import type { AgentSource } from "@oh-my-striped-pi/pi-tui/tools/task";
 export {
 	TASK_SUBAGENT_PROGRESS_CHANNEL,
 	TASK_SUBAGENT_LIFECYCLE_CHANNEL,
-} from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
+} from "@oh-my-striped-pi/pi-tui/overlays/session-observer-registry";
 export type {
 	SubagentProgressPayload,
 	SubagentLifecyclePayload,
-} from "@oh-my-pi/pi-tui/overlays/session-observer-registry";
-import { type BaseType, type FluentType, type } from "@oh-my-pi/omptype";
-import { $env, isRecord } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-tui/overlays/session-observer-registry";
+import { type BaseType, type FluentType, type } from "@oh-my-striped-pi/omptype";
+import { $env, isRecord } from "@oh-my-striped-pi/pi-utils";
 
 import type { AgentSessionEvent } from "../session/agent-session";
-import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-tui/thinking";
+import type { ConfiguredThinkingLevel } from "@oh-my-striped-pi/pi-tui/thinking";
 
 const parseNumber = (value: string | undefined, defaultValue: number): number => {
 	if (value) {
@@ -26,10 +26,10 @@ const parseNumber = (value: string | undefined, defaultValue: number): number =>
 };
 
 /** Maximum output bytes per agent */
-export const MAX_OUTPUT_BYTES = parseNumber($env.PI_TASK_MAX_OUTPUT_BYTES, 500_000);
+export const MAX_OUTPUT_BYTES = parseNumber($env.OMSP_TASK_MAX_OUTPUT_BYTES, 500_000);
 
 /** Maximum output lines per agent */
-export const MAX_OUTPUT_LINES = parseNumber($env.PI_TASK_MAX_OUTPUT_LINES, 5000);
+export const MAX_OUTPUT_LINES = parseNumber($env.OMSP_TASK_MAX_OUTPUT_LINES, 5000);
 
 export const MAX_TASK_FILE_BYTES = 4 * 1024 * 1024;
 

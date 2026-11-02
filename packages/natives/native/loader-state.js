@@ -8,7 +8,7 @@ import { embeddedAddon } from "./embedded-addon.js";
 import { bindingsHaveReleaseIdentity, bindingsReleaseVersion, containsVersionStamp } from "./version-sentinel.js";
 
 /**
- * Native addon loader for `@oh-my-pi/pi-natives`.
+ * Native addon loader for `@oh-my-striped-pi/pi-natives`.
  *
  * Owns every step between "Node imports `native/index.js`" and "the right
  * `pi_natives.<platform>-<arch>*.node` is required, validated, and returned":
@@ -22,8 +22,8 @@ import { bindingsHaveReleaseIdentity, bindingsReleaseVersion, containsVersionSta
  * `scripts/gen-enums.ts`); everything else lives here so the pure helpers stay
  * unit-testable without triggering the side-effectful module-load path.
  *
- * Background (issue #823): `bun build --compile --define PI_COMPILED=true`
- * substitutes the bare identifier `PI_COMPILED`, NOT `process.env.PI_COMPILED`,
+ * Background (issue #823): `bun build --compile --define OMSP_COMPILED=true`
+ * substitutes the bare identifier `OMSP_COMPILED`, NOT `process.env.OMSP_COMPILED`,
  * so a runtime read of the env var returns `undefined`. Older CommonJS loader
  * code also saw the original build-host absolute path in `__filename`; ESM
  * `import.meta.url` is rewritten to the bunfs URL. The embedded-addon
@@ -41,13 +41,13 @@ const SUPPORTED_PLATFORMS = [
 ];
 
 /**
- * Streaming startup marker, enabled by `PI_DEBUG_STARTUP`. Local copy of the
+ * Streaming startup marker, enabled by `OMSP_DEBUG_STARTUP`. Local copy of the
  * pi-utils helper (this loader cannot depend on pi-utils). Synchronous on
  * purpose: extraction/dlopen hangs must still leave the `:start` marker.
  * @param {string} text
  */
 function startupMarker(text) {
-	if (!process.env.PI_DEBUG_STARTUP) return;
+	if (!process.env.OMSP_DEBUG_STARTUP) return;
 	try {
 		fs.writeSync(2, `[startup] ${text}\n`);
 	} catch {
@@ -57,7 +57,7 @@ function startupMarker(text) {
 
 function getNativesDir() {
 	// Match pi-utils directory overrides without depending on pi-utils.
-	const override = process.env.PI_NATIVES_DIR?.trim();
+	const override = process.env.OMSP_NATIVES_DIR?.trim();
 	if (override) {
 		let dir = override;
 		if (dir === "~") dir = os.homedir();
@@ -65,16 +65,16 @@ function getNativesDir() {
 		if (path.isAbsolute(dir)) return path.normalize(dir);
 	}
 	const xdgDataHome = process.env.XDG_DATA_HOME;
-	if (xdgDataHome && fs.existsSync(path.join(xdgDataHome, "omp"))) {
-		return path.join(xdgDataHome, "omp", "natives");
+	if (xdgDataHome && fs.existsSync(path.join(xdgDataHome, "omsp"))) {
+		return path.join(xdgDataHome, "omsp", "natives");
 	}
-	return path.join(os.homedir(), ".omp", "natives");
+	return path.join(os.homedir(), ".omsp", "natives");
 }
 
 function resolveLeafPackageDir(platformTag) {
 	try {
 		const require_ = createRequire(import.meta.url);
-		return path.dirname(require_.resolve(`@oh-my-pi/pi-natives-${platformTag}/package.json`));
+		return path.dirname(require_.resolve(`@oh-my-striped-pi/pi-natives-${platformTag}/package.json`));
 	} catch {
 		return null;
 	}
@@ -94,7 +94,7 @@ function resolveLeafPackageDir(platformTag) {
  */
 export function detectCompiledBinary({ embeddedAddon, env, importMetaUrl }) {
 	if (embeddedAddon) return true;
-	if (env && env.PI_COMPILED) return true;
+	if (env && env.OMSP_COMPILED) return true;
 	if (typeof importMetaUrl === "string") {
 		if (importMetaUrl.includes("$bunfs")) return true;
 		if (importMetaUrl.includes("~BUN")) return true;
@@ -119,14 +119,14 @@ export function getAddonFilenames({ tag, arch, variant }) {
 
 /**
  * Decide whether the loader should mirror the package's `native/<filename>.node`
- * into the per-version cache directory (`~/.omp/natives/<version>/`) before loading.
+ * into the per-version cache directory (`~/.omsp/natives/<version>/`) before loading.
  *
- * Windows-only safety net for `bun install -g` updates: when a previous `omp`
+ * Windows-only safety net for `bun install -g` updates: when a previous `omsp`
  * process is running, bun cannot overwrite the locked `.node` inside
- * `node_modules/@oh-my-pi/pi-natives/native/`, leaving an old binary next to a
+ * `node_modules/@oh-my-striped-pi/pi-natives/native/`, leaving an old binary next to a
  * newer `index.js` and producing `<sym> is not a function` crashes on the next
  * launch. Staging into the version-pinned cache:
- *   1. Gives every package version its own filesystem path, so concurrent omp
+ *   1. Gives every package version its own filesystem path, so concurrent omsp
  *      processes never collide on the same file.
  *   2. Makes the running process keep its handle on the cache copy, freeing bun
  *      to overwrite the `node_modules` copy on subsequent updates.
@@ -210,7 +210,7 @@ function isOlderReleaseVersion(candidate, current) {
 	return false;
 }
 
-// A concurrently starting older OMP binary creates or refreshes this directory
+// A concurrently starting older OMSP binary creates or refreshes this directory
 // before extracting its addon. Keep fresh directories long enough for that
 // startup to finish; a later launch can reclaim them once they are genuinely
 // stale.
@@ -273,7 +273,7 @@ export function cleanupStaleNativeVersions({ nativesDir, currentVersion }) {
  * so every Bun worker and child process spawned afterwards inherits the same
  * verdict and skips re-detection. See `selectCpuVariant` for the lookup order.
  */
-const VARIANT_CACHE_ENV_KEY = "__PI_NATIVE_VARIANT_CACHE";
+const VARIANT_CACHE_ENV_KEY = "__OMSP_NATIVE_VARIANT_CACHE";
 
 /**
  * Spawn `command` with `args` and capture stdout. Prefers `Bun.spawnSync`
@@ -305,7 +305,7 @@ function runCommand(command, args) {
 }
 
 function getVariantOverride() {
-	const value = process.env.PI_NATIVE_VARIANT;
+	const value = process.env.OMSP_NATIVE_VARIANT;
 	if (!value) return null;
 	if (value === "modern" || value === "baseline") return value;
 	return null;
@@ -379,8 +379,8 @@ function detectAvx2Support() {
 /**
  * Pure variant-selection helper, exposed for unit tests. Resolution order:
  *
- *   1. `override` (user-facing `PI_NATIVE_VARIANT` env var). Always wins.
- *   2. The private `__PI_NATIVE_VARIANT_CACHE` env var, populated by the first
+ *   1. `override` (user-facing `OMSP_NATIVE_VARIANT` env var). Always wins.
+ *   2. The private `__OMSP_NATIVE_VARIANT_CACHE` env var, populated by the first
  *      context that detected at runtime. Lets child workers / subprocesses
  *      inherit the main thread's verdict instead of re-spawning `sysctl` etc.
  *      from a worker context where the spawn may fail (issue #3238).
@@ -622,14 +622,14 @@ export function validateLoadedBindings(ctx, bindings, candidate) {
 	if (isCompatiblePreSentinelNativeAddon(bindings, diskHasExpectedStamp)) return;
 	if (residentVersion && diskHasExpectedStamp) {
 		throw new Error(
-			`Loaded ${candidate}, which reports @oh-my-pi/pi-natives@${residentVersion}, but this loader is ` +
-				`@${ctx.packageVersion}. omp was upgraded to ${ctx.packageVersion} while this session was running; ` +
+			`Loaded ${candidate}, which reports @oh-my-striped-pi/pi-natives@${residentVersion}, but this loader is ` +
+				`@${ctx.packageVersion}. omsp was upgraded to ${ctx.packageVersion} while this session was running; ` +
 				`the ${residentVersion} addon is still resident in this process. Disk is already consistent — ` +
-				`restart omp to pick up ${ctx.packageVersion} (reinstalling changes nothing).`,
+				`restart omsp to pick up ${ctx.packageVersion} (reinstalling changes nothing).`,
 		);
 	}
 	throw new Error(
-		`Loaded ${candidate} but it reports ${residentVersion ? `@oh-my-pi/pi-natives@${residentVersion}` : "no release version"}, ` +
+		`Loaded ${candidate} but it reports ${residentVersion ? `@oh-my-striped-pi/pi-natives@${residentVersion}` : "no release version"}, ` +
 			`not the @${ctx.packageVersion} this loader expects. The .node file on disk is from a different ` +
 			"release than this loader — reinstall to re-sync.",
 	);
@@ -660,7 +660,7 @@ function describeLoadedAddon(bindings, candidate, ctx) {
 }
 
 /**
- * The addon behind this process's `@oh-my-pi/pi-natives` exports.
+ * The addon behind this process's `@oh-my-striped-pi/pi-natives` exports.
  * @returns {{ path: string; version: string | null; packageVersion: string; stale: boolean } | null}
  */
 export function nativeAddonStatus() {
@@ -702,15 +702,15 @@ export function missingNativeExport(symbolName, addon = loadedAddon) {
  */
 export function missingNativeExportMessage(symbolName, addon = loadedAddon) {
 	const rebuild = "rebuild it with `bun run build:native`";
-	if (!addon) return `@oh-my-pi/pi-natives does not export \`${symbolName}\`; ${rebuild}.`;
+	if (!addon) return `@oh-my-striped-pi/pi-natives does not export \`${symbolName}\`; ${rebuild}.`;
 	if (!addon.stale) {
-		return `@oh-my-pi/pi-natives export \`${symbolName}\` is missing from ${addon.path}; ${rebuild}.`;
+		return `@oh-my-striped-pi/pi-natives export \`${symbolName}\` is missing from ${addon.path}; ${rebuild}.`;
 	}
 	const loaded = addon.version
-		? `the @oh-my-pi/pi-natives@${addon.version} addon`
+		? `the @oh-my-striped-pi/pi-natives@${addon.version} addon`
 		: "an addon without a release stamp";
 	return (
-		`@oh-my-pi/pi-natives export \`${symbolName}\` is missing: ${addon.path} is ${loaded}, not ` +
+		`@oh-my-striped-pi/pi-natives export \`${symbolName}\` is missing: ${addon.path} is ${loaded}, not ` +
 		`@${addon.packageVersion} — ${rebuild}.`
 	);
 }
@@ -750,22 +750,16 @@ function configureGrammarDir(bindings, nativesDir) {
 function buildHelpMessage(ctx) {
 	if (ctx.isCompiledBinary) {
 		const expectedPaths = ctx.addonFilenames.map(filename => `  ${path.join(ctx.versionedDir, filename)}`).join("\n");
-		const downloadHints = ctx.addonFilenames
-			.map(filename => {
-				const downloadUrl = `https://github.com/can1357/oh-my-pi/releases/latest/download/${filename}`;
-				const targetPath = path.join(ctx.versionedDir, filename);
-				return `  curl -fsSL "${downloadUrl}" -o "${targetPath}"`;
-			})
-			.join("\n");
 		return (
 			`The compiled binary should extract one of:\n${expectedPaths}\n\n` +
-			`If missing, delete ${ctx.versionedDir} and re-run, or download manually:\n${downloadHints}`
+			"This fork has no public addon downloads. Rebuild this checkout with `nix build .#omsp`, " +
+			"or redeploy the matching company-managed build."
 		);
 	}
 	return (
-		"If installed via npm/bun, try reinstalling: bun install @oh-my-pi/pi-natives\n" +
-		"If developing locally, build with: bun --cwd=packages/natives run build\n" +
-		"Explicit targets: bun scripts/bazel-natives.ts <target> --dest packages/natives/native"
+		"This fork has no public npm addon release.\n" +
+		"From the source checkout, build with: bun run build:native\n" +
+		"Or build the application with Nix: nix build .#omsp"
 	);
 }
 
@@ -788,7 +782,7 @@ export function initLoaderContext(overrides = {}) {
 	const versionedDir = path.join(nativesDir, packageVersion);
 	const userDataDir =
 		platform === "win32"
-			? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omp")
+			? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "omsp")
 			: path.join(os.homedir(), ".local", "bin");
 
 	const isCompiledBinary =

@@ -10,26 +10,26 @@
  * The in-memory relay harness (./helpers/in-memory-relay) replaces the real
  * WebSocket so a real CollabHost/CollabSocket run unchanged; a per-test spy on
  * the `publishCollabHost` export redirects discovery metadata into a temp dir,
- * so the registry's real Unix-socket IPC is exercised without touching ~/.omp.
+ * so the registry's real Unix-socket IPC is exercised without touching ~/.omsp.
  */
 import { afterEach, beforeEach, describe, expect, it, type Mock, spyOn } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { setImmediate } from "node:timers/promises";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import { createMockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { importRoomKey } from "@oh-my-pi/pi-coding-agent/collab/crypto";
-import { type CollabGuestUiResult, CollabHost } from "@oh-my-pi/pi-coding-agent/collab/host";
-import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-pi/pi-coding-agent/collab/protocol";
-import * as registry from "@oh-my-pi/pi-coding-agent/collab/registry";
-import { CollabSocket } from "@oh-my-pi/pi-coding-agent/collab/relay-client";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import type { InteractiveModeContext } from "@oh-my-pi/pi-coding-agent/modes/types";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import { createMockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { importRoomKey } from "@oh-my-striped-pi/pi-coding-agent/collab/crypto";
+import { type CollabGuestUiResult, CollabHost } from "@oh-my-striped-pi/pi-coding-agent/collab/host";
+import { COLLAB_PROTO, type CollabFrame, parseCollabLink } from "@oh-my-striped-pi/pi-coding-agent/collab/protocol";
+import * as registry from "@oh-my-striped-pi/pi-coding-agent/collab/registry";
+import { CollabSocket } from "@oh-my-striped-pi/pi-coding-agent/collab/relay-client";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import type { InteractiveModeContext } from "@oh-my-striped-pi/pi-coding-agent/modes/types";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
 import { FakeWebSocket, installInMemoryRelay, uninstallInMemoryRelay } from "./helpers/in-memory-relay";
 import { getTestModel } from "../helpers/model-fixtures";
 
@@ -135,7 +135,7 @@ let host: CollabHost | undefined;
 const guestCleanups: (() => void)[] = [];
 
 beforeEach(async () => {
-	tmp = await fs.mkdtemp(path.join(os.tmpdir(), "omp-hostreg-"));
+	tmp = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-hostreg-"));
 	installInMemoryRelay();
 	// Record every fake socket the host/guests construct so a test can drive a
 	// terminal close on the host's transport directly.

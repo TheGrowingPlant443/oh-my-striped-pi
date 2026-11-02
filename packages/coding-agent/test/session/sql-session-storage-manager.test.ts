@@ -8,10 +8,13 @@
 
 import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import type { Usage } from "@oh-my-pi/pi-ai";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { SqlSessionStorage, type SqlSessionStorageClient } from "@oh-my-pi/pi-coding-agent/session/sql-session-storage";
-import { SessionWriteConflictError } from "@oh-my-pi/pi-coding-agent/session/session-storage";
+import type { Usage } from "@oh-my-striped-pi/pi-ai";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import {
+	SqlSessionStorage,
+	type SqlSessionStorageClient,
+} from "@oh-my-striped-pi/pi-coding-agent/session/sql-session-storage";
+import { SessionWriteConflictError } from "@oh-my-striped-pi/pi-coding-agent/session/session-storage";
 import { SQL } from "bun";
 
 // Storage keys are platform paths; `/sessions/...` is only drive-relative on Windows,
@@ -32,7 +35,7 @@ function fakeUsage(input: number, output: number): Usage {
 class HeldSqlClient implements SqlSessionStorageClient {
 	readonly options: SqlSessionStorageClient["options"];
 	holdNextReplace = false;
-	holdQueryPrefix = "UPDATE omp_session_files SET content";
+	holdQueryPrefix = "UPDATE omsp_session_files SET content";
 	readonly replaceStarted = Promise.withResolvers<void>();
 	readonly allowReplace = Promise.withResolvers<void>();
 	readonly #client: InstanceType<typeof SQL>;
@@ -86,7 +89,7 @@ describe("SessionManager + SqlSessionStorage (SQLite)", () => {
 		await storage.drain();
 		await manager.close();
 
-		const rows = (await client.unsafe(`SELECT content FROM omp_session_files WHERE path = ?`, [
+		const rows = (await client.unsafe(`SELECT content FROM omsp_session_files WHERE path = ?`, [
 			sessionFilePath,
 		])) as Array<{ content: string }>;
 		expect(rows).toHaveLength(1);
@@ -228,7 +231,7 @@ describe("SessionManager + SqlSessionStorage (SQLite)", () => {
 		const heldClient = new HeldSqlClient(client);
 		const storage = await SqlSessionStorage.create({ client: heldClient });
 		const manager = SessionManager.create("/cwd", virtualDir("/sessions/unconfirmed"), storage);
-		heldClient.holdQueryPrefix = "INSERT INTO omp_session_files";
+		heldClient.holdQueryPrefix = "INSERT INTO omsp_session_files";
 		heldClient.holdNextReplace = true;
 
 		const firstWrite = manager.ensureOnDisk();
@@ -257,7 +260,7 @@ describe("SessionManager + SqlSessionStorage (SQLite)", () => {
 		// The atomic write's optimistic index entry is in place, its publish not yet started.
 		expect(storage.existsSync(sessionFile)).toBe(true);
 		atomicStillCurrent = false;
-		heldClient.holdQueryPrefix = "INSERT INTO omp_session_files";
+		heldClient.holdQueryPrefix = "INSERT INTO omsp_session_files";
 		heldClient.holdNextReplace = true;
 		storage.writeTextSync(sessionFile, "sync\n");
 		await atomic;

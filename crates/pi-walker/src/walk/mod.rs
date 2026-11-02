@@ -85,7 +85,7 @@ pub struct Options {
 	/// Do not descend into directories on another filesystem than the root
 	/// (they are still reported).
 	pub same_file_system:  bool,
-	/// Directories listed at once; `None` (or 0) picks `PI_WALK_WORKERS` when
+	/// Directories listed at once; `None` (or 0) picks `OMSP_WALK_WORKERS` when
 	/// set, else [`Fs::workers`].
 	pub workers:           Option<usize>,
 	/// Reuse unchanged directories' listings from earlier walks ([`cache`]).
@@ -95,11 +95,11 @@ pub struct Options {
 
 impl Options {
 	/// Directories a walk of `fs` with these options lists at once:
-	/// [`Self::workers`], else `PI_WALK_WORKERS` (0 = auto, 1 = serial), else
+	/// [`Self::workers`], else `OMSP_WALK_WORKERS` (0 = auto, 1 = serial), else
 	/// [`Fs::workers`], capped by the machine's parallelism.
 	pub fn parallelism(&self, fs: &Fs) -> usize {
 		static ENV: LazyLock<Option<usize>> = LazyLock::new(|| {
-			std::env::var("PI_WALK_WORKERS")
+			std::env::var("OMSP_WALK_WORKERS")
 				.ok()
 				.and_then(|value| value.trim().parse::<usize>().ok())
 				.filter(|&workers| workers > 0)

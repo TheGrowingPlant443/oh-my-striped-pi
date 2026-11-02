@@ -18,8 +18,8 @@ afterEachOAuthFixture(() => resetOAuthMocks());
  */
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-pi/pi-ai/auth-storage";
-import type { UsageHistoryEntry, UsageReport } from "@oh-my-pi/pi-ai/usage";
+import { AuthStorage, SqliteAuthCredentialStore } from "@oh-my-striped-pi/pi-ai/auth-storage";
+import type { UsageHistoryEntry, UsageReport } from "@oh-my-striped-pi/pi-ai/usage";
 import { fixtureUsageProvider } from "./usage-test-utils";
 
 const HOUR = 3_600_000;

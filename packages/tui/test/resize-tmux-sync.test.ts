@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, spyOn, vi } from "bun:test
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PtySession } from "@oh-my-pi/pi-natives";
-import { CURSOR_MARKER, Text, TUI, type TerminalFramePlan, type ViewportSize } from "@oh-my-pi/pi-tui";
-import { tmuxMultiplexer } from "@oh-my-pi/pi-tui/multiplexers/tmux";
-import type { PrivateModeReportHandler } from "@oh-my-pi/pi-tui/terminal";
-import * as capabilities from "@oh-my-pi/pi-tui/terminal-capabilities";
-import * as multiplexer from "@oh-my-pi/pi-tui/terminal-multiplexer";
+import { PtySession } from "@oh-my-striped-pi/pi-natives";
+import { CURSOR_MARKER, Text, TUI, type TerminalFramePlan, type ViewportSize } from "@oh-my-striped-pi/pi-tui";
+import { tmuxMultiplexer } from "@oh-my-striped-pi/pi-tui/multiplexers/tmux";
+import type { PrivateModeReportHandler } from "@oh-my-striped-pi/pi-tui/terminal";
+import * as capabilities from "@oh-my-striped-pi/pi-tui/terminal-capabilities";
+import * as multiplexer from "@oh-my-striped-pi/pi-tui/terminal-multiplexer";
 import { $ } from "bun";
 import { VirtualRenderScheduler } from "./virtual-render-scheduler";
 import { VirtualTerminal } from "./virtual-terminal";
@@ -420,14 +420,14 @@ describe("tmux synchronized rebuild", () => {
 	});
 
 	// Requires tmux with application-side DEC 2026 support (e.g. next-3.9).
-	// PI_TEST_TMUX_SYNC=1 bun test packages/tui/test/resize-tmux-sync.test.ts
+	// OMSP_TEST_TMUX_SYNC=1 bun test packages/tui/test/resize-tmux-sync.test.ts
 	// A detached capture-pane alone cannot catch intermediate frames: attach a
 	// real PTY client and inspect everything tmux actually sends it during replay.
-	it.skipIf(Bun.env.PI_TEST_TMUX_SYNC !== "1")(
+	it.skipIf(Bun.env.OMSP_TEST_TMUX_SYNC !== "1")(
 		"keeps the real Composer at the bottom through rapid height growth and later oscillation",
 		async () => {
 			const tmux = Bun.which("tmux");
-			if (!tmux) throw new Error("PI_TEST_TMUX_SYNC requires tmux");
+			if (!tmux) throw new Error("OMSP_TEST_TMUX_SYNC requires tmux");
 			const args = ["-L", `tui-height-${process.pid}-${Date.now()}`, "-f", "/dev/null"];
 			await $`${tmux} ${args} new-session -d -s probe -x 100 -y 70 sleep 60`.quiet();
 			try {
@@ -483,11 +483,11 @@ describe("tmux synchronized rebuild", () => {
 		15000,
 	);
 
-	it.skipIf(Bun.env.PI_TEST_TMUX_SYNC !== "1")(
+	it.skipIf(Bun.env.OMSP_TEST_TMUX_SYNC !== "1")(
 		"shows only the final history tail to an attached tmux client across slow zoom/unzoom rebuilds",
 		async () => {
 			const tmux = Bun.which("tmux");
-			if (!tmux) throw new Error("PI_TEST_TMUX_SYNC requires tmux");
+			if (!tmux) throw new Error("OMSP_TEST_TMUX_SYNC requires tmux");
 			const directory = await fs.mkdtemp(path.join(os.tmpdir(), "tui-tmux-sync-"));
 			const socket = `tui-sync-${process.pid}-${Date.now()}`;
 			const args = ["-L", socket, "-f", "/dev/null"];

@@ -1,8 +1,8 @@
 import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, expect, it, vi } from "bun:test";
 import * as fs from "node:fs";
-import { HistoryStorage } from "@oh-my-pi/pi-coding-agent/session/history-storage";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { HistoryStorage } from "@oh-my-striped-pi/pi-coding-agent/session/history-storage";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { readTableSql } from "./helpers/sqlite-inspect";
 
 const LEGACY_TIMESTAMP = 1_700_000_000;
@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 it("migrates legacy history schema away from unixepoch defaults", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-legacy-");
+	tempDir = TempDir.createSync("@omsp-history-storage-legacy-");
 	const dbPath = tempDir.join("history.db");
 	const legacyDb = new Database(dbPath);
 	legacyDb.exec(`
@@ -61,7 +61,7 @@ it("migrates legacy history schema away from unixepoch defaults", async () => {
 	}
 });
 it("collapses duplicate prompts and keeps the latest project metadata", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-deduplicate-");
+	tempDir = TempDir.createSync("@omsp-history-storage-deduplicate-");
 	const dbPath = tempDir.join("history.db");
 	const legacyDb = new Database(dbPath);
 	legacyDb.exec(`
@@ -108,7 +108,7 @@ it("collapses duplicate prompts and keeps the latest project metadata", async ()
 	}
 });
 it("adds use_count to a rebuilt store in place, without another rebuild", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-use-count-");
+	tempDir = TempDir.createSync("@omsp-history-storage-use-count-");
 	const dbPath = tempDir.join("history.db");
 	const v1Db = new Database(dbPath);
 	v1Db.exec(`
@@ -150,7 +150,7 @@ it("adds use_count to a rebuilt store in place, without another rebuild", async 
 });
 
 it("normalizes per-line trailing whitespace so padded resubmissions upsert instead of duplicating", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-normalize-");
+	tempDir = TempDir.createSync("@omsp-history-storage-normalize-");
 	const storage = HistoryStorage.open(tempDir.join("history.db"));
 
 	await storage.add("line one   \t\r\nline two  ", "/projects/first", "first-session");
@@ -163,7 +163,7 @@ it("normalizes per-line trailing whitespace so padded resubmissions upsert inste
 });
 
 it("collapses preexisting whitespace-padded duplicates on open, keeping the latest provenance", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-padded-");
+	tempDir = TempDir.createSync("@omsp-history-storage-padded-");
 	const dbPath = tempDir.join("history.db");
 	HistoryStorage.open(dbPath);
 	HistoryStorage.close();
@@ -193,7 +193,7 @@ it("collapses preexisting whitespace-padded duplicates on open, keeping the late
 
 // #13926: report failed persistence once per outage without changing the log-only promise contract.
 it("reports failed writes once per outage and permits persistence after recovery", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-write-failure-");
+	tempDir = TempDir.createSync("@omsp-history-storage-write-failure-");
 	const dbPath = tempDir.join("history.db");
 	const storage = HistoryStorage.open(dbPath);
 	const peer = new Database(dbPath);
@@ -234,7 +234,7 @@ it("reports failed writes once per outage and permits persistence after recovery
 // A damaged page cross-linked into `history` decoded BLOBs as prompts, and the
 // first Up arrow crashed the editor with `text.replace is not a function`.
 it("recalls and searches only text prompts when a row decodes as a BLOB", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-blob-");
+	tempDir = TempDir.createSync("@omsp-history-storage-blob-");
 	const dbPath = tempDir.join("history.db");
 	await HistoryStorage.open(dbPath).add("readable prompt", "/project", "session");
 	HistoryStorage.close();
@@ -251,7 +251,7 @@ it("recalls and searches only text prompts when a row decodes as a BLOB", async 
 });
 
 it("quarantines a store whose newest rows are unreadable and keeps every readable prompt, title, and recap", async () => {
-	tempDir = TempDir.createSync("@omp-history-storage-salvage-");
+	tempDir = TempDir.createSync("@omsp-history-storage-salvage-");
 	const dbPath = tempDir.join("history.db");
 	HistoryStorage.open(dbPath);
 	HistoryStorage.close();

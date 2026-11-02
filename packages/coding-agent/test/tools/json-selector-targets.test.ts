@@ -19,7 +19,7 @@ describe("JSON selector target admission", () => {
 	let tool: ReadTool;
 
 	beforeAll(async () => {
-		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omp-json-target-"));
+		dir = await fs.mkdtemp(path.join(os.tmpdir(), "omsp-json-target-"));
 		const session: ToolSession = {
 			cwd: dir,
 			hasUI: false,

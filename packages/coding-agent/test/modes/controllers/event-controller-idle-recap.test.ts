@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { EventController } from "@oh-my-pi/pi-coding-agent/modes/controllers/event-controller";
-import type { Component } from "@oh-my-pi/pi-tui";
-import { RecapNotice } from "@oh-my-pi/pi-tui/chat/recap-notice";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { EventController } from "@oh-my-striped-pi/pi-coding-agent/modes/controllers/event-controller";
+import type { Component } from "@oh-my-striped-pi/pi-tui";
+import { RecapNotice } from "@oh-my-striped-pi/pi-tui/chat/recap-notice";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 import { createInteractiveModeContext } from "../../helpers/interactive-mode-context";
 import { beginSettingsTest, restoreSettingsTestState, type SettingsTestState } from "../../helpers/settings-test-state";
 

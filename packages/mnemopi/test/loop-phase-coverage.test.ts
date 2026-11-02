@@ -1,8 +1,11 @@
 import { Database, type Statement } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { Mnemopi } from "@oh-my-pi/pi-mnemopi/core/memory";
-import { resetEmbeddingProviderForTests, setEmbeddingProviderForTests } from "@oh-my-pi/pi-mnemopi/core/embeddings";
-import { currentLoopPhase, TempDir } from "@oh-my-pi/pi-utils";
+import { Mnemopi } from "@oh-my-striped-pi/pi-mnemopi/core/memory";
+import {
+	resetEmbeddingProviderForTests,
+	setEmbeddingProviderForTests,
+} from "@oh-my-striped-pi/pi-mnemopi/core/embeddings";
+import { currentLoopPhase, TempDir } from "@oh-my-striped-pi/pi-utils";
 
 let checking = false;
 let monitoredExecutions = 0;

@@ -1,9 +1,10 @@
 {
   "type": "module",
-  "name": "@oh-my-pi/omp-stats",
+  "name": "@oh-my-striped-pi/omsp-stats",
+  "private": true,
   "version": "18.13.3",
-  "description": "Local observability dashboard for omp AI usage statistics",
-  "homepage": "https://omp.sh",
+  "description": "Local observability dashboard for omsp AI usage statistics",
+  "homepage": "https://github.com/TheGrowingPlant443/oh-my-striped-pi",
   "author": {
     "name": "Stencil Labs, Inc.",
     "url": "https://stencil.so"
@@ -11,11 +12,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/can1357/oh-my-pi.git",
+    "url": "git+https://github.com/TheGrowingPlant443/oh-my-striped-pi.git",
     "directory": "packages/stats"
   },
   "bugs": {
-    "url": "https://github.com/can1357/oh-my-pi/issues"
+    "url": "https://github.com/TheGrowingPlant443/oh-my-striped-pi/issues"
   },
   "keywords": [
     "ai",
@@ -28,7 +29,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "bin": {
-    "omp-stats": "./src/index.ts"
+    "omsp-stats": "./src/index.ts"
   },
   "scripts": {
     "gen:stats": "bun scripts/generate-client-bundle.ts --generate",
@@ -42,9 +43,9 @@
     "fmt": "oxfmt --no-error-on-unmatched-pattern 'src/**/*.{ts,tsx}' '{test,bench,examples,scripts}/**/*.ts' '*.ts'"
   },
   "dependencies": {
-    "@oh-my-pi/pi-ai": "catalog:",
-    "@oh-my-pi/pi-catalog": "catalog:",
-    "@oh-my-pi/pi-utils": "catalog:",
+    "@oh-my-striped-pi/pi-ai": "catalog:",
+    "@oh-my-striped-pi/pi-catalog": "catalog:",
+    "@oh-my-striped-pi/pi-utils": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

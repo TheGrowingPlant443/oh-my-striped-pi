@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import type { StreamFn } from "@oh-my-pi/pi-agent-core";
-import * as ai from "@oh-my-pi/pi-ai";
-import { createModelJobWidgetAuthor } from "@oh-my-pi/pi-coding-agent/job-widgets/author";
+import type { StreamFn } from "@oh-my-striped-pi/pi-agent-core";
+import * as ai from "@oh-my-striped-pi/pi-ai";
+import { createModelJobWidgetAuthor } from "@oh-my-striped-pi/pi-coding-agent/job-widgets/author";
 import {
 	type Api,
 	type AssistantMessage,
@@ -10,28 +10,28 @@ import {
 	type Model,
 	type ModelSpec,
 	registerCustomApi,
-} from "@oh-my-pi/pi-ai";
-import { AssistantMessageEventStream } from "@oh-my-pi/pi-ai/utils/event-stream";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { runCli } from "@oh-my-pi/pi-coding-agent/cli";
-import { parseArgs } from "@oh-my-pi/pi-coding-agent/cli/args";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { clearOmpExtensionCliRoots } from "@oh-my-pi/pi-coding-agent/discovery/omp-extension-roots";
-import { runRootCommand } from "@oh-my-pi/pi-coding-agent/main";
-import { PRINT_MODE_COST_CAP_EXIT_CODE, runPrintMode } from "@oh-my-pi/pi-coding-agent/modes/print-mode";
-import { type CreateAgentSessionOptions, createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import type { AgentSession, AgentSessionEvent } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
+} from "@oh-my-striped-pi/pi-ai";
+import { AssistantMessageEventStream } from "@oh-my-striped-pi/pi-ai/utils/event-stream";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { runCli } from "@oh-my-striped-pi/pi-coding-agent/cli";
+import { parseArgs } from "@oh-my-striped-pi/pi-coding-agent/cli/args";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { clearOmpExtensionCliRoots } from "@oh-my-striped-pi/pi-coding-agent/discovery/omsp-extension-roots";
+import { runRootCommand } from "@oh-my-striped-pi/pi-coding-agent/main";
+import { PRINT_MODE_COST_CAP_EXIT_CODE, runPrintMode } from "@oh-my-striped-pi/pi-coding-agent/modes/print-mode";
+import { type CreateAgentSessionOptions, createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import type { AgentSession, AgentSessionEvent } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
 import {
 	COST_GATE_NOTICE_SOURCE,
 	CostCapError,
 	CostGate,
 	guardStreamFn,
-} from "@oh-my-pi/pi-coding-agent/session/cost-gate";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { cfgSessionMaxCost, cfgSessionWarnCost } from "@oh-my-pi/pi-coding-agent/session/settings";
-import { TempDir } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/session/cost-gate";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { cfgSessionMaxCost, cfgSessionWarnCost } from "@oh-my-striped-pi/pi-coding-agent/session/settings";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { createAssistantMessage } from "./helpers/agent-session-setup";
 import { rejectionOf } from "./helpers/rejection";
 
@@ -229,7 +229,7 @@ describe("--warn-cost / --max-cost", () => {
 	});
 
 	it("override the configured thresholds for the session", async () => {
-		using tempDir = TempDir.createSync("@omp-cost-gate-");
+		using tempDir = TempDir.createSync("@omsp-cost-gate-");
 		const authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		const settings = Settings.isolated({
 			"marketplace.autoUpdate": "off",
@@ -289,7 +289,7 @@ describe("cost gate in a running session", () => {
 		values: Record<string, unknown>,
 		extra: Partial<CreateAgentSessionOptions> = {},
 	): Promise<AgentSession> {
-		const tempDir = TempDir.createSync("@omp-cost-gate-session-");
+		const tempDir = TempDir.createSync("@omsp-cost-gate-session-");
 		tempDirs.push(tempDir);
 		const authStorage = await AuthStorage.create(path.join(tempDir.path(), "auth.db"));
 		authStorages.push(authStorage);
@@ -370,7 +370,7 @@ describe("cost gate in a running session", () => {
 	it("hands a prompt back, unsent and unrecorded, when a resumed session is already past its cap", async () => {
 		const api = "test-cost-gate-resume";
 		const provider = scriptedProvider(api, [response(0.1)]);
-		const tempDir = TempDir.createSync("@omp-cost-gate-resume-");
+		const tempDir = TempDir.createSync("@omsp-cost-gate-resume-");
 		tempDirs.push(tempDir);
 		const sessionManager = SessionManager.inMemory(tempDir.path());
 		sessionManager.appendMessage({ role: "user", content: "earlier", timestamp: Date.now() });
@@ -428,7 +428,7 @@ describe("cost gate in a running session", () => {
 	it("keeps the spent budget when the session is forked from an earlier message", async () => {
 		const api = "test-cost-gate-fork";
 		const provider = scriptedProvider(api, [response(1.2), response(0.1)]);
-		const tempDir = TempDir.createSync("@omp-cost-gate-fork-");
+		const tempDir = TempDir.createSync("@omsp-cost-gate-fork-");
 		tempDirs.push(tempDir);
 		const session = await createSession(
 			api,
@@ -466,7 +466,7 @@ describe("cost gate in a running session", () => {
 	it("starts a resumed session from its recorded spend when switching to it", async () => {
 		const api = "test-cost-gate-switch";
 		const provider = scriptedProvider(api, [response(0.1)]);
-		const tempDir = TempDir.createSync("@omp-cost-gate-switch-");
+		const tempDir = TempDir.createSync("@omsp-cost-gate-switch-");
 		tempDirs.push(tempDir);
 		const saved = SessionManager.create(tempDir.path(), tempDir.path());
 		saved.appendMessage({ role: "user", content: "earlier", timestamp: Date.now() });

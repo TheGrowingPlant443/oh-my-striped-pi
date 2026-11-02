@@ -8,11 +8,11 @@ import {
 	type SnapshotResponse,
 	scheduleAuthBrokerSnapshotCacheWrite,
 	writeAuthBrokerSnapshotCache,
-} from "@oh-my-pi/pi-ai/auth-broker";
+} from "@oh-my-striped-pi/pi-ai/auth-broker";
 import { removeWithRetries } from "../../utils/src/temp";
 
 const TOKEN = "broker-cache-token";
-const URL = "http://127.0.0.1:8765";
+const URL = "http://127.0.0.1:8766";
 const CACHE_VERSION_OFFSET = 4;
 const CACHE_IV_OFFSET = CACHE_VERSION_OFFSET + 1;
 const CACHE_IV_LENGTH = 12;

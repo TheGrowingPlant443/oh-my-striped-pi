@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { JsRuntime, type RuntimeHooks } from "@oh-my-pi/pi-coding-agent/eval/js/shared/runtime";
+import { JsRuntime, type RuntimeHooks } from "@oh-my-striped-pi/pi-coding-agent/eval/js/shared/runtime";
 
 // `xd://eval/agents` and `xd://eval/judge` tell JS sessions that `workpool()`, `judgeBatch()`,
 // `judgeBatch.attach()` and every handle, pool and batch method except `drainIter` return

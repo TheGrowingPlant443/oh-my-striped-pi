@@ -1,8 +1,8 @@
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import type { AssistantMessage, ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import * as AIError from "@oh-my-pi/pi-ai/error";
-import { raceWithSignal } from "@oh-my-pi/pi-ai/utils/abort";
-import { logger } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import type { AssistantMessage, ImageContent, TextContent } from "@oh-my-striped-pi/pi-ai";
+import * as AIError from "@oh-my-striped-pi/pi-ai/error";
+import { raceWithSignal } from "@oh-my-striped-pi/pi-ai/utils/abort";
+import { logger } from "@oh-my-striped-pi/pi-utils";
 import { isEvalStateContext } from "../eval/state";
 import {
 	collectNativeReplayRegexSecretValues,

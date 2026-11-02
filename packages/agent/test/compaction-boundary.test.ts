@@ -5,9 +5,9 @@ import {
 	createFileOps,
 	DEFAULT_COMPACTION_SETTINGS,
 	generateSummary,
-} from "@oh-my-pi/pi-agent-core/compaction";
-import type { Model } from "@oh-my-pi/pi-ai";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
+} from "@oh-my-striped-pi/pi-agent-core/compaction";
+import type { Model } from "@oh-my-striped-pi/pi-ai";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
 
 function getModel(): Model {
 	const model = getBundledModel("github-copilot", "claude-sonnet-4.5");

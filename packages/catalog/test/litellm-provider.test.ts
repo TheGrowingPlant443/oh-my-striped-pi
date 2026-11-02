@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
 import {
 	fetchLiteLLMRichModels,
 	litellmModelManagerOptions,
 	resolveLiteLLMApi,
-} from "@oh-my-pi/pi-catalog/provider-models/openai-compat";
-import type { FetchImpl, ModelSpec } from "@oh-my-pi/pi-catalog/types";
+} from "@oh-my-striped-pi/pi-catalog/provider-models/openai-compat";
+import type { FetchImpl, ModelSpec } from "@oh-my-striped-pi/pi-catalog/types";
 
 const baseUrl = "https://models.company.example/proxy/v1";
 const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } });

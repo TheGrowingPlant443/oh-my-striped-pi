@@ -1,6 +1,6 @@
 import type { NativeToolView, ToolRenderer, ToolRenderResult } from "./renderer";
 import { type Component, padding, Text, visibleWidth } from "../index";
-import type { TspTone } from "@oh-my-pi/pi-wire";
+import type { TspTone } from "@oh-my-striped-pi/pi-wire";
 import { ansi, compact, item, list, md, node, span, text } from "../native/describe";
 import type { NativeChild, NativeNode } from "../native/node";
 import { OwnerMemo } from "../native/memo";
@@ -604,7 +604,7 @@ export const githubToolRenderer = {
 } satisfies ToolRenderer<GithubToolRenderArgs, GhToolDetails>;
 
 import type { OutputMeta } from "./output-meta";
-import type { IsoBackendKind } from "@oh-my-pi/pi-natives";
+import type { IsoBackendKind } from "@oh-my-striped-pi/pi-natives";
 /** Display metadata for GitHub operations. */
 export interface GhToolDetails {
 	meta?: OutputMeta;

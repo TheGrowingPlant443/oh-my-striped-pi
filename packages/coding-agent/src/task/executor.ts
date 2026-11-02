@@ -6,22 +6,30 @@
 
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import type { AgentEvent, AgentIdentity, AgentMessage, AgentTelemetryConfig } from "@oh-my-pi/pi-agent-core";
-import { AgentBusyError, recordHandoff, resolveTelemetry } from "@oh-my-pi/pi-agent-core";
-import type { Api, Model, ServiceTierByFamily, Usage } from "@oh-my-pi/pi-ai";
-import { isRecord, logger, popLoopPhase, prompt, pushLoopPhase, sanitizeText, untilAborted } from "@oh-my-pi/pi-utils";
+import type { AgentEvent, AgentIdentity, AgentMessage, AgentTelemetryConfig } from "@oh-my-striped-pi/pi-agent-core";
+import { AgentBusyError, recordHandoff, resolveTelemetry } from "@oh-my-striped-pi/pi-agent-core";
+import type { Api, Model, ServiceTierByFamily, Usage } from "@oh-my-striped-pi/pi-ai";
+import {
+	isRecord,
+	logger,
+	popLoopPhase,
+	prompt,
+	pushLoopPhase,
+	sanitizeText,
+	untilAborted,
+} from "@oh-my-striped-pi/pi-utils";
 import { ASYNC_JOB_MANAGER_SHUTDOWN_REASON, AsyncJobError, AsyncJobManager, type AsyncJobRunResult } from "../async";
 import type { Rule } from "../capability/rule";
 import type { EffectiveExtensionRoots } from "../capability/types";
 import { ModelRegistry } from "../config/model-registry";
-import { formatModelSelectorValue } from "@oh-my-pi/pi-tui/overlays/model-selector";
+import { formatModelSelectorValue } from "@oh-my-striped-pi/pi-tui/overlays/model-selector";
 import {
 	previewLine,
 	replaceTabs,
 	shortenToolArgumentPaths,
 	TRUNCATE_LENGTHS,
-} from "@oh-my-pi/pi-tui/render/render-utils";
-import { type EditMode, getEditInputPaths } from "@oh-my-pi/pi-tui/tools/edit";
+} from "@oh-my-striped-pi/pi-tui/render/render-utils";
+import { type EditMode, getEditInputPaths } from "@oh-my-striped-pi/pi-tui/tools/edit";
 import {
 	formatModelStringWithRouting,
 	resolveAgentAdvisorRolePattern,
@@ -79,18 +87,18 @@ import type { AuthStorage } from "../session/auth-storage";
 import type { CostGate } from "../session/cost-gate";
 import { SKILL_PROMPT_MESSAGE_TYPE } from "../session/messages";
 import { hasConversationalHistory, SessionManager } from "../session/session-manager";
-import { truncateTail } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { truncateTail } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import {
 	type ConfiguredThinkingLevel,
 	prewalkWouldBeNoop,
 	resolveTaskEffortLevel,
 	type TaskEffort,
-} from "@oh-my-pi/pi-tui/thinking";
+} from "@oh-my-striped-pi/pi-tui/thinking";
 import type { ContextFileEntry, ToolSession } from "../tools";
 import { resolveEvalBackends } from "../tools/eval-backends";
 import { isIrcEnabled } from "../irc/messaging";
-import { LIST_STATUS_ORDER } from "@oh-my-pi/pi-tui/tools/irc";
-import { DEFAULT_PEER_ROSTER_LIMIT } from "@oh-my-pi/pi-tui/tools/irc";
+import { LIST_STATUS_ORDER } from "@oh-my-striped-pi/pi-tui/tools/irc";
+import { DEFAULT_PEER_ROSTER_LIMIT } from "@oh-my-striped-pi/pi-tui/tools/irc";
 import { normalizeSchema } from "../tools/jtd-to-json-schema";
 import { buildOutputValidator, summarizeValidationFailure } from "../tools/output-schema-validator";
 import { ToolAbortError } from "../tools/tool-errors";
@@ -128,9 +136,9 @@ import {
 	type StructuredSubagentSchemaSource,
 	type TaskToolDetails,
 	type YieldItem,
-} from "@oh-my-pi/pi-tui/tools/task";
+} from "@oh-my-striped-pi/pi-tui/tools/task";
 import { yieldSectionShapes } from "./yield-assembly";
-import { assembleYieldResult } from "@oh-my-pi/pi-tui/tools/task-yield-assembly";
+import { assembleYieldResult } from "@oh-my-striped-pi/pi-tui/tools/task-yield-assembly";
 import {
 	cfgTaskPrewalk,
 	cfgTaskAgentPrewalk,
@@ -160,7 +168,7 @@ import {
 	cfgCompactionThresholdTokens,
 } from "../session/context-settings";
 
-export type { YieldItem } from "@oh-my-pi/pi-tui/tools/task";
+export type { YieldItem } from "@oh-my-striped-pi/pi-tui/tools/task";
 
 const TASK_ABORT_CLEANUP_GRACE_MS = 10_000;
 
@@ -530,7 +538,7 @@ export interface ExecutorOptions {
 	preloadedPreparedExtensions?: readonly PreparedExtension[];
 	/**
 	 * Parent's discovered custom-tool source paths. Forwarded to skip the
-	 * `.omp/tools/` FS scan in the subagent; the subagent then re-binds each
+	 * `.omsp/tools/` FS scan in the subagent; the subagent then re-binds each
 	 * tool against its own `CustomToolAPI` (cwd, exec, pushPendingAction, UI).
 	 */
 	preloadedCustomToolPaths?: ToolPathWithSource[];
@@ -3664,7 +3672,7 @@ export interface FollowUpTurnOptions {
 	message: string;
 	/**
 	 * Go on with the turn the previous process left unfinished instead of sending
-	 * `message` (`omp --restore`: {@link AgentSession.restoreInterruptedTurn}).
+	 * `message` (`omsp --restore`: {@link AgentSession.restoreInterruptedTurn}).
 	 */
 	restore?: boolean;
 	index?: number;

@@ -5,17 +5,17 @@
  * rule of the same name overrides a bundled default (first-wins dedup).
  */
 import { describe, expect, it } from "bun:test";
-import { getCapability } from "@oh-my-pi/pi-coding-agent/capability";
+import { getCapability } from "@oh-my-striped-pi/pi-coding-agent/capability";
 import {
 	BUILTIN_DEFAULTS_PROVIDER_ID,
 	compileRuleCondition,
 	type Rule,
 	ruleCapability,
-} from "@oh-my-pi/pi-coding-agent/capability/rule";
-import type { LoadContext } from "@oh-my-pi/pi-coding-agent/capability/types";
+} from "@oh-my-striped-pi/pi-coding-agent/capability/rule";
+import type { LoadContext } from "@oh-my-striped-pi/pi-coding-agent/capability/types";
 // Register all discovery providers as a side effect.
-import "@oh-my-pi/pi-coding-agent/discovery";
-import { TtsrManager, type TtsrMatchContext } from "@oh-my-pi/pi-coding-agent/export/ttsr";
+import "@oh-my-striped-pi/pi-coding-agent/discovery";
+import { TtsrManager, type TtsrMatchContext } from "@oh-my-striped-pi/pi-coding-agent/export/ttsr";
 
 function ruleProvider() {
 	const cap = getCapability(ruleCapability.id);
@@ -115,7 +115,7 @@ describe("builtin-defaults rule provider", () => {
 
 		manager.resetBuffer();
 		expect(
-			manager.checkDelta('import { isRecord } from "@oh-my-pi/pi-utils";', {
+			manager.checkDelta('import { isRecord } from "@oh-my-striped-pi/pi-utils";', {
 				source: "tool",
 				toolName: "write",
 				filePaths: ["packages/x/src/foo.ts"],
@@ -585,7 +585,7 @@ describe("builtin-defaults rule provider", () => {
 			" * intact: anything that cited the preview's lines can still resolve.",
 			" * (`tallyStep`'s `items`): any of them fails the phase.",
 			"/** `posts.raw_json`, as far as anything reads it back. */",
-			"// The debugging bar shows while omp has any one attached.",
+			"// The debugging bar shows while omsp has any one attached.",
 			"return any?.newest ? { date: any.newest } : {};",
 			"// mapping: any\nconst flag = true;",
 			"const flag = true; // as far as any\nreturn flag;",

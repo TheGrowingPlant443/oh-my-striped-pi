@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	type ResolveOpenAIOutputTokenInput,
 	resolveOpenAIOutputTokenParam,
-} from "@oh-my-pi/pi-ai/providers/openai-shared";
+} from "@oh-my-striped-pi/pi-ai/providers/openai-shared";
 
 const OPENAI_MAX_OUTPUT_TOKENS = 64_000;
 

@@ -19,7 +19,7 @@
 - Improved provider-specific credential usage lookups so they no longer wait for unrelated providers, while preserving cache freshness, cancellation isolation, and complete aggregate reports. The corresponding server-side latency improvement requires an updated auth broker.
 - Added safe credential-usage prefetching during session setup without selecting, pinning, or advancing the OAuth account rotation.
 - Fixed cancelled OAuth refresh requests aborting the entire session, and ensured requests joining an existing refresh can still use the refreshed credential when the original request is cancelled.
-- Fixed short-lived commands that refresh OAuth credentials, such as `omp token --force-refresh`, remaining open for several seconds after completing.
+- Fixed short-lived commands that refresh OAuth credentials, such as `omsp token --force-refresh`, remaining open for several seconds after completing.
 - Fixed forced tool calls on non-reasoning models causing an unhandled reasoning-effort error.
 - Fixed interrupted turns reporting a transport error instead of the caller-provided cancellation reason.
 - Fixed long-running pi-native turns being terminated before their first event by fetch or proxy timeouts by supporting keepalives and the configured first-event timeout.

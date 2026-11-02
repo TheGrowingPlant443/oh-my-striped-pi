@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import type { AgentMessage } from "@oh-my-pi/pi-agent-core";
-import { escapeXmlText, prompt } from "@oh-my-pi/pi-utils";
+import type { AgentMessage } from "@oh-my-striped-pi/pi-agent-core";
+import { escapeXmlText, prompt } from "@oh-my-striped-pi/pi-utils";
 import evalStateContextPrompt from "../prompts/system/eval-state-context.md" with { type: "text" };
 import type { CustomMessage } from "../session/messages";
 import type { ToolSession } from "../tools";

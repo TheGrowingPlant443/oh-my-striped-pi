@@ -2,22 +2,22 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn, vi } from 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { AssistantMessage } from "@oh-my-pi/pi-ai";
-import { closeModelCache } from "@oh-my-pi/pi-catalog/model-cache";
-import type { Rule } from "@oh-my-pi/pi-coding-agent/capability/rule";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { LocalProtocolHandler } from "@oh-my-pi/pi-coding-agent/internal-urls/local-protocol";
-import { AgentLifecycleManager } from "@oh-my-pi/pi-coding-agent/registry/agent-lifecycle";
-import { AgentRegistry } from "@oh-my-pi/pi-coding-agent/registry/agent-registry";
-import { createAgentSession } from "@oh-my-pi/pi-coding-agent/sdk";
-import * as secrets from "@oh-my-pi/pi-coding-agent/secrets";
-import type { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { VibeSessionRegistry } from "@oh-my-pi/pi-coding-agent/vibe/runtime";
-import { getSessionsDir, removeSyncWithRetries, Snowflake } from "@oh-my-pi/pi-utils";
-import { getActiveProfile, getConfigRootDir, setProfile } from "@oh-my-pi/pi-utils/dirs";
+import type { AssistantMessage } from "@oh-my-striped-pi/pi-ai";
+import { closeModelCache } from "@oh-my-striped-pi/pi-catalog/model-cache";
+import type { Rule } from "@oh-my-striped-pi/pi-coding-agent/capability/rule";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import { LocalProtocolHandler } from "@oh-my-striped-pi/pi-coding-agent/internal-urls/local-protocol";
+import { AgentLifecycleManager } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-lifecycle";
+import { AgentRegistry } from "@oh-my-striped-pi/pi-coding-agent/registry/agent-registry";
+import { createAgentSession } from "@oh-my-striped-pi/pi-coding-agent/sdk";
+import * as secrets from "@oh-my-striped-pi/pi-coding-agent/secrets";
+import type { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { VibeSessionRegistry } from "@oh-my-striped-pi/pi-coding-agent/vibe/runtime";
+import { getSessionsDir, removeSyncWithRetries, Snowflake } from "@oh-my-striped-pi/pi-utils";
+import { getActiveProfile, getConfigRootDir, setProfile } from "@oh-my-striped-pi/pi-utils/dirs";
 import { getTestModel } from "./helpers/model-fixtures";
 
 function createTtsrRule(name: string): Rule {
@@ -57,25 +57,25 @@ async function withClearedSecretEnv<T>(run: () => Promise<T>): Promise<T> {
 
 async function withTempConfigRoot<T>(run: () => Promise<T>): Promise<T> {
 	const originalProfile = getActiveProfile();
-	const originalConfigDir = process.env.PI_CONFIG_DIR;
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-	const configDirName = `.omp-sdk-session-${Snowflake.next()}`;
+	const originalConfigDir = process.env.OMSP_CONFIG_DIR;
+	const originalAgentDir = process.env.OMSP_CODING_AGENT_DIR;
+	const configDirName = `.omsp-sdk-session-${Snowflake.next()}`;
 	const configRoot = path.join(os.homedir(), configDirName);
 	try {
-		process.env.PI_CONFIG_DIR = configDirName;
+		process.env.OMSP_CONFIG_DIR = configDirName;
 		setProfile(undefined);
 		return await run();
 	} finally {
 		setProfile(undefined);
 		if (originalConfigDir === undefined) {
-			delete process.env.PI_CONFIG_DIR;
+			delete process.env.OMSP_CONFIG_DIR;
 		} else {
-			process.env.PI_CONFIG_DIR = originalConfigDir;
+			process.env.OMSP_CONFIG_DIR = originalConfigDir;
 		}
 		if (originalAgentDir === undefined) {
-			delete process.env.PI_CODING_AGENT_DIR;
+			delete process.env.OMSP_CODING_AGENT_DIR;
 		} else {
-			process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+			process.env.OMSP_CODING_AGENT_DIR = originalAgentDir;
 		}
 		setProfile(originalProfile);
 		// The model registry opened the shared `<configRoot>/agent/models.db` cache while the
@@ -446,8 +446,8 @@ describe("createAgentSession session storage isolation", () => {
 				existingKeySpy.mockRestore();
 			}
 
-			fs.mkdirSync(path.join(cwd, ".omp"), { recursive: true });
-			fs.writeFileSync(path.join(cwd, ".omp", "secrets.yml"), `- type: plain\n  content: ${configuredSecret}\n`);
+			fs.mkdirSync(path.join(cwd, ".omsp"), { recursive: true });
+			fs.writeFileSync(path.join(cwd, ".omsp", "secrets.yml"), `- type: plain\n  content: ${configuredSecret}\n`);
 
 			const withSecrets = await createAgentSession(commonOptions);
 			try {
@@ -467,9 +467,9 @@ describe("createAgentSession session storage isolation", () => {
 				tempDirs.push(tempDir);
 				const cwd = path.join(tempDir, "project");
 				const agentDir = path.join(tempDir, "agent");
-				fs.mkdirSync(path.join(cwd, ".omp"), { recursive: true });
+				fs.mkdirSync(path.join(cwd, ".omsp"), { recursive: true });
 				fs.writeFileSync(
-					path.join(cwd, ".omp", "secrets.yml"),
+					path.join(cwd, ".omsp", "secrets.yml"),
 					"- type: plain\n  content: sdk-secret-token-123456\n",
 				);
 
@@ -540,7 +540,7 @@ describe("createAgentSession session storage isolation", () => {
 			tempDirs.push(tempDir);
 			const cwd = path.join(tempDir, "project");
 			const agentDir = path.join(tempDir, "agent");
-			fs.mkdirSync(path.join(cwd, ".omp"), { recursive: true });
+			fs.mkdirSync(path.join(cwd, ".omsp"), { recursive: true });
 
 			const commonOptions = {
 				cwd,
@@ -578,7 +578,7 @@ describe("createAgentSession session storage isolation", () => {
 				// Replace-mode secrets never build a reversible keyed placeholder, so
 				// startup must not create the key file; an existing key is still redacted.
 				fs.writeFileSync(
-					path.join(cwd, ".omp", "secrets.yml"),
+					path.join(cwd, ".omsp", "secrets.yml"),
 					"- type: plain\n  mode: replace\n  content: replace-only-secret-123456\n",
 				);
 				const replaceOnly = await createAgentSession(commonOptions);
@@ -597,7 +597,7 @@ describe("createAgentSession session storage isolation", () => {
 				keySpy.mockClear();
 				existingKeySpy.mockClear();
 				fs.writeFileSync(
-					path.join(cwd, ".omp", "secrets.yml"),
+					path.join(cwd, ".omsp", "secrets.yml"),
 					"- type: plain\n  content: obfuscate-secret-123456\n",
 				);
 				const withObfuscate = await createAgentSession(commonOptions);
@@ -620,11 +620,11 @@ describe("createAgentSession session storage isolation", () => {
 			tempDirs.push(tempDir);
 			const cwd = path.join(tempDir, "project");
 			const agentDir = path.join(tempDir, "agent");
-			fs.mkdirSync(path.join(cwd, ".omp"), { recursive: true });
+			fs.mkdirSync(path.join(cwd, ".omsp"), { recursive: true });
 			// Only an ignored short (<8 char) plain obfuscate secret: it never becomes an
 			// active secret, but a previously-created key file must still be redacted and
 			// no new key must be created.
-			fs.writeFileSync(path.join(cwd, ".omp", "secrets.yml"), "- type: plain\n  content: abc\n");
+			fs.writeFileSync(path.join(cwd, ".omsp", "secrets.yml"), "- type: plain\n  content: abc\n");
 
 			const keySpy = spyOn(secrets, "getSecretPlaceholderKey").mockImplementation(
 				async () => "test-placeholder-key",
@@ -670,9 +670,9 @@ describe("createAgentSession session storage isolation", () => {
 				tempDirs.push(tempDir);
 				const cwd = path.join(tempDir, "project");
 				const agentDir = path.join(tempDir, "agent");
-				fs.mkdirSync(path.join(cwd, ".omp"), { recursive: true });
+				fs.mkdirSync(path.join(cwd, ".omsp"), { recursive: true });
 				fs.writeFileSync(
-					path.join(cwd, ".omp", "secrets.yml"),
+					path.join(cwd, ".omsp", "secrets.yml"),
 					"- type: plain\n  content: agent-dir-secret-123456\n",
 				);
 

@@ -16,7 +16,7 @@
  * the item id and `action` with an action id (plus `value` for
  * `scope`/`tab`/`strip`). {@link pickerEvent} folds them into one shape.
  */
-import type { TspPickerAction, TspPickerItem, TspPickerProps, TspProps } from "@oh-my-pi/pi-wire";
+import type { TspPickerAction, TspPickerItem, TspPickerProps, TspProps } from "@oh-my-striped-pi/pi-wire";
 import type { KeyName } from "../key-hint-format";
 import { getKeybindings, type Keybinding } from "../keybindings";
 import type { Input } from "../components/input";
@@ -193,7 +193,7 @@ export interface SelectPickerOptions {
 	readonly subtitle?: string;
 	readonly icon?: string;
 	readonly noun?: string;
-	/** Show omp's filter text as the search field (lists that filter as you type). */
+	/** Show omsp's filter text as the search field (lists that filter as you type). */
 	readonly searchable?: boolean;
 	/** Per-item extras (a thinking-level dot, a swatch mark, a budget fact). */
 	readonly decorate?: (item: SelectItem) => Partial<Omit<TspPickerItem, "id">> | undefined;

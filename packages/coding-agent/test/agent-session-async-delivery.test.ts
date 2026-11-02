@@ -7,39 +7,42 @@
  */
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as path from "node:path";
-import { Agent } from "@oh-my-pi/pi-agent-core";
-import type { ImageContent } from "@oh-my-pi/pi-ai";
-import { createMockModel, type MockModel } from "@oh-my-pi/pi-ai/providers/mock";
-import { getBundledModel } from "@oh-my-pi/pi-catalog/models";
-import { AsyncJobManager } from "@oh-my-pi/pi-coding-agent/async";
-import type { AsyncJob } from "@oh-my-pi/pi-coding-agent/async/job-manager";
-import { ModelRegistry } from "@oh-my-pi/pi-coding-agent/config/model-registry";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
-import { ExtensionRuntime, loadExtensionFromFactory } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/loader";
-import { ExtensionRunner } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/runner";
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
-import type { DaemonCompletionNotification } from "@oh-my-pi/pi-coding-agent/launch/protocol";
-import { buildAsyncResultBlock } from "@oh-my-pi/pi-tui/chat/transcript-render-helpers";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
-import { AgentSession } from "@oh-my-pi/pi-coding-agent/session/agent-session";
-import { ArtifactManager } from "@oh-my-pi/pi-coding-agent/session/artifacts";
+import { Agent } from "@oh-my-striped-pi/pi-agent-core";
+import type { ImageContent } from "@oh-my-striped-pi/pi-ai";
+import { createMockModel, type MockModel } from "@oh-my-striped-pi/pi-ai/providers/mock";
+import { getBundledModel } from "@oh-my-striped-pi/pi-catalog/models";
+import { AsyncJobManager } from "@oh-my-striped-pi/pi-coding-agent/async";
+import type { AsyncJob } from "@oh-my-striped-pi/pi-coding-agent/async/job-manager";
+import { ModelRegistry } from "@oh-my-striped-pi/pi-coding-agent/config/model-registry";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
+import {
+	ExtensionRuntime,
+	loadExtensionFromFactory,
+} from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/loader";
+import { ExtensionRunner } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/runner";
+import type { ExtensionAPI } from "@oh-my-striped-pi/pi-coding-agent/extensibility/extensions/types";
+import type { DaemonCompletionNotification } from "@oh-my-striped-pi/pi-coding-agent/launch/protocol";
+import { buildAsyncResultBlock } from "@oh-my-striped-pi/pi-tui/chat/transcript-render-helpers";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
+import { AgentSession } from "@oh-my-striped-pi/pi-coding-agent/session/agent-session";
+import { ArtifactManager } from "@oh-my-striped-pi/pi-coding-agent/session/artifacts";
 import {
 	buildAsyncResultBatchMessage,
 	type AsyncResultDetails,
 	type AsyncResultEntry,
-} from "@oh-my-pi/pi-coding-agent/session/async-job-delivery";
-import { AuthStorage } from "@oh-my-pi/pi-coding-agent/session/auth-storage";
-import { convertToLlm, type CustomMessage } from "@oh-my-pi/pi-coding-agent/session/messages";
-import { SessionManager } from "@oh-my-pi/pi-coding-agent/session/session-manager";
-import { formatTaskResultSummary, INLINE_OUTPUT_CHARS } from "@oh-my-pi/pi-coding-agent/task/result-summary";
+} from "@oh-my-striped-pi/pi-coding-agent/session/async-job-delivery";
+import { AuthStorage } from "@oh-my-striped-pi/pi-coding-agent/session/auth-storage";
+import { convertToLlm, type CustomMessage } from "@oh-my-striped-pi/pi-coding-agent/session/messages";
+import { SessionManager } from "@oh-my-striped-pi/pi-coding-agent/session/session-manager";
+import { formatTaskResultSummary, INLINE_OUTPUT_CHARS } from "@oh-my-striped-pi/pi-coding-agent/task/result-summary";
 
-import type { ToolSession } from "@oh-my-pi/pi-coding-agent/tools";
-import { BashTool } from "@oh-my-pi/pi-coding-agent/tools/bash";
-import { type OutputMeta } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { formatOutputNotice } from "@oh-my-pi/pi-tui/tools/output-meta";
-import { ReadTool } from "@oh-my-pi/pi-coding-agent/tools/read";
-import { EventBus } from "@oh-my-pi/pi-coding-agent/utils/event-bus";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import type { ToolSession } from "@oh-my-striped-pi/pi-coding-agent/tools";
+import { BashTool } from "@oh-my-striped-pi/pi-coding-agent/tools/bash";
+import { type OutputMeta } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { formatOutputNotice } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
+import { ReadTool } from "@oh-my-striped-pi/pi-coding-agent/tools/read";
+import { EventBus } from "@oh-my-striped-pi/pi-coding-agent/utils/event-bus";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 function observeAsyncResultEnqueue(session: AgentSession): Promise<void> {
 	const queued = Promise.withResolvers<void>();
 	const enqueue = session.yieldQueue.enqueueWithReceipt.bind(session.yieldQueue);

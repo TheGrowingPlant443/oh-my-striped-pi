@@ -2,16 +2,16 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { Api, AssistantMessage, completeSimple, Model } from "@oh-my-pi/pi-ai";
-import type { ModelSpec } from "@oh-my-pi/pi-ai/types";
-import { buildModel } from "@oh-my-pi/pi-catalog/build";
-import { Settings } from "@oh-my-pi/pi-coding-agent/config/settings";
+import type { Api, AssistantMessage, completeSimple, Model } from "@oh-my-striped-pi/pi-ai";
+import type { ModelSpec } from "@oh-my-striped-pi/pi-ai/types";
+import { buildModel } from "@oh-my-striped-pi/pi-catalog/build";
+import { Settings } from "@oh-my-striped-pi/pi-coding-agent/config/settings";
 import {
 	type DescribeAttachedImagesDeps,
 	describeAttachedImagesForTextModel,
-} from "@oh-my-pi/pi-coding-agent/utils/image-vision-fallback";
-import { CostGate } from "@oh-my-pi/pi-coding-agent/session/cost-gate";
-import { removeWithRetries } from "@oh-my-pi/pi-utils";
+} from "@oh-my-striped-pi/pi-coding-agent/utils/image-vision-fallback";
+import { CostGate } from "@oh-my-striped-pi/pi-coding-agent/session/cost-gate";
+import { removeWithRetries } from "@oh-my-striped-pi/pi-utils";
 
 // 1x1 transparent PNG.
 const TINY_PNG_BASE64 =

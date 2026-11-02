@@ -2,10 +2,10 @@
  * Show what the read tool will return for a path, URL, or internal URI.
  */
 
-import { Args, Command } from "@oh-my-pi/pi-utils/cli";
+import { Args, Command } from "@oh-my-striped-pi/pi-utils/cli";
 import { readHelp as commandHelp } from "../cli/command-help";
 import { type ReadCommandArgs, runReadCommand } from "../cli/read-cli";
-import { initTheme } from "@oh-my-pi/pi-tui/theme";
+import { initTheme } from "@oh-my-striped-pi/pi-tui/theme";
 
 export default class Read extends Command {
 	static description = commandHelp.description;
@@ -18,14 +18,14 @@ export default class Read extends Command {
 	};
 
 	static examples = [
-		"omp read src/foo.ts",
-		"omp read src/foo.ts:50-100",
-		"omp read src/foo.ts:raw",
-		"omp read https://example.com",
-		"omp read omp://",
-		"omp read issue://123",
-		"omp read path/to/archive.zip:dir/file.ts",
-		"omp read path/to/db.sqlite:users:42",
+		"omsp read src/foo.ts",
+		"omsp read src/foo.ts:50-100",
+		"omsp read src/foo.ts:raw",
+		"omsp read https://example.com",
+		"omsp read omsp://",
+		"omsp read issue://123",
+		"omsp read path/to/archive.zip:dir/file.ts",
+		"omsp read path/to/db.sqlite:users:42",
 	];
 
 	async run(): Promise<void> {

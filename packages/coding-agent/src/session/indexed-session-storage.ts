@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { toError } from "@oh-my-pi/pi-utils";
+import { toError } from "@oh-my-striped-pi/pi-utils";
 import {
 	directChildKeyName,
 	SessionWriteConflictError,

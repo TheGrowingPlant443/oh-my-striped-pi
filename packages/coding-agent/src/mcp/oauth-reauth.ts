@@ -14,8 +14,8 @@
  * shown, and (TUI only) where manual code input comes from.
  */
 import * as path from "node:path";
-import { getMCPConfigPath, getProjectDir } from "@oh-my-pi/pi-utils";
-import type { OAuthController } from "@oh-my-pi/pi-ai/oauth/types";
+import { getMCPConfigPath, getProjectDir } from "@oh-my-striped-pi/pi-utils";
+import type { OAuthController } from "@oh-my-striped-pi/pi-ai/oauth/types";
 import { expandEnvVarsDeep } from "../discovery/helpers";
 import { connectToServer, disconnectServer } from "./client";
 import { readMCPConfigFile, updateMCPServer } from "./config-writer";
@@ -380,7 +380,7 @@ export async function resolveMcpOAuthEndpointsFromServer(
 		cwd?: string;
 	},
 ): Promise<OAuthEndpoints> {
-	// Stdio servers manage credentials inside the child process; OMP's OAuth
+	// Stdio servers manage credentials inside the child process; OMSP's OAuth
 	// flow only applies to http/sse transports. Without this guard the
 	// unauthenticated preflight below spawns the child, which happily reuses
 	// its own cached tokens (e.g. mcp-remote's machine-wide ~/.mcp-auth) and
@@ -391,8 +391,8 @@ export async function resolveMcpOAuthEndpointsFromServer(
 		const usesMcpRemote = [config.command, ...(config.args ?? [])].some(part => part?.includes("mcp-remote"));
 		throw new McpReauthRefusalError(
 			usesMcpRemote
-				? `this server proxies OAuth through mcp-remote, which caches tokens machine-wide in ~/.mcp-auth (shared across every OMP profile). Clear ~/.mcp-auth to force a fresh login, or replace the proxy with ${httpHint} so OMP manages OAuth per profile.`
-				: `stdio servers manage their own credentials, so OMP has no OAuth to reauthorize. If the service supports OAuth over HTTP, configure it as ${httpHint} instead.`,
+				? `this server proxies OAuth through mcp-remote, which caches tokens machine-wide in ~/.mcp-auth (shared across every OMSP profile). Clear ~/.mcp-auth to force a fresh login, or replace the proxy with ${httpHint} so OMSP manages OAuth per profile.`
+				: `stdio servers manage their own credentials, so OMSP has no OAuth to reauthorize. If the service supports OAuth over HTTP, configure it as ${httpHint} instead.`,
 		);
 	}
 	let connectionSucceeded = false;

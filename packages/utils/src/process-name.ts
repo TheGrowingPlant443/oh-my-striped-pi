@@ -1,10 +1,10 @@
 /**
- * Set the OS-visible process name (`/proc/self/comm`) so `omp` shows up as
- * `omp` — not `bun` — in `ps`, `pgrep`, `killall`, `top`, `htop`, and systemd.
+ * Set the OS-visible process name (`/proc/self/comm`) so `omsp` shows up as
+ * `omsp` — not `bun` — in `ps`, `pgrep`, `killall`, `top`, `htop`, and systemd.
  *
  * Bun's `process.title` setter only stores the value on the JS side; unlike
  * Node/libuv it never calls `prctl(PR_SET_NAME)`, so the kernel's `comm` stays
- * `bun` and process-name-based tooling can't target omp (and `pkill bun` becomes
+ * `bun` and process-name-based tooling can't target omsp (and `pkill bun` becomes
  * a footgun that kills every Bun process on the machine). We keep the
  * `process.title` assignment (correct getter, future-proof if Bun ever fixes the
  * setter) and additionally drive `prctl` via `bun:ffi` on Linux, mirroring the
@@ -13,7 +13,7 @@
  * macOS has no clean userspace equivalent for the shebang-run path, so there
  * we only set `process.title`. Windows derives the name from the exec'd file,
  * and there Bun's `process.title` setter is libuv's `SetConsoleTitleW`: every
- * omp child attached to a pane's console (workers, `browser-relay`, servers)
+ * omsp child attached to a pane's console (workers, `browser-relay`, servers)
  * would overwrite that pane's tab title, so Windows skips it entirely.
  */
 import { dlopen, FFIType, ptr } from "bun:ffi";

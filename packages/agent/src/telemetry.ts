@@ -2,7 +2,7 @@
  * OpenTelemetry instrumentation for the agent loop.
  *
  * Implements the OpenTelemetry GenAI semantic conventions
- * (https://opentelemetry.io/docs/specs/semconv/gen-ai/) plus `omp.gen_ai.*`
+ * (https://opentelemetry.io/docs/specs/semconv/gen-ai/) plus `omsp.gen_ai.*`
  * extension attributes for run summaries, dashboard summaries, and cost hints
  * that are useful to downstream observability UIs.
  *
@@ -38,7 +38,7 @@ import {
 	shouldSendServiceTier,
 	type ToolChoice,
 	type Usage,
-} from "@oh-my-pi/pi-ai";
+} from "@oh-my-striped-pi/pi-ai";
 import {
 	type Attributes,
 	type AttributeValue,
@@ -53,7 +53,7 @@ import { AgentRunCollector, type AgentRunCoverage, type AgentRunSummary, type To
 import type { AgentTool } from "./types";
 
 /** Default tracer name. Override via {@link AgentTelemetryConfig.tracerName}. */
-export const DEFAULT_TRACER_NAME = "@oh-my-pi/pi-agent-core";
+export const DEFAULT_TRACER_NAME = "@oh-my-striped-pi/pi-agent-core";
 
 /** Env var matching the OTEL semconv content-capture toggle. */
 const CONTENT_CAPTURE_ENV = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT";
@@ -125,47 +125,47 @@ export const enum OpenAIAttr {
 
 /** Project extension attributes. Kept out of the reserved `gen_ai.*` namespace. */
 export const enum OmpGenAIAttr {
-	AgentStepNumber = "omp.gen_ai.agent.step.number",
-	AgentStepCount = "omp.gen_ai.agent.step.count",
-	RequestReasoningEffort = "omp.gen_ai.request.reasoning.effort",
-	RequestToolChoice = "omp.gen_ai.request.tool.choice",
-	RequestAvailableTools = "omp.gen_ai.request.available_tools",
-	RequestMessages = "omp.gen_ai.request.messages",
-	ResponseText = "omp.gen_ai.response.text",
-	ResponseToolCalls = "omp.gen_ai.response.tool_calls",
-	ResponseUpstreamProvider = "omp.gen_ai.response.upstream_provider",
-	UsageTotalTokens = "omp.gen_ai.usage.total_tokens",
-	UsageServerSideTools = "omp.gen_ai.usage.server_tool_requests",
-	CostEstimatedUsd = "omp.gen_ai.cost.estimated_usd",
-	CostInputUsd = "omp.gen_ai.cost.input_usd",
-	CostOutputUsd = "omp.gen_ai.cost.output_usd",
-	CostUnavailableReason = "omp.gen_ai.cost.unavailable_reason",
-	ToolStatus = "omp.gen_ai.tool.status",
-	ToolCallIntent = "omp.gen_ai.tool.call.intent",
-	HandoffFromAgentName = "omp.gen_ai.handoff.from_agent.name",
-	HandoffFromAgentId = "omp.gen_ai.handoff.from_agent.id",
-	HandoffToAgentName = "omp.gen_ai.handoff.to_agent.name",
-	HandoffToAgentId = "omp.gen_ai.handoff.to_agent.id",
+	AgentStepNumber = "omsp.gen_ai.agent.step.number",
+	AgentStepCount = "omsp.gen_ai.agent.step.count",
+	RequestReasoningEffort = "omsp.gen_ai.request.reasoning.effort",
+	RequestToolChoice = "omsp.gen_ai.request.tool.choice",
+	RequestAvailableTools = "omsp.gen_ai.request.available_tools",
+	RequestMessages = "omsp.gen_ai.request.messages",
+	ResponseText = "omsp.gen_ai.response.text",
+	ResponseToolCalls = "omsp.gen_ai.response.tool_calls",
+	ResponseUpstreamProvider = "omsp.gen_ai.response.upstream_provider",
+	UsageTotalTokens = "omsp.gen_ai.usage.total_tokens",
+	UsageServerSideTools = "omsp.gen_ai.usage.server_tool_requests",
+	CostEstimatedUsd = "omsp.gen_ai.cost.estimated_usd",
+	CostInputUsd = "omsp.gen_ai.cost.input_usd",
+	CostOutputUsd = "omsp.gen_ai.cost.output_usd",
+	CostUnavailableReason = "omsp.gen_ai.cost.unavailable_reason",
+	ToolStatus = "omsp.gen_ai.tool.status",
+	ToolCallIntent = "omsp.gen_ai.tool.call.intent",
+	HandoffFromAgentName = "omsp.gen_ai.handoff.from_agent.name",
+	HandoffFromAgentId = "omsp.gen_ai.handoff.from_agent.id",
+	HandoffToAgentName = "omsp.gen_ai.handoff.to_agent.name",
+	HandoffToAgentId = "omsp.gen_ai.handoff.to_agent.id",
 	// Marks chat spans emitted outside the agent loop (compaction, handoff, branch
 	// summary, image inspection, …). Lets dashboards split oneshot cost / latency
 	// from main-turn cost without overloading the semconv `gen_ai.operation.name`.
-	OneshotKind = "omp.gen_ai.oneshot.kind",
+	OneshotKind = "omsp.gen_ai.oneshot.kind",
 	// Gateway / proxy (LiteLLM, Helicone, Portkey, …) — populated when a known
 	// gateway header pattern is detected on the upstream response. The base
 	// `gen_ai.provider.name` continues to track the *upstream* provider (e.g.
 	// `anthropic`) that the gateway routed to.
-	GatewayName = "omp.gen_ai.gateway.name",
-	GatewayEndpoint = "omp.gen_ai.gateway.endpoint",
-	GatewayCallId = "omp.gen_ai.gateway.call_id",
-	GatewayRoutedTo = "omp.gen_ai.gateway.routed_to",
+	GatewayName = "omsp.gen_ai.gateway.name",
+	GatewayEndpoint = "omsp.gen_ai.gateway.endpoint",
+	GatewayCallId = "omsp.gen_ai.gateway.call_id",
+	GatewayRoutedTo = "omsp.gen_ai.gateway.routed_to",
 	/** Cloudflare AI Gateway response-cache status (`cf-aig-cache-status`), never prompt-cache. */
-	GatewayResponseCacheStatus = "omp.gen_ai.gateway.response_cache.status",
+	GatewayResponseCacheStatus = "omsp.gen_ai.gateway.response_cache.status",
 	/** Caller-level reason a judgment ran (`find`, `ttsr`, `judge_batch`, …). */
-	JudgmentPurpose = "omp.gen_ai.judgment.purpose",
+	JudgmentPurpose = "omsp.gen_ai.judgment.purpose",
 	/** Questions the caller asked in one judgment request. */
-	JudgmentQuestions = "omp.gen_ai.judgment.questions",
+	JudgmentQuestions = "omsp.gen_ai.judgment.questions",
 	/** Questions answered from the local judgment cache instead of the provider. */
-	JudgmentCachedQuestions = "omp.gen_ai.judgment.cached_questions",
+	JudgmentCachedQuestions = "omsp.gen_ai.judgment.cached_questions",
 }
 
 /** GenAI operation names — values for {@link GenAIAttr.OperationName}. */
@@ -219,9 +219,9 @@ export interface CostEstimatorContext {
 
 /**
  * Cost estimator result.
- *   { usd: number }                — cost is known; emitted as omp.gen_ai.cost.estimated_usd
+ *   { usd: number }                — cost is known; emitted as omsp.gen_ai.cost.estimated_usd
  *   { unavailable: string }        — cost is intentionally unknown; emitted as
- *                                    omp.gen_ai.cost.unavailable_reason
+ *                                    omsp.gen_ai.cost.unavailable_reason
  *   undefined                      — no opinion; nothing emitted
  */
 export type CostEstimate =
@@ -270,7 +270,7 @@ export interface ChatUsageEvent {
 	 *
 	 * Use this to reconcile gateway-issued ids (e.g. `x-litellm-call-id`) with
 	 * downstream billing / spend dashboards. Known gateway patterns are also
-	 * auto-stamped on the chat span as `omp.gen_ai.gateway.*` attributes.
+	 * auto-stamped on the chat span as `omsp.gen_ai.gateway.*` attributes.
 	 */
 	readonly headers: Readonly<Record<string, string>> | undefined;
 }
@@ -1755,7 +1755,7 @@ export interface InstrumentedChatSpanOptions {
 	/** Step index recorded on the span; defaults to `-1` for non-loop calls. */
 	readonly stepNumber?: number;
 	/**
-	 * Tag stamped onto `omp.gen_ai.oneshot.kind`. Values used by the agent:
+	 * Tag stamped onto `omsp.gen_ai.oneshot.kind`. Values used by the agent:
 	 * `compaction_summary`, `compaction_short_summary`, `compaction_turn_prefix`,
 	 * `handoff`, `branch_summary`, `image_question`, `skill_description`. Free-form
 	 * to allow callers outside this package to add new kinds without bumping the helper.
@@ -1765,7 +1765,7 @@ export interface InstrumentedChatSpanOptions {
 	readonly attributes?: Attributes;
 	/**
 	 * Override for the underlying {@link completeSimple} call. Defaults to
-	 * `completeSimple` from `@oh-my-pi/pi-ai`. Use to retain a test injection
+	 * `completeSimple` from `@oh-my-striped-pi/pi-ai`. Use to retain a test injection
 	 * seam while still going through the chat-span lifecycle.
 	 */
 	readonly completeImpl?: <TApi extends Api>(
@@ -2076,33 +2076,33 @@ export function fireOnRunEnd(telemetry: AgentTelemetry, summary: AgentRunSummary
 	}
 }
 
-/** Aggregate `omp.gen_ai.agent.*` attributes stamped on the `invoke_agent` span. */
+/** Aggregate `omsp.gen_ai.agent.*` attributes stamped on the `invoke_agent` span. */
 export const enum OmpGenAIAggregateAttr {
-	ChatsCount = "omp.gen_ai.agent.chats.count",
-	ChatsTotalLatencyMs = "omp.gen_ai.agent.chats.total_latency_ms",
-	ChatsStopReasonPrefix = "omp.gen_ai.agent.chats.stop_reason.",
-	ToolsCount = "omp.gen_ai.agent.tools.count",
-	ToolsOkCount = "omp.gen_ai.agent.tools.ok.count",
-	ToolsErrorCount = "omp.gen_ai.agent.tools.error.count",
-	ToolsSkippedCount = "omp.gen_ai.agent.tools.skipped.count",
-	ToolsBlockedCount = "omp.gen_ai.agent.tools.blocked.count",
-	ToolsTimeoutCount = "omp.gen_ai.agent.tools.timeout.count",
-	ToolsAbortedCount = "omp.gen_ai.agent.tools.aborted.count",
-	ToolsTotalLatencyMs = "omp.gen_ai.agent.tools.total_latency_ms",
-	ToolsInvoked = "omp.gen_ai.agent.tools.invoked",
-	ToolsAvailable = "omp.gen_ai.agent.tools.available",
-	ToolsUnused = "omp.gen_ai.agent.tools.unused",
-	UsageInputTokensTotal = "omp.gen_ai.agent.usage.input_tokens.total",
-	UsageOutputTokensTotal = "omp.gen_ai.agent.usage.output_tokens.total",
-	UsageCacheReadInputTokensTotal = "omp.gen_ai.agent.usage.cache_read.input_tokens.total",
-	UsageCacheCreationInputTokensTotal = "omp.gen_ai.agent.usage.cache_creation.input_tokens.total",
-	UsageReasoningOutputTokensTotal = "omp.gen_ai.agent.usage.reasoning.output_tokens.total",
-	UsageTotalTokensTotal = "omp.gen_ai.agent.usage.total_tokens.total",
-	CostEstimatedUsdTotal = "omp.gen_ai.agent.cost.estimated_usd.total",
-	ErrorsCount = "omp.gen_ai.agent.errors.count",
+	ChatsCount = "omsp.gen_ai.agent.chats.count",
+	ChatsTotalLatencyMs = "omsp.gen_ai.agent.chats.total_latency_ms",
+	ChatsStopReasonPrefix = "omsp.gen_ai.agent.chats.stop_reason.",
+	ToolsCount = "omsp.gen_ai.agent.tools.count",
+	ToolsOkCount = "omsp.gen_ai.agent.tools.ok.count",
+	ToolsErrorCount = "omsp.gen_ai.agent.tools.error.count",
+	ToolsSkippedCount = "omsp.gen_ai.agent.tools.skipped.count",
+	ToolsBlockedCount = "omsp.gen_ai.agent.tools.blocked.count",
+	ToolsTimeoutCount = "omsp.gen_ai.agent.tools.timeout.count",
+	ToolsAbortedCount = "omsp.gen_ai.agent.tools.aborted.count",
+	ToolsTotalLatencyMs = "omsp.gen_ai.agent.tools.total_latency_ms",
+	ToolsInvoked = "omsp.gen_ai.agent.tools.invoked",
+	ToolsAvailable = "omsp.gen_ai.agent.tools.available",
+	ToolsUnused = "omsp.gen_ai.agent.tools.unused",
+	UsageInputTokensTotal = "omsp.gen_ai.agent.usage.input_tokens.total",
+	UsageOutputTokensTotal = "omsp.gen_ai.agent.usage.output_tokens.total",
+	UsageCacheReadInputTokensTotal = "omsp.gen_ai.agent.usage.cache_read.input_tokens.total",
+	UsageCacheCreationInputTokensTotal = "omsp.gen_ai.agent.usage.cache_creation.input_tokens.total",
+	UsageReasoningOutputTokensTotal = "omsp.gen_ai.agent.usage.reasoning.output_tokens.total",
+	UsageTotalTokensTotal = "omsp.gen_ai.agent.usage.total_tokens.total",
+	CostEstimatedUsdTotal = "omsp.gen_ai.agent.cost.estimated_usd.total",
+	ErrorsCount = "omsp.gen_ai.agent.errors.count",
 }
 
-/** Stamp the aggregate `omp.gen_ai.agent.*` attributes on the given span. */
+/** Stamp the aggregate `omsp.gen_ai.agent.*` attributes on the given span. */
 function applyAggregateAttributes(span: Span, summary: AgentRunSummary, coverage: AgentRunCoverage): void {
 	span.setAttribute(OmpGenAIAggregateAttr.ChatsCount, summary.chats.total);
 	span.setAttribute(OmpGenAIAggregateAttr.ChatsTotalLatencyMs, summary.chats.totalLatencyMs);

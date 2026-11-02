@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { describe, expect, it } from "bun:test";
-import { colorToAnsi, detectColorMode } from "@oh-my-pi/pi-tui/theme/color";
+import { colorToAnsi, detectColorMode } from "@oh-my-striped-pi/pi-tui/theme/color";
 
 describe("theme color mode", () => {
 	it("emits 256-color SGR for macOS Terminal.app", () => {
@@ -26,7 +26,7 @@ describe("theme color mode", () => {
 			{
 				cwd: path.resolve(import.meta.dir, "../../.."),
 				// Only what the child needs to run: any inherited terminal identity (TMUX, WT_SESSION,
-				// NO_COLOR, FORCE_COLOR, a parent omp's overrides, …) would change the detected color depth.
+				// NO_COLOR, FORCE_COLOR, a parent omsp's overrides, …) would change the detected color depth.
 				env: {
 					PATH: process.env.PATH,
 					HOME: process.env.HOME,

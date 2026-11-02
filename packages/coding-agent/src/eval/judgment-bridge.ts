@@ -22,9 +22,9 @@ import type {
 	Question,
 	Questions,
 	ScoreQuestion,
-} from "@oh-my-pi/pi-ai";
-import { isRecord } from "@oh-my-pi/pi-utils";
-import { isEmbeddedImageContent } from "@oh-my-pi/pi-ai/judgment";
+} from "@oh-my-striped-pi/pi-ai";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
+import { isEmbeddedImageContent } from "@oh-my-striped-pi/pi-ai/judgment";
 import type { LoadedImageInput } from "../utils/image-loading";
 import { loadImageAttachmentInput, loadImageInput, loadSvgImageInput } from "../utils/image-loading";
 import {
@@ -34,7 +34,7 @@ import {
 	resolveJudge,
 	sharedJudgmentCache,
 } from "../judgment";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { withBridgeTimeoutPause } from "./bridge-timeout";
 import { type EvalCompletionBridgeOptions, evalRequestSlots } from "./completion-bridge";
 

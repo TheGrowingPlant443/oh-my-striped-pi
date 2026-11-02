@@ -1,4 +1,4 @@
-import { logger, sanitizeText, truncate } from "@oh-my-pi/pi-utils";
+import { logger, sanitizeText, truncate } from "@oh-my-striped-pi/pi-utils";
 import { findPersistedRecall, persistRecall } from "../memory-backend/recall-entry";
 import type { MemoryPromptPreparation } from "../memory-backend/types";
 import type { AgentSession } from "../session/agent-session";

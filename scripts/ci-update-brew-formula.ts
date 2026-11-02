@@ -1,24 +1,30 @@
 #!/usr/bin/env bun
 //
-// Render the Homebrew formula for `omp` from a GitHub release and write it to
+// Render the Homebrew formula for `omsp` from a GitHub release and write it to
 // a tap checkout. Each formula target points at the release asset with the
 // sha256 listed in the release's SHA256SUMS.txt, so the formula never drifts
 // from the shipped binaries. Fails when the release lacks a formula target.
 //
 // Usage:
-//   bun scripts/ci-update-brew-formula.ts <tag> --out <path/to/Formula/omp.rb>
+//   bun scripts/ci-update-brew-formula.ts <tag> --out <path/to/Formula/omsp.rb>
 //   bun scripts/ci-update-brew-formula.ts v18.8.9        # prints to stdout
 
-const HOMEPAGE = "https://omp.sh";
+if (import.meta.main) {
+	throw new Error(
+		"Public Homebrew distribution is disabled for oh-my-striped-pi. Build from the source checkout or with Nix.",
+	);
+}
+
+const HOMEPAGE = "https://github.com/TheGrowingPlant443/oh-my-striped-pi";
 const DESC = "Coding agent with the IDE wired in";
-const RELEASE_DOWNLOAD_URL = "https://github.com/can1357/oh-my-pi/releases/download";
+const RELEASE_DOWNLOAD_URL = "https://github.com/TheGrowingPlant443/oh-my-striped-pi/releases/download";
 
 /** Release asset name of each formula stanza. */
 const FORMULA_TARGETS = {
-	macosArm: "omp-darwin-arm64",
-	macosIntel: "omp-darwin-x64",
-	linuxArm: "omp-linux-arm64",
-	linuxIntel: "omp-linux-x64",
+	macosArm: "omsp-darwin-arm64",
+	macosIntel: "omsp-darwin-x64",
+	linuxArm: "omsp-linux-arm64",
+	linuxIntel: "omsp-linux-x64",
 } as const;
 
 type FormulaTarget = keyof typeof FORMULA_TARGETS;
@@ -60,12 +66,12 @@ export function renderFormula(version: string, files: Record<FormulaTarget, Form
 	// Each `url` carries `using: :nounzip` because the build files are bare
 	// Mach-O/ELF executables, not archives. Without it Homebrew's default
 	// CurlDownloadStrategy routes through UnpackStrategy::Uncompressed#extract_nestedly,
-	// which nests the file outside the staging CWD; `Dir["omp-*"].first` then
-	// returns `nil` and `bin.install nil => "omp"` raises.
+	// which nests the file outside the staging CWD; `Dir["omsp-*"].first` then
+	// returns `nil` and `bin.install nil => "omsp"` raises.
 	//
 	// `with_env(HOME: buildpath)` redirects the CLI's `os.homedir()` lookup to
 	// the writable staging dir so `generate_completions_from_executable` does
-	// not touch the real `/Users/<user>/.omp` (denied by Homebrew's sandbox
+	// not touch the real `/Users/<user>/.omsp` (denied by Homebrew's sandbox
 	// profile, which would otherwise fail the popen).
 	return `class Omp < Formula
   desc "${DESC}"
@@ -100,15 +106,15 @@ export function renderFormula(version: string, files: Record<FormulaTarget, Form
   end
 
   def install
-    bin.install Dir["omp-*"].first => "omp"
-    (bin/"omp").chmod 0555
+    bin.install Dir["omsp-*"].first => "omsp"
+    (bin/"omsp").chmod 0555
     with_env(HOME: buildpath) do
-      generate_completions_from_executable(bin/"omp", "completions", shells: [:bash, :zsh, :fish])
+      generate_completions_from_executable(bin/"omsp", "completions", shells: [:bash, :zsh, :fish])
     end
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/omp --version")
+    assert_match version.to_s, shell_output("#{bin}/omsp --version")
   end
 end
 `;

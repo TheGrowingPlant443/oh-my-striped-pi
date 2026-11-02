@@ -1,4 +1,4 @@
-import { classifyJsonPrefix, parseJsonWithRepair } from "@oh-my-pi/pi-utils";
+import { classifyJsonPrefix, parseJsonWithRepair } from "@oh-my-striped-pi/pi-utils";
 import type { Message, ToolCall } from "../types";
 import { parseToolCallArguments } from "../utils/tool-call-arguments";
 import { asRecord, mintToolCallId, partialSuffixOverlapAny } from "./coercion";

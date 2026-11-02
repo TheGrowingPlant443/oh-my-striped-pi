@@ -3,14 +3,14 @@ import {
 	type AgentToolResult,
 	type AgentToolUpdateCallback,
 	validateAgentToolArguments,
-} from "@oh-my-pi/pi-agent-core";
-import { type ImageContent, toolWireSchema } from "@oh-my-pi/pi-ai";
-import { isRecord } from "@oh-my-pi/pi-utils";
-import { INTENT_FIELD } from "@oh-my-pi/pi-wire";
+} from "@oh-my-striped-pi/pi-agent-core";
+import { type ImageContent, toolWireSchema } from "@oh-my-striped-pi/pi-ai";
+import { isRecord } from "@oh-my-striped-pi/pi-utils";
+import { INTENT_FIELD } from "@oh-my-striped-pi/pi-wire";
 import type { ToolSession } from "../../tools";
 import { committedTodoPhases } from "../../tools/todo";
-import { parseMCPProgress } from "@oh-my-pi/pi-tui/tools/mcp";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { parseMCPProgress } from "@oh-my-striped-pi/pi-tui/tools/mcp";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { schemaDeclaresIntentField } from "../../utils/tool-schema";
 import { findEnabledEvalPrelude, invokeEvalPrelude } from "../preludes";
 import { EVAL_AGENT_BRIDGE_NAME, type EvalAgentHandleResult, runEvalAgent } from "../agent-bridge";

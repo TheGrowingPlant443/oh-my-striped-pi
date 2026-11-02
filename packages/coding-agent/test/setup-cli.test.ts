@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { TempDir } from "@oh-my-pi/pi-utils";
+import { TempDir } from "@oh-my-striped-pi/pi-utils";
 import { checkPythonSetup } from "../src/cli/setup-cli";
 import { Settings } from "../src/config/settings";
 import { restoreEnvValue } from "./helpers/settings-test-state";
@@ -23,7 +23,7 @@ async function runSetupPython(cwd: string): Promise<CliProcessResult> {
 	const env: NodeJS.ProcessEnv = {
 		...process.env,
 		NO_COLOR: "1",
-		PI_CODING_AGENT_DIR: path.join(cwd, "agent"),
+		OMSP_CODING_AGENT_DIR: path.join(cwd, "agent"),
 	};
 	delete env.VIRTUAL_ENV;
 	delete env.CONDA_DEFAULT_ENV;
@@ -44,7 +44,7 @@ async function runSetup(cwd: string, ...setupArgs: string[]): Promise<CliProcess
 	const env: NodeJS.ProcessEnv = {
 		...process.env,
 		NO_COLOR: "1",
-		PI_CODING_AGENT_DIR: path.join(cwd, "agent"),
+		OMSP_CODING_AGENT_DIR: path.join(cwd, "agent"),
 	};
 	const proc = Bun.spawn([process.execPath, cliEntry, "setup", ...setupArgs], {
 		cwd,
@@ -79,7 +79,7 @@ function hideActivePythonEnv(): () => void {
 	};
 }
 
-describe("omp setup python", () => {
+describe("omsp setup python", () => {
 	let projectDir: TempDir | undefined;
 
 	afterEach(async () => {
@@ -91,12 +91,12 @@ describe("omp setup python", () => {
 	it.skipIf(process.platform === "win32")(
 		"probes the project-configured interpreter instead of the PATH interpreter",
 		async () => {
-			projectDir = TempDir.createSync("@omp-setup-python-");
+			projectDir = TempDir.createSync("@omsp-setup-python-");
 			const cwd = projectDir.path();
 			const interpreter = path.join(cwd, "configured-python");
 			await Bun.write(interpreter, "#!/bin/sh\nexit 0\n");
 			await fs.chmod(interpreter, 0o755);
-			await Bun.write(path.join(cwd, ".omp", "config.yml"), `python:\n  interpreter: ${interpreter}\n`);
+			await Bun.write(path.join(cwd, ".omsp", "config.yml"), `python:\n  interpreter: ${interpreter}\n`);
 
 			const result = await runSetupPython(cwd);
 
@@ -110,7 +110,7 @@ describe("omp setup python", () => {
 		},
 	);
 	it.skipIf(process.platform === "win32")("prefers the project venv over the PATH interpreter", async () => {
-		projectDir = TempDir.createSync("@omp-setup-python-");
+		projectDir = TempDir.createSync("@omsp-setup-python-");
 		const cwd = projectDir.path();
 		const interpreter = path.join(cwd, ".venv", "bin", "python");
 		await Bun.write(interpreter, "#!/bin/sh\nexit 0\n");
@@ -130,14 +130,14 @@ describe("omp setup python", () => {
 		}
 	});
 	it.skipIf(process.platform === "win32")("does not let the global probe bypass skip setup validation", async () => {
-		projectDir = TempDir.createSync("@omp-setup-python-");
+		projectDir = TempDir.createSync("@omsp-setup-python-");
 		const cwd = projectDir.path();
 		const interpreter = path.join(cwd, "configured-python");
 		await Bun.write(interpreter, "#!/bin/sh\nexit 23\n");
 		await fs.chmod(interpreter, 0o755);
 
-		const previousSkipCheck = process.env.PI_PYTHON_SKIP_CHECK;
-		process.env.PI_PYTHON_SKIP_CHECK = "1";
+		const previousSkipCheck = process.env.OMSP_PYTHON_SKIP_CHECK;
+		process.env.OMSP_PYTHON_SKIP_CHECK = "1";
 		try {
 			const result = await checkPythonSetup(cwd, interpreter);
 			expect(result).toMatchObject({
@@ -146,13 +146,13 @@ describe("omp setup python", () => {
 				usingManagedEnv: false,
 			});
 		} finally {
-			if (previousSkipCheck === undefined) delete process.env.PI_PYTHON_SKIP_CHECK;
-			else process.env.PI_PYTHON_SKIP_CHECK = previousSkipCheck;
+			if (previousSkipCheck === undefined) delete process.env.OMSP_PYTHON_SKIP_CHECK;
+			else process.env.OMSP_PYTHON_SKIP_CHECK = previousSkipCheck;
 		}
 	});
 });
 
-describe("omp setup without a component", () => {
+describe("omsp setup without a component", () => {
 	let projectDir: TempDir | undefined;
 
 	afterEach(async () => {
@@ -165,7 +165,7 @@ describe("omp setup without a component", () => {
 	// scripted `--json` health checks. It must now fail loudly on stderr.
 	for (const flags of [["--check"], ["--json"]]) {
 		it(`fails on stderr with a non-zero exit for ${["setup", ...flags].join(" ")}`, async () => {
-			projectDir = TempDir.createSync("@omp-setup-noarg-");
+			projectDir = TempDir.createSync("@omsp-setup-noarg-");
 			const result = await runSetup(projectDir.path(), ...flags);
 
 			expect(result.exitCode).not.toBe(0);

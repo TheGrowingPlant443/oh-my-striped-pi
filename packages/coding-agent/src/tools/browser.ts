@@ -1,9 +1,9 @@
-import { type } from "@oh-my-pi/omptype";
-import type { AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { isRecord, logger, untilAborted } from "@oh-my-pi/pi-utils";
+import { type } from "@oh-my-striped-pi/omptype";
+import type { AgentToolResult } from "@oh-my-striped-pi/pi-agent-core";
+import { isRecord, logger, untilAborted } from "@oh-my-striped-pi/pi-utils";
 import type { EvalPreludeContext, EvalPreludeDefinition } from "../eval/preludes";
 import type { ToolSession } from "../sdk";
-import { enforceInlineByteCap } from "@oh-my-pi/pi-tui/tools/streaming-output";
+import { enforceInlineByteCap } from "@oh-my-striped-pi/pi-tui/tools/streaming-output";
 import { resolveCmuxKind } from "./browser/cmux/rpc";
 import { describeRelayTargets, listRelayTargets, type RelayTarget, resolveSpawnArgs } from "./browser/attach";
 import {
@@ -24,7 +24,7 @@ import { resolveTernKind } from "./browser/tern/kind";
 import { isTernUnavailable } from "./browser/tern/wire";
 import type { AriaSnapshotOptions } from "./browser/aria/aria-snapshot";
 import type { ScreenshotResult } from "./browser/tab-protocol";
-import type { OutputMeta } from "@oh-my-pi/pi-tui/tools/output-meta";
+import type { OutputMeta } from "@oh-my-striped-pi/pi-tui/tools/output-meta";
 import {
 	type AcquireTabResult,
 	acquireTab,
@@ -44,7 +44,7 @@ import { renderTabCall } from "./browser/tab-call";
 import { resolveToCwd } from "./path-utils";
 import { renderCallChain, renderFunctionRun } from "./run-code";
 import { ToolAbortError, throwIfAborted } from "./tool-errors";
-import { ToolError } from "@oh-my-pi/pi-tui/tools/tool-errors";
+import { ToolError } from "@oh-my-striped-pi/pi-tui/tools/tool-errors";
 import { toolResult } from "./tool-result";
 import { clampTimeout } from "./tool-timeouts";
 
@@ -101,7 +101,7 @@ const appSchema = type({
 	"path?": type("string").describe("binary path to spawn"),
 	"cdp_url?": type("string").describe("existing cdp endpoint"),
 	"relay?": type("boolean").describe(
-		"true drives the user's own tabs via the omp browser relay; false skips a relay the settings enable",
+		"true drives the user's own tabs via the omsp browser relay; false skips a relay the settings enable",
 	),
 	"tern?": type("boolean").describe("inside Tern: true forces a Tern picture-in-picture, false opts out"),
 	"args?": type("string[]").describe("extra cli args"),
@@ -187,7 +187,7 @@ export function resolveBrowserKind(
 		return { kind: "spawned", path: exe, args };
 	}
 	const relayUrl = cfgBrowserRelayUrl.get(session.settings);
-	// Explicit app.relay wins over every setting; PI_BROWSER_RELAY stays the
+	// Explicit app.relay wins over every setting; OMSP_BROWSER_RELAY stays the
 	// final kill switch (a relay that is down would otherwise brick the tool).
 	if (app?.relay) {
 		const relayKind = resolveRelayKind({ settingEnabled: true, url: relayUrl }, env);
@@ -197,7 +197,7 @@ export function resolveBrowserKind(
 		const ternKind = resolveTernKind({ settingEnabled: true }, env);
 		if (!ternKind) {
 			throw new ToolError(
-				"app.tern:true requires running inside a Tern pane (TERN_PANE_SOCKET and TERN_PANE are not set) with PI_BROWSER_TERN not set to 0.",
+				"app.tern:true requires running inside a Tern pane (TERN_PANE_SOCKET and TERN_PANE are not set) with OMSP_BROWSER_TERN not set to 0.",
 			);
 		}
 		return ternKind;
@@ -259,7 +259,7 @@ export function createBrowserPrelude(session: ToolSession): EvalPreludeDefinitio
 	return createBrowserPreludeDefinition(session, {
 		invoke: (parameters: unknown, context: EvalPreludeContext) => invokeBrowser(session, parameters, context),
 		status: describeBrowserCall,
-		// The documentation promises omp's own browser for an open without `app`; while
+		// The documentation promises omsp's own browser for an open without `app`; while
 		// the relay takes that open, the prompt names where `app.relay: false` goes instead.
 		relayFallback:
 			resolveBrowserKind({ action: "open" }, session).kind === "relay"
@@ -423,7 +423,7 @@ async function openOnKind(
 	// Chrome's extension debugger API exposes no Security domain, so the relay cannot honor the override.
 	if (params.ignore_https_errors && kind.kind === "relay") {
 		throw new ToolError(
-			"ignore_https_errors is not supported through the Chrome relay: the extension debugger API does not expose the CDP Security domain. Pass app.relay:false to use omp's Chromium instead.",
+			"ignore_https_errors is not supported through the Chrome relay: the extension debugger API does not expose the CDP Security domain. Pass app.relay:false to use omsp's Chromium instead.",
 		);
 	}
 
@@ -583,7 +583,7 @@ async function listTargets(
 	const kind = resolveBrowserKind({ ...params, app: { ...params.app, target: params.app?.target ?? "" } }, session);
 	if (kind.kind !== "tern" && kind.kind !== "relay") {
 		throw new ToolError(
-			`No pages to adopt here (the browser would be ${describeKind(kind)}): targets exist only inside a Tern pane (its browser blocks) or with the omp relay (app.relay: true or the browser.relay setting).`,
+			`No pages to adopt here (the browser would be ${describeKind(kind)}): targets exist only inside a Tern pane (its browser blocks) or with the omsp relay (app.relay: true or the browser.relay setting).`,
 		);
 	}
 	details.browser = kind.kind;
@@ -742,7 +742,7 @@ function ternNotes(tab: TernTabSession): string[] {
 		notes.push(
 			adopted
 				? `Not on screen: the user is viewing another Tern tab or session. Block ${adopted.block} shows once they switch to the tab holding it; tell them where it is.`
-				: `Not on screen: the user hid pictures in picture (⌃⌥⌘P), or this Tern shows them only in the tab holding this omp pane (block ${tab.browser.kind.pane}); tell them where it is.`,
+				: `Not on screen: the user hid pictures in picture (⌃⌥⌘P), or this Tern shows them only in the tab holding this omsp pane (block ${tab.browser.kind.pane}); tell them where it is.`,
 		);
 	}
 	return notes;

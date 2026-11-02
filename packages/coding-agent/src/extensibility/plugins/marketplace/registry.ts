@@ -17,9 +17,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { getPluginsDir, isEnoent, logger, tryParseJson } from "@oh-my-pi/pi-utils";
+import { getPluginsDir, isEnoent, logger, tryParseJson } from "@oh-my-striped-pi/pi-utils";
 
-export { getMarketplacesRegistryPath } from "@oh-my-pi/pi-utils";
+export { getMarketplacesRegistryPath } from "@oh-my-striped-pi/pi-utils";
 
 import type {
 	InstalledPluginEntry,

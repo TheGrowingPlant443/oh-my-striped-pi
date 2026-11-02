@@ -1,7 +1,7 @@
-# @oh-my-pi/collab-web
+# @oh-my-striped-pi/collab-web
 
 Private/local live collaboration browser client and shared React renderers for
-self-contained omp HTML session exports. No public relay or viewer is selected
+self-contained omsp HTML session exports. No public relay or viewer is selected
 implicitly, and the browser entry has no hosted analytics or remote asset loader.
 
 ## Private/local collaboration
@@ -13,7 +13,7 @@ bun scripts/local-relay.ts --port 7466
 bun --hot index.html
 ```
 
-In an omp session, run `/collab ws://localhost:7466`. For browser links, configure
+In an omsp session, run `/collab ws://localhost:7466`. For browser links, configure
 `collab.webUrl` to the browser server's printed localhost URL before starting the
 room. Alternatively, configure `collab.relayUrl` to an operator-managed `wss://`
 relay and `collab.webUrl` to its private HTTPS browser deployment. If the browser
@@ -22,9 +22,9 @@ is derived only from that explicitly selected relay.
 
 `/collab view` creates read-only access; control links permit prompting,
 interrupting, agent commands, and answering host dialogs. `/join <link>` and
-`omp join <link>` join from another terminal; `/leave` leaves; `/collab stop`
-withdraws the hosted room. `omp collab list` exposes local metadata only;
-`omp collab link <instanceId|pid> [--view]` explicitly retrieves a capability link.
+`omsp join <link>` join from another terminal; `/leave` leaves; `/collab stop`
+withdraws the hosted room. `omsp collab list` exposes local metadata only;
+`omsp collab link <instanceId|pid> [--view]` explicitly retrieves a capability link.
 Do not log or publish room links: anyone holding one can decrypt the session.
 Bare room/key links are rejected because they do not identify a relay.
 
@@ -61,8 +61,8 @@ Markdown, highlighting, styles, and session data rather than loading remote scri
 ## Retained source graph
 
 - `src/export-standalone.ts` registers the viewer's browser components.
-- `src/tool-render/` provides tool cards and the `<omp-tool-view>` custom element.
-- `src/trace-render/` provides `<omp-session-trace>` using the local stats viewer.
+- `src/tool-render/` provides tool cards and the `<omsp-tool-view>` custom element.
+- `src/trace-render/` provides `<omsp-session-trace>` using the local stats viewer.
 - `src/components/transcript/Markdown.tsx`, `math.ts`, and `src/lib/format.ts`
   provide shared Markdown, math, and formatting support.
 

@@ -106,6 +106,8 @@
         in
         {
           inherit omsp;
+          # Source SDK for hosts that run omsp from source (OMBP).
+          sdk = omsp.sdk;
           default = omsp;
         }
       );
